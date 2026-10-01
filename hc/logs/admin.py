@@ -54,7 +54,5 @@ class RecordsAdmin(ModelAdmin[Record]):
     def has_add_permission(self, request: HttpRequest) -> bool:
         return False
 
-    def has_change_permission(
-        self, request: HttpRequest, obj: Record | None = None
-    ) -> bool:
+    def has_change_permission(self, request: HttpRequest, obj: Record | None = None) -> bool:
         return False

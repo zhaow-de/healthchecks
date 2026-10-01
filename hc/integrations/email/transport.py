@@ -82,7 +82,7 @@ class Email(Transport):
 
         try:
             emails.alert(self.channel.email.value, ctx, headers, attachment)
-        except (SMTPServerDisconnected, SMTPDataError, ConnectionRefusedError):
+        except SMTPServerDisconnected, SMTPDataError, ConnectionRefusedError:
             logger.exception("Exception while sending email")
             raise TransportError("SMTP connection error")
 

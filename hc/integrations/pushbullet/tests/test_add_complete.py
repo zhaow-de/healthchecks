@@ -49,9 +49,7 @@ class AddPushbulletTestCase(BaseTestCase):
             mock_post.return_value.content = sample
             with patch("hc.integrations.pushbullet.views.logger") as logger:
                 r = self.client.get(url, follow=True)
-                self.assertContains(
-                    r, "Received an unexpected response from Pushbullet."
-                )
+                self.assertContains(r, "Received an unexpected response from Pushbullet.")
                 self.assertTrue(logger.warning.called)
 
     def test_it_avoids_csrf(self) -> None:

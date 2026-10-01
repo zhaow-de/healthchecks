@@ -19,9 +19,7 @@ from hc.api.models import Check
 from hc.lib.html import html2text
 from hc.lib.string import match_keywords
 
-RE_UUID = re.compile(
-    r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-4[a-fA-F0-9]{3}-[8|9|aA|bB][a-fA-F0-9]{3}-[a-fA-F0-9]{12}$"
-)
+RE_UUID = re.compile(r"^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-4[a-fA-F0-9]{3}-[8|9|aA|bB][a-fA-F0-9]{3}-[a-fA-F0-9]{12}$")
 
 RE_PING_KEY_SLUG = re.compile(r"^[a-zA-Z0-9_-]{22}\+[a-z0-9-_]+$")
 
@@ -124,9 +122,7 @@ class PingHandler:
         envelope.rcpt_tos.append(address)
         return "250 OK"
 
-    async def handle_DATA(
-        self, server: SMTP, session: Session, envelope: Envelope
-    ) -> str:
+    async def handle_DATA(self, server: SMTP, session: Session, envelope: Envelope) -> str:
         assert session.peer
         remote_addr = session.peer[0]
         mailfrom = envelope.mail_from
@@ -144,12 +140,8 @@ class Command(BaseCommand):
     help = "Listen for ping emails"
 
     def add_arguments(self, parser: ArgumentParser) -> None:
-        parser.add_argument(
-            "--host", help="ip address to listen on, default 0.0.0.0", default="0.0.0.0"
-        )
-        parser.add_argument(
-            "--port", help="port to listen on, default 25", type=int, default=25
-        )
+        parser.add_argument("--host", help="ip address to listen on, default 0.0.0.0", default="0.0.0.0")
+        parser.add_argument("--port", help="port to listen on, default 25", type=int, default=25)
 
     def handle(self, host: str, port: int, **options: Any) -> None:
         handler = PingHandler(self.stdout)

@@ -69,9 +69,7 @@ class CustomHeaderBackend(BasicBackend):
 
     """
 
-    def authenticate(
-        self, request: HttpRequest, remote_user_email: str | None = None
-    ) -> User | None:
+    def authenticate(self, request: HttpRequest, remote_user_email: str | None = None) -> User | None:
         """
         The email address passed as remote_user_email is considered trusted.
         Return the User object with the given email address. Create a new User

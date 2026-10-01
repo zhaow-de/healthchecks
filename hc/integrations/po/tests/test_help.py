@@ -5,9 +5,7 @@ from django.test.utils import override_settings
 from hc.test import BaseTestCase
 
 
-@override_settings(
-    PUSHOVER_API_TOKEN="token", PUSHOVER_SUBSCRIPTION_URL="http://example.org"
-)
+@override_settings(PUSHOVER_API_TOKEN="token", PUSHOVER_SUBSCRIPTION_URL="http://example.org")
 class AddPushoverHelpTestCase(BaseTestCase):
     url = "/integrations/add_pushover/"
 

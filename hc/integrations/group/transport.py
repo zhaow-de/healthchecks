@@ -16,6 +16,4 @@ class Group(Transport):
             if error and error != "no-op":
                 error_count += 1
         if error_count:
-            raise TransportError(
-                f"{error_count} out of {len(channels)} notifications failed"
-            )
+            raise TransportError(f"{error_count} out of {len(channels)} notifications failed")

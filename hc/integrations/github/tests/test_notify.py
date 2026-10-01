@@ -37,9 +37,7 @@ class NotifyGitHubTestCase(BaseTestCase):
 
         self.channel = Channel(project=self.project)
         self.channel.kind = "github"
-        self.channel.value = json.dumps(
-            {"installation_id": 123, "repo": "alice/foo", "labels": ["foo", "bar"]}
-        )
+        self.channel.value = json.dumps({"installation_id": 123, "repo": "alice/foo", "labels": ["foo", "bar"]})
         self.channel.save()
         self.channel.checks.add(self.check)
 

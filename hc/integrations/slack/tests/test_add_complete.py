@@ -74,9 +74,7 @@ class AddSlackCompleteTestCase(BaseTestCase):
 
     @patch("hc.integrations.slack.views.logger")
     @patch("hc.integrations.slack.views.curl.post", autospec=True)
-    def test_it_handles_unexpected_oauth_response(
-        self, mock_post: Mock, logger: Mock
-    ) -> None:
+    def test_it_handles_unexpected_oauth_response(self, mock_post: Mock, logger: Mock) -> None:
         session = self.client.session
         session["add_slack"] = ("foo", str(self.project.code))
         session.save()

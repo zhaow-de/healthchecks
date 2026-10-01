@@ -187,9 +187,7 @@ class Command(BaseCommand):
             db["OPTIONS"]["application_name"] = "sendalerts"
 
         if pool:
-            self.stdout.write(
-                "WARNING: The --pool argument is not supported any more and will be ignored.\n"
-            )
+            self.stdout.write("WARNING: The --pool argument is not supported any more and will be ignored.\n")
 
         self.seats = BoundedSemaphore(num_workers)
         self.executor = ThreadPoolExecutor(max_workers=num_workers)

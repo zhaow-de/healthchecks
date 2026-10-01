@@ -12,9 +12,7 @@ from hc.test import BaseTestCase
 
 
 class NotifyPdTestCase(BaseTestCase):
-    def _setup_data(
-        self, value: str, status: str = "down", email_verified: bool = True
-    ) -> None:
+    def _setup_data(self, value: str, status: str = "down", email_verified: bool = True) -> None:
         self.check = Check(project=self.project)
         self.check.name = "Foo"
         self.check.desc = "Description goes here"
@@ -71,9 +69,7 @@ class NotifyPdTestCase(BaseTestCase):
         self.channel.notify(self.flip)
 
         payload = mock_post.call_args.kwargs["json"]
-        self.assertEqual(
-            payload["description"], "Foo is DOWN (received a failure signal)."
-        )
+        self.assertEqual(payload["description"], "Foo is DOWN (received a failure signal).")
 
     @patch("hc.api.transports.curl.request", autospec=True)
     def test_it_shows_cron_schedule_and_tz(self, mock_post: Mock) -> None:

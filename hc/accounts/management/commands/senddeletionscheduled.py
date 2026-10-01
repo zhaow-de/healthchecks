@@ -26,9 +26,7 @@ class Command(BaseCommand):
         q = q.exclude(last_login=None)
         return q.order_by("email")
 
-    def send_channel_notifications(
-        self, profile: Profile, skip_emails: list[str]
-    ) -> None:
+    def send_channel_notifications(self, profile: Profile, skip_emails: list[str]) -> None:
         # Sending deletion notices to configured notification channels is
         # a last ditch effort: only do this if 14 or fewer days are left.
         assert profile.deletion_scheduled_date

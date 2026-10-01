@@ -52,9 +52,7 @@ class AddTelegramTestCase(BaseTestCase):
         self.assertEqual(c.project, self.project)
 
     def test_it_saves_thread_id(self) -> None:
-        payload = signing.dumps(
-            {"id": 123, "type": "group", "name": "My Group", "thread_id": 456}
-        )
+        payload = signing.dumps({"id": 123, "type": "group", "name": "My Group", "thread_id": 456})
 
         self.client.login(username="alice@example.org", password="password")
         form = {"project": str(self.project.code)}
@@ -130,9 +128,7 @@ class AddTelegramTestCase(BaseTestCase):
         samples.append({"message": {"chat": {"id": 123, "type": "group"}}})
 
         # bad chat type
-        samples.append(
-            {"message": {"chat": {"id": 123, "type": "invalid"}, "text": "/start"}}
-        )
+        samples.append({"message": {"chat": {"id": 123, "type": "invalid"}, "text": "/start"}})
 
         # bad message_thread_id
         samples.append(

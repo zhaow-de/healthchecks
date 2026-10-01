@@ -15,9 +15,7 @@ class EditSmsTestCase(BaseTestCase):
         self.check = Check.objects.create(project=self.project)
 
         self.channel = Channel(project=self.project, kind="sms")
-        self.channel.value = json.dumps(
-            {"value": "+12345678", "up": True, "down": True}
-        )
+        self.channel.value = json.dumps({"value": "+12345678", "up": True, "down": True})
         self.channel.save()
 
         self.url = f"/integrations/{self.channel.code}/edit/"

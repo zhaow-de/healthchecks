@@ -31,9 +31,7 @@ class Zulip(HttpTransport):
 
         topic = self.channel.zulip.topic
         if not topic:
-            topic = self.tmpl(
-                "zulip_topic.html", check=flip.owner, status=flip.new_status
-            )
+            topic = self.tmpl("zulip_topic.html", check=flip.owner, status=flip.new_status)
 
         url = self.channel.zulip.site + "/api/v1/messages"
         auth = (self.channel.zulip.bot_email, self.channel.zulip.api_key)

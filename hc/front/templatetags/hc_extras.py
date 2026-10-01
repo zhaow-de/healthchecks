@@ -257,9 +257,7 @@ def guess_schedule(check: Check) -> str | None:
     return None
 
 
-FORMATTED_PING_ENDPOINT_TMPL = (
-    f"""<span class="base">{settings.PING_ENDPOINT}</span>{{}}"""
-)
+FORMATTED_PING_ENDPOINT_TMPL = f"""<span class="base">{settings.PING_ENDPOINT}</span>{{}}"""
 
 
 @register.filter

@@ -12,9 +12,7 @@ from hc.test import BaseTestCase
 
 
 class NotifyTestCase(BaseTestCase):
-    def _setup_data(
-        self, kind: str, value: str, status: str = "down", email_verified: bool = True
-    ) -> None:
+    def _setup_data(self, kind: str, value: str, status: str = "down", email_verified: bool = True) -> None:
         self.check = Check(project=self.project)
         # Transport classes should use flip.new_status,
         # so the status "paused" should not appear anywhere

@@ -127,12 +127,8 @@ class PingDetailsTestCase(BaseTestCase):
 
     def test_it_accepts_n(self) -> None:
         # remote_addr, scheme, method, ua, body, action, rid:
-        self.check.ping(
-            "1.2.3.4", "http", "post", "tester", b"foo-123", "success", None
-        )
-        self.check.ping(
-            "1.2.3.4", "http", "post", "tester", b"bar-456", "success", None
-        )
+        self.check.ping("1.2.3.4", "http", "post", "tester", b"foo-123", "success", None)
+        self.check.ping("1.2.3.4", "http", "post", "tester", b"bar-456", "success", None)
 
         self.client.login(username="alice@example.org", password="password")
 
@@ -169,9 +165,7 @@ class PingDetailsTestCase(BaseTestCase):
         self.assertContains(r, "(exit status 0)", status_code=200)
 
     def test_it_decodes_plaintext_email_body(self) -> None:
-        Ping.objects.create(
-            owner=self.check, n=1, scheme="email", body_raw=PLAINTEXT_EMAIL
-        )
+        Ping.objects.create(owner=self.check, n=1, scheme="email", body_raw=PLAINTEXT_EMAIL)
 
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.url)
@@ -184,9 +178,7 @@ class PingDetailsTestCase(BaseTestCase):
         self.assertContains(r, "hello world")
 
     def test_it_handles_utf8_encoded_plaintext(self) -> None:
-        Ping.objects.create(
-            owner=self.check, n=1, scheme="email", body_raw=PLAINTEXT_UTF8_EMAIL
-        )
+        Ping.objects.create(owner=self.check, n=1, scheme="email", body_raw=PLAINTEXT_UTF8_EMAIL)
 
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.url)
@@ -194,9 +186,7 @@ class PingDetailsTestCase(BaseTestCase):
         self.assertContains(r, "<pre>glāžšķūņu rūķīši")
 
     def test_it_handles_bad_base64_in_email_body(self) -> None:
-        Ping.objects.create(
-            owner=self.check, n=1, scheme="email", body_raw=BAD_BASE64_EMAIL
-        )
+        Ping.objects.create(owner=self.check, n=1, scheme="email", body_raw=BAD_BASE64_EMAIL)
 
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.url)
@@ -249,9 +239,7 @@ class PingDetailsTestCase(BaseTestCase):
 
     @override_settings(S3_BUCKET="test-bucket")
     @patch("hc.api.models.get_object")
-    def test_it_decodes_plaintext_email_from_object_storage(
-        self, get_object: Mock
-    ) -> None:
+    def test_it_decodes_plaintext_email_from_object_storage(self, get_object: Mock) -> None:
         Ping.objects.create(owner=self.check, n=1, scheme="email", object_size=1000)
         get_object.return_value = PLAINTEXT_EMAIL
 

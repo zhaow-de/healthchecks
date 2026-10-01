@@ -34,9 +34,7 @@ class GetCheckTestCase(BaseTestCase):
         self.c1 = Channel.objects.create(project=self.project)
         self.a1.channel_set.add(self.c1)
 
-    def get(
-        self, code: UUID | str, api_key: str = "X" * 32, v: int = 1
-    ) -> TestHttpResponse:
+    def get(self, code: UUID | str, api_key: str = "X" * 32, v: int = 1) -> TestHttpResponse:
         url = f"/api/v{v}/checks/{code}"
         return self.client.get(url, HTTP_X_API_KEY=api_key)
 
@@ -71,12 +69,8 @@ class GetCheckTestCase(BaseTestCase):
         self.assertFalse(doc["filter_body"])
         self.assertFalse(doc["filter_http_body"])
         self.assertFalse(doc["filter_default_fail"])
-        self.assertEqual(
-            doc["badge_url"], f"http://testserver/b/2/{self.a1.badge_key}.svg"
-        )
-        self.assertEqual(
-            doc["update_url"], f"http://testserver/api/v1/checks/{self.a1.code}"
-        )
+        self.assertEqual(doc["badge_url"], f"http://testserver/b/2/{self.a1.badge_key}.svg")
+        self.assertEqual(doc["update_url"], f"http://testserver/api/v1/checks/{self.a1.code}")
 
     def test_it_handles_invalid_uuid(self) -> None:
         r = self.get("not-an-uuid")

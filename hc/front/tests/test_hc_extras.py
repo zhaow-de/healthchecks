@@ -36,9 +36,7 @@ class HcExtrasTestCase(TestCase):
 
 
 class AbsoluteSiteLogoUrlTestCase(TestCase):
-    def _test(
-        self, site_root: str, site_logo_url: str | None, expected_result: str
-    ) -> None:
+    def _test(self, site_root: str, site_logo_url: str | None, expected_result: str) -> None:
         subpath = urlparse(site_root).path
         with override_settings(
             SITE_ROOT=site_root,

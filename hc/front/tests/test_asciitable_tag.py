@@ -35,9 +35,7 @@ class AsciiTableTestCase(BaseTestCase):
             t.render(Context())
 
     def test_it_handles_cell_without_row(self) -> None:
-        t = Template(
-            """{% load asciitable %}{% table %}{% cell %}Text{% endcell %}{% endtable %}"""
-        )
+        t = Template("""{% load asciitable %}{% table %}{% cell %}Text{% endcell %}{% endtable %}""")
 
         with self.assertRaises(TemplateSyntaxError):
             t.render(Context())

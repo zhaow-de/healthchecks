@@ -119,14 +119,14 @@ class Spec(BaseModel):
                 # Test if cronsim accepts it and can calculate the next datetime
                 it = CronSim(v, datetime(2000, 1, 1))
                 next(it)
-            except (CronSimError, StopIteration):
+            except CronSimError, StopIteration:
                 raise PydanticCustomError("cron_syntax", "not a valid cron expression")
         else:
             try:
                 # Test if oncalendar accepts it, and can calculate the next datetime
                 oncalendar_it = OnCalendar(v, datetime(2000, 1, 1, tzinfo=timezone.utc))
                 next(oncalendar_it)
-            except (OnCalendarError, StopIteration):
+            except OnCalendarError, StopIteration:
                 raise PydanticCustomError("cron_syntax", "not a valid expression")
 
         return v
@@ -726,9 +726,7 @@ def _shields_response(label: str, status: str) -> JsonResponse:
 
 @never_cache
 @cors("GET")
-def badge(
-    request: HttpRequest, badge_key: str, signature: str, tag: str, fmt: str
-) -> HttpResponse:
+def badge(request: HttpRequest, badge_key: str, signature: str, tag: str, fmt: str) -> HttpResponse:
     if fmt not in ("svg", "json", "shields"):
         return HttpResponseNotFound()
 
@@ -770,9 +768,7 @@ def badge(
         return _shields_response(label, status)
 
     if fmt == "json":
-        return JsonResponse(
-            {"status": status, "total": total, "grace": grace, "down": down}
-        )
+        return JsonResponse({"status": status, "total": total, "grace": grace, "down": down})
 
     svg = get_badge_svg(label, status)
     return HttpResponse(svg, content_type="image/svg+xml")
@@ -780,9 +776,7 @@ def badge(
 
 @never_cache
 @cors("GET")
-def check_badge(
-    request: HttpRequest, states: int, badge_key: UUID, fmt: str
-) -> HttpResponse:
+def check_badge(request: HttpRequest, states: int, badge_key: UUID, fmt: str) -> HttpResponse:
     if fmt not in ("svg", "json", "shields"):
         return HttpResponseNotFound()
 

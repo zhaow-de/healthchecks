@@ -111,9 +111,7 @@ class AddGitHubSelectTestCase(BaseTestCase):
 
         client.get_repos.return_value = {}
         r = self.client.get(self.url + "?state=test-state&code=test-code")
-        self.assertRedirects(
-            r, "http://example.org/installations/new", fetch_redirect_response=False
-        )
+        self.assertRedirects(r, "http://example.org/installations/new", fetch_redirect_response=False)
 
     def test_it_handles_access_denied(self) -> None:
         self.client.login(username="alice@example.org", password="password")
@@ -123,9 +121,7 @@ class AddGitHubSelectTestCase(BaseTestCase):
         session["add_github_state"] = "test-state"
         session.save()
 
-        r = self.client.get(
-            self.url + "?error=access_denied&state=test-state", follow=True
-        )
+        r = self.client.get(self.url + "?error=access_denied&state=test-state", follow=True)
         self.assertRedirects(r, self.channels_url)
 
         self.assertRedirects(r, self.channels_url)

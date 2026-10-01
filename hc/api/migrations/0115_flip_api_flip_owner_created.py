@@ -11,8 +11,6 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddIndex(
             model_name="flip",
-            index=models.Index(
-                fields=["owner", "created"], name="api_flip_owner_created"
-            ),
+            index=models.Index(fields=["owner", "created"], name="api_flip_owner_created"),
         ),
     ]

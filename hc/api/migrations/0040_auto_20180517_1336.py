@@ -12,7 +12,5 @@ class Migration(migrations.Migration):
             name="last_ping_was_fail",
             field=models.NullBooleanField(default=False),
         ),
-        migrations.AddField(
-            model_name="ping", name="fail", field=models.NullBooleanField(default=False)
-        ),
+        migrations.AddField(model_name="ping", name="fail", field=models.NullBooleanField(default=False)),
     ]

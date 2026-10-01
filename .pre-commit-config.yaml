@@ -17,9 +17,7 @@ exclude: |
       stuff/icons_icomoon_project\.json
   )$
 
-# Hooks that parse Python build their environments with the project's interpreter, 3.14 as
-# `requires-python` pins it, and not with whatever Python pre-commit itself was installed with,
-# which may reject syntax the project is allowed to use.
+# Not the Python pre-commit was installed with, which may predate 3.14 and reject `except A, B:`.
 default_language_version:
   python: python3.14
 
@@ -59,6 +57,24 @@ repos:
         args: ["--fix=lf"]
       - id: trailing-whitespace
         stages: [pre-commit]
+
+  # Local, not the upstream mirror, so the one ruff is the one uv.lock pins and dependabot's `uv`
+  # ecosystem bumps; the mirror would pin it a second time, and the two would drift.
+  # `--force-exclude` applies ruff.toml's `exclude` to the paths pre-commit names as well.
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: uv run ruff check --force-exclude --fix
+        language: system
+        types_or: [python, pyi, jupyter]
+        require_serial: true
+      - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format --force-exclude
+        language: system
+        types_or: [python, pyi, jupyter]
+        require_serial: true
 
   - repo: https://github.com/adrienverge/yamllint
     rev: v1.38.0

@@ -34,9 +34,7 @@ class UnsubscribeTestCase(BaseTestCase):
 
     def test_fresh_signature_does_not_autosubmit(self) -> None:
         r = self.client.get(self.url)
-        self.assertContains(
-            r, "Please press the button below to unsubscribe", status_code=200
-        )
+        self.assertContains(r, "Please press the button below to unsubscribe", status_code=200)
         self.assertNotContains(r, "submit()", status_code=200)
 
     def test_aged_signature_does_autosubmit(self) -> None:
@@ -48,9 +46,7 @@ class UnsubscribeTestCase(BaseTestCase):
         url = f"/integrations/{self.channel.code}/unsub/{signed_token}/"
 
         r = self.client.get(url)
-        self.assertContains(
-            r, "Please press the button below to unsubscribe", status_code=200
-        )
+        self.assertContains(r, "Please press the button below to unsubscribe", status_code=200)
         self.assertContains(r, "submit()", status_code=200)
 
     def test_it_checks_signature(self) -> None:

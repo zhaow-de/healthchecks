@@ -25,7 +25,7 @@ class EmailThread(Thread):
                 self.message.send()
                 # No exception--great! Return from the retry loop
                 return
-            except (SMTPServerDisconnected, SMTPDataError):
+            except SMTPServerDisconnected, SMTPDataError:
                 if attempt + 1 == self.MAX_TRIES:
                     # This was the last attempt and it failed:
                     # re-raise the exception
@@ -69,10 +69,7 @@ def make_message(
 
 
 def send(message: Message, block: bool = False) -> None:
-    assert settings.MAILERS, (
-        "No SMTP configuration,"
-        " see https://github.com/healthchecks/healthchecks#sending-emails"
-    )
+    assert settings.MAILERS, "No SMTP configuration, see https://github.com/healthchecks/healthchecks#sending-emails"
 
     t = EmailThread(message)
     if block or hasattr(settings, "BLOCKING_EMAILS"):

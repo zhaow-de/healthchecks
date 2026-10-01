@@ -14,9 +14,7 @@ class AddTrelloTestCase(BaseTestCase):
 
     @patch("hc.integrations.trello.views.curl.get", autospec=True)
     def test_it_works(self, mock_get: Mock) -> None:
-        mock_get.return_value.content = json.dumps(
-            [{"id": "1", "name": "My Board", "lists": [{"id": "2", "name": "Alerts"}]}]
-        )
+        mock_get.return_value.content = json.dumps([{"id": "1", "name": "My Board", "lists": [{"id": "2", "name": "Alerts"}]}])
 
         self.client.login(username="alice@example.org", password="password")
         r = self.client.post(self.url)

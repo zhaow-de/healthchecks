@@ -11,15 +11,11 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="channel",
             name="project",
-            field=models.ForeignKey(
-                on_delete=django.db.models.deletion.CASCADE, to="accounts.Project"
-            ),
+            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to="accounts.Project"),
         ),
         migrations.AlterField(
             model_name="check",
             name="project",
-            field=models.ForeignKey(
-                on_delete=django.db.models.deletion.CASCADE, to="accounts.Project"
-            ),
+            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to="accounts.Project"),
         ),
     ]

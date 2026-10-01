@@ -21,6 +21,7 @@ CLAUDE.md
 .vscode
 .pre-commit-config.yaml
 .yamllint.yaml
+ruff.toml
 scripts
 tests
 

@@ -16,9 +16,7 @@ class ApiAdminTestCase(BaseTestCase):
     def test_it_shows_channel_list_with_pushbullet(self) -> None:
         self.client.login(username="alice@example.org", password="password")
 
-        Channel.objects.create(
-            project=self.project, kind="pushbullet", value="test-token"
-        )
+        Channel.objects.create(project=self.project, kind="pushbullet", value="test-token")
 
         r = self.client.get("/admin/api/channel/")
         self.assertContains(r, '<span class="ic">pushbullet</span>')

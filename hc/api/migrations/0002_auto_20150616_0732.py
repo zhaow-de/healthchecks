@@ -12,9 +12,7 @@ class Migration(migrations.Migration):
             name="alert_after",
             field=models.DateTimeField(null=True, blank=True),
         ),
-        migrations.AddField(
-            model_name="check", name="enabled", field=models.BooleanField(default=True)
-        ),
+        migrations.AddField(model_name="check", name="enabled", field=models.BooleanField(default=True)),
         migrations.AddField(
             model_name="check",
             name="status",

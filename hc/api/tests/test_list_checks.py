@@ -114,9 +114,7 @@ class ListChecksTestCase(BaseTestCase):
         self.assertEqual(check["tags"], "a2-tag")
 
     def test_it_filters_with_multiple_tags_param(self) -> None:
-        r = self.client.get(
-            "/api/v1/checks/?tag=a1-tag&tag=a1-additional-tag", HTTP_X_API_KEY="X" * 32
-        )
+        r = self.client.get("/api/v1/checks/?tag=a1-tag&tag=a1-additional-tag", HTTP_X_API_KEY="X" * 32)
         self.assertEqual(r.status_code, 200)
 
         doc = r.json()

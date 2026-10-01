@@ -41,9 +41,7 @@ class Migration(migrations.Migration):
                 ("checks", models.ManyToManyField(to="api.Check")),
                 (
                     "user",
-                    models.ForeignKey(
-                        to=settings.AUTH_USER_MODEL, on_delete=models.CASCADE
-                    ),
+                    models.ForeignKey(to=settings.AUTH_USER_MODEL, on_delete=models.CASCADE),
                 ),
             ],
         )

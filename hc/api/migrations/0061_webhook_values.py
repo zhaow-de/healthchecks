@@ -58,6 +58,4 @@ def normalize_webhook_values(apps: Apps, schema_editor: Any) -> None:
 class Migration(migrations.Migration):
     dependencies = [("api", "0060_tokenbucket")]
 
-    operations = [
-        migrations.RunPython(normalize_webhook_values, migrations.RunPython.noop)
-    ]
+    operations = [migrations.RunPython(normalize_webhook_values, migrations.RunPython.noop)]

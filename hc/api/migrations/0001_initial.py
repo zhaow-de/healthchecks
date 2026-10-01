@@ -24,9 +24,7 @@ class Migration(migrations.Migration):
                 ("last_ping", models.DateTimeField(null=True, blank=True)),
                 (
                     "user",
-                    models.ForeignKey(
-                        to=settings.AUTH_USER_MODEL, on_delete=models.CASCADE
-                    ),
+                    models.ForeignKey(to=settings.AUTH_USER_MODEL, on_delete=models.CASCADE),
                 ),
             ],
         )

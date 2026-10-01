@@ -82,9 +82,7 @@ To: foo@example.com
         self.assertEqual(r.text, "OK")
 
         self.channel.refresh_from_db()
-        self.assertEqual(
-            self.channel.last_error, "Delivery failed (SMTP status code: 5.0.0)"
-        )
+        self.assertEqual(self.channel.last_error, "Delivery failed (SMTP status code: 5.0.0)")
         self.assertTrue(self.channel.disabled)
 
     def test_it_handles_transient_notification_bounce(self) -> None:
@@ -96,18 +94,14 @@ To: foo@example.com
         self.assertEqual(self.n.error, "Delivery failed (SMTP status code: 4.0.0)")
 
         self.channel.refresh_from_db()
-        self.assertEqual(
-            self.channel.last_error, "Delivery failed (SMTP status code: 4.0.0)"
-        )
+        self.assertEqual(self.channel.last_error, "Delivery failed (SMTP status code: 4.0.0)")
         self.assertFalse(self.channel.disabled)
 
     def test_it_categorizes_5_4_4_as_transient(self) -> None:
         self.post(status="5.4.4")
 
         self.channel.refresh_from_db()
-        self.assertEqual(
-            self.channel.last_error, "Delivery failed (SMTP status code: 5.4.4)"
-        )
+        self.assertEqual(self.channel.last_error, "Delivery failed (SMTP status code: 5.4.4)")
         # 5.4.4 ("Unable to route") can be caused by DNS problems on our
         # side and so should not be treated as permanent:
         self.assertFalse(self.channel.disabled)
@@ -167,16 +161,12 @@ To: foo@example.com
         self.assertEqual(r.text, "OK (user not found)")
 
     def test_it_logs_diagnostic_code(self) -> None:
-        diagnostic_code = (
-            "Diagnostic-Code: smtp; 451 4.0.0 No usable MXs, last err: try again later"
-        )
+        diagnostic_code = "Diagnostic-Code: smtp; 451 4.0.0 No usable MXs, last err: try again later"
 
         r = self.post(status="4.0.0", diagnostic_code=diagnostic_code)
         self.assertEqual(r.status_code, 200)
 
-        expected = (
-            "Delivery failed (451 4.0.0 No usable MXs, last err: try again later)"
-        )
+        expected = "Delivery failed (451 4.0.0 No usable MXs, last err: try again later)"
 
         self.n.refresh_from_db()
         self.assertEqual(self.n.error, expected)

@@ -20,9 +20,7 @@ class ResumeTestCase(BaseTestCase):
         self.url = f"/api/v1/checks/{self.check.code}/resume"
 
     def test_it_works(self) -> None:
-        r = self.csrf_client.post(
-            self.url, "", content_type="application/json", HTTP_X_API_KEY="X" * 32
-        )
+        r = self.csrf_client.post(self.url, "", content_type="application/json", HTTP_X_API_KEY="X" * 32)
 
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r["Access-Control-Allow-Origin"], "*")
@@ -43,9 +41,7 @@ class ResumeTestCase(BaseTestCase):
         self.check.status = "up"
         self.check.save()
 
-        r = self.csrf_client.post(
-            self.url, "", content_type="application/json", HTTP_X_API_KEY="X" * 32
-        )
+        r = self.csrf_client.post(self.url, "", content_type="application/json", HTTP_X_API_KEY="X" * 32)
 
         self.assertEqual(r.status_code, 409)
 
@@ -69,31 +65,23 @@ class ResumeTestCase(BaseTestCase):
     def test_it_validates_ownership(self) -> None:
         check = Check.objects.create(project=self.bobs_project, status="up")
         url = f"/api/v1/checks/{check.code}/resume"
-        r = self.client.post(
-            url, "", content_type="application/json", HTTP_X_API_KEY="X" * 32
-        )
+        r = self.client.post(url, "", content_type="application/json", HTTP_X_API_KEY="X" * 32)
 
         self.assertEqual(r.status_code, 403)
 
     def test_it_validates_uuid(self) -> None:
         url = "/api/v1/checks/not-uuid/resume"
-        r = self.client.post(
-            url, "", content_type="application/json", HTTP_X_API_KEY="X" * 32
-        )
+        r = self.client.post(url, "", content_type="application/json", HTTP_X_API_KEY="X" * 32)
 
         self.assertEqual(r.status_code, 404)
 
     def test_it_handles_missing_check(self) -> None:
         url = "/api/v1/checks/07c2f548-9850-4b27-af5d-6c9dc157ec02/resume"
-        r = self.client.post(
-            url, "", content_type="application/json", HTTP_X_API_KEY="X" * 32
-        )
+        r = self.client.post(url, "", content_type="application/json", HTTP_X_API_KEY="X" * 32)
 
         self.assertEqual(r.status_code, 404)
 
     def test_it_rejects_non_dict_post_body(self) -> None:
         r = self.csrf_client.post(self.url, "123", content_type="application/json")
         self.assertEqual(r.status_code, 400)
-        self.assertEqual(
-            r.json()["error"], "json validation error: value is not an object"
-        )
+        self.assertEqual(r.json()["error"], "json validation error: value is not an object")

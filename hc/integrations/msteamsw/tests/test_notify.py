@@ -64,8 +64,7 @@ class NotifyMsTeamsTestCase(BaseTestCase):
         heading = card["body"][0]
         self.assertEqual(
             heading["text"],
-            "🔴 “Foo” is DOWN (success signal did not"
-            " arrive on time, grace time passed).",
+            "🔴 “Foo” is DOWN (success signal did not arrive on time, grace time passed).",
         )
 
         facts = self.facts(payload)

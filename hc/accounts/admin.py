@@ -157,9 +157,7 @@ class ProfileAdmin(ModelAdmin[Profile]):
         # Use Func() instead of Count() here because Count() would
         # also add a GROUP BY clause.
         subquery = (
-            Check.objects.filter(project__owner=OuterRef("user_id"))
-            .annotate(count=Func("id", function="COUNT"))
-            .values("count")
+            Check.objects.filter(project__owner=OuterRef("user_id")).annotate(count=Func("id", function="COUNT")).values("count")
         )
         qs = qs.annotate(num_checks=Subquery(subquery))
 
@@ -319,9 +317,7 @@ class HcUserAdmin(UserAdmin[User]):
 
         return qs
 
-    def last_active(
-        self, user: WithAnnotations[User, UserAnnotations]
-    ) -> datetime | None:
+    def last_active(self, user: WithAnnotations[User, UserAnnotations]) -> datetime | None:
         return user.last_active_date
 
     def usage(self, user: WithAnnotations[User, UserAnnotations]) -> str:

@@ -74,9 +74,7 @@ class ProfileModelTestCase(BaseTestCase):
         self.assertEqual(message.subject, "Monthly Report")
 
         # The summary line
-        self.assertEmailContainsHtml(
-            "In December, <strong>1 check</strong> had <strong>1 downtime event</strong>."
-        )
+        self.assertEmailContainsHtml("In December, <strong>1 check</strong> had <strong>1 downtime event</strong>.")
         self.assertEmailContainsText("In December, 1 check had 1 downtime event.")
 
         # Note, assertEmailContains tests if the fragment appears in
@@ -116,9 +114,7 @@ class ProfileModelTestCase(BaseTestCase):
         self.assertEmailContainsHtml(
             "Last week (January 6 to January 12), <strong>1 check</strong> had <strong>1 downtime event</strong>."
         )
-        self.assertEmailContainsText(
-            "Last week (January 6 to January 12), 1 check had 1 downtime event."
-        )
+        self.assertEmailContainsText("Last week (January 6 to January 12), 1 check had 1 downtime event.")
 
         email = mail.outbox[0]
         self.assertEqual(email.subject, "Weekly Report")
@@ -132,12 +128,8 @@ class ProfileModelTestCase(BaseTestCase):
         self.profile.send_report()
 
         # The summary line
-        self.assertEmailContainsHtml(
-            "Yesterday (January 12), <strong>1 check</strong> had <strong>1 downtime event</strong>."
-        )
-        self.assertEmailContainsText(
-            "Yesterday (January 12), 1 check had 1 downtime event."
-        )
+        self.assertEmailContainsHtml("Yesterday (January 12), <strong>1 check</strong> had <strong>1 downtime event</strong>.")
+        self.assertEmailContainsText("Yesterday (January 12), 1 check had 1 downtime event.")
 
         email = mail.outbox[0]
         self.assertEqual(email.subject, "Daily Report")

@@ -135,14 +135,10 @@ class Profile(models.Model):
 
         return check_password(token, self.token)
 
-    def send_instant_login_link(
-        self, membership: Member | None = None, redirect_url: str | None = None
-    ) -> None:
+    def send_instant_login_link(self, membership: Member | None = None, redirect_url: str | None = None) -> None:
         token = self.prepare_token()
         query = {"next": redirect_url} if redirect_url else None
-        url = absolute_reverse(
-            "hc-check-token", args=[self.user.username, token], query=query
-        )
+        url = absolute_reverse("hc-check-token", args=[self.user.username, token], query=query)
 
         ctx = {
             "button_text": "Log In",
@@ -189,9 +185,7 @@ class Profile(models.Model):
         # But the single query approach has significantly worse performance
         # on PostgreSQL.
         owned_ids = Project.objects.filter(owner_id=self.user_id).values_list("id")
-        joined_ids = Member.objects.filter(user_id=self.user_id).values_list(
-            "project_id"
-        )
+        joined_ids = Member.objects.filter(user_id=self.user_id).values_list("project_id")
         return owned_ids.union(joined_ids)
 
     def projects(self) -> QuerySet[Project]:
@@ -395,9 +389,7 @@ class Profile(models.Model):
 
 
 class ProjectManager(models.Manager["Project"]):
-    def for_api_key(
-        self, api_key: str, accept_rw: bool, accept_ro: bool
-    ) -> Project | None:
+    def for_api_key(self, api_key: str, accept_rw: bool, accept_ro: bool) -> Project | None:
         """Look up project by API key.
 
         This handles both the old plain text API keys, and the new hashed API keys.
@@ -610,11 +602,7 @@ class Member(models.Model):
     role = models.CharField(max_length=1, default=Role.REGULAR, choices=Role.choices)
 
     class Meta:
-        constraints = (
-            models.UniqueConstraint(
-                fields=["user", "project"], name="accounts_member_no_duplicates"
-            ),
-        )
+        constraints = (models.UniqueConstraint(fields=["user", "project"], name="accounts_member_no_duplicates"),)
 
     def can_accept(self) -> bool:
         return self.user.profile.can_accept(self.project)

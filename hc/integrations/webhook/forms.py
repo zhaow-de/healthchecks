@@ -37,9 +37,7 @@ class HeadersField(forms.Field):
                 raise ValidationError(message=self.message)
 
             if not _is_latin1(n):
-                raise ValidationError(
-                    message="Header names must not contain special characters"
-                )
+                raise ValidationError(message="Header names must not contain special characters")
 
             headers[n] = v
 

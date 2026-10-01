@@ -105,9 +105,7 @@ def check_signature(badge_key: str, tag: str, sig: str) -> bool:
     return ours[:8] == sig[:8]
 
 
-def get_badge_url(
-    badge_key: str, tag: str, fmt: str = "svg", with_late: bool = False
-) -> str:
+def get_badge_url(badge_key: str, tag: str, fmt: str = "svg", with_late: bool = False) -> str:
     sig = base64_hmac(str(badge_key), tag, settings.SECRET_KEY, algorithm="sha1")[:8]
     if not with_late:
         sig += "-2"

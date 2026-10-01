@@ -75,9 +75,7 @@ def add_complete(request: AuthenticatedHttpRequest) -> HttpResponse:
     for item in doc["integration_keys"]:
         channel = Channel(kind="pd", project=project)
         channel.name = item["name"]
-        channel.value = json.dumps(
-            {"service_key": item["integration_key"], "account": doc["account"]["name"]}
-        )
+        channel.value = json.dumps({"service_key": item["integration_key"], "account": doc["account"]["name"]})
         channel.save()
         channel.assign_all_checks()
 

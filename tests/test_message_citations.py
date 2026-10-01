@@ -142,9 +142,7 @@ def test_a_citation_of_the_other_side_of_the_commit_stands():
 
 
 def test_a_dead_symbol_is_refused_and_every_definition_shape_admits_one():
-    admitted = (
-        "hc/x.py::run, hc/x.py:fetch, hc/x.py:Foo, hc/x.py:LIMIT, hc/x.py:NAME, x.py:Foo.bar, tests/test_x.py::test_a[1-2]"
-    )
+    admitted = "hc/x.py::run, hc/x.py:fetch, hc/x.py:Foo, hc/x.py:LIMIT, hc/x.py:NAME, x.py:Foo.bar, tests/test_x.py::test_a[1-2]"
     assert _judge(admitted + "\n") == []
     assert _judge("count-list.sh:c_a, count-list.sh::c_b, count-list.sh:TOKEN\n") == []
     assert _judge("hc/x.py::nope\n") == ["hc/x.py::nope: no line of hc/x.py defines nope, on either side of the commit"]

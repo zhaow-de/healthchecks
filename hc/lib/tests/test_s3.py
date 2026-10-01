@@ -55,9 +55,7 @@ class S3TestCase(TestCase):
 
     @patch("hc.lib.s3.statsd")
     @patch("hc.lib.s3._client")
-    def test_get_object_handles_urllib_exceptions(
-        self, client: Mock, statsd: Mock
-    ) -> None:
+    def test_get_object_handles_urllib_exceptions(self, client: Mock, statsd: Mock) -> None:
         for e in [ProtocolError, InvalidHeader]:
             client.get_object.reset_mock()
             client.get_object.return_value.read = Mock(side_effect=e)
@@ -67,9 +65,7 @@ class S3TestCase(TestCase):
 
     @patch("hc.lib.s3.statsd")
     @patch("hc.lib.s3._client")
-    def test_get_object_handles_invalidresponseerror(
-        self, client: Mock, statsd: Mock
-    ) -> None:
+    def test_get_object_handles_invalidresponseerror(self, client: Mock, statsd: Mock) -> None:
         e = InvalidResponseError(123, "text/plain", None)
         client.get_object.return_value.read = Mock(side_effect=e)
         with self.assertRaises(GetObjectError):

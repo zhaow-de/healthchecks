@@ -13,9 +13,7 @@ from hc.test import BaseTestCase
 
 
 class NotifyWebhookTestCase(BaseTestCase):
-    def _setup_data(
-        self, value: str, status: str = "down", email_verified: bool = True
-    ) -> None:
+    def _setup_data(self, value: str, status: str = "down", email_verified: bool = True) -> None:
         self.check = Check(project=self.project)
         # Transport classes should use flip.new_status,
         # so the status "paused" should not appear anywhere
@@ -109,9 +107,7 @@ class NotifyWebhookTestCase(BaseTestCase):
         autospec=True,
         side_effect=CurlError("Foo failed"),
     )
-    def test_webhooks_dont_retry_when_sending_test_notifications(
-        self, mock_get: Mock
-    ) -> None:
+    def test_webhooks_dont_retry_when_sending_test_notifications(self, mock_get: Mock) -> None:
         definition = {
             "method_down": "GET",
             "url_down": "http://example",
@@ -413,9 +409,7 @@ class NotifyWebhookTestCase(BaseTestCase):
         self.assertEqual(payload, b"Body Line 1\nBody Line 2")
 
     @patch("hc.api.transports.curl.request", autospec=True)
-    def test_webhooks_dont_support_body_variable_in_url_and_headers(
-        self, mock_post: Mock
-    ) -> None:
+    def test_webhooks_dont_support_body_variable_in_url_and_headers(self, mock_post: Mock) -> None:
         definition = {
             "method_down": "POST",
             "url_down": "http://example.org/$BODY",
@@ -453,9 +447,7 @@ class NotifyWebhookTestCase(BaseTestCase):
         self.assertEqual(payload, b"Exit status 123")
 
     @patch("hc.api.transports.curl.request", autospec=True)
-    def test_webhooks_handle_exitstatus_variable_with_last_ping_missing(
-        self, mock_post: Mock
-    ) -> None:
+    def test_webhooks_handle_exitstatus_variable_with_last_ping_missing(self, mock_post: Mock) -> None:
         definition = {
             "method_down": "POST",
             "url_down": "http://example.org",

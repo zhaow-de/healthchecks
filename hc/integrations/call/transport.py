@@ -37,11 +37,7 @@ class Call(HttpTransport):
         return status != "down"
 
     def notify(self, flip: Flip, notification: Notification) -> None:
-        if (
-            not settings.TWILIO_ACCOUNT
-            or not settings.TWILIO_AUTH
-            or not settings.TWILIO_FROM
-        ):
+        if not settings.TWILIO_ACCOUNT or not settings.TWILIO_AUTH or not settings.TWILIO_FROM:
             raise TransportError("Call notifications are not enabled")
 
         ctx = {"check": flip.owner, "site_name": settings.SITE_NAME}

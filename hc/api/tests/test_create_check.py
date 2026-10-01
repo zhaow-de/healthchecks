@@ -112,9 +112,7 @@ class CreateCheckTestCase(BaseTestCase):
 
     def test_it_accepts_api_key_in_header(self) -> None:
         payload = {"name": "Foo"}
-        r = self.client.post(
-            self.URL, payload, content_type="application/json", HTTP_X_API_KEY="X" * 32
-        )
+        r = self.client.post(self.URL, payload, content_type="application/json", HTTP_X_API_KEY="X" * 32)
 
         self.assertEqual(r.status_code, 201)
 
@@ -261,9 +259,7 @@ class CreateCheckTestCase(BaseTestCase):
         self.assertEqual(r.json()["error"], "missing api key")
 
     def test_it_handles_invalid_json(self) -> None:
-        r = self.client.post(
-            self.URL, "this is not json", content_type="application/json"
-        )
+        r = self.client.post(self.URL, "this is not json", content_type="application/json")
         self.assertEqual(r.status_code, 400)
         self.assertEqual(r.json()["error"], "could not parse request body")
 
@@ -415,9 +411,7 @@ class CreateCheckTestCase(BaseTestCase):
         self.assertEqual(check.methods, "POST")
 
     def test_it_rejects_bad_methods_value(self) -> None:
-        self.post(
-            {"methods": "bad-value"}, expect_fragment="methods has unexpected value"
-        )
+        self.post({"methods": "bad-value"}, expect_fragment="methods has unexpected value")
 
     def test_it_rejects_long_filtering_keywords(self) -> None:
         for s in ("subject", "subject_fail", "start_kw", "success_kw", "failure_kw"):
@@ -474,11 +468,7 @@ class CreateCheckTestCase(BaseTestCase):
         for slug in ["Uppercase", "special!", "look spaces"]:
             r = self.post({"name": "Foo", "slug": slug}, v=3)
             self.assertEqual(r.status_code, 400)
-            self.assertEqual(
-                r.json()["error"], "json validation error: slug does not match pattern"
-            )
+            self.assertEqual(r.json()["error"], "json validation error: slug does not match pattern")
 
     def test_it_rejects_long_slug(self) -> None:
-        self.post(
-            {"name": "Foo", "slug": "a" * 101}, v=3, expect_fragment="slug is too long"
-        )
+        self.post({"name": "Foo", "slug": "a" * 101}, v=3, expect_fragment="slug is too long")

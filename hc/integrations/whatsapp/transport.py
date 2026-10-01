@@ -24,9 +24,7 @@ class WhatsApp(HttpTransport):
     def raise_for_response(cls, response: curl.Response) -> NoReturn:
         if response.status_code == 400:
             try:
-                doc = WhatsApp.ErrorModel.model_validate_json(
-                    response.content, strict=True
-                )
+                doc = WhatsApp.ErrorModel.model_validate_json(response.content, strict=True)
                 if doc.code == 21211:
                     raise TransportError("Invalid phone number", permanent=True)
             except ValidationError:

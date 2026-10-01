@@ -12,8 +12,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="member",
             name="role",
-            field=models.CharField(
-                choices=Member.Role.choices, default=Member.Role.REGULAR, max_length=1
-            ),
+            field=models.CharField(choices=Member.Role.choices, default=Member.Role.REGULAR, max_length=1),
         ),
     ]

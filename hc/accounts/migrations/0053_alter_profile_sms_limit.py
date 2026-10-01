@@ -4,15 +4,14 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('accounts', '0052_remove_profile_team_limit'),
+        ("accounts", "0052_remove_profile_team_limit"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='profile',
-            name='sms_limit',
+            model_name="profile",
+            name="sms_limit",
             field=models.IntegerField(default=0),
         ),
     ]

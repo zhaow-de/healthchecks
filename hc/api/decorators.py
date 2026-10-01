@@ -84,9 +84,7 @@ def authorize_read(f: ViewFunc) -> ViewFunc:
             return error("wrong api key", 401)
 
         request.project = project
-        request.readonly = (
-            api_key.startswith("hcr_") or api_key == request.project.api_key_readonly
-        )
+        request.readonly = api_key.startswith("hcr_") or api_key == request.project.api_key_readonly
         request.v = _get_api_version(request)
         return f(request, *args, **kwds)
 

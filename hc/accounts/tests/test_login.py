@@ -33,9 +33,7 @@ class LoginTestCase(BaseTestCase):
         r = self.client.get("/accounts/login/")
         self.assertRedirects(r, self.checks_url)
 
-    @override_settings(
-        SITE_ROOT="http://testserver", SITE_LOGO_URL=None, SESSION_COOKIE_SECURE=False
-    )
+    @override_settings(SITE_ROOT="http://testserver", SITE_LOGO_URL=None, SESSION_COOKIE_SECURE=False)
     def test_it_sends_link(self) -> None:
         form = {"identity": "alice@example.org"}
 
@@ -200,9 +198,7 @@ class LoginTestCase(BaseTestCase):
 
         form = {"action": "login", "email": "alice@example.org", "password": "password"}
         r = self.client.post("/accounts/login/", form)
-        self.assertRedirects(
-            r, "/accounts/login/two_factor/", fetch_redirect_response=False
-        )
+        self.assertRedirects(r, "/accounts/login/two_factor/", fetch_redirect_response=False)
 
         # It should not log the user in yet
         self.assertNotIn("_auth_user_id", self.client.session)
@@ -243,9 +239,7 @@ class LoginTestCase(BaseTestCase):
 
         form = {"action": "login", "email": "alice@example.org", "password": "password"}
         r = self.client.post(f"/accounts/login/?next={self.channels_url}", form)
-        self.assertRedirects(
-            r, f"/accounts/login/two_factor/totp/?next={self.channels_url}"
-        )
+        self.assertRedirects(r, f"/accounts/login/two_factor/totp/?next={self.channels_url}")
 
     def test_it_handles_missing_profile(self) -> None:
         self.profile.delete()

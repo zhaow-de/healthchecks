@@ -49,9 +49,7 @@ class NotifyRocketChatTestCase(BaseTestCase):
         self.assertEqual(url, "https://example.org")
 
         text = mock_post.call_args.kwargs["json"]["text"]
-        self.assertIn(
-            "is DOWN (success signal did not arrive on time, grace time passed).", text
-        )
+        self.assertIn("is DOWN (success signal did not arrive on time, grace time passed).", text)
 
         attachment = mock_post.call_args.kwargs["json"]["attachments"][0]
         fields = {f["title"]: f["value"] for f in attachment["fields"]}

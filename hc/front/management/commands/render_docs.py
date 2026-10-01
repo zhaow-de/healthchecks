@@ -28,18 +28,14 @@ class Command(BaseCommand):
             "def_list",
             "attr_list",
         ]
-        extension_configs = {
-            "codehilite": {"css_class": "highlight", "startinline": True}
-        }
+        extension_configs = {"codehilite": {"css_class": "highlight", "startinline": True}}
 
         def process_directory(path: Path) -> None:
             for src_path in path.glob("*.md"):
                 print(f"Rendering {src_path.name}")
 
                 text = src_path.open("r", encoding="utf-8").read()
-                html = markdown.markdown(
-                    text, extensions=extensions, extension_configs=extension_configs
-                )
+                html = markdown.markdown(text, extensions=extensions, extension_configs=extension_configs)
 
                 dst_path = src_path.with_suffix(".html-fragment")
                 with dst_path.open("w", encoding="utf-8") as f:

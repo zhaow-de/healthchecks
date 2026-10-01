@@ -6,8 +6,4 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
     dependencies = [("api", "0040_auto_20180517_1336")]
 
-    operations = [
-        migrations.AddField(
-            model_name="check", name="desc", field=models.TextField(blank=True)
-        )
-    ]
+    operations = [migrations.AddField(model_name="check", name="desc", field=models.TextField(blank=True))]

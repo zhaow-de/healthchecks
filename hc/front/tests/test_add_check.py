@@ -99,16 +99,12 @@ class AddCheckTestCase(BaseTestCase):
 
     def test_it_validates_cron_expression_with_no_matches(self) -> None:
         self.client.login(username="alice@example.org", password="password")
-        r = self.client.post(
-            self.url, self._payload(kind="cron", schedule="* * */100 * MON#2")
-        )
+        r = self.client.post(self.url, self._payload(kind="cron", schedule="* * */100 * MON#2"))
         self.assertEqual(r.status_code, 400)
 
     def test_it_validates_oncalendar_expression(self) -> None:
         self.client.login(username="alice@example.org", password="password")
-        r = self.client.post(
-            self.url, self._payload(kind="oncalendar", schedule="12:345")
-        )
+        r = self.client.post(self.url, self._payload(kind="oncalendar", schedule="12:345"))
         self.assertEqual(r.status_code, 400)
 
     def test_it_validates_tz(self) -> None:

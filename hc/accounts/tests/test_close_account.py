@@ -25,9 +25,7 @@ class CloseAccountTestCase(BaseTestCase):
 
     def test_it_works(self) -> None:
         Check.objects.create(project=self.project, tags="foo a-B_1  baz@")
-        Subscription.objects.create(
-            user=self.alice, subscription_id="123", customer_id="fake-customer-id"
-        )
+        Subscription.objects.create(user=self.alice, subscription_id="123", customer_id="fake-customer-id")
 
         self.client.login(username="alice@example.org", password="password")
         self.set_sudo_flag()

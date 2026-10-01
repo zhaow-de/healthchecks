@@ -34,20 +34,16 @@ uwsgi = ["uwsgi"]
 [dependency-groups]
 # Installed by default by "uv sync" and "uv run".
 dev = [
-    # The test suite and mypy cover the apprise and minio code paths. Keep these
-    # two pins equal to the extras above; "uv lock" fails if they disagree.
+    # The test suite covers the apprise and minio code paths. Keep these two
+    # pins equal to the extras above; "uv lock" fails if they disagree.
     "apprise==1.13.1",
     "minio==7.2.20",
-    "django-stubs==6.1.1",
     "markdown==3.10.2",
-    "mypy==2.3.1",
     "pre-commit>=4.6.2",
     "pygments==2.21.0",
     "pytest>=9.1.1",
+    "ruff>=0.16.4",
     "time-machine==3.5.1",
-    "types-markdown",
-    "types-pycurl",
-    "types-pygments",
 ]
 coverage = ["coverage", "coveralls"]
 

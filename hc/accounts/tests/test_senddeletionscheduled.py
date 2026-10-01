@@ -51,9 +51,7 @@ class SendDeletionScheduledTestCase(BaseTestCase):
         self.assertEmailContainsText("Number of checks in the account: 2")
 
         self.assertEmailContainsHtml("Owner: <strong>alice@example.org</strong>")
-        self.assertEmailContainsHtml(
-            "Number of checks in the account: <strong>2</strong>"
-        )
+        self.assertEmailContainsHtml("Number of checks in the account: <strong>2</strong>")
 
     def test_it_sends_notice_to_team_members(self) -> None:
         self.profile.deletion_scheduled_date = now() + td(days=31)
@@ -91,9 +89,7 @@ class SendDeletionScheduledTestCase(BaseTestCase):
         self.bob.save()
 
         second_project = Project.objects.create(owner=self.alice)
-        Member.objects.create(
-            user=self.bob, project=second_project, role=Member.Role.REGULAR
-        )
+        Member.objects.create(user=self.bob, project=second_project, role=Member.Role.REGULAR)
 
         cmd = Command(stdout=Mock())
         cmd.handle()

@@ -102,9 +102,7 @@ class NotifyTelegramTestCase(BaseTestCase):
         self.channel.notify(self.flip)
 
         payload = mock_post.call_args.kwargs["json"]
-        self.assertIn(
-            "<b>Last Ping:</b> Exit status 123, 10 minutes ago", payload["text"]
-        )
+        self.assertIn("<b>Last Ping:</b> Exit status 123, 10 minutes ago", payload["text"])
 
     @patch("hc.api.transports.curl.request", autospec=True)
     def test_it_sends_to_thread(self, mock_post: Mock) -> None:
@@ -131,9 +129,7 @@ class NotifyTelegramTestCase(BaseTestCase):
         self.channel.notify(self.flip)
 
         payload = mock_post.call_args.kwargs["json"]
-        self.assertIn(
-            "<b>Schedule:</b> <code>* * * * MON-FRI</code>\n", payload["text"]
-        )
+        self.assertIn("<b>Schedule:</b> <code>* * * * MON-FRI</code>\n", payload["text"])
         self.assertIn("<b>Time Zone:</b> Europe/Riga\n", payload["text"])
 
     @patch("hc.api.transports.curl.request", autospec=True)

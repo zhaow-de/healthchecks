@@ -79,9 +79,7 @@ class SignalCaptchaTestCase(BaseTestCase):
         socketobj = setup_mock(socket, {})
 
         self.client.login(username="alice@example.org", password="password")
-        self.client.post(
-            self.url, {"challenge": "foo", "captcha": "signalcaptcha://bar"}
-        )
+        self.client.post(self.url, {"challenge": "foo", "captcha": "signalcaptcha://bar"})
 
         assert socketobj.req
         params = socketobj.req["params"]

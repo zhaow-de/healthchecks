@@ -251,9 +251,7 @@ def login_link_sent(request: HttpRequest) -> HttpResponse:
     return render(request, "accounts/login_link_sent.html")
 
 
-def check_token(
-    request: HttpRequest, username: str, token: str, new_email: str | None = None
-) -> HttpResponse:
+def check_token(request: HttpRequest, username: str, token: str, new_email: str | None = None) -> HttpResponse:
     if request.user.is_authenticated:
         auth_logout(request)
 
@@ -319,9 +317,7 @@ def profile(request: AuthenticatedHttpRequest) -> HttpResponse:
             return HttpResponseBadRequest()
 
         try:
-            project = Project.objects.get(
-                code=leave_form.cleaned_data["code"], member__user=request.user
-            )
+            project = Project.objects.get(code=leave_form.cleaned_data["code"], member__user=request.user)
         except Project.DoesNotExist:
             return HttpResponseBadRequest()
 

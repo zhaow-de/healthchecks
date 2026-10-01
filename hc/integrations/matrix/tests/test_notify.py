@@ -11,9 +11,7 @@ from hc.api.models import Channel, Check, Flip, Notification, Ping
 from hc.test import BaseTestCase
 
 
-@override_settings(
-    MATRIX_HOMESERVER="https://example.net", MATRIX_ACCESS_TOKEN="test-token"
-)
+@override_settings(MATRIX_HOMESERVER="https://example.net", MATRIX_ACCESS_TOKEN="test-token")
 class NotifyMatrixTestCase(BaseTestCase):
     def setUp(self) -> None:
         super().setUp()
@@ -79,9 +77,7 @@ class NotifyMatrixTestCase(BaseTestCase):
 
         payload = mock_post.call_args.kwargs["json"]
         self.assertIn("The downtime lasted 1 hour, 30 minutes.", payload["body"])
-        self.assertIn(
-            "The downtime lasted 1 hour, 30 minutes.", payload["formatted_body"]
-        )
+        self.assertIn("The downtime lasted 1 hour, 30 minutes.", payload["formatted_body"])
 
     @patch("hc.api.transports.curl.request", autospec=True)
     def test_it_reports_down_duration(self, mock_post: Mock) -> None:

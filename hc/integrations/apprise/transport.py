@@ -21,15 +21,11 @@ class Apprise(HttpTransport):
         a = apprise.Apprise()
         check, status = flip.owner, flip.new_status
         title = self.tmpl("apprise_title.html", check=check, status=status)
-        body = self.tmpl(
-            "apprise_description.html", check=check, status=status, flip=flip
-        )
+        body = self.tmpl("apprise_description.html", check=check, status=status, flip=flip)
 
         a.add(self.channel.value)
 
-        notify_type = (
-            apprise.NotifyType.SUCCESS if status == "up" else apprise.NotifyType.FAILURE
-        )
+        notify_type = apprise.NotifyType.SUCCESS if status == "up" else apprise.NotifyType.FAILURE
 
         if not a.notify(body=body, title=title, notify_type=notify_type):
             raise TransportError("Failed")

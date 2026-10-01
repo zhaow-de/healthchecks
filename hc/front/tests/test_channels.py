@@ -71,9 +71,7 @@ class ChannelsTestCase(BaseTestCase):
 
     def test_it_shows_down_only_note_for_email(self) -> None:
         channel = Channel(project=self.project, kind="email")
-        channel.value = json.dumps(
-            {"value": "alice@example.org", "up": False, "down": True}
-        )
+        channel.value = json.dumps({"value": "alice@example.org", "up": False, "down": True})
         channel.save()
 
         self.client.login(username="alice@example.org", password="password")
@@ -83,9 +81,7 @@ class ChannelsTestCase(BaseTestCase):
 
     def test_it_shows_up_only_note_for_email(self) -> None:
         channel = Channel(project=self.project, kind="email")
-        channel.value = json.dumps(
-            {"value": "alice@example.org", "up": True, "down": False}
-        )
+        channel.value = json.dumps({"value": "alice@example.org", "up": True, "down": False})
         channel.save()
 
         self.client.login(username="alice@example.org", password="password")
@@ -171,9 +167,7 @@ class ChannelsTestCase(BaseTestCase):
 
     def test_it_shows_gotify_details(self) -> None:
         ch = Channel(kind="gotify", project=self.project)
-        ch.value = json.dumps(
-            {"url": "https://example.org", "token": "abc", "priority": 5}
-        )
+        ch.value = json.dumps({"url": "https://example.org", "token": "abc", "priority": 5})
         ch.save()
 
         self.client.login(username="alice@example.org", password="password")

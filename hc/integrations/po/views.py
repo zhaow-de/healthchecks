@@ -49,11 +49,7 @@ def add(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
             },
         )
         assert settings.PUSHOVER_SUBSCRIPTION_URL
-        subscription_url = (
-            settings.PUSHOVER_SUBSCRIPTION_URL
-            + "?"
-            + urlencode({"success": success_url, "failure": failure_url})
-        )
+        subscription_url = settings.PUSHOVER_SUBSCRIPTION_URL + "?" + urlencode({"success": success_url, "failure": failure_url})
 
         request.session["pushover"] = state
         return redirect(subscription_url)

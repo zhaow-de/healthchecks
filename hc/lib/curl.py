@@ -215,9 +215,7 @@ def get(
     auth: Auth = None,
     timeout: Timeout = None,
 ) -> Response:
-    return request(
-        "get", url, params=params, headers=headers, auth=auth, timeout=timeout
-    )
+    return request("get", url, params=params, headers=headers, auth=auth, timeout=timeout)
 
 
 # Convenience wrapper around request for making "POST" requests

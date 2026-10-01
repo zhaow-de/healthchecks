@@ -56,9 +56,7 @@ class ChecksAdmin(ModelAdmin[Check]):
     def project_(self, obj: WithAnnotations[Check, CheckAnnotations]) -> str:
         url = obj.project.get_absolute_url()
         name = obj.project.name or "Default"
-        return format_html(
-            """{} &rsaquo; <a href="{}">{}</a>""", obj.owner_email, url, name
-        )
+        return format_html("""{} &rsaquo; <a href="{}">{}</a>""", obj.owner_email, url, name)
 
     def name_tags(self, obj: Check) -> str:
         url = obj.details_url(full=False)
@@ -89,9 +87,7 @@ class SchemeListFilter(admin.SimpleListFilter):
     def lookups(self, request: HttpRequest, model_admin: ModelAdmin[Check]) -> Lookups:
         return (("http", "HTTP"), ("https", "HTTPS"), ("email", "Email"))
 
-    def queryset(
-        self, request: HttpRequest, queryset: QuerySet[Ping]
-    ) -> QuerySet[Ping]:
+    def queryset(self, request: HttpRequest, queryset: QuerySet[Ping]) -> QuerySet[Ping]:
         if self.value():
             queryset = queryset.filter(scheme=self.value())
         return queryset
@@ -279,9 +275,7 @@ class ErrorFilter(admin.SimpleListFilter):
             ("error", "Error"),
         )
 
-    def queryset(
-        self, r: HttpRequest, qs: QuerySet[Notification]
-    ) -> QuerySet[Notification]:
+    def queryset(self, r: HttpRequest, qs: QuerySet[Notification]) -> QuerySet[Notification]:
         v = self.value()
         if v == "ok":
             qs = qs.filter(error="")

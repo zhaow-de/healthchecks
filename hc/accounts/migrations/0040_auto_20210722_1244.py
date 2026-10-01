@@ -12,9 +12,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="member",
             name="role",
-            field=models.CharField(
-                choices=[("r", "Read-only"), ("w", "Member")], default="w", max_length=1
-            ),
+            field=models.CharField(choices=[("r", "Read-only"), ("w", "Member")], default="w", max_length=1),
         ),
         migrations.AlterField(
             model_name="member",

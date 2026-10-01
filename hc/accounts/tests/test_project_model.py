@@ -31,6 +31,4 @@ class ProjectModelTestCase(BaseTestCase):
         self.assertTrue(self.project.have_channel_issues())
 
     def test_team_emails_work(self) -> None:
-        self.assertEqual(
-            self.project.team_emails(), ["alice@example.org", "bob@example.org"]
-        )
+        self.assertEqual(self.project.team_emails(), ["alice@example.org", "bob@example.org"])

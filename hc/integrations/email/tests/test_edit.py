@@ -16,9 +16,7 @@ class EditEmailTestCase(BaseTestCase):
         self.check = Check.objects.create(project=self.project)
 
         self.channel = Channel(project=self.project, kind="email")
-        self.channel.value = json.dumps(
-            {"value": "alerts@example.org", "up": True, "down": True}
-        )
+        self.channel.value = json.dumps({"value": "alerts@example.org", "up": True, "down": True})
         self.channel.email_verified = True
         self.channel.save()
 

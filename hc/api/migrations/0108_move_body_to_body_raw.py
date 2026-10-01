@@ -23,6 +23,4 @@ class Migration(migrations.Migration):
         ("api", "0107_fix_legacy_timezones"),
     ]
 
-    operations = [
-        migrations.RunPython(move_body_to_body_raw, migrations.RunPython.noop)
-    ]
+    operations = [migrations.RunPython(move_body_to_body_raw, migrations.RunPython.noop)]

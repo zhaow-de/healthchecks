@@ -609,9 +609,7 @@ class Check(models.Model):
         threshold = self.n_pings - self.project.owner_profile.ping_log_limit
         return self.ping_set.filter(n__gt=threshold)
 
-    def downtimes_by_boundary(
-        self, boundaries: list[datetime], tz: str
-    ) -> list[DowntimeRecord]:
+    def downtimes_by_boundary(self, boundaries: list[datetime], tz: str) -> list[DowntimeRecord]:
         """Calculate downtime counts and durations for the given time intervals.
 
         Returns a list of DowntimeRecord instances in descending datetime order.
@@ -649,9 +647,7 @@ class Check(models.Model):
         boundaries = month_boundaries(months, tz)
         return self.downtimes_by_boundary(boundaries, tz)
 
-    def create_flip(
-        self, new_status: str, reason: str = "", mark_as_processed: bool = False
-    ) -> None:
+    def create_flip(self, new_status: str, reason: str = "", mark_as_processed: bool = False) -> None:
         """Create a Flip object for this check.
 
         Flip objects record check status changes, and have two uses:
@@ -707,9 +703,7 @@ class Ping(models.Model):
         if self.has_body():
             # Optimization: construct API URLs manually instead of using reverse().
             # This is significantly quicker when returning hundreds of pings.
-            body_url = (
-                f"{settings.SITE_ROOT}/api/v{v}/checks/{owner_code}/pings/{self.n}/body"
-            )
+            body_url = f"{settings.SITE_ROOT}/api/v{v}/checks/{owner_code}/pings/{self.n}/body"
 
         else:
             body_url = None
@@ -1088,9 +1082,7 @@ class Channel(models.Model):
         subject = "Signal CAPTCHA proof required"
         message = f"Challenge token: {challenge}"
         hostname = socket.gethostname()
-        submit_url = absolute_reverse(
-            "hc-signal-captcha", query={"host": hostname, "challenge": challenge}
-        )
+        submit_url = absolute_reverse("hc-signal-captcha", query={"host": hostname, "challenge": challenge})
         html_message = f"""
             On host <b>{hostname}</b>, run:<br>
             <pre>manage.py submitchallenge {challenge} CAPTCHA-SOLUTION-HERE</pre><br>
@@ -1325,9 +1317,7 @@ class Channel(models.Model):
     @property
     def group_channels(self) -> QuerySet[Channel]:
         assert self.kind == "group"
-        return Channel.objects.filter(
-            project=self.project, code__in=self.value.split(",")
-        )
+        return Channel.objects.filter(project=self.project, code__in=self.value.split(","))
 
     @property
     def ntfy(self) -> NtfyConf:
@@ -1439,9 +1429,7 @@ class TokenBucket(models.Model):
     updated = models.DateTimeField(default=now)
 
     @staticmethod
-    def authorize(
-        value: str, capacity: int, refill_time_secs: int, force: bool = False
-    ) -> bool:
+    def authorize(value: str, capacity: int, refill_time_secs: int, force: bool = False) -> bool:
         frozen_now = now()
         obj, created = TokenBucket.objects.get_or_create(value=value)
 

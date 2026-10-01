@@ -11,9 +11,7 @@ class GroupForm(forms.Form):
         super().__init__(*args, **kwargs)
 
         assert isinstance(self.fields["channels"], forms.MultipleChoiceField)
-        self.fields["channels"].choices = (
-            (c.code, c) for c in project.channel_set.exclude(kind="group")
-        )
+        self.fields["channels"].choices = ((c.code, c) for c in project.channel_set.exclude(kind="group"))
 
     error_css_class = "has-error"
     label = forms.CharField(max_length=100, required=False)

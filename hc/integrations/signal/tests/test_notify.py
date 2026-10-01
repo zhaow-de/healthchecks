@@ -20,9 +20,7 @@ Address = str | tuple[str, int]
 
 
 class MockSocket:
-    def __init__(
-        self, response_tmpl: Any, side_effect: Exception | None = None
-    ) -> None:
+    def __init__(self, response_tmpl: Any, side_effect: Exception | None = None) -> None:
         self.response_tmpl = response_tmpl
         self.side_effect = side_effect
         self.timeout: None | int = None
@@ -56,9 +54,7 @@ class MockSocket:
         return head
 
 
-def setup_mock(
-    socket: Mock, response_tmpl: Any, side_effect: Exception | None = None
-) -> MockSocket:
+def setup_mock(socket: Mock, response_tmpl: Any, side_effect: Exception | None = None) -> MockSocket:
     # A mock of socket.socket object
     socketobj = MockSocket(response_tmpl, side_effect)
 
@@ -512,8 +508,7 @@ class NotifySignalTestCase(BaseTestCase):
         email = emails["alice@example.org"]
         self.assertEqual(
             email.subject,
-            "Signal notification failed: The check Foo & Co is DOWN"
-            " (success signal did not arrive on time, grace time passed).",
+            "Signal notification failed: The check Foo & Co is DOWN (success signal did not arrive on time, grace time passed).",
         )
         # The plaintext version should have no HTML markup, and should
         # have no &amp;, &lt; &gt; stuff:

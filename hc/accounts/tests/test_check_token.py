@@ -75,9 +75,7 @@ class CheckTokenTestCase(BaseTestCase):
         Credential.objects.create(user=self.alice, name="Alices Key")
 
         r = self.client.post(self.url)
-        self.assertRedirects(
-            r, "/accounts/login/two_factor/", fetch_redirect_response=False
-        )
+        self.assertRedirects(r, "/accounts/login/two_factor/", fetch_redirect_response=False)
 
         # It should not log the user in yet
         self.assertNotIn("_auth_user_id", self.client.session)

@@ -39,9 +39,7 @@ def client() -> Minio:
             settings.S3_SECRET_KEY,
             region=settings.S3_REGION,
             secure=settings.S3_SECURE,
-            http_client=PoolManager(
-                timeout=settings.S3_TIMEOUT, retries=Retry(total=1)
-            ),
+            http_client=PoolManager(timeout=settings.S3_TIMEOUT, retries=Retry(total=1)),
         )
 
     return _client
@@ -140,9 +138,7 @@ def _remove_objects(code: UUID, upto_n: int) -> None:
                         e.message,
                     )
         except ReadTimeoutError:
-            logger.exception(
-                f"ReadTimeoutError while removing {num_objs} objects for {code}"
-            )
+            logger.exception(f"ReadTimeoutError while removing {num_objs} objects for {code}")
             statsd.incr("hc.lib.s3.removeObjectsErrors")
 
 

@@ -26,9 +26,7 @@ class FlipModelTestCase(BaseTestCase):
         self.assertEqual(channels, [self.channel])
 
     def test_select_channels_handles_noop(self) -> None:
-        self.channel.value = json.dumps(
-            {"value": "alice@example.org", "up": False, "down": False}
-        )
+        self.channel.value = json.dumps({"value": "alice@example.org", "up": False, "down": False})
         self.channel.save()
 
         channels = self.flip.select_channels()
@@ -54,13 +52,9 @@ class FlipModelTestCase(BaseTestCase):
         self.assertEqual(channels, [])
 
     def test_it_sorts_channels_by_last_notify_duration(self) -> None:
-        c1 = Channel.objects.create(
-            project=self.project, kind="email", last_notify_duration=td(seconds=1)
-        )
+        c1 = Channel.objects.create(project=self.project, kind="email", last_notify_duration=td(seconds=1))
         c1.checks.add(self.check)
-        c9 = Channel.objects.create(
-            project=self.project, kind="email", last_notify_duration=td(seconds=9)
-        )
+        c9 = Channel.objects.create(project=self.project, kind="email", last_notify_duration=td(seconds=9))
         c9.checks.add(self.check)
 
         channels = self.flip.select_channels()

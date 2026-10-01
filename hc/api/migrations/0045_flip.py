@@ -51,9 +51,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "owner",
-                    models.ForeignKey(
-                        on_delete=django.db.models.deletion.CASCADE, to="api.Check"
-                    ),
+                    models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to="api.Check"),
                 ),
             ],
         )

@@ -13,9 +13,7 @@ class WebhookValidatorTestCase(BaseTestCase):
         self.assertEqual(self.v.add_tld("http://example.org"), "http://example.org")
 
     def test_it_does_not_touch_existing_tld_with_port(self) -> None:
-        self.assertEqual(
-            self.v.add_tld("http://example.org:80"), "http://example.org:80"
-        )
+        self.assertEqual(self.v.add_tld("http://example.org:80"), "http://example.org:80")
 
     def test_it_does_not_touch_existing_tld_with_port_and_basic_auth(self) -> None:
         self.assertEqual(
@@ -30,9 +28,7 @@ class WebhookValidatorTestCase(BaseTestCase):
         self.assertEqual(self.v.add_tld("http://example."), "http://example.dummytld")
 
     def test_it_handles_port(self) -> None:
-        self.assertEqual(
-            self.v.add_tld("http://example:80"), "http://example.dummytld:80"
-        )
+        self.assertEqual(self.v.add_tld("http://example:80"), "http://example.dummytld:80")
 
     def test_it_handles_port_and_basic_auth(self) -> None:
         self.assertEqual(

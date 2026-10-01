@@ -24,9 +24,7 @@ class LowercaseEmailField(forms.EmailField):
 class SignupForm(forms.Form):
     # Call it "identity" instead of "email"
     # to avoid some of the dumber bots
-    identity = LowercaseEmailField(
-        error_messages={"required": "Please enter your email address."}
-    )
+    identity = LowercaseEmailField(error_messages={"required": "Please enter your email address."})
     tz = forms.CharField(required=False)
 
     def __init__(self, request: HttpRequest):

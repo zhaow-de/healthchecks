@@ -24,6 +24,4 @@ class Migration(migrations.Migration):
         ("api", "0099_alter_channel_disabled"),
     ]
 
-    operations = [
-        migrations.RunPython(normalize_opsgenie_values, migrations.RunPython.noop)
-    ]
+    operations = [migrations.RunPython(normalize_opsgenie_values, migrations.RunPython.noop)]

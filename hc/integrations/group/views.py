@@ -29,9 +29,7 @@ def group_form(request: HttpRequest, channel: Channel) -> HttpResponse:
     else:
         # Filter out unavailable channels
         channels = list(channel.group_channels.values_list("code", flat=True))
-        form = GroupForm(
-            {"channels": channels, "label": channel.name}, project=channel.project
-        )
+        form = GroupForm({"channels": channels, "label": channel.name}, project=channel.project)
 
     ctx = {"page": "channels", "project": channel.project, "form": form}
     return render(request, "group_form.html", ctx)

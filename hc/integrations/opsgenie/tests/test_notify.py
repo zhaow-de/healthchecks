@@ -12,9 +12,7 @@ from hc.test import BaseTestCase
 
 
 class NotifyOpsgenieTestCase(BaseTestCase):
-    def _setup_data(
-        self, value: str, status: str = "down", email_verified: bool = True
-    ) -> None:
+    def _setup_data(self, value: str, status: str = "down", email_verified: bool = True) -> None:
         self.check = Check(project=self.project)
         self.check.name = "Foo"
         # Transport classes should use flip.new_status,

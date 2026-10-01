@@ -16,8 +16,6 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="check",
-            index=models.Index(
-                fields=["project_id", "slug"], name="api_check_project_slug"
-            ),
+            index=models.Index(fields=["project_id", "slug"], name="api_check_project_slug"),
         ),
     ]

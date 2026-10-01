@@ -45,9 +45,7 @@ class Command(BaseCommand):
 
         # A sort of optimistic lock. Will try to update next_report_date,
         # and if does get modified, we're in drivers seat:
-        qq = Profile.objects.filter(
-            id=profile.id, next_report_date=profile.next_report_date
-        )
+        qq = Profile.objects.filter(id=profile.id, next_report_date=profile.next_report_date)
 
         # Next report date is currently not scheduled: schedule it and move on.
         if profile.next_report_date is None:

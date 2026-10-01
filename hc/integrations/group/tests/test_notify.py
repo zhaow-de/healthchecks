@@ -56,9 +56,7 @@ class NotifyGroupTestCase(BaseTestCase):
         self.assertEqual(len(mail.outbox), 1)
 
     def test_it_handles_noop(self) -> None:
-        self.channel_email.value = json.dumps(
-            {"value": "alice@example.org", "up": False, "down": False}
-        )
+        self.channel_email.value = json.dumps({"value": "alice@example.org", "up": False, "down": False})
         self.channel_email.save()
 
         self.channel.notify(self.flip)
@@ -71,9 +69,7 @@ class NotifyGroupTestCase(BaseTestCase):
         self.assertEqual(n.error, "")
 
     def test_it_ignores_invalid_channels(self) -> None:
-        self.channel.value = (
-            "bda20a83-409c-4b2c-8e9b-589d408cd57b,40500bf8-0f37-4bb3-970c-9fe64b7ef39d"
-        )
+        self.channel.value = "bda20a83-409c-4b2c-8e9b-589d408cd57b,40500bf8-0f37-4bb3-970c-9fe64b7ef39d"
         self.channel.save()
 
         self.channel.notify(self.flip)

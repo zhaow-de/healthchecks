@@ -70,9 +70,7 @@ class NotifyPagertreeTestCase(BaseTestCase):
         payload = mock_post.call_args.kwargs["json"]
         self.assertEqual("Foo is DOWN (received a failure signal)", payload["title"])
 
-        self.assertIn(
-            "Foo is DOWN (received a failure signal).", payload["description"]
-        )
+        self.assertIn("Foo is DOWN (received a failure signal).", payload["description"])
         self.assertIn("Last ping was 10 minutes ago.", payload["description"])
 
     @override_settings(PAGERTREE_ENABLED=False)

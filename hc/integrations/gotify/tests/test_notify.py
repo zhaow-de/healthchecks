@@ -83,9 +83,7 @@ class NotifyGotidyTestCase(BaseTestCase):
     @patch("hc.api.transports.curl.request", autospec=True)
     def test_it_handles_subpath(self, mock_post: Mock) -> None:
         mock_post.return_value.status_code = 200
-        self.channel.value = json.dumps(
-            {"url": "https://example.org/sub/", "token": "abc"}
-        )
+        self.channel.value = json.dumps({"url": "https://example.org/sub/", "token": "abc"})
 
         self.channel.notify(self.flip)
 
@@ -95,9 +93,7 @@ class NotifyGotidyTestCase(BaseTestCase):
     @patch("hc.api.transports.curl.request", autospec=True)
     def test_it_handles_subpath_with_missing_slash(self, mock_post: Mock) -> None:
         mock_post.return_value.status_code = 200
-        self.channel.value = json.dumps(
-            {"url": "https://example.org/sub", "token": "abc"}
-        )
+        self.channel.value = json.dumps({"url": "https://example.org/sub", "token": "abc"})
 
         self.channel.notify(self.flip)
 

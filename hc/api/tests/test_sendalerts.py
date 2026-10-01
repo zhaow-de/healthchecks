@@ -216,9 +216,7 @@ class SendAlertsTestCase(BaseTestCase):
             Webhook.is_noop.return_value = False
             notify(flip)
 
-        self.assertEqual(
-            statsd.incr.mock_calls, [call("hc.notifications.webhook.success")]
-        )
+        self.assertEqual(statsd.incr.mock_calls, [call("hc.notifications.webhook.success")])
 
     @patch("hc.api.management.commands.sendalerts.statsd")
     def test_it_increases_statsd_fail_counter(self, statsd: Mock) -> None:
@@ -241,6 +239,4 @@ class SendAlertsTestCase(BaseTestCase):
             Webhook.notify.side_effect = TransportError("Test error message")
             notify(flip)
 
-        self.assertEqual(
-            statsd.incr.mock_calls, [call("hc.notifications.webhook.fail")]
-        )
+        self.assertEqual(statsd.incr.mock_calls, [call("hc.notifications.webhook.fail")])

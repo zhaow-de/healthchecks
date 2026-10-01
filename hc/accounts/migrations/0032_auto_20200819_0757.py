@@ -11,8 +11,6 @@ class Migration(migrations.Migration):
     operations = [
         migrations.AddConstraint(
             model_name="member",
-            constraint=models.UniqueConstraint(
-                fields=("user", "project"), name="accounts_member_no_duplicates"
-            ),
+            constraint=models.UniqueConstraint(fields=("user", "project"), name="accounts_member_no_duplicates"),
         ),
     ]

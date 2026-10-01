@@ -38,9 +38,7 @@ class NtfyForm(forms.Form):
     token = forms.CharField(max_length=100, required=False)
 
     priority = forms.TypedChoiceField(choices=PRIORITY_CHOICES, coerce=int, initial=3)
-    priority_up = forms.TypedChoiceField(
-        choices=PRIORITY_CHOICES, coerce=int, initial=3
-    )
+    priority_up = forms.TypedChoiceField(choices=PRIORITY_CHOICES, coerce=int, initial=3)
 
     def get_value(self) -> str:
         return json.dumps(dict(self.cleaned_data), sort_keys=True)

@@ -13,9 +13,7 @@ from hc.test import BaseTestCase
 
 
 class NotifySlackTestCase(BaseTestCase):
-    def _setup_data(
-        self, value: str, status: str = "down", email_verified: bool = True
-    ) -> None:
+    def _setup_data(self, value: str, status: str = "down", email_verified: bool = True) -> None:
         self.check = Check(project=self.project)
         self.check.name = "Foobar"
         # Transport classes should use flip.new_status,
@@ -203,9 +201,7 @@ class NotifySlackTestCase(BaseTestCase):
 
     @patch("hc.api.transports.logger.debug", autospec=True)
     @patch("hc.api.transports.curl.request", autospec=True)
-    def test_it_disables_channel_on_400_invalid_token(
-        self, mock_post: Mock, debug: Mock
-    ) -> None:
+    def test_it_disables_channel_on_400_invalid_token(self, mock_post: Mock, debug: Mock) -> None:
         self._setup_data("123")
         mock_post.return_value.status_code = 400
         mock_post.return_value.content = b"invalid_token"

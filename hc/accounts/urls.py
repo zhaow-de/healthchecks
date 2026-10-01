@@ -7,9 +7,7 @@ from hc.accounts import views
 urlpatterns = [
     path("projects/add/", views.add_project, name="hc-add-project"),
     path("projects/<uuid:code>/settings/", views.project, name="hc-project-settings"),
-    path(
-        "projects/<uuid:code>/remove/", views.remove_project, name="hc-remove-project"
-    ),
+    path("projects/<uuid:code>/remove/", views.remove_project, name="hc-remove-project"),
     path("accounts/login/", views.login, name="hc-login"),
     path("accounts/login/two_factor/", views.login_webauthn, name="hc-login-webauthn"),
     path("accounts/login/two_factor/totp/", views.login_totp, name="hc-login-totp"),
@@ -24,9 +22,7 @@ urlpatterns = [
     ),
     path("accounts/profile/", views.profile, name="hc-profile"),
     path("accounts/profile/appearance/", views.appearance, name="hc-appearance"),
-    path(
-        "accounts/profile/notifications/", views.notifications, name="hc-notifications"
-    ),
+    path("accounts/profile/notifications/", views.notifications, name="hc-notifications"),
     path("accounts/close/", views.close, name="hc-close"),
     path(
         "accounts/unsubscribe_reports/<str:signed_username>/",

@@ -24,9 +24,7 @@ class CreateSuperuserTestCase(BaseTestCase):
     @patch(Command.__module__ + ".sys.stdin.isatty", Mock(return_value=True))
     @patch(Command.__module__ + ".getpass")
     @patch(Command.__module__ + ".input")
-    def test_it_rejects_duplicate_email(
-        self, mock_input: Mock, mock_getpass: Mock
-    ) -> None:
+    def test_it_rejects_duplicate_email(self, mock_input: Mock, mock_getpass: Mock) -> None:
         cmd = Command(stdout=Mock(), stderr=Mock())
         mock_input.side_effect = ["alice@example.org", "alice2@example.org"]
         mock_getpass.return_value = "hunter2"

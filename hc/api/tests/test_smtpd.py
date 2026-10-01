@@ -286,9 +286,7 @@ class SmtpdTestCase(BaseTestCase):
 
     def test_it_handles_missing_slug(self) -> None:
         mailto = f"{self.project.ping_key}+missing@example.org"
-        result = _process_message(
-            "1.2.3.4", "foobar@example.org", mailto, b"hello world"
-        )
+        result = _process_message("1.2.3.4", "foobar@example.org", mailto, b"hello world")
         self.assertEqual(result, f"Check not found: {mailto}")
 
     def test_it_handles_ambiguous_slug(self) -> None:
@@ -299,9 +297,7 @@ class SmtpdTestCase(BaseTestCase):
         Check.objects.create(project=self.project, slug="testslug")
 
         mailto = f"{self.project.ping_key}+testslug@example.org"
-        result = _process_message(
-            "1.2.3.4", "foobar@example.org", mailto, b"hello world"
-        )
+        result = _process_message("1.2.3.4", "foobar@example.org", mailto, b"hello world")
         self.assertEqual(result, f"Ambiguous slug: {mailto}")
 
     def test_it_handles_filter_default_fail(self) -> None:

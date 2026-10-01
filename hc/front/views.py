@@ -108,9 +108,7 @@ def _common_timezones(checks: Iterable[Check]) -> list[str]:
     return [tz for tz, _ in counter.most_common(3)]
 
 
-def _get_check_for_user(
-    request: HttpRequest, code: UUID, preload_owner_profile: bool = False
-) -> tuple[Check, bool]:
+def _get_check_for_user(request: HttpRequest, code: UUID, preload_owner_profile: bool = False) -> tuple[Check, bool]:
     """Return specified check if current user has access to it.
 
     If `preload_owner_profile` is `True`, the returned check's
@@ -334,16 +332,12 @@ def status(request: HttpRequest, code: UUID) -> HttpResponse:
 
     tags_counts, num_down = _tags_counts(checks)
     tags = {tag: (status, tooltip) for tag, status, tooltip in tags_counts}
-    return JsonResponse(
-        {"details": details, "tags": tags, "title": num_down_title(num_down)}
-    )
+    return JsonResponse({"details": details, "tags": tags, "title": num_down_title(num_down)})
 
 
 @login_required
 @require_POST
-def switch_channel(
-    request: AuthenticatedHttpRequest, code: UUID, channel_code: UUID
-) -> HttpResponse:
+def switch_channel(request: AuthenticatedHttpRequest, code: UUID, channel_code: UUID) -> HttpResponse:
     check = _get_rw_check_for_user(request, code)
 
     channel = get_object_or_404(Channel, code=channel_code)
@@ -364,9 +358,7 @@ class ProjectStatus(TypedDict):
 
 
 def _get_project_summary(profile: Profile) -> dict[UUID, ProjectStatus]:
-    statuses: dict[UUID, ProjectStatus] = defaultdict(
-        lambda: {"status": "up", "started": False}
-    )
+    statuses: dict[UUID, ProjectStatus] = defaultdict(lambda: {"status": "up", "started": False})
     q = profile.checks_from_all_projects()
     q = q.annotate(project_code=F("project__code"))
     for check in q:
@@ -732,9 +724,7 @@ def validate_schedule(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
-def ping_details(
-    request: AuthenticatedHttpRequest, code: UUID, n: int | None = None
-) -> HttpResponse:
+def ping_details(request: AuthenticatedHttpRequest, code: UUID, n: int | None = None) -> HttpResponse:
     # This view makes two non-obvious SQL queries:
     # * it calls ping.get_body(), which reads self.owner.code, triggering a query
     # * the template calls ping.duration() which queries past "/start" events
@@ -929,9 +919,7 @@ def _get_events(
     # as "body_raw_preview". This reduces both network I/O to database, and disk I/O
     # on the database host if the database contains large request bodies.
     pq = pq.defer("body_raw")
-    pq = pq.annotate(
-        body_raw_preview=Substr("body_raw", 1, 151, output_field=BinaryField())
-    )
+    pq = pq.annotate(body_raw_preview=Substr("body_raw", 1, 151, output_field=BinaryField()))
     pings = list(pq[:page_limit])
     prepare_durations(pings)
 
@@ -1140,9 +1128,7 @@ def status_single(request: HttpRequest, code: UUID) -> HttpResponse:
     if updated != request.GET.get("u"):
         doc["events"] = EVENTS_TMPL.render({"check": check, "events": events})
         downtimes = check.downtimes(3, request.profile.tz)
-        doc["downtimes"] = DOWNTIMES_TMPL.render(
-            {"downtimes": downtimes, "tz": request.profile.tz}
-        )
+        doc["downtimes"] = DOWNTIMES_TMPL.render({"downtimes": downtimes, "tz": request.profile.tz})
 
     return JsonResponse(doc)
 
@@ -1167,9 +1153,7 @@ def badges(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
             url = get_badge_url(project.badge_key, label, fmt, with_late)
         elif form.cleaned_data["target"] == "check":
             check = project.check_set.get(code=form.cleaned_data["check"])
-            url = absolute_reverse(
-                "hc-badge-check", args=[states, check.badge_key, fmt]
-            )
+            url = absolute_reverse("hc-badge-check", args=[states, check.badge_key, fmt])
             label = check.name_then_code()
 
         if fmt == "shields":
@@ -1299,9 +1283,7 @@ def update_channel_name(request: AuthenticatedHttpRequest, code: UUID) -> HttpRe
 
 @require_POST
 @login_required
-def send_test_notification(
-    request: AuthenticatedHttpRequest, code: UUID
-) -> HttpResponse:
+def send_test_notification(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
     channel, _rw = _get_channel_for_user(request, code)
 
     dummy = Check(name="TEST", status="down", project=channel.project)

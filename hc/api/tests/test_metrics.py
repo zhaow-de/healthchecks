@@ -38,9 +38,7 @@ class MetricsTestCase(BaseTestCase):
     def test_it_returns_max_notification_id(self) -> None:
         check = Check.objects.create(project=self.project, status="down")
         channel = Channel.objects.create(project=self.project, kind="email")
-        n = Notification.objects.create(
-            owner=check, channel=channel, check_status="down"
-        )
+        n = Notification.objects.create(owner=check, channel=channel, check_status="down")
 
         r = self.client.get(self.url, HTTP_X_METRICS_KEY="foo")
         self.assertEqual(r.status_code, 200)

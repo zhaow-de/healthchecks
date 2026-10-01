@@ -25,9 +25,7 @@ class UpdateCheckTestCase(BaseTestCase):
         api_key: str = "X" * 32,
     ) -> TestHttpResponse:
         url = f"/api/v{v}/checks/{code}"
-        return self.csrf_client.post(
-            url, data, content_type="application/json", HTTP_X_API_KEY=api_key
-        )
+        return self.csrf_client.post(url, data, content_type="application/json", HTTP_X_API_KEY=api_key)
 
     def test_it_works(self) -> None:
         self.check.last_ping = now()

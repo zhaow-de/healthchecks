@@ -12,10 +12,6 @@ class Migration(migrations.Migration):
             name="last_sms_date",
             field=models.DateTimeField(blank=True, null=True),
         ),
-        migrations.AddField(
-            model_name="profile", name="sms_limit", field=models.IntegerField(default=0)
-        ),
-        migrations.AddField(
-            model_name="profile", name="sms_sent", field=models.IntegerField(default=0)
-        ),
+        migrations.AddField(model_name="profile", name="sms_limit", field=models.IntegerField(default=0)),
+        migrations.AddField(model_name="profile", name="sms_sent", field=models.IntegerField(default=0)),
     ]

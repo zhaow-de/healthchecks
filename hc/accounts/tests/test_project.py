@@ -129,9 +129,7 @@ class ProjectTestCase(BaseTestCase):
         members = self.project.member_set.all()
         self.assertEqual(members.count(), 2)
 
-        member = Member.objects.get(
-            project=self.project, user__email="frank@example.org"
-        )
+        member = Member.objects.get(project=self.project, user__email="frank@example.org")
 
         # The read-write flag should be set
         self.assertEqual(member.role, member.Role.REGULAR)
@@ -164,9 +162,7 @@ class ProjectTestCase(BaseTestCase):
         r = self.client.post(self.url, form)
         self.assertEqual(r.status_code, 200)
 
-        member = Member.objects.get(
-            project=self.project, user__email="frank@example.org"
-        )
+        member = Member.objects.get(project=self.project, user__email="frank@example.org")
 
         self.assertEqual(member.role, member.Role.READONLY)
 
@@ -179,9 +175,7 @@ class ProjectTestCase(BaseTestCase):
         r = self.client.post(self.url, form)
         self.assertEqual(r.status_code, 200)
 
-        member = Member.objects.get(
-            project=self.project, user__email="frank@example.org"
-        )
+        member = Member.objects.get(project=self.project, user__email="frank@example.org")
 
         # The new user should have role manager
         self.assertEqual(member.role, member.Role.MANAGER)

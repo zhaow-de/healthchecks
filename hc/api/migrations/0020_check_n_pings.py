@@ -6,8 +6,4 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
     dependencies = [("api", "0019_check_tags")]
 
-    operations = [
-        migrations.AddField(
-            model_name="check", name="n_pings", field=models.IntegerField(default=0)
-        )
-    ]
+    operations = [migrations.AddField(model_name="check", name="n_pings", field=models.IntegerField(default=0))]

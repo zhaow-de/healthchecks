@@ -19,9 +19,7 @@ class GotifyForm(forms.Form):
     token = forms.CharField(max_length=50)
     url = LaxURLField(max_length=1000, assume_scheme="https")
     priority = forms.TypedChoiceField(choices=PRIORITY_CHOICES, coerce=int, initial=5)
-    priority_up = forms.TypedChoiceField(
-        choices=PRIORITY_CHOICES, coerce=int, initial=5
-    )
+    priority_up = forms.TypedChoiceField(choices=PRIORITY_CHOICES, coerce=int, initial=5)
 
     def get_value(self) -> str:
         return json.dumps(dict(self.cleaned_data), sort_keys=True)

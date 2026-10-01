@@ -231,9 +231,7 @@ if os.getenv("DB") == "postgres":
             "OPTIONS": {
                 "application_name": "hc",
                 "sslmode": os.getenv("DB_SSLMODE", "prefer"),
-                "target_session_attrs": os.getenv(
-                    "DB_TARGET_SESSION_ATTRS", "read-write"
-                ),
+                "target_session_attrs": os.getenv("DB_TARGET_SESSION_ATTRS", "read-write"),
             },
         }
     }
