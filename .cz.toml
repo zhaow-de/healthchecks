@@ -1,0 +1,17 @@
+[tool.commitizen]
+name = "cz_customize"
+version = "4.5.0"
+tag_format = "v$version"
+major_version_zero = false
+update_changelog_on_bump = false
+version_files = [
+    "pyproject.toml:^version",
+    "README.md:badge/version-",
+]
+bump_message = "chore(release): bump version $current_version → $new_version"
+
+# bump_map keys are matched against bump_pattern's capture group, so the
+# pattern wraps "type(scope)!" in ONE group to make the "!" visible to "^.+!".
+[tool.commitizen.customize]
+bump_pattern = "^((?:feat|fix|chore|docs|ci|test|style|perf|refactor|build|revert|claude)(?:\\([^()]*\\))?!?|BREAKING[ -]CHANGE)(?=:)"
+bump_map = {"^.+!" = "MAJOR", "^BREAKING" = "MAJOR", "fix" = "PATCH", "docs" = "PATCH", "ci" = "PATCH", "test" = "PATCH", "style" = "PATCH", "chore" = "PATCH", "claude" = "PATCH", "feat" = "MINOR", "perf" = "MINOR", "refactor" = "MINOR", "build" = "MINOR", "revert" = "MINOR"}

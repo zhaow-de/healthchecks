@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import sys
+import tomllib
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, overload
@@ -80,13 +81,8 @@ if v := os.getenv("SECURE_PROXY_SSL_HEADER"):
     SECURE_PROXY_SSL_HEADER = tuple(v.split(",", maxsplit=1))
 
 
-VERSION = ""
-
-with (BASE_DIR / "CHANGELOG.md").open(encoding="utf-8") as f:
-    for line in f.readlines():
-        if line.startswith("## v"):
-            VERSION = line.split()[1]
-            break
+with (BASE_DIR / "pyproject.toml").open("rb") as f:
+    VERSION = f"v{tomllib.load(f)['project']['version']}"
 
 
 INSTALLED_APPS = (

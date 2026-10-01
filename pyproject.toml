@@ -1,7 +1,6 @@
 [project]
 name = "healthchecks"
-# Matches the release tag (v4.5.0). The version shown in the app comes from
-# CHANGELOG.md (see VERSION in hc/settings.py).
+# Bumped by cz bump (see .cz.toml), never by hand; hc/settings.py reads it.
 version = "4.5.0"
 requires-python = "==3.14.*"
 dependencies = [

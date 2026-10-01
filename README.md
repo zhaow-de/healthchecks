@@ -1,5 +1,6 @@
 # Healthchecks
 
+![Version](https://img.shields.io/badge/version-v4.5.0-blue)
 ![Tests](https://img.shields.io/github/actions/workflow/status/zhaow-de/healthchecks/tests.yml?label=tests)
 ![Coveralls](https://img.shields.io/coverallsCoverage/github/zhaow-de/healthchecks)
 
@@ -17,7 +18,9 @@ The building blocks are:
 * Django 6.1
 * PostgreSQL, MySQL or MariaDB
 
-Healthchecks is licensed under the BSD 3-clause license.
+This repository's changes are licensed under the MIT license. The code
+from the original Healthchecks project remains under its BSD 3-clause
+license. Both are in [LICENSE](LICENSE).
 
 Healthchecks is available as a hosted service
 at [https://healthchecks.io/](https://healthchecks.io/).

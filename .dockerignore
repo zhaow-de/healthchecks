@@ -22,6 +22,7 @@ docker/.env
 CLAUDE.md
 .idea
 .vscode
+.cz.toml
 .pre-commit-config.yaml
 .yamllint.yaml
 ruff.toml
