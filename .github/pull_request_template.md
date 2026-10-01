@@ -1,8 +1,16 @@
-#### AI Assistance Disclosure
+## Summary
 
-- [ ] I have read [CONTRIBUTING.md](https://github.com/healthchecks/healthchecks/blob/master/CONTRIBUTING.md)
-- [ ] No AI tools were used in preparing this PR.
+<!-- A few sentences on what the change does and why. -->
 
-#### Description
+Read before push by: <model — Claude Opus or Claude Fable> at <sha>
 
-<!-- please describe the PR here -->
+<!--
+Optional sections as the change warrants; .claude/skills/open-pr/SKILL.md lists them.
+-->
+
+## Checklist
+
+- [ ] Tests pass (`uv run ./manage.py test` and `uv run pytest`)
+
+---
+Co-Authored-By: <Claude models, deduplicated>

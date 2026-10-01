@@ -10,6 +10,8 @@ static-collected
 .coverage
 coverage.lcov
 htmlcov
+.local
+.tmp
 
 # Secrets for docker compose
 docker/.env
