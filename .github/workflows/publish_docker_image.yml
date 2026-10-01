@@ -1,43 +1,43 @@
 name: Publish Docker image
 
 on:
-    release:
-        types: [published]
-    workflow_dispatch:
+  release:
+    types: [published]
+  workflow_dispatch: {}
 
 permissions: {}
 
 jobs:
-    push_to_registry:
-        name: Push Docker image to Docker Hub
-        runs-on: ubuntu-latest
-        steps:
-            - name: Check out the repo
-              uses: actions/checkout@v7
+  push_to_registry:
+    name: Push Docker image to Docker Hub
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v7
 
-            - name: Log in to Docker Hub
-              uses: docker/login-action@v4
-              with:
-                  username: ${{ secrets.DOCKERHUB_USERNAME }}
-                  password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-            - name: Extract metadata (tags, labels) for Docker
-              id: meta
-              uses: docker/metadata-action@v6
-              with:
-                  images: healthchecks/healthchecks
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: healthchecks/healthchecks
 
-            - name: Set up Docker Buildx
-              uses: docker/setup-buildx-action@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
 
-            - name: Build and push Docker image
-              uses: docker/build-push-action@v7
-              with:
-                  context: .
-                  file: docker/Dockerfile
-                  platforms: linux/amd64
-                  push: true
-                  tags: ${{ steps.meta.outputs.tags }}
-                  labels: ${{ steps.meta.outputs.labels }}
-                  annotations: ${{ steps.meta.outputs.annotations }}
-                  sbom: true
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
+          sbom: true

@@ -32,4 +32,3 @@ to PowerShell directly, using the "-Command" argument:
 # Pass the command to PowerShell directly:
 powershell.exe -Command "&{Invoke-RestMethod PING_URL}"
 ```
-

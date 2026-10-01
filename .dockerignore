@@ -19,8 +19,13 @@ docker/.env
 CLAUDE.md
 .idea
 .vscode
+.pre-commit-config.yaml
+.yamllint.yaml
+scripts
+tests
 
 # Caches
 **/__pycache__
 .mypy_cache
+.pytest_cache
 .ruff_cache

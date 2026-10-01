@@ -41,13 +41,22 @@ dev = [
     "django-stubs==6.1.1",
     "markdown==3.10.2",
     "mypy==2.3.1",
+    "pre-commit>=4.6.2",
     "pygments==2.21.0",
+    "pytest>=9.1.1",
     "time-machine==3.5.1",
     "types-markdown",
     "types-pycurl",
     "types-pygments",
 ]
 coverage = ["coverage", "coveralls"]
+
+[tool.pytest.ini_options]
+# `uv run pytest` runs the tests of the commit tooling under tests/ alone. The application's tests
+# under hc/ need Django's runner: `uv run ./manage.py test`.
+testpaths = ["tests"]
+# Without this an unregistered mark is a warning, and a misspelt one silently selects nothing.
+addopts = ["--strict-markers"]
 
 [tool.uv]
 # Healthchecks is an application run via manage.py, not an installable package.

@@ -195,5 +195,3 @@ replace the "build" section with:
 ```text
 image: healthchecks/healthchecks:vX.Y
 ```
-
-

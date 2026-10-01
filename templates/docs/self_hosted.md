@@ -200,4 +200,3 @@ have regular, automatic database backups set up.
 Get the [source code](https://github.com/zhaow-de/healthchecks).
 
 See [Configuration](../self_hosted_configuration/) for a list of configuration options.
-

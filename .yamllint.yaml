@@ -1,0 +1,31 @@
+extends: relaxed
+
+rules:
+  # relaxed sets these to warning level, which yamllint exits 0 on: pre-commit would pass them silently.
+  braces:
+    level: error
+  brackets:
+    level: error
+  colons:
+    level: error
+    max-spaces-before: 0
+    max-spaces-after: 1
+  commas:
+    level: error
+  empty-lines:
+    level: error
+  hyphens:
+    level: error
+  indentation:
+    level: error
+    spaces: 2
+    indent-sequences: true
+    check-multi-line-strings: false
+
+  key-duplicates: enable
+  line-length: disable
+  empty-values:
+    forbid-in-block-mappings: true
+    forbid-in-flow-mappings: true
+  trailing-spaces: enable
+  new-line-at-end-of-file: enable

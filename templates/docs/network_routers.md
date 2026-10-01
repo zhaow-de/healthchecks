@@ -58,6 +58,3 @@ Notes:
   also need to load these.
 * [Here's the full list of options](https://wiki.mikrotik.com/wiki/Manual:Tools/Fetch)
   supported by "tool fetch".
-
-
-

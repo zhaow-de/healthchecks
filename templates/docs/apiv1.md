@@ -1423,4 +1423,3 @@ curl --header "X-Api-Key: your-api-key" SITE_ROOT/api/v1/badges/
   }
 }
 ```
-

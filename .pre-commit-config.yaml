@@ -1,0 +1,95 @@
+# Installed per clone by `uv run pre-commit install`. The generated hooks exec this checkout's
+# `.venv/bin/python` by absolute path, falling back to a `pre-commit` on PATH, else refusing every
+# commit until `uv sync` rebuilds `.venv`.
+# `uv run pre-commit run -a` runs the pre-commit stage alone; the two commit-msg hooks need a message
+# file and run from the installed hook, and `--range <base>..<head>` on either script judges commits
+# already made.
+
+# Files committed exactly as a tool writes them. Each of these tools writes its output without a
+# final newline, so a fixer's edit would be undone the next time the tool runs:
+#   .idea/                            JetBrains IDE project settings
+#   templates/docs/*.html-fragment    ./manage.py render_docs
+#   stuff/icons_icomoon_project.json  project export of the IcoMoon app
+exclude: |
+  (?x)^(
+      \.idea/.*|
+      templates/docs/.*\.html-fragment|
+      stuff/icons_icomoon_project\.json
+  )$
+
+# Hooks that parse Python build their environments with the project's interpreter, 3.14 as
+# `requires-python` pins it, and not with whatever Python pre-commit itself was installed with,
+# which may reject syntax the project is allowed to use.
+default_language_version:
+  python: python3.14
+
+# Every hook is a commit-time hook unless it says otherwise. Without this line a hook whose manifest
+# declares no stages runs at every installed hook type, the commit-msg one included.
+default_stages: [pre-commit]
+# `pre-commit install` installs the commit-msg hook type beside pre-commit, for message-citations,
+# without a `--hook-type` per clone.
+default_install_hook_types: [pre-commit, commit-msg]
+
+repos:
+  # Five hooks below pin `stages: [pre-commit]`. Their upstream manifest declares
+  # `[pre-commit, pre-push, manual]`, which outranks `default_stages`, and two of the five REWRITE
+  # files — at push they would edit the working tree mid-push. The push stage is empty by design and
+  # `tests/test_pre_push_stage.py` holds it there, so a hook arriving in it is a red, not a choice.
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+        stages: [pre-commit]
+      - id: check-case-conflict
+      - id: check-executables-have-shebangs
+        stages: [pre-commit]
+      - id: check-merge-conflict
+      - id: check-shebang-scripts-are-executable
+        stages: [pre-commit]
+      - id: check-toml
+      - id: check-yaml
+      - id: debug-statements
+      - id: end-of-file-fixer
+        stages: [pre-commit]
+        # log_rows.html must render to an empty string when there are no events: static/js/log.js
+        # treats any non-empty response as new rows. A final newline in the template would be
+        # part of the response.
+        exclude: '^templates/front/log_rows\.html$'
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+      - id: trailing-whitespace
+        stages: [pre-commit]
+
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.38.0
+    hooks:
+      - id: yamllint
+        args: ["-c", ".yamllint.yaml"]
+
+  # shellcheck over every tracked file `identify` types as shell, by shebang or extension. A finding is
+  # fixed in the script; a `# shellcheck disable=` stays only on the one line it is wrong for, with the
+  # reason beside it.
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1
+    hooks:
+      - id: shellcheck
+        types: [shell]
+
+  # Enforcement for the one-kind-per-commit rule. Only separates claude-kind from everything else;
+  # feat/fix commits legitimately mix code, tests, templates and docs. SKIP=staged-kind commits the
+  # mix.
+  - repo: local
+    hooks:
+      - id: staged-kind
+        name: claude-kind files not mixed with other kinds
+        entry: bash scripts/staged-kind-check.sh
+        language: system
+        pass_filenames: false
+        always_run: true
+      # The script's docstring names what it judges on the index and at HEAD, and what it leaves alone.
+      - id: message-citations
+        name: every citation in the message resolves
+        entry: uv run python scripts/message-citations.py
+        language: system
+        stages: [commit-msg]
+        always_run: true
