@@ -13,7 +13,7 @@ team management features: projects, team members, read-only access.
 
 The building blocks are:
 
-* Python 3.12+
+* Python 3.14
 * Django 6.1
 * PostgreSQL, MySQL or MariaDB
 
@@ -22,7 +22,7 @@ Healthchecks is licensed under the BSD 3-clause license.
 Healthchecks is available as a hosted service
 at [https://healthchecks.io/](https://healthchecks.io/).
 
-A [Dockerfile](https://github.com/healthchecks/healthchecks/tree/master/docker)
+A [Dockerfile](docker/)
 and [pre-built Docker images](https://hub.docker.com/r/healthchecks/healthchecks) are
 available.
 
@@ -62,59 +62,37 @@ If you are planning to developing Healthchecks, please read
 
 To set up Healthchecks development environment:
 
-* Install dependencies (Debian/Ubuntu):
+* Install [uv](https://docs.astral.sh/uv/getting-started/installation/).
+  Healthchecks uses uv to manage the Python interpreter, the virtual environment
+  and the dependencies.
 
-  ```sh
-  sudo apt update
-  sudo apt install -y python3-venv
-  ```
-
-* Prepare directory for project code and virtualenv. Feel free to use a
-  different location:
+* Check out project code. Feel free to use a different location:
 
   ```sh
   mkdir -p ~/webapps
   cd ~/webapps
+  git clone https://github.com/zhaow-de/healthchecks.git
+  cd healthchecks
   ```
 
-* Prepare virtual environment
-  (with virtualenv you get pip, we'll use it soon to install requirements):
+* Install requirements (Django, ...):
 
   ```sh
-  python3 -m venv .venv
-  source .venv/bin/activate
+  uv sync
   ```
 
-* Check out project code:
+  This creates a virtual environment in `.venv` and installs the exact package
+  versions listed in `uv.lock`. If you do not have Python 3.14, uv downloads it.
 
-  ```sh
-  git clone https://github.com/healthchecks/healthchecks.git
-  ```
-
-* Install requirements (Django, ...) into virtualenv:
-
-  ```sh
-  pip install -r healthchecks/requirements.txt -r healthchecks/requirements-dev.txt
-  ```
-
-* macOS only - pycurl needs to be reinstalled using the following method (assumes OpenSSL was installed using brew):
-
-  ```sh
-  export PYCURL_VERSION=`cat requirements.txt | grep pycurl | cut -d '=' -f3`
-  export OPENSSL_LOCATION=`brew --prefix openssl`
-  export PYCURL_SSL_LIBRARY=openssl
-  export LDFLAGS=-L$OPENSSL_LOCATION/lib
-  export CPPFLAGS=-I$OPENSSL_LOCATION/include
-  pip uninstall -y pycurl
-  pip install pycurl==$PYCURL_VERSION --compile --no-cache-dir
-  ```
+  Most dependencies are installed from pre-built wheels. On platforms where a
+  dependency has no pre-built wheel (for example, `cryptography` on Intel Macs),
+  uv compiles it from source, and you will need a C compiler and a Rust toolchain.
 
 * Create database tables and a superuser account:
 
   ```sh
-  cd ~/webapps/healthchecks
-  ./manage.py migrate
-  ./manage.py createsuperuser
+  uv run ./manage.py migrate
+  uv run ./manage.py createsuperuser
   ```
 
   With the default configuration, Healthchecks stores data in a SQLite file
@@ -123,18 +101,23 @@ To set up Healthchecks development environment:
 * Run tests:
 
   ```sh
-  ./manage.py test
+  uv run ./manage.py test
   ```
 
 * Run development server:
 
   ```sh
-  ./manage.py runserver
+  uv run ./manage.py runserver
   ```
 
 The site should now be running at `http://localhost:8000`.
 To access Django administration site, log in as a superuser, then
 visit `http://localhost:8000/admin/`
+
+`uv run` runs a command in the project's virtual environment. Alternatively,
+activate the virtual environment with `source .venv/bin/activate`, and then
+run `./manage.py` directly. The `./manage.py` examples in the rest of this document
+assume an activated virtual environment.
 
 ## Configuration
 
@@ -347,11 +330,19 @@ AUTHENTICATION_BACKENDS = ["hc.accounts.backends.CustomHeaderBackend"]
 Healthchecks can optionally store large ping bodies in S3-compatible object
 storage. To enable this feature, you will need to:
 
-* ensure you have the [MinIO Python library](https://docs.min.io/docs/python-client-quickstart-guide.html) installed:
+* ensure you have the [MinIO Python library](https://docs.min.io/docs/python-client-quickstart-guide.html) installed.
+  `uv sync` installs it as a part of the development dependencies. If you use
+  `uv sync --no-dev`, add the `minio` extra:
 
   ```bash
-  pip install minio
+  uv sync --no-dev --extra minio
   ```
+
+  `uv sync` makes the environment match the command exactly, so pass every
+  extra you use each time (for example, `--extra minio --extra apprise`).
+  After a `--no-dev` install, run commands with `uv run --no-sync` or from an
+  activated virtual environment: a plain `uv run` syncs the environment first
+  and installs the development dependencies again.
 * configure the credentials for accessing object storage: `S3_ACCESS_KEY`,
   `S3_SECRET_KEY`, `S3_ENDPOINT`, `S3_REGION` and `S3_BUCKET`.
 
@@ -488,11 +479,19 @@ scheme.
 
 To enable Apprise integration, you will need to:
 
-* ensure you have apprise installed in your local environment:
+* ensure you have apprise installed in your local environment. `uv sync` installs
+  it as a part of the development dependencies. If you use `uv sync --no-dev`,
+  add the `apprise` extra:
 
   ```bash
-  pip install apprise
+  uv sync --no-dev --extra apprise
   ```
+
+  `uv sync` makes the environment match the command exactly, so pass every
+  extra you use each time (for example, `--extra minio --extra apprise`).
+  After a `--no-dev` install, run commands with `uv run --no-sync` or from an
+  activated virtual environment: a plain `uv run` syncs the environment first
+  and installs the development dependencies again.
 * enable the apprise functionality by setting the `APPRISE_ENABLED` environment variable.
 
 ### Shell Commands
@@ -567,8 +566,10 @@ Healthchecks instance in production.
      **Do not use it in production**, instead consider using
      [uWSGI](https://uwsgi-docs.readthedocs.io/en/latest/) or
      [gunicorn](https://gunicorn.org/).
-     An example of a minimal setup would be to install uWSGI using `pip3 install uwsgi`,
-     and to run `uwsgi --http :8000 --module hc.wsgi` from the project's root directory.
+     An example of a minimal setup would be to install uWSGI using
+     `uv sync --no-dev --extra uwsgi` (plus any other extras you use), and to run
+     `uv run --no-sync uwsgi --http :8000 --module hc.wsgi` from the project's root
+     directory.
   *  `manage.py sendalerts` is the process that monitors checks and sends out
      monitoring alerts. It must be always running, it must be started on reboot, and it
      must be restarted if it itself crashes. On modern linux systems, a good option is
@@ -589,10 +590,10 @@ Healthchecks instance in production.
 
 ## Docker Image
 
-Healthchecks provides a reference Dockerfile and prebuilt Docker images for every
-release. The Dockerfile lives in the [/docker/](https://github.com/healthchecks/healthchecks/tree/master/docker)
-directory, and Docker images for amd64, arm/v7 and arm64 architectures are available
-[on Docker Hub](https://hub.docker.com/r/healthchecks/healthchecks).
+Healthchecks provides a reference Dockerfile. It lives in the [/docker/](docker/)
+directory and builds images for the amd64 architecture only. The prebuilt images
+[on Docker Hub](https://hub.docker.com/r/healthchecks/healthchecks) are published
+by the upstream project, from its own Dockerfile.
 
 The Docker images:
 

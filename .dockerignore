@@ -1,0 +1,26 @@
+# Version control and files not needed in the image
+.git
+stuff
+
+# Local development state
+.venv
+hc.sqlite
+hc/local_settings.py
+static-collected
+.coverage
+htmlcov
+
+# Secrets for docker compose
+docker/.env
+
+# Editor, tooling and CI settings
+.claude
+.github
+CLAUDE.md
+.idea
+.vscode
+
+# Caches
+**/__pycache__
+.mypy_cache
+.ruff_cache

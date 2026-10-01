@@ -3,9 +3,18 @@ All notable changes to this project will be documented in this file.
 
 ## v4.5-dev - Unreleased
 
+This release drops support of Python 3.13 and below. The required Python
+version is 3.14.
+
+The Docker image is now built for the amd64 architecture only. The arm/v7 and arm64
+images are no longer built.
+
 ### Improvements
 - Fix project invite email template to mangle URLs in project names
 - Fix transfer request email template to mangle URLs in project names
+- Switch dependency management from pip and requirements.txt to uv (pyproject.toml, uv.lock)
+- Update Dockerfile to install the locked dependency versions with uv, into a virtual
+  environment in /opt/venv
 
 ### Bug Fixes
 - Fix the email integration to handle SMTP connection errors gracefully (#1346)

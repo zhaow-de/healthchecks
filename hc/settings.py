@@ -202,7 +202,7 @@ WSGI_APPLICATION = "hc.wsgi.application"
 
 
 # Default database engine is SQLite. So one can just check out code,
-# install requirements.txt and do manage.py runserver and it works
+# run "uv sync" and do manage.py runserver and it works
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 DATABASES: Mapping[str, Any] = {
     "default": {

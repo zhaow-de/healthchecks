@@ -28,7 +28,7 @@ def apprise_installed_check(
         items.append(
             Warning(
                 "settings.APPRISE_ENABLED is set to True, but apprise is not installed",
-                hint="try installing it using `pip install apprise`",
+                hint="add `--extra apprise` to your `uv sync` command",
                 id="hc.integrations.apprise.W001",
             )
         )

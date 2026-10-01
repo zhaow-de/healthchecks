@@ -8,68 +8,61 @@ Healthchecks instance yourself.
 
 The building blocks are:
 
-* Python 3.12+
+* Python 3.14
 * Django 6.0
 * PostgreSQL or MySQL
 
 ## Setting Up for Development
 
-You can set up a development environment in a Python
-[virtual environment](https://docs.python.org/3/tutorial/venv.html)
-on your local system to develop a new feature, write a new integration
-or test a bugfix.
+You can set up a development environment on your local system to develop a new
+feature, write a new integration or test a bugfix. Healthchecks uses
+[uv](https://docs.astral.sh/uv/) to manage the Python interpreter,
+the [virtual environment](https://docs.python.org/3/tutorial/venv.html)
+and the dependencies.
 
-The following instructions assume you are using a Debian-based OS.
+* Install uv by following
+  [its installation instructions](https://docs.astral.sh/uv/getting-started/installation/).
 
-* Install dependencies:
-
-        $ sudo apt-get update
-        $ sudo apt-get install -y gcc python3-dev python3-venv
-
-* Prepare directory for project code and virtualenv. Feel free to use a
-  different location:
+* Check out project code. Feel free to use a different location:
 
         $ mkdir -p ~/webapps
         $ cd ~/webapps
+        $ git clone https://github.com/zhaow-de/healthchecks.git
+        $ cd healthchecks
 
-* Prepare virtual environment
-  (with virtualenv you get pip, we'll use it soon to install requirements):
+* Install requirements (Django, ...):
 
-        $ python3 -m venv hc-venv
-        $ source hc-venv/bin/activate
+        $ uv sync
 
-* Check out project code:
-
-        $ git clone https://github.com/healthchecks/healthchecks.git
-
-* Install requirements (Django, ...) into virtualenv:
-
-        $ pip install wheel
-        $ pip install -r healthchecks/requirements.txt
-
+    This creates a virtual environment in `.venv` and installs the exact package
+    versions listed in `uv.lock`. If you do not have Python 3.14, uv downloads it.
 
 * Create database tables and a superuser account:
 
-        $ cd ~/webapps/healthchecks
-        $ ./manage.py migrate
-        $ ./manage.py createsuperuser
+        $ uv run ./manage.py migrate
+        $ uv run ./manage.py createsuperuser
 
     With the default configuration, Healthchecks stores data in a SQLite file
     `hc.sqlite` in the project directory (`~/webapps/healthchecks/`).
 
 * Run tests:
 
-        $ ./manage.py test
+        $ uv run ./manage.py test
 
 * Run development server:
 
-        $ ./manage.py runserver
+        $ uv run ./manage.py runserver
 
 * From another shell, run the `sendalerts` management command, responsible for
   sending out notifications:
-        $ ./manage.py sendalerts
+        $ uv run ./manage.py sendalerts
 
 At this point, the site should now be running at `http://localhost:8000`.
+
+`uv run` runs a command in the project's virtual environment. Alternatively,
+activate the virtual environment with `source .venv/bin/activate`, and then
+run `./manage.py` directly. The `./manage.py` examples in the rest of this document
+assume an activated virtual environment.
 
 ## Accessing Administration Panel
 
@@ -204,7 +197,7 @@ have regular, automatic database backups set up.
 
 ## Next Steps
 
-Get the [source code](https://github.com/healthchecks/healthchecks).
+Get the [source code](https://github.com/zhaow-de/healthchecks).
 
 See [Configuration](../self_hosted_configuration/) for a list of configuration options.
 

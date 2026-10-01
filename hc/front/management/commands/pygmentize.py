@@ -32,7 +32,7 @@ class Command(BaseCommand):
         if not have_pygments:
             self.stdout.write("This command requires the Pygments package.")
             self.stdout.write("Please install it with:\n\n")
-            self.stdout.write("  pip install Pygments\n\n")
+            self.stdout.write("  uv sync\n\n")
             return
 
         # Invocation examples

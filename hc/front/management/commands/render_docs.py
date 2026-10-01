@@ -16,7 +16,7 @@ class Command(BaseCommand):
             if find_spec(pkg) is None:
                 self.stdout.write(f"This command requires the {pkg} package.")
                 self.stdout.write("Please install it with:\n\n")
-                self.stdout.write(f"  pip install {pkg}\n\n")
+                self.stdout.write("  uv sync\n\n")
                 return
 
         import markdown

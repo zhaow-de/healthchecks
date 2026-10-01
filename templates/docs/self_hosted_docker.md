@@ -1,6 +1,6 @@
 # Running with Docker
 
-In the Healthchecks source code, [/docker/ directory](https://github.com/healthchecks/healthchecks/tree/master/docker),
+In the Healthchecks source code, [/docker/ directory](https://github.com/zhaow-de/healthchecks/tree/main/docker),
 you can find a sample configuration for running the project with
 [Docker](https://www.docker.com) and [Docker Compose](https://docs.docker.com/compose/).
 
@@ -11,7 +11,7 @@ termination.
 ## Getting Started
 
 * Grab the Healthchecks source code
-  [from the GitHub repository](https://github.com/healthchecks/healthchecks).
+  [from the GitHub repository](https://github.com/zhaow-de/healthchecks).
 * Copy `docker/.env.example` to `docker/.env` and add your configuration in it.
   As a minimum, set the following fields:
     * `ALLOWED_HOSTS` – the domain name of your Healthchecks instance.
@@ -171,13 +171,13 @@ docker run --rm --name pgauto -it \
 
 ## Pre-built Images
 
-Pre-built Docker images, built from the Dockerfile in the `/docker/` directory,
-are available [on Docker Hub](https://hub.docker.com/r/healthchecks/healthchecks).
-The images are built automatically for every new release.
+Pre-built Docker images are available
+[on Docker Hub](https://hub.docker.com/r/healthchecks/healthchecks). They are published
+by the upstream project for every upstream release, from its own Dockerfile.
 
-The Docker images:
+The Docker images built from the Dockerfile in the `/docker/` directory:
 
-* Support amd64, arm/v7 and arm64 architectures.
+* Support the amd64 architecture only.
 * Use uWSGI as the web server. uWSGI is configured to perform database migrations
   on startup, and to run `sendalerts`, `sendreports`, and `smtpd` in the background.
   You do not need to run them separately.

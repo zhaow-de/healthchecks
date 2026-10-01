@@ -5,58 +5,42 @@
 Healthchecks instance yourself.</p>
 <p>The building blocks are:</p>
 <ul>
-<li>Python 3.12+</li>
+<li>Python 3.14</li>
 <li>Django 6.0</li>
 <li>PostgreSQL or MySQL</li>
 </ul>
 <h2>Setting Up for Development</h2>
-<p>You can set up a development environment in a Python
-<a href="https://docs.python.org/3/tutorial/venv.html">virtual environment</a>
-on your local system to develop a new feature, write a new integration
-or test a bugfix.</p>
-<p>The following instructions assume you are using a Debian-based OS.</p>
+<p>You can set up a development environment on your local system to develop a new
+feature, write a new integration or test a bugfix. Healthchecks uses
+<a href="https://docs.astral.sh/uv/">uv</a> to manage the Python interpreter,
+the <a href="https://docs.python.org/3/tutorial/venv.html">virtual environment</a>
+and the dependencies.</p>
 <ul>
 <li>
-<p>Install dependencies:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>sudo<span class="w"> </span>apt-get<span class="w"> </span>update
-$<span class="w"> </span>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>gcc<span class="w"> </span>python3-dev<span class="w"> </span>python3-venv
-</code></pre></div>
-
+<p>Install uv by following
+  <a href="https://docs.astral.sh/uv/getting-started/installation/">its installation instructions</a>.</p>
 </li>
 <li>
-<p>Prepare directory for project code and virtualenv. Feel free to use a
-  different location:</p>
+<p>Check out project code. Feel free to use a different location:</p>
 <div class="highlight"><pre><span></span><code>$<span class="w"> </span>mkdir<span class="w"> </span>-p<span class="w"> </span>~/webapps
 $<span class="w"> </span><span class="nb">cd</span><span class="w"> </span>~/webapps
+$<span class="w"> </span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/zhaow-de/healthchecks.git
+$<span class="w"> </span><span class="nb">cd</span><span class="w"> </span>healthchecks
 </code></pre></div>
 
 </li>
 <li>
-<p>Prepare virtual environment
-  (with virtualenv you get pip, we'll use it soon to install requirements):</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>python3<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>hc-venv
-$<span class="w"> </span><span class="nb">source</span><span class="w"> </span>hc-venv/bin/activate
+<p>Install requirements (Django, ...):</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>uv<span class="w"> </span>sync
 </code></pre></div>
 
-</li>
-<li>
-<p>Check out project code:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/healthchecks/healthchecks.git
-</code></pre></div>
-
-</li>
-<li>
-<p>Install requirements (Django, ...) into virtualenv:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>wheel
-$<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>healthchecks/requirements.txt
-</code></pre></div>
-
+<p>This creates a virtual environment in <code>.venv</code> and installs the exact package
+versions listed in <code>uv.lock</code>. If you do not have Python 3.14, uv downloads it.</p>
 </li>
 <li>
 <p>Create database tables and a superuser account:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span><span class="nb">cd</span><span class="w"> </span>~/webapps/healthchecks
-$<span class="w"> </span>./manage.py<span class="w"> </span>migrate
-$<span class="w"> </span>./manage.py<span class="w"> </span>createsuperuser
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>./manage.py<span class="w"> </span>migrate
+$<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>./manage.py<span class="w"> </span>createsuperuser
 </code></pre></div>
 
 <p>With the default configuration, Healthchecks stores data in a SQLite file
@@ -64,23 +48,27 @@ $<span class="w"> </span>./manage.py<span class="w"> </span>createsuperuser
 </li>
 <li>
 <p>Run tests:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>./manage.py<span class="w"> </span><span class="nb">test</span>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>./manage.py<span class="w"> </span><span class="nb">test</span>
 </code></pre></div>
 
 </li>
 <li>
 <p>Run development server:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>./manage.py<span class="w"> </span>runserver
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>./manage.py<span class="w"> </span>runserver
 </code></pre></div>
 
 </li>
 <li>
 <p>From another shell, run the <code>sendalerts</code> management command, responsible for
   sending out notifications:
-        $ ./manage.py sendalerts</p>
+        $ uv run ./manage.py sendalerts</p>
 </li>
 </ul>
 <p>At this point, the site should now be running at <code>http://localhost:8000</code>.</p>
+<p><code>uv run</code> runs a command in the project's virtual environment. Alternatively,
+activate the virtual environment with <code>source .venv/bin/activate</code>, and then
+run <code>./manage.py</code> directly. The <code>./manage.py</code> examples in the rest of this document
+assume an activated virtual environment.</p>
 <h2>Accessing Administration Panel</h2>
 <p>Healthchecks comes with Django's administration panel where you can perform
 administrative tasks: delete user accounts, change passwords, increase limits for
@@ -103,11 +91,11 @@ environment variables:</p>
 <ul>
 <li>Implicit TLS (<em>recommended</em>):</li>
 </ul>
-<div class="highlight"><pre><span></span><code><span class="n">DEFAULT_FROM_EMAIL</span> <span class="o">=</span> <span class="s2">&quot;valid-sender-address@example.org&quot;</span>
-<span class="n">EMAIL_HOST</span> <span class="o">=</span> <span class="s2">&quot;smtp.example.org&quot;</span>
+<div class="highlight"><pre><span></span><code><span class="n">DEFAULT_FROM_EMAIL</span> <span class="o">=</span> <span class="s2">"valid-sender-address@example.org"</span>
+<span class="n">EMAIL_HOST</span> <span class="o">=</span> <span class="s2">"smtp.example.org"</span>
 <span class="n">EMAIL_PORT</span> <span class="o">=</span> <span class="mi">465</span>
-<span class="n">EMAIL_HOST_USER</span> <span class="o">=</span> <span class="s2">&quot;example-username&quot;</span>
-<span class="n">EMAIL_HOST_PASSWORD</span> <span class="o">=</span> <span class="s2">&quot;example-password&quot;</span>
+<span class="n">EMAIL_HOST_USER</span> <span class="o">=</span> <span class="s2">"example-username"</span>
+<span class="n">EMAIL_HOST_PASSWORD</span> <span class="o">=</span> <span class="s2">"example-password"</span>
 <span class="n">EMAIL_USE_TLS</span> <span class="o">=</span> <span class="kc">False</span>
 <span class="n">EMAIL_USE_SSL</span> <span class="o">=</span> <span class="kc">True</span>
 </code></pre></div>
@@ -118,11 +106,11 @@ to use a TLS certificate and not an SSL one.</p>
 <ul>
 <li>Explicit TLS:</li>
 </ul>
-<div class="highlight"><pre><span></span><code><span class="n">DEFAULT_FROM_EMAIL</span> <span class="o">=</span> <span class="s2">&quot;valid-sender-address@example.org&quot;</span>
-<span class="n">EMAIL_HOST</span> <span class="o">=</span> <span class="s2">&quot;smtp.example.org&quot;</span>
+<div class="highlight"><pre><span></span><code><span class="n">DEFAULT_FROM_EMAIL</span> <span class="o">=</span> <span class="s2">"valid-sender-address@example.org"</span>
+<span class="n">EMAIL_HOST</span> <span class="o">=</span> <span class="s2">"smtp.example.org"</span>
 <span class="n">EMAIL_PORT</span> <span class="o">=</span> <span class="mi">587</span>
-<span class="n">EMAIL_HOST_USER</span> <span class="o">=</span> <span class="s2">&quot;example-username&quot;</span>
-<span class="n">EMAIL_HOST_PASSWORD</span> <span class="o">=</span> <span class="s2">&quot;example-password&quot;</span>
+<span class="n">EMAIL_HOST_USER</span> <span class="o">=</span> <span class="s2">"example-username"</span>
+<span class="n">EMAIL_HOST_PASSWORD</span> <span class="o">=</span> <span class="s2">"example-password"</span>
 <span class="n">EMAIL_USE_TLS</span> <span class="o">=</span> <span class="kc">True</span>
 </code></pre></div>
 
@@ -137,10 +125,10 @@ checks by sending email messages.</p>
 </code></pre></div>
 
 <p>Send a test email:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>curl<span class="w"> </span>--url<span class="w"> </span><span class="s1">&#39;smtp://127.0.0.1:2525&#39;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--mail-from<span class="w"> </span><span class="s1">&#39;foo@example.org&#39;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--mail-rcpt<span class="w"> </span><span class="s1">&#39;11111111-1111-1111-1111-111111111111@my-hc.example.org&#39;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>-F<span class="w"> </span><span class="s1">&#39;=&#39;</span>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>curl<span class="w"> </span>--url<span class="w"> </span><span class="s1">'smtp://127.0.0.1:2525'</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--mail-from<span class="w"> </span><span class="s1">'foo@example.org'</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--mail-rcpt<span class="w"> </span><span class="s1">'11111111-1111-1111-1111-111111111111@my-hc.example.org'</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-F<span class="w"> </span><span class="s1">'='</span>
 </code></pre></div>
 
 <h2>Sending Status Notifications</h2>
@@ -189,5 +177,5 @@ test them on a copy of your database, not on the live database right away.
 In a production setup, you will want to run these commands regularly, as well as
 have regular, automatic database backups set up.</p>
 <h2>Next Steps</h2>
-<p>Get the <a href="https://github.com/healthchecks/healthchecks">source code</a>.</p>
+<p>Get the <a href="https://github.com/zhaow-de/healthchecks">source code</a>.</p>
 <p>See <a href="../self_hosted_configuration/">Configuration</a> for a list of configuration options.</p>

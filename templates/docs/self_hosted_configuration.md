@@ -148,11 +148,19 @@ Default: `False`
 A boolean that turns on/off the [Apprise](https://github.com/caronc/apprise)
 integration.
 
-Before enabling the Apprise integration, make sure the `apprise` package is installed:
+Before enabling the Apprise integration, make sure the `apprise` package is installed.
+`uv sync` installs it as a part of the development dependencies. If you use
+`uv sync --no-dev`, add the `apprise` extra:
 
 ```bash
-pip install apprise
+uv sync --no-dev --extra apprise
 ```
+
+`uv sync` makes the environment match the command exactly, so pass every
+extra you use each time (for example, `--extra minio --extra apprise`).
+After a `--no-dev` install, run commands with `uv run --no-sync` or from an
+activated virtual environment: a plain `uv run` syncs the environment first
+and installs the development dependencies again.
 
 ## `DB` {: #DB }
 

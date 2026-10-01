@@ -1,5 +1,5 @@
 <h1>Running with Docker</h1>
-<p>In the Healthchecks source code, <a href="https://github.com/healthchecks/healthchecks/tree/master/docker">/docker/ directory</a>,
+<p>In the Healthchecks source code, <a href="https://github.com/zhaow-de/healthchecks/tree/main/docker">/docker/ directory</a>,
 you can find a sample configuration for running the project with
 <a href="https://www.docker.com">Docker</a> and <a href="https://docs.docker.com/compose/">Docker Compose</a>.</p>
 <p>Note: For the sake of simplicity, the sample configuration starts a single database
@@ -8,7 +8,7 @@ termination.</p>
 <h2>Getting Started</h2>
 <ul>
 <li>Grab the Healthchecks source code
-  <a href="https://github.com/healthchecks/healthchecks">from the GitHub repository</a>.</li>
+  <a href="https://github.com/zhaow-de/healthchecks">from the GitHub repository</a>.</li>
 <li>
 <p>Copy <code>docker/.env.example</code> to <code>docker/.env</code> and add your configuration in it.
   As a minimum, set the following fields:</p>
@@ -150,12 +150,12 @@ data directory. One way to do this is using the
 <li>Start containers: <code>docker compose up</code></li>
 </ul>
 <h2>Pre-built Images</h2>
-<p>Pre-built Docker images, built from the Dockerfile in the <code>/docker/</code> directory,
-are available <a href="https://hub.docker.com/r/healthchecks/healthchecks">on Docker Hub</a>.
-The images are built automatically for every new release.</p>
-<p>The Docker images:</p>
+<p>Pre-built Docker images are available
+<a href="https://hub.docker.com/r/healthchecks/healthchecks">on Docker Hub</a>. They are published
+by the upstream project for every upstream release, from its own Dockerfile.</p>
+<p>The Docker images built from the Dockerfile in the <code>/docker/</code> directory:</p>
 <ul>
-<li>Support amd64, arm/v7 and arm64 architectures.</li>
+<li>Support the amd64 architecture only.</li>
 <li>Use uWSGI as the web server. uWSGI is configured to perform database migrations
   on startup, and to run <code>sendalerts</code>, <code>sendreports</code>, and <code>smtpd</code> in the background.
   You do not need to run them separately.</li>

@@ -14,7 +14,6 @@ jobs:
         strategy:
             matrix:
                 db: [sqlite, postgres, mysql, mariadb]
-                python-version: ["3.12", "3.13", "3.14"]
                 include:
                     - db: postgres
                       db_user: runner
@@ -28,11 +27,14 @@ jobs:
 
         steps:
             - uses: actions/checkout@v7
-            - name: Set up Python ${{ matrix.python-version }}
-              uses: actions/setup-python@v6
+            - name: Install uv
+              uses: astral-sh/setup-uv@v10.2.0
               with:
-                  python-version: ${{ matrix.python-version }}
-                  allow-prereleases: true
+                  version: "0.12.19"
+            - name: Set up Python
+              # Installs the version specified in .python-version. Keep this step:
+              # without it uv would use the runner's system Python.
+              run: uv python install
             - name: Start MySQL
               if: matrix.db == 'mysql'
               run: sudo systemctl start mysql.service
@@ -45,15 +47,11 @@ jobs:
               uses: ankane/setup-mariadb@v1
               if: matrix.db == 'mariadb'
             - name: Install Dependencies
-              run: |
-                  sudo apt-get update -qq
-                  sudo apt-get install -y libcurl4-openssl-dev libpython3-dev libssl-dev
-                  python -m pip install --upgrade pip
-                  pip install -r requirements.txt -r requirements-dev.txt mysqlclient
+              run: uv sync --locked --extra mysql
             - name: Run Tests
               env:
                   DB: ${{ matrix.db }}
                   DB_USER: ${{ matrix.db_user }}
                   DB_PASSWORD: ${{ matrix.db_password }}
                   SECRET_KEY: dummy-key
-              run: python manage.py test
+              run: uv run --no-sync manage.py test

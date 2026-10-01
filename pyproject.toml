@@ -1,0 +1,55 @@
+[project]
+name = "healthchecks"
+# Matches the release tag (v4.5.0). The version shown in the app comes from
+# CHANGELOG.md (see VERSION in hc/settings.py).
+version = "4.5.0"
+requires-python = "==3.14.*"
+dependencies = [
+    "aiosmtpd==1.4.6",
+    "cronsim==2.7",
+    "django[argon2]==6.1.1",
+    "django-compressor==4.6",
+    "django-stubs-ext==6.1.1",
+    "fido2==2.2.1",
+    "oncalendar==1.1",
+    "psycopg==3.3.6",
+    "pycurl==7.48.0",
+    "pydantic==2.13.5",
+    "pyjwt[crypto]==2.13.0",
+    "pyotp==2.10.0",
+    "segno==1.6.6",
+    "statsd==4.0.1",
+    "whitenoise==6.12.0",
+]
+
+# Optional runtime features. Install with "uv sync --extra <name>".
+# The Docker image is built with all of them.
+[project.optional-dependencies]
+apprise = ["apprise==1.13.1"]
+minio = ["minio==7.2.20"]
+mysql = ["mysqlclient"]
+psycopg-c = ["psycopg[c]"]
+uwsgi = ["uwsgi"]
+
+[dependency-groups]
+# Installed by default by "uv sync" and "uv run".
+dev = [
+    # The test suite and mypy cover the apprise and minio code paths. Keep these
+    # two pins equal to the extras above; "uv lock" fails if they disagree.
+    "apprise==1.13.1",
+    "minio==7.2.20",
+    "django-stubs==6.1.1",
+    "markdown==3.10.2",
+    "mypy==2.3.1",
+    "pygments==2.21.0",
+    "time-machine==3.5.1",
+    "types-markdown",
+    "types-pycurl",
+    "types-pygments",
+]
+coverage = ["coverage", "coveralls"]
+
+[tool.uv]
+# Healthchecks is an application run via manage.py, not an installable package.
+package = false
+required-version = ">=0.12.19"

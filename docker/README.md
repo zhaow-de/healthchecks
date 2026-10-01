@@ -40,7 +40,7 @@ termination.
 
 * `collectstatic`, `compress` – when running with Docker, you do
   not need to manually run these. These are run while building the container image,
-  and their results are baked in the image (you can find them listed in the [Dockerfile](https://github.com/healthchecks/healthchecks/blob/master/docker/Dockerfile)).
+  and their results are baked in the image (you can find them listed in the [Dockerfile](Dockerfile)).
 * `migrate`, `sendalerts`, `sendreports`, `smtpd` – when running with Docker, you
   also do  not need to manually run these. They are run automatically on
   container startup (you can find them listed in [uwsgi.ini](https://github.com/healthchecks/healthchecks/blob/master/docker/uwsgi.ini)).
@@ -151,13 +151,13 @@ docker run --rm --name pgauto -it \
 
 ## Pre-built Images
 
-Pre-built Docker images, built from the Dockerfile in this directory, are available
-[on Docker Hub](https://hub.docker.com/r/healthchecks/healthchecks). The images are
-built automatically for every new release.
+Pre-built Docker images are available
+[on Docker Hub](https://hub.docker.com/r/healthchecks/healthchecks). They are published
+by the upstream project for every upstream release, from its own Dockerfile.
 
-The Docker images:
+The Docker images built from the Dockerfile in this directory:
 
-* Support amd64, arm/v7 and arm64 architectures.
+* Support the amd64 architecture only.
 * Use uWSGI as the web server. uWSGI is configured to perform database migrations
   on startup, and to run `sendalerts`, `sendreports`, and `smtpd` in the background.
   You do not need to run them separately. The SMTP listener (`manage.py smtpd`) is

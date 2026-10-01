@@ -13,22 +13,21 @@ jobs:
         runs-on: ubuntu-26.04
         steps:
             - uses: actions/checkout@v7
-            - name: Set up Python
-              uses: actions/setup-python@v6
+            - name: Install uv
+              uses: astral-sh/setup-uv@v10.2.0
               with:
-                  python-version: "3.12"
+                  version: "0.12.19"
+            - name: Set up Python
+              # Installs the version specified in .python-version. Keep this step:
+              # without it uv would use the runner's system Python.
+              run: uv python install
             - name: Install Dependencies
-              run: |
-                  sudo apt-get update -qq
-                  sudo apt-get install -y libcurl4-openssl-dev libpython3-dev libssl-dev
-                  python -m pip install --upgrade pip
-                  pip install -r requirements.txt -r requirements-dev.txt
-                  pip install coverage coveralls
+              run: uv sync --locked --group coverage
             - name: Run Tests
               env:
                   SECRET_KEY: dummy-key
-              run: coverage run --omit=*/tests/*,*/migrations/* --source=hc manage.py test
+              run: uv run --no-sync coverage run --omit=*/tests/*,*/migrations/* --source=hc manage.py test
             - name: Coveralls
-              run: coveralls --service=github
+              run: uv run --no-sync coveralls --service=github
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
