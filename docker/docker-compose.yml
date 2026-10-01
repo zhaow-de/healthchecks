@@ -14,8 +14,8 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
     # To use a pre-built image, remove the above "build" section
-    # and uncomment the following line:
-    # image: healthchecks/healthchecks:latest
+    # and uncomment the following line (`latest` is the newest build of main):
+    # image: ghcr.io/zhaow-de/healthchecks:latest
     env_file:
       - .env
     ports:

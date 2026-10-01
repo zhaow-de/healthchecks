@@ -151,8 +151,10 @@ data directory. One way to do this is using the
 </ul>
 <h2>Pre-built Images</h2>
 <p>Pre-built Docker images are available
-<a href="https://hub.docker.com/r/healthchecks/healthchecks">on Docker Hub</a>. They are published
-by the upstream project for every upstream release, from its own Dockerfile.</p>
+<a href="https://github.com/zhaow-de/healthchecks/pkgs/container/healthchecks">on the GitHub Container Registry</a>
+as <code>ghcr.io/zhaow-de/healthchecks</code>. They are published from the Dockerfile in the
+<code>/docker/</code> directory: every release as <code>vX.Y.Z</code>, every build of the <code>develop</code> and <code>main</code>
+branches as its commit sha, and the newest build of <code>main</code> as <code>latest</code>.</p>
 <p>The Docker images built from the Dockerfile in the <code>/docker/</code> directory:</p>
 <ul>
 <li>Support the amd64 architecture only.</li>
@@ -166,7 +168,7 @@ by the upstream project for every upstream release, from its own Dockerfile.</p>
   the Healthchecks container behind a reverse proxy or load balancer that handles TLS
   termination.</li>
 </ul>
-<p>To use a pre-built image for Healthchecks version X.Y, in the <code>docker-compose.yml</code> file
+<p>To use a pre-built image for Healthchecks version X.Y.Z, in the <code>docker-compose.yml</code> file
 replace the "build" section with:</p>
-<div class="highlight"><pre><span></span><code>image: healthchecks/healthchecks:vX.Y
+<div class="highlight"><pre><span></span><code>image: ghcr.io/zhaow-de/healthchecks:vX.Y.Z
 </code></pre></div>

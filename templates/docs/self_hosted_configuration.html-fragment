@@ -447,7 +447,7 @@ emails, you will also need:</p>
   instance's IP address.</li>
 <li><code>manage.py smtpd</code> (Healthchecks' SMTP listener service) running, listening
   on port 25, and reachable from the outside world. If you are using the
-  <a href="https://hub.docker.com/r/healthchecks/healthchecks">official Docker image</a>,
+  <a href="https://github.com/zhaow-de/healthchecks/pkgs/container/healthchecks">pre-built Docker image</a>,
   see <a href="../self_hosted_docker/#SMTPD_PORT">the instructions here</a> for enabling the SMTP
   listener service.</li>
 </ul>
@@ -725,7 +725,7 @@ access directly</strong>. The logo image can use any image format supported by b
 <p><strong>Docker note.</strong> You can build a custom Docker image with your logo "baked in". To
 do so, use a Dockerfile with the following contents, and with your logo.png placed next
 to it:</p>
-<div class="highlight"><pre><span></span><code><span class="k">FROM</span><span class="w"> </span><span class="s">healthchecks/healthchecks</span>
+<div class="highlight"><pre><span></span><code><span class="k">FROM</span><span class="w"> </span><span class="s">ghcr.io/zhaow-de/healthchecks:vX.Y.Z</span>
 <span class="k">COPY</span><span class="w"> </span>logo.png<span class="w"> </span>/opt/healthchecks/static-collected/img/
 </code></pre></div>
 

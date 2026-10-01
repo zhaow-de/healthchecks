@@ -8,6 +8,7 @@ hc.sqlite
 hc/local_settings.py
 static-collected
 .coverage
+coverage.lcov
 htmlcov
 
 # Secrets for docker compose

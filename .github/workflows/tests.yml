@@ -1,16 +1,17 @@
 name: Tests
 
 on:
-  push:
-    branches: [master]
+  # Pull requests only: every change reaches develop and main through one, so a push run after the merge would repeat the suite.
   pull_request:
-    branches: [master]
-
-permissions: {}
+    branches: [develop, main]
 
 jobs:
-  test:
+  django:
+    name: Django tests (${{ matrix.db }})
     runs-on: ubuntu-26.04
+    # `actions/checkout` persists this token in .git/config for every later step; bound it whatever the repository default is.
+    permissions:
+      contents: read
     strategy:
       matrix:
         db: [sqlite, postgres, mysql, mariadb]
@@ -26,11 +27,27 @@ jobs:
             db_password: ""
 
     steps:
+      # The cache rule below compares uv.lock with `origin/develop`, which a depth-1 checkout does not fetch.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      # setup-uv skips the save on a hit; on a miss, only a pull request that changes uv.lock saves, for its later pushes.
+      # Any other leaves it to uv-cache.yml: a copy under its merge ref is one no other pull request can read.
+      - id: lock
+        run: |
+          if git diff --quiet origin/develop -- uv.lock; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
       - name: Install uv
         uses: astral-sh/setup-uv@v10.2.0
         with:
           version: "0.12.19"
+          # mysqlclient has no Linux wheel, and the cached one links the client library of a runner setup-mariadb has not touched.
+          enable-cache: ${{ matrix.db != 'mariadb' }}
+          cache-dependency-glob: uv.lock
+          save-cache: ${{ steps.lock.outputs.changed == 'true' }}
       - name: Set up Python
         # Installs the version specified in .python-version. Keep this step:
         # without it uv would use the runner's system Python.
@@ -49,9 +66,84 @@ jobs:
       - name: Install Dependencies
         run: uv sync --locked --extra mysql
       - name: Run Tests
+        if: matrix.db != 'sqlite'
         env:
           DB: ${{ matrix.db }}
           DB_USER: ${{ matrix.db_user }}
           DB_PASSWORD: ${{ matrix.db_password }}
           SECRET_KEY: dummy-key
-        run: uv run --no-sync manage.py test
+        run: uv run --no-sync ./manage.py test
+      # The SQLite leg runs the same tests under pytest with pytest-cov, so the numbers cost no extra run.
+      - name: Run Tests with coverage
+        if: matrix.db == 'sqlite'
+        env:
+          DB: ${{ matrix.db }}
+          SECRET_KEY: dummy-key
+        run: uv run --no-sync pytest hc --cov --cov-report=lcov:coverage.lcov
+      - name: Upload coverage to Coveralls
+        if: matrix.db == 'sqlite'
+        uses: coverallsapp/github-action@v2
+        with:
+          file: coverage.lcov
+          # The action fails the job on an upload error by default, which would let a coveralls.io outage block every merge.
+          fail-on-error: false
+        env:
+          COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
+
+  tooling:
+    # The tests of the commit tooling under tests/, which `./manage.py test` does not discover.
+    name: Tooling tests
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+    steps:
+      # The whole history, not the tip: `scripts/count-list.sh` reads develop's first-parent
+      # commits, and a depth-1 clone has none of them.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      # The same cache rule as the Django job above.
+      - id: lock
+        run: |
+          if git diff --quiet origin/develop -- uv.lock; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.2.0
+        with:
+          version: "0.12.19"
+          cache-dependency-glob: uv.lock
+          save-cache: ${{ steps.lock.outputs.changed == 'true' }}
+      - name: Set up Python
+        # Installs the version specified in .python-version. Keep this step:
+        # without it uv would use the runner's system Python.
+        run: uv python install
+      # The branch under the name the tooling reads: a pull_request checkout is detached at the
+      # merge ref with only `origin/develop`, and `scripts/count-list.sh` refuses a checkout with
+      # no local `develop`.
+      - run: git branch --force develop origin/develop
+      - name: Install Dependencies
+        run: uv sync --locked --extra mysql
+      - name: Run Tests
+        run: uv run --no-sync pytest
+
+  suite:
+    # This `name:` is the required context in .github/settings.yml and the check-run the open-pr and release skills wait for.
+    # Renaming ALSO strands every pull request open at that moment: their runs already reported under the old name, and
+    # a re-run replays the old workflow file, so each needs a fresh run (push a commit, or close and reopen) before it
+    # can merge again.
+    name: Full test suite
+    needs: [django, tooling]
+    if: always()
+    runs-on: ubuntu-26.04
+    permissions: {}
+    steps:
+      - name: Both jobs succeeded
+        env:
+          DJANGO: ${{ needs.django.result }}
+          TOOLING: ${{ needs.tooling.result }}
+        run: |
+          echo "Django tests: $DJANGO, tooling tests: $TOOLING"
+          test "$DJANGO" = success && test "$TOOLING" = success

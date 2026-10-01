@@ -152,8 +152,10 @@ docker run --rm --name pgauto -it \
 ## Pre-built Images
 
 Pre-built Docker images are available
-[on Docker Hub](https://hub.docker.com/r/healthchecks/healthchecks). They are published
-by the upstream project for every upstream release, from its own Dockerfile.
+[on the GitHub Container Registry](https://github.com/zhaow-de/healthchecks/pkgs/container/healthchecks)
+as `ghcr.io/zhaow-de/healthchecks`. This repository publishes them from the Dockerfile
+in this directory: every release as `vX.Y.Z`, every build of the `develop` and `main`
+branches as its commit sha, and the newest build of `main` as `latest`.
 
 The Docker images built from the Dockerfile in this directory:
 
@@ -169,13 +171,13 @@ The Docker images built from the Dockerfile in this directory:
   the Healthchecks container behind a reverse proxy or load balancer that handles TLS
   termination.
 
-To use a pre-built image for Healthchecks version X.Y, in the `docker-compose.yml` file
+To use a pre-built image for Healthchecks version X.Y.Z, in the `docker-compose.yml` file
 replace the "build" section with:
 
 ```text
-image: healthchecks/healthchecks:vX.Y
+image: ghcr.io/zhaow-de/healthchecks:vX.Y.Z
 ```
 
 To upgrade to a newer Healthchecks version, edit `docker-compose.yml` and update the
-version number in the container image name (the "X.Y" part) and run
+version number in the container image name (the "X.Y.Z" part) and run
 `docker compose up`.

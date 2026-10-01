@@ -622,7 +622,7 @@ emails, you will also need:
   instance's IP address.
 * `manage.py smtpd` (Healthchecks' SMTP listener service) running, listening
   on port 25, and reachable from the outside world. If you are using the
-  [official Docker image](https://hub.docker.com/r/healthchecks/healthchecks),
+  [pre-built Docker image](https://github.com/zhaow-de/healthchecks/pkgs/container/healthchecks),
   see [the instructions here](../self_hosted_docker/#SMTPD_PORT) for enabling the SMTP
   listener service.
 
@@ -1020,7 +1020,7 @@ do so, use a Dockerfile with the following contents, and with your logo.png plac
 to it:
 
 ```docker
-FROM healthchecks/healthchecks
+FROM ghcr.io/zhaow-de/healthchecks:vX.Y.Z
 COPY logo.png /opt/healthchecks/static-collected/img/
 ```
 

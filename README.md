@@ -1,7 +1,7 @@
 # Healthchecks
 
-[![Tests](https://github.com/healthchecks/healthchecks/actions/workflows/tests.yml/badge.svg)](https://github.com/healthchecks/healthchecks/actions/workflows/tests.yml)
-[![Coverage Status](https://coveralls.io/repos/healthchecks/healthchecks/badge.svg?branch=master&service=github)](https://coveralls.io/github/healthchecks/healthchecks?branch=master)
+![Tests](https://img.shields.io/github/actions/workflow/status/zhaow-de/healthchecks/tests.yml?label=tests)
+![Coveralls](https://img.shields.io/coverallsCoverage/github/zhaow-de/healthchecks)
 
 Healthchecks is a cron job monitoring service. It listens for HTTP requests
 and email messages ("pings") from your cron jobs and scheduled tasks ("checks").
@@ -23,7 +23,7 @@ Healthchecks is available as a hosted service
 at [https://healthchecks.io/](https://healthchecks.io/).
 
 A [Dockerfile](docker/)
-and [pre-built Docker images](https://hub.docker.com/r/healthchecks/healthchecks) are
+and [pre-built Docker images](https://github.com/zhaow-de/healthchecks/pkgs/container/healthchecks) are
 available.
 
 Screenshots:
@@ -591,9 +591,11 @@ Healthchecks instance in production.
 ## Docker Image
 
 Healthchecks provides a reference Dockerfile. It lives in the [/docker/](docker/)
-directory and builds images for the amd64 architecture only. The prebuilt images
-[on Docker Hub](https://hub.docker.com/r/healthchecks/healthchecks) are published
-by the upstream project, from its own Dockerfile.
+directory and builds images for the amd64 architecture only. This repository
+publishes the images it builds from that Dockerfile
+[on the GitHub Container Registry](https://github.com/zhaow-de/healthchecks/pkgs/container/healthchecks)
+as `ghcr.io/zhaow-de/healthchecks`: a release as `vX.Y.Z`, every build of the
+`develop` and `main` branches as its commit sha, and the newest build of `main` as `latest`.
 
 The Docker images:
 

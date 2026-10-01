@@ -42,17 +42,29 @@ dev = [
     "pre-commit>=4.6.2",
     "pygments==2.21.0",
     "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "pytest-django>=4.14.0",
     "ruff>=0.16.4",
     "time-machine==3.5.1",
 ]
-coverage = ["coverage", "coveralls"]
 
 [tool.pytest.ini_options]
-# `uv run pytest` runs the tests of the commit tooling under tests/ alone. The application's tests
-# under hc/ need Django's runner: `uv run ./manage.py test`.
+# `uv run pytest` runs the tests of the commit tooling under tests/. `uv run pytest hc` runs the
+# application's tests under hc/ through pytest-django, the same tests `uv run ./manage.py test` runs.
 testpaths = ["tests"]
+DJANGO_SETTINGS_MODULE = "hc.settings"
 # Without this an unregistered mark is a warning, and a misspelt one silently selects nothing.
 addopts = ["--strict-markers"]
+filterwarnings = [
+    # hc.test imports HttpResponse as TestHttpResponse, which pytest takes for a test class.
+    "ignore:cannot collect test class 'HttpResponse':pytest.PytestCollectionWarning",
+    # WhiteNoise warns on every request that static-collected/ is missing; the tests never collect static files.
+    "ignore:No directory at:UserWarning",
+]
+
+[tool.coverage.run]
+source = ["hc"]
+omit = ["*/tests/*", "*/migrations/*"]
 
 [tool.uv]
 # Healthchecks is an application run via manage.py, not an installable package.
