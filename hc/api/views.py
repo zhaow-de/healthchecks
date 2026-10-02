@@ -266,12 +266,6 @@ def ping_by_slug(
         except Project.DoesNotExist:
             return HttpResponseNotFound("not found")
 
-        profile = project.owner_profile
-        # When using auto-provisioning, users are allowed to temporarily
-        # exceed their check limit up to 2 times.
-        if profile.num_checks_used() >= profile.check_limit * 2:
-            return HttpResponseNotFound("not found")
-
         check = Check(project=project, name=slug, slug=slug)
         check.save()
         check.assign_all_channels()
@@ -440,9 +434,6 @@ def create_check(request: ApiRequest) -> HttpResponse:
     created = False
     check = _lookup(request.project, spec)
     if check is None:
-        if request.project.num_checks_available() <= 0:
-            return HttpResponseForbidden()
-
         check = Check(project=request.project)
         created = True
 

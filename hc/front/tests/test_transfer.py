@@ -16,31 +16,16 @@ class TransferTestCase(BaseTestCase):
         self.client.login(username="bob@example.org", password="password")
         r = self.client.get(self.url)
         self.assertContains(r, "Transfer to Another Project")
-        self.assertNotContains(r, "(at check limit)")
+        self.assertContains(r, f'<option value="{self.project.code}">')
 
-    def test_form_obeys_check_limit(self) -> None:
-        # Alices's projects cannot accept checks due to limits:
-        self.profile.check_limit = 0
-        self.profile.save()
-
-        self.client.login(username="bob@example.org", password="password")
-        r = self.client.get(self.url)
-        self.assertContains(r, "Transfer to Another Project")
-        self.assertContains(r, "(at check limit)")
-
-    def test_form_always_allows_transfers_between_same_accounts_projects(self) -> None:
-        # If user is at check limit, they should still be able to
-        # transfer checks between their own projects.
-        self.bobs_profile.check_limit = 1
-        self.bobs_profile.save()
-
+    def test_form_offers_same_accounts_projects(self) -> None:
         self.bobs_membership.delete()
-        Project.objects.create(owner=self.bob)
+        p2 = Project.objects.create(owner=self.bob)
 
         self.client.login(username="bob@example.org", password="password")
         r = self.client.get(self.url)
         self.assertContains(r, "Transfer to Another Project")
-        self.assertNotContains(r, "(at check limit)")
+        self.assertContains(r, f'<option value="{p2.code}">')
 
     def test_it_works(self) -> None:
         self.client.login(username="bob@example.org", password="password")
@@ -52,12 +37,7 @@ class TransferTestCase(BaseTestCase):
         check = Check.objects.get()
         self.assertEqual(check.project, self.project)
 
-    def test_post_always_allows_transfers_between_same_accounts_projects(self) -> None:
-        # If user is at check limit, they should still be able to
-        # transfer checks between their own projects.
-        self.bobs_profile.check_limit = 1
-        self.bobs_profile.save()
-
+    def test_post_allows_transfers_between_same_accounts_projects(self) -> None:
         self.bobs_membership.delete()
         p2 = Project.objects.create(owner=self.bob)
 
@@ -67,15 +47,16 @@ class TransferTestCase(BaseTestCase):
         self.assertRedirects(r, f"/checks/{self.check.code}/details/")
         self.assertContains(r, "Check transferred successfully")
 
-    def test_post_obeys_check_limit(self) -> None:
-        # Alice's projects cannot accept checks due to limits:
-        self.profile.check_limit = 0
-        self.profile.save()
+    def test_post_has_no_check_limit(self) -> None:
+        Check.objects.bulk_create([Check(project=self.project) for _ in range(25)])
 
         self.client.login(username="bob@example.org", password="password")
         payload = {"project": self.project.code}
         r = self.client.post(self.url, payload)
-        self.assertEqual(r.status_code, 400)
+        self.assertRedirects(r, f"/checks/{self.check.code}/details/")
+
+        self.check.refresh_from_db()
+        self.assertEqual(self.check.project, self.project)
 
     def test_it_reassigns_channels(self) -> None:
         alices_mail = Channel.objects.create(kind="email", project=self.project)

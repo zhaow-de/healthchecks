@@ -43,11 +43,6 @@ class Call(HttpTransport):
         ctx = {"check": flip.owner, "site_name": settings.SITE_NAME}
         message = self.tmpl("call_message.html", **ctx)
 
-        profile = self.channel.project.owner_profile
-        if not profile.authorize_call():
-            self.channel.send_call_limit_notice(message)
-            raise TransportError("Monthly phone call limit exceeded")
-
         url = self.URL % settings.TWILIO_ACCOUNT
         auth = (settings.TWILIO_ACCOUNT, settings.TWILIO_AUTH)
         escaped_message = escape(message)

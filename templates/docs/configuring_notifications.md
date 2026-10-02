@@ -30,19 +30,6 @@ each check's details pages:
   <source src="IMG_URL/details_integrations.webm" type="video/webm">
 </video>
 
-## SMS, WhatsApp, and Phone Call Monthly Quotas
-
-SITE_NAME sets a quota on the maximum number of SMS, WhatsApp, and phone-call
-notifications an account can send per month. The site administrator sets the
-limit for each account. The quota automatically resets at the start of each month.
-The "unused" sends from one month do not carry over to the next month.
-
-When an account exceeds its monthly limit, SITE_NAME will:
-
-* Send a warning email to the account's primary email address
-* Show a warning message on the **Integrations** page
-
-
 ## Repeated Notifications
 
 If you want to receive repeated notifications for as long as a particular check is

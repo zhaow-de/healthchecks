@@ -70,8 +70,8 @@ run <code>./manage.py</code> directly. The <code>./manage.py</code> examples in 
 assume an activated virtual environment.</p>
 <h2>Accessing Administration Panel</h2>
 <p>Healthchecks comes with Django's administration panel where you can perform
-administrative tasks: delete user accounts, change passwords, increase limits for
-specific users, inspect contents of database tables.</p>
+administrative tasks: delete user accounts, change passwords, inspect contents of
+database tables.</p>
 <p>To access the administration panel, if you haven't already, create a superuser account:</p>
 <div class="highlight"><pre><span></span><code>$<span class="w"> </span>./manage.py<span class="w"> </span>createsuperuser
 </code></pre></div>

@@ -63,6 +63,11 @@ class DetailsTestCase(BaseTestCase):
         r = self.client.get(self.url)
         self.assertEqual(r.status_code, 404)
 
+    def test_it_shows_copy_button(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(self.url)
+        self.assertContains(r, "Create a Copy&hellip;")
+
     def test_it_shows_cron_expression(self) -> None:
         self.check.kind = "cron"
         self.check.save()

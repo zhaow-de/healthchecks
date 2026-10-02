@@ -29,9 +29,6 @@ class SendInactivityNoticesTestCase(BaseTestCase):
         self.alice.date_joined = now() - td(days=500)
         self.alice.save()
 
-        self.profile.sms_limit = 5
-        self.profile.save()
-
         # remove members from alice's project
         self.project.member_set.all().delete()
 

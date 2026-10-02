@@ -133,10 +133,10 @@ class AddCheckTestCase(BaseTestCase):
         r = self.client.post(self.url, self._payload())
         self.assertEqual(r.status_code, 403)
 
-    def test_it_obeys_check_limit(self) -> None:
-        self.profile.check_limit = 0
-        self.profile.save()
+    def test_it_has_no_check_limit(self) -> None:
+        Check.objects.bulk_create([Check(project=self.project) for _ in range(25)])
 
         self.client.login(username="alice@example.org", password="password")
         r = self.client.post(self.url, self._payload())
-        self.assertEqual(r.status_code, 400)
+        self.assertRedirects(r, self.redirect_url)
+        self.assertEqual(Check.objects.count(), 26)

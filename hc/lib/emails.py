@@ -131,14 +131,6 @@ def deletion_scheduled(to: list[str], ctx: dict[str, Any]) -> None:
     send(m, block=True)
 
 
-def sms_limit(to: list[str], ctx: dict[str, Any]) -> None:
-    send(make_message("sms-limit", to, ctx))
-
-
-def call_limit(to: list[str], ctx: dict[str, Any]) -> None:
-    send(make_message("phone-call-limit", to, ctx))
-
-
 def sudo_code(to: str, ctx: dict[str, Any]) -> None:
     send(make_message("sudo-code", to, ctx))
 

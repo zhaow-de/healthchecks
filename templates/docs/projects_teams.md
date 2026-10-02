@@ -81,21 +81,6 @@ owner, and click "Initiate Transfer". The chosen team member will receive
 an email asking to confirm the ownership change. After they confirm,
 they will become the project's owner, and you will become a Team Member.
 
-## Check Limits
-
-**Check Limit** is the total number of checks your account can have. The site
-administrator sets it for each account. When you reach the Check Limit,
-you will not be able to create new checks.
-
-All projects owned by your account shares your account's Check Limit.
-For example, consider an account with a Check Limit of 100 and two projects,
-"Project A" and "Project B." If A has 70 checks, then B cannot have more than
-30 checks in order to not exceed the account's total limit of 100.
-
-However, only checks from your own projects count towards your account's
-quota. If you get invited to somebody else's project, that does not change
-the number of checks you can create in your projects.
-
 ## Monthly / Weekly / Daily Email Reports
 
 SITE_NAME can optionally send periodic email reports with a summary of checks

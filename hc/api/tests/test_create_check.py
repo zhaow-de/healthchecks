@@ -369,12 +369,12 @@ class CreateCheckTestCase(BaseTestCase):
         doc = r.json()
         self.assertEqual(doc["timeout"], 86400)
 
-    def test_it_obeys_check_limit(self) -> None:
-        self.profile.check_limit = 0
-        self.profile.save()
+    def test_it_has_no_check_limit(self) -> None:
+        Check.objects.bulk_create([Check(project=self.project) for _ in range(25)])
 
         r = self.post({})
-        self.assertEqual(r.status_code, 403)
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(Check.objects.count(), 26)
 
     def test_it_rejects_readonly_key(self) -> None:
         self.project.api_key_readonly = "R" * 32

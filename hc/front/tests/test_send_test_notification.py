@@ -134,9 +134,6 @@ class SendTestNotificationTestCase(BaseTestCase):
     def test_it_handles_up_only_sms_channel(self, mock_post: Mock) -> None:
         mock_post.return_value.status_code = 200
 
-        self.profile.sms_limit = 50
-        self.profile.save()
-
         self.channel.kind = "sms"
         self.channel.value = json.dumps({"value": "+123", "up": True, "down": False})
         self.channel.save()

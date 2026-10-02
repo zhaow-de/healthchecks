@@ -635,9 +635,6 @@ filter_default_fail
 401 Unauthorized
 :   The API key is either missing or invalid.
 
-403 Forbidden
-:   The account has hit its check limit.
-
 ### Example Request
 
 ```bash

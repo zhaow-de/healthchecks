@@ -602,8 +602,6 @@ as a failure signal.</p>
 field values.</dd>
 <dt>401 Unauthorized</dt>
 <dd>The API key is either missing or invalid.</dd>
-<dt>403 Forbidden</dt>
-<dd>The account has hit its check limit.</dd>
 </dl>
 <h3>Example Request</h3>
 <div class="highlight"><pre><span></span><code>curl<span class="w"> </span>SITE_ROOT/api/v3/checks/<span class="w"> </span><span class="se">\</span>

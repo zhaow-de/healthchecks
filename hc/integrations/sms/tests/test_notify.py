@@ -17,9 +17,6 @@ class NotifySmsTestCase(BaseTestCase):
     def setUp(self) -> None:
         super().setUp()
 
-        self.profile.sms_limit = 50
-        self.profile.save()
-
         self.check = Check(project=self.project)
         self.check.name = "Foo"
         # Transport classes should use flip.new_status,
@@ -62,10 +59,6 @@ class NotifySmsTestCase(BaseTestCase):
         n = Notification.objects.get()
         callback_path = f"/api/v3/notifications/{n.code}/status"
         self.assertTrue(payload["StatusCallback"].endswith(callback_path))
-
-        # sent SMS counter should go up
-        self.profile.refresh_from_db()
-        self.assertEqual(self.profile.sms_sent, 1)
 
     @override_settings(TWILIO_FROM="+000", TWILIO_MESSAGING_SERVICE_SID=None)
     @patch("hc.api.transports.curl.request", autospec=True)
@@ -116,62 +109,17 @@ class NotifySmsTestCase(BaseTestCase):
         self.assertEqual(payload["MessagingServiceSid"], "dummy-sid")
         self.assertFalse("From" in payload)
 
-    @patch("hc.api.transports.curl.request", autospec=True)
-    def test_it_enforces_limit(self, mock_post: Mock) -> None:
-        # At limit already:
-        self.profile.last_sms_date = now()
-        self.profile.sms_sent = 50
-        self.profile.save()
-
-        self.channel.notify(self.flip)
-        mock_post.assert_not_called()
-
-        n = Notification.objects.get()
-        self.assertTrue("Monthly SMS limit exceeded" in n.error)
-
-        # And email should have been sent
-        self.assertEqual(len(mail.outbox), 1)
-
-        email = mail.outbox[0]
-        self.assertEqual(email.to[0], "alice@example.org")
-        self.assertEqual(email.to[1], "bob@example.org")
-        self.assertEqual(email.subject, "Monthly SMS Limit Reached")
-
-        # Account's owner should be mentioned in the message body
-        self.assertEmailContains("alice@example.org")
-
-        # The alert content itself should be in the message body
-        self.assertEmailContainsText("""The check "Foo" is DOWN""")
-        self.assertEmailContainsHtml("""The check &quot;Foo&quot; is DOWN""")
-
-    @patch("hc.api.transports.curl.request", autospec=True)
-    def test_limit_notice_handles_escaping(self, mock_post: Mock) -> None:
-        self.check.name = "Foo & Bar"
-        self.check.save()
-
-        # At limit already:
-        self.profile.last_sms_date = now()
-        self.profile.sms_sent = 50
-        self.profile.save()
-
-        self.channel.notify(self.flip)
-        mock_post.assert_not_called()
-
-        self.assertEmailContainsText("""The check "Foo & Bar" is DOWN""")
-        self.assertEmailContainsHtml("The check &quot;Foo &amp; Bar&quot; is DOWN")
-
     @override_settings(TWILIO_FROM="+000")
     @patch("hc.api.transports.curl.request", autospec=True)
-    def test_it_resets_limit_next_month(self, mock_post: Mock) -> None:
-        # At limit, but also into a new month
-        self.profile.sms_sent = 50
-        self.profile.last_sms_date = now() - td(days=100)
-        self.profile.save()
-
+    def test_it_has_no_monthly_quota(self, mock_post: Mock) -> None:
         mock_post.return_value.status_code = 200
 
-        self.channel.notify(self.flip)
-        mock_post.assert_called_once()
+        for _ in range(3):
+            self.channel.notify(self.flip)
+
+        self.assertEqual(mock_post.call_count, 3)
+        self.assertEqual(Notification.objects.filter(error="").count(), 3)
+        self.assertEqual(len(mail.outbox), 0)
 
     @override_settings(TWILIO_FROM="+000")
     @patch("hc.api.transports.curl.request", autospec=True)

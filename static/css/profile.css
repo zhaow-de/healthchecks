@@ -16,16 +16,6 @@
     padding: 8px 15px;
 }
 
-.at-limit span {
-    display: inline-block;
-    color: #333;
-    background-color: #FFD54F;
-    font-weight: bold;
-    font-size: 12px;
-    border-radius: 2px;
-    padding: 2px 6px;
-}
-
 #my-projects th {
     border-top: 0;
 }

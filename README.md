@@ -131,8 +131,8 @@ the latter takes precedence.
 ## Accessing Administration Panel
 
 Healthchecks comes with Django's administration panel where you can perform
-administrative tasks: delete user accounts, change passwords, increase limits for
-specific users, inspect contents of database tables.
+administrative tasks: delete user accounts, change passwords, inspect contents of
+database tables.
 
 To access the administration panel,
 

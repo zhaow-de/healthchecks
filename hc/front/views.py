@@ -113,7 +113,7 @@ def _get_check_for_user(request: HttpRequest, code: UUID, preload_owner_profile:
 
     If `preload_owner_profile` is `True`, the returned check's
     project.owner.profile will be already loaded. This helps avoid extra SQL queries
-    if the caller later looks up the project owner's check_limit or ping_log_limit.
+    if the caller later looks up the project owner's ping_log_limit.
 
     """
 
@@ -296,7 +296,6 @@ def checks(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
         "common_timezones": _common_timezones(checks),
         "timezones": all_timezones,
         "project": project,
-        "num_available": project.num_checks_available(),
         "sort": request.profile.sort,
         "selected_tags": selected_tags,
         "selected_statuses": selected_statuses,
@@ -520,9 +519,6 @@ def docs_cron(request: HttpRequest) -> HttpResponse:
 @login_required
 def add_check(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
     project = _get_rw_project_for_user(request, code)
-    if project.num_checks_available() <= 0:
-        return HttpResponseBadRequest()
-
     form = forms.AddCheckForm(request.POST)
     if not form.is_valid():
         return HttpResponseBadRequest()
@@ -1036,10 +1032,6 @@ def transfer(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
             return HttpResponseBadRequest()
 
         target_project = _get_rw_project_for_user(request, form.cleaned_data["project"])
-        if target_project.owner_id != check.project.owner_id:
-            if target_project.num_checks_available() <= 0:
-                return HttpResponseBadRequest()
-
         check.project = target_project
         check.save(update_fields=("project",))
         check.assign_all_channels()
@@ -1055,9 +1047,6 @@ def transfer(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
 @login_required
 def copy(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
     check = _get_rw_check_for_user(request, code)
-
-    if check.project.num_checks_available() <= 0:
-        return HttpResponseBadRequest()
 
     new_name = check.name + " (copy)"
     # Make sure we don't exceed the 100 character db field limit:
@@ -1214,7 +1203,6 @@ def channels(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
         "page": "channels",
         "rw": rw,
         "project": project,
-        "profile": project.owner_profile,
         "channels": channels,
         "num_checks": project.check_set.count(),
         "enable_apprise": settings.APPRISE_ENABLED is True,

@@ -51,11 +51,6 @@ class Sms(HttpTransport):
             site_name=settings.SITE_NAME,
         )
 
-        profile = self.channel.project.owner_profile
-        if not profile.authorize_sms():
-            self.channel.send_sms_limit_notice("SMS", text)
-            raise TransportError("Monthly SMS limit exceeded")
-
         url = self.URL % settings.TWILIO_ACCOUNT
         auth = (settings.TWILIO_ACCOUNT, settings.TWILIO_AUTH)
 

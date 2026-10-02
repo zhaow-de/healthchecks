@@ -53,22 +53,6 @@ class WhatsApp(HttpTransport):
             if not getattr(settings, key):
                 raise TransportError("WhatsApp notifications are not enabled")
 
-        profile = self.channel.project.owner_profile
-        if not profile.authorize_sms():
-            # We don't know the precise message content (the message templates
-            # are defined and live in Twilio). Use the SMS template as a
-            # "close enough" substitute:
-            text = self.tmpl(
-                "sms_message.html",
-                flip=flip,
-                check=flip.owner,
-                status=flip.new_status,
-                site_name=settings.SITE_NAME,
-            )
-
-            self.channel.send_sms_limit_notice("WhatsApp", text)
-            raise TransportError("Monthly message limit exceeded")
-
         url = self.URL % settings.TWILIO_ACCOUNT
         assert settings.TWILIO_ACCOUNT and settings.TWILIO_AUTH
         auth = (settings.TWILIO_ACCOUNT, settings.TWILIO_AUTH)

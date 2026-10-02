@@ -68,9 +68,9 @@ class AccountsAdminTestCase(BaseTestCase):
 
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(reverse("admin:accounts_profile_changelist"))
-        self.assertContains(r, '<td class="field-checks"><b>2 of 20</b></td>', html=True)
-        self.assertContains(r, '<td class="field-checks">1 of 20</td>', html=True)
-        self.assertContains(r, '<td class="field-checks">0 of 20</td>', html=True)
+        self.assertContains(r, '<td class="field-checks"><b>2</b></td>', html=True)
+        self.assertContains(r, '<td class="field-checks">1</td>', html=True)
+        self.assertContains(r, '<td class="field-checks">0</td>', html=True)
 
     def test_it_filters_profiles_by_check_count(self) -> None:
         Check.objects.bulk_create([Check(project=self.project) for _ in range(11)])
@@ -86,18 +86,15 @@ class AccountsAdminTestCase(BaseTestCase):
 
     def test_profile_date_columns_show_dates(self) -> None:
         self.profile.last_active_date = datetime(2020, 1, 2, 3, tzinfo=timezone.utc)
-        self.profile.over_limit_date = datetime(2020, 2, 3, 4, tzinfo=timezone.utc)
         self.profile.deletion_scheduled_date = datetime(2020, 3, 4, 5, tzinfo=timezone.utc)
 
         profile_admin = ProfileAdmin(Profile, admin.site)
         self.assertEqual(profile_admin.last_active(self.profile), date(2020, 1, 2))
-        self.assertEqual(profile_admin.over_limit(self.profile), date(2020, 2, 3))
         self.assertEqual(profile_admin.deletion(self.profile), date(2020, 3, 4))
 
     def test_profile_date_columns_handle_missing_dates(self) -> None:
         profile_admin = ProfileAdmin(Profile, admin.site)
         self.assertIsNone(profile_admin.last_active(self.bobs_profile))
-        self.assertIsNone(profile_admin.over_limit(self.bobs_profile))
         self.assertIsNone(profile_admin.deletion(self.bobs_profile))
 
     def test_login_action_logs_in_as_selected_user(self) -> None:

@@ -504,9 +504,6 @@ def project(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
             if not tr or tr.user != request.user:
                 return HttpResponseForbidden()
 
-            if not tr.can_accept():
-                return HttpResponseBadRequest()
-
             with transaction.atomic():
                 # 1. Reuse the existing membership, and change its user
                 tr.user = project.owner

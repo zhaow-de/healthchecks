@@ -25,9 +25,6 @@ class NotifyWhatsAppTestCase(BaseTestCase):
     def setUp(self) -> None:
         super().setUp()
 
-        self.profile.sms_limit = 50
-        self.profile.save()
-
         self.check = Check(project=self.project)
         self.check.name = "Foo"
         # Transport classes should use flip.new_status,
@@ -67,10 +64,6 @@ class NotifyWhatsAppTestCase(BaseTestCase):
         callback_path = f"/api/v3/notifications/{n.code}/status"
         self.assertTrue(payload["StatusCallback"].endswith(callback_path))
 
-        # sent SMS counter should go up
-        self.profile.refresh_from_db()
-        self.assertEqual(self.profile.sms_sent, 1)
-
     @patch("hc.api.transports.curl.request", autospec=True)
     def test_it_handles_last_ping_now(self, mock_post: Mock) -> None:
         mock_post.return_value.status_code = 200
@@ -109,32 +102,15 @@ class NotifyWhatsAppTestCase(BaseTestCase):
         mock_post.assert_not_called()
 
     @patch("hc.api.transports.curl.request", autospec=True)
-    def test_it_enforces_limit(self, mock_post: Mock) -> None:
-        # At limit already:
-        self.profile.last_sms_date = now()
-        self.profile.sms_sent = 50
-        self.profile.save()
+    def test_it_has_no_monthly_quota(self, mock_post: Mock) -> None:
+        mock_post.return_value.status_code = 200
 
-        self.channel.notify(self.flip)
-        mock_post.assert_not_called()
+        for _ in range(3):
+            self.channel.notify(self.flip)
 
-        n = Notification.objects.get()
-        self.assertTrue("Monthly message limit exceeded" in n.error)
-
-        # And email should have been sent
-        self.assertEqual(len(mail.outbox), 1)
-
-        email = mail.outbox[0]
-        self.assertEqual(email.to[0], "alice@example.org")
-        self.assertEqual(email.to[1], "bob@example.org")
-        self.assertEqual(email.subject, "Monthly WhatsApp Limit Reached")
-
-        # Account's owner should be mentioned in the message body
-        self.assertEmailContains("alice@example.org")
-
-        # The alert content itself should be in the message body
-        self.assertEmailContainsText("""The check "Foo" is DOWN""")
-        self.assertEmailContainsHtml("""The check &quot;Foo&quot; is DOWN""")
+        self.assertEqual(mock_post.call_count, 3)
+        self.assertEqual(Notification.objects.filter(error="").count(), 3)
+        self.assertEqual(len(mail.outbox), 0)
 
     @patch("hc.api.transports.curl.request", autospec=True)
     def test_it_does_not_escape_special_characters(self, mock_post: Mock) -> None:

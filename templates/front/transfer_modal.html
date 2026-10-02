@@ -35,10 +35,8 @@
                         {% for project in request.profile.projects.all %}
                             {% if project == check.project %}
                                 <option disabled>{{ project }} (current project)</option>
-                            {% elif project.owner_id == check.project.owner_id or project.num_checks_available > 0 %}
-                                <option value="{{ project.code }}">{{ project }}</option>
                             {% else %}
-                                <option disabled>{{ project }} (at check limit)</option>
+                                <option value="{{ project.code }}">{{ project }}</option>
                             {% endif %}
                         {% endfor %}
                     </select>

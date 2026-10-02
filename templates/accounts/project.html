@@ -13,7 +13,6 @@
         {% endfor %}
 
         {% if transfer_request and transfer_request.user == request.user %}
-        {% with can_accept=transfer_request.can_accept %}
         <div id="transfer-request" class="panel">
             <div class="panel-body settings-block">
                 <h2>Ownership Transfer Request</h2>
@@ -21,19 +20,6 @@
                     <strong>{{ project.owner.email }}</strong> would like to transfer
                     the ownership of this project to you.
                 </p>
-
-                {% if not can_accept %}
-                {% with num_checks=project.check_set.count num_available=request.profile.num_checks_available %}
-                <p>
-                    This project has
-                    <strong>{{ num_checks }} check{{ num_checks|pluralize}}</strong>,
-                    but your account only has space for
-                    <strong>{{ num_available }} additional check{{ num_available|pluralize }}</strong>.
-                    To accept the transfer, ask the site administrator to raise
-                    your account's check limit first.
-                </p>
-                {% endwith%}
-                {% endif %}
 
                 <div class="pull-right">
                     <form method="post">
@@ -45,14 +31,12 @@
                         <button
                             type="submit"
                             name="accept_transfer"
-                            {% if not can_accept %}disabled{% endif %}
                             class="btn btn-primary">Accept</button>
                     </form>
                 </div>
 
             </div>
         </div>
-        {% endwith %}
         {% endif %}
 
         <div class="panel panel-{{ project_name_status|default:'default' }}">
