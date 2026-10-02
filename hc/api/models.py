@@ -32,7 +32,6 @@ from hc.accounts.models import Project
 from hc.api import transports
 from hc.lib import emails
 from hc.lib.date import month_boundaries, seconds_in_month
-from hc.lib.s3 import GetObjectError, get_object, put_object, remove_objects
 from hc.lib.urls import absolute_reverse
 
 STATUSES = (("up", "Up"), ("down", "Down"), ("new", "New"), ("paused", "Paused"))
@@ -555,31 +554,19 @@ class Check(models.Model):
             ping.method = method
             # If User-Agent is longer than 200 characters, truncate it:
             ping.ua = ua[:200]
-            if len(body) > 100 and settings.S3_BUCKET:
-                ping.object_size = len(body)
-            else:
-                ping.body_raw = body
+            ping.body_raw = body
             ping.rid = rid
             ping.exitstatus = exitstatus
             ping.save()
-
-        # Upload ping body to S3 outside the DB transaction, because this operation
-        # can potentially take a long time:
-        if ping.object_size:
-            put_object(self.code, ping.n, body)
 
         # Every 100 received pings, prune old pings and notifications:
         if self.n_pings % 100 == 0:
             self.prune()
 
-    def prune(self, wait: bool = False) -> None:
+    def prune(self) -> None:
         """Remove old pings and notifications."""
 
         threshold = self.n_pings - self.project.owner_profile.ping_log_limit
-
-        # Remove ping bodies from object storage
-        if settings.S3_BUCKET:
-            remove_objects(str(self.code), threshold, wait=wait)
 
         # Remove ping objects from db
         self.ping_set.filter(n__lte=threshold).delete()
@@ -692,12 +679,8 @@ class Ping(models.Model):
     method = models.CharField(max_length=10, blank=True)
     ua = models.CharField(max_length=200, blank=True)
     body_raw = models.BinaryField(null=True)
-    object_size = models.IntegerField(null=True)
     exitstatus = models.SmallIntegerField(null=True)
     rid = models.UUIDField(null=True)
-
-    class GetBodyError(Exception):
-        pass
 
     def to_dict(self, owner_code: uuid.UUID, v: int) -> PingDict:
         if self.has_body():
@@ -729,10 +712,6 @@ class Ping(models.Model):
         return result
 
     def has_body(self) -> bool:
-        # Non-zero object size tells us there should be ping body in object store
-        if self.object_size:
-            return True
-
         # If the ping instance has "body_raw_length" attribute,
         # use that instead of body_raw itself. This enables a defer("body_raw")
         # optimization in the "Get Pings" API call.
@@ -742,34 +721,13 @@ class Ping(models.Model):
         return bool(self.body_raw)
 
     def get_body_bytes(self) -> bytes | None:
-        if self.object_size and self.n:
-            # Do not attemt to touch S3 if we have recorded more than 3
-            # errors (503 responses, request timeouts) in the last minute
-            # when accessing S3.
-            # If we don't do this, a S3 outage can clog our requests handlers and
-            # cause a bigger issue.
-            if not TokenBucket.s3_is_healthy():
-                raise self.GetBodyError()
-
-            try:
-                return get_object(str(self.owner.code), self.n)
-            except GetObjectError:
-                # If S3 access resulted in error, record this fact:
-                TokenBucket.record_s3_get_object_error()
-                raise self.GetBodyError()
-
         if self.body_raw:
             return bytes(self.body_raw)
 
         return None
 
     def get_body(self) -> str | None:
-        try:
-            body_bytes = self.get_body_bytes()
-        except self.GetBodyError:
-            return None
-
-        if body_bytes:
+        if body_bytes := self.get_body_bytes():
             return body_bytes.decode(errors="replace")
 
         return None
@@ -777,8 +735,6 @@ class Ping(models.Model):
     def get_body_size(self) -> int:
         if self.body_raw:
             return len(self.body_raw)
-        if self.object_size:
-            return self.object_size
         return 0
 
     def get_kind_display(self) -> str:
@@ -1429,7 +1385,7 @@ class TokenBucket(models.Model):
     updated = models.DateTimeField(default=now)
 
     @staticmethod
-    def authorize(value: str, capacity: int, refill_time_secs: int, force: bool = False) -> bool:
+    def authorize(value: str, capacity: int, refill_time_secs: int) -> bool:
         frozen_now = now()
         obj, created = TokenBucket.objects.get_or_create(value=value)
 
@@ -1439,7 +1395,7 @@ class TokenBucket(models.Model):
             obj.tokens = min(1.0, obj.tokens + duration_secs / refill_time_secs)
 
         obj.tokens -= 1.0 / capacity
-        if obj.tokens < 0 and not force:
+        if obj.tokens < 0:
             # Not enough tokens
             return False
 
@@ -1553,22 +1509,3 @@ class TokenBucket(models.Model):
         # During that period, allow the code to only be used once,
         # so an eavesdropping attacker cannot reuse a code.
         return TokenBucket.authorize(value, 1, 90)
-
-    @staticmethod
-    def s3_is_healthy() -> bool:
-        """Return True if fewer than 3 GetObject errors in the last minute."""
-        try:
-            obj = TokenBucket.objects.get(value="s3_get_object_error")
-        except TokenBucket.DoesNotExist:
-            return True
-
-        duration_secs = (now() - obj.updated).total_seconds()
-        # How many tokens we would have after top-up:
-        tokens = min(1.0, obj.tokens + duration_secs / 60)
-        return tokens >= 1.0 / 3
-
-    @staticmethod
-    def record_s3_get_object_error() -> None:
-        # Use force=True, we are recording the S3 error after the error already
-        # happened, and want to record it even if the tokens field would go negative.
-        TokenBucket.authorize("s3_get_object_error", 3, 60, force=True)

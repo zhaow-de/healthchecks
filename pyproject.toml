@@ -25,17 +25,15 @@ dependencies = [
 # The Docker image is built with all of them.
 [project.optional-dependencies]
 apprise = ["apprise==1.13.1"]
-minio = ["minio==7.2.20"]
 psycopg-c = ["psycopg[c]"]
 uwsgi = ["uwsgi"]
 
 [dependency-groups]
 # Installed by default by "uv sync" and "uv run".
 dev = [
-    # The test suite covers the apprise and minio code paths. Keep these two
-    # pins equal to the extras above; "uv lock" fails if they disagree.
+    # The test suite covers the apprise code path. Keep this pin equal to the
+    # extra above; "uv lock" fails if they disagree.
     "apprise==1.13.1",
-    "minio==7.2.20",
     "markdown==3.10.2",
     "pre-commit>=4.6.2",
     "pygments==2.21.0",

@@ -318,16 +318,6 @@ if os.getenv("EMAIL_HOST"):
 # WebAuthn
 RP_ID = os.getenv("RP_ID")
 
-# Object storage credentials for storing large ping bodies.
-# (Optional. If not specified, will store ping bodies in the database.)
-S3_ACCESS_KEY = os.getenv("S3_ACCESS_KEY")
-S3_SECRET_KEY = envsecret("S3_SECRET_KEY")
-S3_ENDPOINT = os.getenv("S3_ENDPOINT")
-S3_REGION = os.getenv("S3_REGION")
-S3_BUCKET = os.getenv("S3_BUCKET")
-S3_TIMEOUT = envint("S3_TIMEOUT", "60")
-S3_SECURE = envbool("S3_SECURE", "True")
-
 # To enable statsd metric collection, set STATSD_HOST="host:hostport"
 # (example: "localhost:8125")
 STATSD_HOST = os.getenv("STATSD_HOST")

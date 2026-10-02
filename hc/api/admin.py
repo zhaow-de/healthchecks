@@ -130,7 +130,7 @@ class PingsPaginator(Paginator[Ping]):
 class PingsAdmin(ModelAdmin[Ping]):
     readonly_fields = ("owner", "has_body")
     list_select_related = ("owner",)
-    list_display = ("id", "created", "owner", "scheme", "method", "object_size", "ua")
+    list_display = ("id", "created", "owner", "scheme", "method", "ua")
     list_filter = ("created", SchemeListFilter, MethodListFilter, KindListFilter)
     exclude = ("body",)
 

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import time
 from typing import TYPE_CHECKING, Any, NoReturn
 
 from django.template.loader import render_to_string
@@ -17,27 +16,9 @@ logger = logging.getLogger(__name__)
 
 
 def get_ping_body_bytes(ping: Ping | None) -> bytes | None:
-    """Return ping body as bytes for a given Ping object.
-
-    If body has not been uploaded to object storage yet, wait 5 seconds
-    and try to fetch it again.
-    """
-    from hc.api.models import Ping
-
+    """Return ping body as bytes for a given Ping object."""
     if ping and ping.has_body():
-        try:
-            if result := ping.get_body_bytes():
-                return result
-
-            if ping.object_size:
-                # If the ping object has an object size but get_body_bytes returns
-                # None then body is not uploaded to the object storage yet.
-                # When sending notifications we can afford to wait a little
-                # bit and retry.
-                time.sleep(5)
-                return ping.get_body_bytes()
-        except Ping.GetBodyError:
-            pass
+        return ping.get_body_bytes()
 
     return None
 

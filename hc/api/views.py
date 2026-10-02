@@ -634,11 +634,7 @@ def ping_body(request: ApiRequest, code: UUID, n: int) -> HttpResponse:
         raise Http404()
 
     ping = get_object_or_404(Ping, owner=check, n=n)
-    try:
-        body = ping.get_body_bytes()
-    except Ping.GetBodyError:
-        return HttpResponse(status=503)
-
+    body = ping.get_body_bytes()
     if not body:
         raise Http404()
 

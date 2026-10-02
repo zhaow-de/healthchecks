@@ -2,12 +2,11 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from datetime import timedelta as td
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import time_machine
 from django.db import IntegrityError
 from django.db.models import QuerySet
-from django.test.utils import override_settings
 from django.utils.timezone import now
 
 from hc.api.models import MAX_DURATION, Channel, Check, Flip, Notification, Ping
@@ -353,7 +352,6 @@ class CheckModelTestCase(BaseTestCase):
         # Nov. 2019
         self.assertTrue(nov.no_data)
 
-    @override_settings(S3_BUCKET=None)
     def test_it_prunes(self) -> None:
         check = Check.objects.create(project=self.project, n_pings=101)
         Ping.objects.create(owner=check, created=CURRENT_TIME, n=101)
@@ -380,7 +378,6 @@ class CheckModelTestCase(BaseTestCase):
         self.assertEqual(Notification.objects.count(), 0)
         self.assertEqual(Flip.objects.count(), 0)
 
-    @override_settings(S3_BUCKET=None)
     @time_machine.travel(CURRENT_TIME)
     def test_it_does_not_prune_flips_less_than_93_days_old(self) -> None:
         check = Check.objects.create(project=self.project, n_pings=101)
@@ -397,7 +394,6 @@ class CheckModelTestCase(BaseTestCase):
 
         self.assertEqual(Flip.objects.count(), 1)
 
-    @override_settings(S3_BUCKET=None)
     def test_it_does_not_prune_flips_newer_than_the_earliest_ping(self) -> None:
         check = Check.objects.create(project=self.project, n_pings=101)
         Ping.objects.create(owner=check, n=101)
@@ -413,17 +409,6 @@ class CheckModelTestCase(BaseTestCase):
         check.prune()
 
         self.assertEqual(Flip.objects.count(), 1)
-
-    @override_settings(S3_BUCKET="test-bucket")
-    @patch("hc.api.models.remove_objects")
-    def test_it_prunes_object_storage(self, remove_objects: Mock) -> None:
-        check = Check.objects.create(project=self.project, n_pings=101)
-        Ping.objects.create(owner=check, n=101)
-        Ping.objects.create(owner=check, n=1, object_size=1000)
-
-        check.prune()
-
-        remove_objects.assert_called_once_with(str(check.code), 1, wait=False)
 
     def test_get_grace_start_returns_utc(self) -> None:
         check = Check(project=self.project)
@@ -507,7 +492,6 @@ class CheckModelTestCase(BaseTestCase):
         check.last_duration = None
         self.assertNotIn("last_duration", check.to_dict())
 
-    @override_settings(S3_BUCKET=None)
     def test_every_hundredth_ping_prunes_old_pings(self) -> None:
         self.profile.ping_log_limit = 10
         self.profile.save()
@@ -521,7 +505,6 @@ class CheckModelTestCase(BaseTestCase):
         # Ping #100 triggers pruning: with the limit of 10, only n > 90 is kept
         self.assertEqual(sorted(check.ping_set.values_list("n", flat=True)), [95, 100])
 
-    @override_settings(S3_BUCKET=None)
     def test_other_pings_do_not_prune(self) -> None:
         self.profile.ping_log_limit = 10
         self.profile.save()

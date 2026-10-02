@@ -6,6 +6,9 @@ When using HTTP POST, **you can include an arbitrary payload in the request body
 SITE_NAME will log the first PING_BODY_LIMIT_FORMATTED (PING_BODY_LIMIT bytes) of the
 request body, so that you can inspect it later.
 
+Keep the request body to the output you need to read later: SITE_NAME stores it in
+its database along with every other ping in the check's log.
+
 ## Logging Command Output
 
 In this example, we run `certbot renew`, capture its output (both the stdout

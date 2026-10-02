@@ -138,7 +138,6 @@ def test_a_named_entry_runs_alone_and_an_unknown_name_is_refused():
 
 _CLIENT_EXEMPTIONS = {
     "hc/lib/curl.py": "import pycurl\n",
-    "hc/lib/s3.py": "import urllib3\n",
     "hc/integrations/apprise/transport.py": "import apprise\n",
     "hc/integrations/apprise/tests/test_notify.py": "import apprise\nimport requests\n",
 }

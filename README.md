@@ -236,8 +236,7 @@ go to the Administration Panel, look up user's **Profile** and modify its
 "Ping log limit" field.
 
 Healthchecks also provides management commands for cleaning up
-`auth_user` (user accounts) and `api_tokenbucket` (rate limiting records) tables,
-and for removing stale objects from external object storage.
+`auth_user` (user accounts) and `api_tokenbucket` (rate limiting records) tables.
 
 * Remove user accounts that are older than 1 month and have never logged in:
 
@@ -251,19 +250,6 @@ and for removing stale objects from external object storage.
 
   ```sh
   ./manage.py prunetokenbucket
-  ```
-
-* Remove old objects from external object storage. When an user removes
-  a check, removes a project, or closes their account, Healthchecks
-  does not remove the associated objects from the external object
-  storage on the fly. Instead, you should run `pruneobjects` occasionally
-  (for example, once a month). This command first takes an inventory
-  of all checks in the database, and then iterates over top-level
-  keys in the object storage bucket, and deletes any that don't also
-  exist in the database.
-
-  ```sh
-  ./manage.py pruneobjects
   ```
 
 When you first try these commands on your data, it is a good idea to
@@ -319,46 +305,6 @@ using the `local_settings.py` file instead of environment variables, and specify
 REMOTE_USER_HEADER = "HTTP_X_AUTHENTICATED_USER"
 AUTHENTICATION_BACKENDS = ["hc.accounts.backends.CustomHeaderBackend"]
 ```
-
-## External Object Storage
-
-Healthchecks can optionally store large ping bodies in S3-compatible object
-storage. To enable this feature, you will need to:
-
-* ensure you have the [MinIO Python library](https://docs.min.io/docs/python-client-quickstart-guide.html) installed.
-  `uv sync` installs it as a part of the development dependencies. If you use
-  `uv sync --no-dev`, add the `minio` extra:
-
-  ```bash
-  uv sync --no-dev --extra minio
-  ```
-
-  `uv sync` makes the environment match the command exactly, so pass every
-  extra you use each time (for example, `--extra minio --extra apprise`).
-  After a `--no-dev` install, run commands with `uv run --no-sync` or from an
-  activated virtual environment: a plain `uv run` syncs the environment first
-  and installs the development dependencies again.
-* configure the credentials for accessing object storage: `S3_ACCESS_KEY`,
-  `S3_SECRET_KEY`, `S3_ENDPOINT`, `S3_REGION` and `S3_BUCKET`.
-
-Healthchecks will use external object storage for storing any request bodies that
-exceed 100 bytes. If the size of a request body is 100 bytes or below, Healthchecks
-will still store it in the database.
-
-Healthchecks automatically removes old stored ping bodies from object
-storage while uploading new data. However, Healthchecks does not automatically
-clean up data when you delete checks, projects or entire user accounts.
-Use the `pruneobjects` management command to remove data for checks that don't
-exist any more.
-
-When external object storage is not enabled (the credentials for accessing object
-storage are not set), Healthchecks stores all ping bodies in the database.
-If you enable external object storage, Healthchecks will still be able to
-access the ping bodies already stored in the database. You don't need to migrate
-them to the object storage. On the other hand, if you later decide to disable
-external object storage, Healthchecks will not have access to the externally
-stored ping bodies any more. And there is currently no script or management command
-for migrating ping bodies from external object storage back to the database.
 
 ## Integrations
 
@@ -481,7 +427,7 @@ To enable Apprise integration, you will need to:
   ```
 
   `uv sync` makes the environment match the command exactly, so pass every
-  extra you use each time (for example, `--extra minio --extra apprise`).
+  extra you use each time (for example, `--extra apprise --extra uwsgi`).
   After a `--no-dev` install, run commands with `uv run --no-sync` or from an
   activated virtual environment: a plain `uv run` syncs the environment first
   and installs the development dependencies again.

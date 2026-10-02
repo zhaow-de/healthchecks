@@ -159,8 +159,7 @@ go to the Administration Panel, look up user's **Profile** and modify its
 "Ping log limit" field.
 
 Healthchecks provides management commands for cleaning up
-`auth_user` (user accounts) and `api_tokenbucket` (rate limiting records) tables,
-and for removing stale objects from external object storage.
+`auth_user` (user accounts) and `api_tokenbucket` (rate limiting records) tables.
 
 Remove user accounts that are older than 1 month and have never logged in:
 
@@ -174,19 +173,6 @@ Any records older than one day can be safely removed.
 
 ```sh
 $ ./manage.py prunetokenbucket
-```
-
-Remove old objects from external object storage. When an user removes
-a check, removes a project, or closes their account, Healthchecks
-does not remove the associated objects from the external object
-storage on the fly. Instead, you should run `pruneobjects` occasionally
-(for example, once a month). This command first takes an inventory
-of all checks in the database, and then iterates over top-level
-keys in the object storage bucket, and deletes any that don't also
-exist in the database.
-
-```sh
-$ ./manage.py pruneobjects
 ```
 
 When you first try these commands on your data, it is a good idea to

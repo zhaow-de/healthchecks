@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from datetime import timedelta as td
-from unittest.mock import Mock, patch
 
 from django.utils.timezone import now
 
@@ -39,17 +38,6 @@ class LogTestCase(BaseTestCase):
         # in the timezone switcher:
         self.assertContains(r, "Europe/Riga")
         self.assertContains(r, "Europe/Berlin")
-
-    @patch("hc.api.models.get_object")
-    def test_it_does_not_load_body_from_object_storage(self, get_object: Mock) -> None:
-        self.ping.body_raw = None
-        self.ping.object_size = 1234
-        self.ping.save()
-
-        self.client.login(username="alice@example.org", password="password")
-        r = self.client.get(self.url)
-        self.assertContains(r, "1234 byte body")
-        get_object.assert_not_called()
 
     def test_it_displays_email(self) -> None:
         self.ping.scheme = "email"

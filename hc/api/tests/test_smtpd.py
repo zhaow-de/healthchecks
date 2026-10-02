@@ -48,7 +48,7 @@ class NullSink:
         pass
 
 
-@override_settings(S3_BUCKET=None, PING_EMAIL_DOMAIN="hc.example.com")
+@override_settings(PING_EMAIL_DOMAIN="hc.example.com")
 class SmtpdTestCase(BaseTestCase):
     def setUp(self) -> None:
         super().setUp()

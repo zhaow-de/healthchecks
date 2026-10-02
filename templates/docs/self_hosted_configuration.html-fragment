@@ -65,14 +65,6 @@ from environment variables. Below is a list of environment variables it reads an
 <li><a href="#REMOTE_USER_HEADER">REMOTE_USER_HEADER</a></li>
 <li><a href="#ROCKETCHAT_ENABLED">ROCKETCHAT_ENABLED</a></li>
 <li><a href="#RP_ID">RP_ID</a></li>
-<li><a href="#S3_ACCESS_KEY">S3_ACCESS_KEY</a></li>
-<li><a href="#S3_BUCKET">S3_BUCKET</a></li>
-<li><a href="#S3_ENDPOINT">S3_ENDPOINT</a></li>
-<li><a href="#S3_REGION">S3_REGION</a></li>
-<li><a href="#S3_SECRET_KEY">S3_SECRET_KEY</a></li>
-<li><a href="#S3_SECRET_KEY_FILE">S3_SECRET_KEY_FILE</a></li>
-<li><a href="#S3_TIMEOUT">S3_TIMEOUT</a></li>
-<li><a href="#S3_SECURE">S3_SECURE</a></li>
 <li><a href="#SECRET_KEY">SECRET_KEY</a></li>
 <li><a href="#SECRET_KEY_FILE">SECRET_KEY_FILE</a></li>
 <li><a href="#SECURE_PROXY_SSL_HEADER">SECURE_PROXY_SSL_HEADER</a></li>
@@ -139,7 +131,7 @@ integration.</p>
 </code></pre></div>
 
 <p><code>uv sync</code> makes the environment match the command exactly, so pass every
-extra you use each time (for example, <code>--extra minio --extra apprise</code>).
+extra you use each time (for example, <code>--extra apprise --extra uwsgi</code>).
 After a <code>--no-dev</code> install, run commands with <code>uv run --no-sync</code> or from an
 activated virtual environment: a plain <code>uv run</code> syncs the environment first
 and installs the development dependencies again.</p>
@@ -431,6 +423,11 @@ copy integration keys from PagerDuty and paste them in Healthchecks.</p>
 <p>The upper size limit in bytes for logged ping request bodies.
 The default value is 10000 (10 kilobytes). You can adjust the limit or you can remove
 it altogether by setting this value to <code>None</code>.</p>
+<p>Healthchecks stores ping bodies in the database, in the <code>api_ping</code> table, for every
+ping it keeps: each check keeps its most recent pings up to the account's ping log
+limit (100 by default), pruned every 100 pings. <code>PING_BODY_LIMIT</code> applies to pings
+sent over HTTP; a ping sent by email is stored whole. Keep <code>PING_BODY_LIMIT</code>, and the
+bodies your jobs send, no bigger than the output you actually need to read.</p>
 <h2 id="PING_EMAIL_DOMAIN"><code>PING_EMAIL_DOMAIN</code></h2>
 <p>Default: <code>localhost</code></p>
 <p>The domain to use for generating ping email addresses. Example:</p>
@@ -597,44 +594,6 @@ if your site runs on <code>https://my-hc.example.org</code>, set <code>RP_ID</co
 <p>Note that WebAuthn requires HTTPS, even if running on localhost. To test WebAuthn
 locally with a self-signed certificate, you can use the <code>runsslserver</code> command
 from the <code>django-sslserver</code> package.</p>
-<h2 id="S3_ACCESS_KEY"><code>S3_ACCESS_KEY</code></h2>
-<p>Default: <code>None</code></p>
-<p>Access key of an account in S3 service.</p>
-<p>Healthchecks can optionally upload ping request body data to S3-compatible object
-storage instead of storing it in the database. To use this feature, provide valid
-credentials to an S3-compatible service by setting the following environment variables:</p>
-<ul>
-<li><code>S3_ACCESS_KEY</code> (example: <code>AKIAFIXMEFIXME</code>)</li>
-<li><code>S3_BUCKET</code> (example: <code>my-bucket</code>)</li>
-<li><code>S3_ENDPOINT</code> (example: <code>s3.eu-central-1.amazonaws.com</code>)</li>
-<li><code>S3_REGION</code> (example: <code>eu-central-1</code>)</li>
-<li><code>S3_SECRET_KEY</code></li>
-</ul>
-<h2 id="S3_BUCKET"><code>S3_BUCKET</code></h2>
-<p>Default: <code>None</code></p>
-<p>Name of the bucket in S3 service for storing ping request body data.</p>
-<h2 id="S3_ENDPOINT"><code>S3_ENDPOINT</code></h2>
-<p>Default: <code>None</code></p>
-<p>URL to the S3-compatible service.</p>
-<h2 id="S3_REGION"><code>S3_REGION</code></h2>
-<p>Default: <code>None</code></p>
-<p>Region name of buckets in S3 service.</p>
-<h2 id="S3_SECRET_KEY"><code>S3_SECRET_KEY</code></h2>
-<p>Default: <code>None</code></p>
-<p>The secret key of an account in S3 service.</p>
-<h2 id="S3_SECRET_KEY_FILE"><code>S3_SECRET_KEY_FILE</code></h2>
-<p>Default: <code>None</code></p>
-<p>If set, must contain a filesystem path pointing to a readable file. Healthchecks will
-read the contents of the file into the <a href="#S3_SECRET_KEY">S3_SECRET_KEY</a> setting.
-If <code>S3_SECRET_KEY</code> and <code>S3_SECRET_KEY_FILE</code> are both set, <code>S3_SECRET_KEY_FILE</code> takes
-precedence.</p>
-<h2 id="S3_TIMEOUT"><code>S3_TIMEOUT</code></h2>
-<p>Default: <code>60</code></p>
-<p>Timeout for individual S3 operations, in seconds.</p>
-<h2 id="S3_SECURE"><code>S3_SECURE</code></h2>
-<p>Default: <code>True</code></p>
-<p>Whether to use secure (TLS) connection to S3 or not. To
-use unencrypted HTTP requests, set this value to <code>False</code>.</p>
 <h2 id="SECRET_KEY"><code>SECRET_KEY</code></h2>
 <p>Default: <code>---</code></p>
 <p>A secret key used for cryptographic signing. Should be set to a unique,

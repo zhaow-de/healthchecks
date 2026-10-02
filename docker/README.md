@@ -44,7 +44,7 @@ termination.
 * `migrate`, `sendalerts`, `sendreports`, `smtpd` – when running with Docker, you
   also do  not need to manually run these. They are run automatically on
   container startup (you can find them listed in [uwsgi.ini](uwsgi.ini)).
-* `createsuperuser`, `pruneobjects`, `prunetokenbucket`, `pruneusers`,
+* `createsuperuser`, `prunetokenbucket`, `pruneusers`,
   `settelegramwebhook` – you need to run them **inside the container**, not on
   the host system. Do it like so:
 

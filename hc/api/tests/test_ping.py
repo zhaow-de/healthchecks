@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import timedelta as td
-from unittest.mock import Mock, patch
 from uuid import UUID, uuid4
 
 from django.test import Client
@@ -12,7 +11,6 @@ from hc.api.models import Check, Flip, Ping
 from hc.test import BaseTestCase
 
 
-@override_settings(S3_BUCKET=None)
 class PingTestCase(BaseTestCase):
     def setUp(self) -> None:
         super().setUp()
@@ -387,21 +385,6 @@ class PingTestCase(BaseTestCase):
         self.assertEqual(ping.method, "POST")
         assert ping.body_raw
         self.assertEqual(bytes(ping.body_raw), b"Hello \xe9 World")
-
-    @override_settings(S3_BUCKET="test-bucket", PING_BODY_LIMIT=None)
-    @patch("hc.api.models.put_object")
-    def test_it_uploads_body_to_s3(self, put_object: Mock) -> None:
-        r = self.client.post(self.url, b"a" * 101, content_type="text/plain")
-        self.assertEqual(r.status_code, 200)
-
-        ping = Ping.objects.get()
-        self.assertEqual(ping.method, "POST")
-        self.assertEqual(ping.object_size, 101)
-
-        code, n, data = put_object.call_args.args
-        self.assertEqual(code, self.check.code)
-        self.assertEqual(n, 1)
-        self.assertEqual(data, b"a" * 101)
 
     def test_log_endpoint_works(self) -> None:
         r = self.client.post(self.url + "/log", "hello", content_type="text/plain")

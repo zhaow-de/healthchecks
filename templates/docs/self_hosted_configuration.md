@@ -67,14 +67,6 @@ from environment variables. Below is a list of environment variables it reads an
 <li><a href="#REMOTE_USER_HEADER">REMOTE_USER_HEADER</a></li>
 <li><a href="#ROCKETCHAT_ENABLED">ROCKETCHAT_ENABLED</a></li>
 <li><a href="#RP_ID">RP_ID</a></li>
-<li><a href="#S3_ACCESS_KEY">S3_ACCESS_KEY</a></li>
-<li><a href="#S3_BUCKET">S3_BUCKET</a></li>
-<li><a href="#S3_ENDPOINT">S3_ENDPOINT</a></li>
-<li><a href="#S3_REGION">S3_REGION</a></li>
-<li><a href="#S3_SECRET_KEY">S3_SECRET_KEY</a></li>
-<li><a href="#S3_SECRET_KEY_FILE">S3_SECRET_KEY_FILE</a></li>
-<li><a href="#S3_TIMEOUT">S3_TIMEOUT</a></li>
-<li><a href="#S3_SECURE">S3_SECURE</a></li>
 <li><a href="#SECRET_KEY">SECRET_KEY</a></li>
 <li><a href="#SECRET_KEY_FILE">SECRET_KEY_FILE</a></li>
 <li><a href="#SECURE_PROXY_SSL_HEADER">SECURE_PROXY_SSL_HEADER</a></li>
@@ -157,7 +149,7 @@ uv sync --no-dev --extra apprise
 ```
 
 `uv sync` makes the environment match the command exactly, so pass every
-extra you use each time (for example, `--extra minio --extra apprise`).
+extra you use each time (for example, `--extra apprise --extra uwsgi`).
 After a `--no-dev` install, run commands with `uv run --no-sync` or from an
 activated virtual environment: a plain `uv run` syncs the environment first
 and installs the development dependencies again.
@@ -601,6 +593,12 @@ The upper size limit in bytes for logged ping request bodies.
 The default value is 10000 (10 kilobytes). You can adjust the limit or you can remove
 it altogether by setting this value to `None`.
 
+Healthchecks stores ping bodies in the database, in the `api_ping` table, for every
+ping it keeps: each check keeps its most recent pings up to the account's ping log
+limit (100 by default), pruned every 100 pings. `PING_BODY_LIMIT` applies to pings
+sent over HTTP; a ping sent by email is stored whole. Keep `PING_BODY_LIMIT`, and the
+bodies your jobs send, no bigger than the output you actually need to read.
+
 ## `PING_EMAIL_DOMAIN` {: #PING_EMAIL_DOMAIN }
 
 Default: `localhost`
@@ -827,68 +825,6 @@ if your site runs on `https://my-hc.example.org`, set `RP_ID` to `my-hc.example.
 Note that WebAuthn requires HTTPS, even if running on localhost. To test WebAuthn
 locally with a self-signed certificate, you can use the `runsslserver` command
 from the `django-sslserver` package.
-
-## `S3_ACCESS_KEY` {: #S3_ACCESS_KEY }
-
-Default: `None`
-
-Access key of an account in S3 service.
-
-Healthchecks can optionally upload ping request body data to S3-compatible object
-storage instead of storing it in the database. To use this feature, provide valid
-credentials to an S3-compatible service by setting the following environment variables:
-
-* `S3_ACCESS_KEY` (example: `AKIAFIXMEFIXME`)
-* `S3_BUCKET` (example: `my-bucket`)
-* `S3_ENDPOINT` (example: `s3.eu-central-1.amazonaws.com`)
-* `S3_REGION` (example: `eu-central-1`)
-* `S3_SECRET_KEY`
-
-## `S3_BUCKET` {: #S3_BUCKET }
-
-Default: `None`
-
-Name of the bucket in S3 service for storing ping request body data.
-
-## `S3_ENDPOINT` {: #S3_ENDPOINT }
-
-Default: `None`
-
-URL to the S3-compatible service.
-
-## `S3_REGION` {: #S3_REGION }
-
-Default: `None`
-
-Region name of buckets in S3 service.
-
-## `S3_SECRET_KEY` {: #S3_SECRET_KEY }
-
-Default: `None`
-
-The secret key of an account in S3 service.
-
-## `S3_SECRET_KEY_FILE` {: #S3_SECRET_KEY_FILE }
-
-Default: `None`
-
-If set, must contain a filesystem path pointing to a readable file. Healthchecks will
-read the contents of the file into the [S3_SECRET_KEY](#S3_SECRET_KEY) setting.
-If `S3_SECRET_KEY` and `S3_SECRET_KEY_FILE` are both set, `S3_SECRET_KEY_FILE` takes
-precedence.
-
-## `S3_TIMEOUT` {: #S3_TIMEOUT }
-
-Default: `60`
-
-Timeout for individual S3 operations, in seconds.
-
-## `S3_SECURE` {: #S3_SECURE }
-
-Default: `True`
-
-Whether to use secure (TLS) connection to S3 or not. To
-use unencrypted HTTP requests, set this value to `False`.
 
 ## `SECRET_KEY` {: #SECRET_KEY }
 

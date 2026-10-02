@@ -130,12 +130,7 @@
         <a href="{{ check.cloaked_url }}#ping-{{ ping.n }}">View full body</a>.
     {% endif %}
     </p>
-    {% if body is None %}
-    <p>
-        The request body data is being processed and will be available for viewing shortly.
-        Please <a href="{{ check.cloaked_url }}#ping-{{ ping.n }}">view it on the website</a>.
-    </p>
-    {% elif ping_attached %}
+    {% if ping_attached %}
     <p>See the attachment.</p>
     {% else %}
     <pre style="font-family: monospace; line-height: 1em;">{{ body|slice:"-10000:"|linebreaksbr }}</pre>

@@ -725,9 +725,8 @@ def validate_schedule(request: HttpRequest) -> HttpResponse:
 
 @login_required
 def ping_details(request: AuthenticatedHttpRequest, code: UUID, n: int | None = None) -> HttpResponse:
-    # This view makes two non-obvious SQL queries:
-    # * it calls ping.get_body(), which reads self.owner.code, triggering a query
-    # * the template calls ping.duration() which queries past "/start" events
+    # This view makes a non-obvious SQL query: the template calls ping.duration(),
+    # which queries past "/start" events
 
     check, _rw = _get_check_for_user(request, code)
     q = Ping.objects.filter(owner=check)
@@ -743,10 +742,7 @@ def ping_details(request: AuthenticatedHttpRequest, code: UUID, n: int | None = 
     except Ping.DoesNotExist:
         return render(request, "front/ping_details_not_found.html")
 
-    try:
-        body_bytes = ping.get_body_bytes()
-    except Ping.GetBodyError:
-        body_bytes = None
+    body_bytes = ping.get_body_bytes()
 
     ctx = {
         "check": check,
@@ -793,11 +789,7 @@ def ping_body(request: AuthenticatedHttpRequest, code: UUID, n: int) -> HttpResp
     check, _rw = _get_check_for_user(request, code)
     ping = get_object_or_404(Ping, owner=check, n=n)
 
-    try:
-        body = ping.get_body_bytes()
-    except Ping.GetBodyError:
-        return HttpResponse(status=503)
-
+    body = ping.get_body_bytes()
     if not body:
         raise Http404("not found")
 
