@@ -23,13 +23,13 @@ class ApiAdminTestCase(BaseTestCase):
         self.alice.is_superuser = True
         self.alice.save()
 
-    def test_it_shows_channel_list_with_pushbullet(self) -> None:
+    def test_it_shows_channel_list_with_slack(self) -> None:
         self.client.login(username="alice@example.org", password="password")
 
-        Channel.objects.create(project=self.project, kind="pushbullet", value="test-token")
+        Channel.objects.create(project=self.project, kind="slack", value="https://example.org")
 
         r = self.client.get("/admin/api/channel/")
-        self.assertContains(r, '<span class="ic">pushbullet</span>')
+        self.assertContains(r, '<span class="ic">slack</span>')
 
     def test_it_shows_checks(self) -> None:
         self.check.name = "Backup & Restore"
@@ -108,7 +108,7 @@ class ApiAdminTestCase(BaseTestCase):
         Channel.objects.create(project=self.project, kind="slack", last_error="Received status code 500")
         Channel.objects.create(
             project=self.bobs_project,
-            kind="shell",
+            kind="group",
             last_notify=now(),
             last_notify_duration=td(seconds=2.5),
         )
@@ -167,7 +167,7 @@ class ApiAdminTestCase(BaseTestCase):
     def test_disable_action_disables_channels(self) -> None:
         c1 = Channel.objects.create(project=self.project, kind="webhook")
         c2 = Channel.objects.create(project=self.project, kind="slack")
-        c3 = Channel.objects.create(project=self.project, kind="shell")
+        c3 = Channel.objects.create(project=self.project, kind="email")
 
         self.client.login(username="alice@example.org", password="password")
         payload = {"action": "disable", "_selected_action": [c1.id, c2.id]}

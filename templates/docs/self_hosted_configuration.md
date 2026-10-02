@@ -6,7 +6,6 @@ from environment variables. Below is a list of environment variables it reads an
 <ul class="self-hosted-configuration-toc">
 <li><a href="#ADMINS">ADMINS</a></li>
 <li><a href="#ALLOWED_HOSTS">ALLOWED_HOSTS</a></li>
-<li><a href="#APPRISE_ENABLED">APPRISE_ENABLED</a></li>
 <li><a href="#DB">DB</a></li>
 <li><a href="#DB_CONN_MAX_AGE">DB_CONN_MAX_AGE</a></li>
 <li><a href="#DB_HOST">DB_HOST</a></li>
@@ -19,9 +18,6 @@ from environment variables. Below is a list of environment variables it reads an
 <li><a href="#DB_USER">DB_USER</a></li>
 <li><a href="#DEBUG">DEBUG</a></li>
 <li><a href="#DEFAULT_FROM_EMAIL">DEFAULT_FROM_EMAIL</a></li>
-<li><a href="#DISCORD_CLIENT_ID">DISCORD_CLIENT_ID</a></li>
-<li><a href="#DISCORD_CLIENT_SECRET">DISCORD_CLIENT_SECRET</a></li>
-<li><a href="#DISCORD_CLIENT_SECRET_FILE">DISCORD_CLIENT_SECRET_FILE</a></li>
 <li><a href="#EMAIL_HOST">EMAIL_HOST</a></li>
 <li><a href="#EMAIL_HOST_PASSWORD">EMAIL_HOST_PASSWORD</a></li>
 <li><a href="#EMAIL_HOST_PASSWORD_FILE">EMAIL_HOST_PASSWORD_FILE</a></li>
@@ -30,47 +26,18 @@ from environment variables. Below is a list of environment variables it reads an
 <li><a href="#EMAIL_USE_TLS">EMAIL_USE_TLS</a></li>
 <li><a href="#EMAIL_USE_SSL">EMAIL_USE_SSL</a></li>
 <li><a href="#EMAIL_USE_VERIFICATION">EMAIL_USE_VERIFICATION</a></li>
-<li><a href="#GITHUB_CLIENT_ID">GITHUB_CLIENT_ID</a></li>
-<li><a href="#GITHUB_CLIENT_SECRET">GITHUB_CLIENT_SECRET</a></li>
-<li><a href="#GITHUB_CLIENT_SECRET_FILE">GITHUB_CLIENT_SECRET_FILE</a></li>
-<li><a href="#GITHUB_PRIVATE_KEY">GITHUB_PRIVATE_KEY</a></li>
-<li><a href="#GITHUB_PRIVATE_KEY_FILE">GITHUB_PRIVATE_KEY_FILE</a></li>
-<li><a href="#GITHUB_PUBLIC_LINK">GITHUB_PUBLIC_LINK</a></li>
 <li><a href="#http_proxy">http_proxy and https_proxy</a></li>
 <li><a href="#INTEGRATIONS_ALLOW_PRIVATE_IPS">INTEGRATIONS_ALLOW_PRIVATE_IPS</a></li>
 <li><a href="#MASTER_BADGE_LABEL">MASTER_BADGE_LABEL</a></li>
-<li><a href="#MATRIX_ACCESS_TOKEN">MATRIX_ACCESS_TOKEN</a></li>
-<li><a href="#MATRIX_ACCESS_TOKEN_FILE">MATRIX_ACCESS_TOKEN_FILE</a></li>
-<li><a href="#MATRIX_HOMESERVER">MATRIX_HOMESERVER</a></li>
-<li><a href="#MATRIX_USER_ID">MATRIX_USER_ID</a></li>
-<li><a href="#MATTERMOST_ENABLED">MATTERMOST_ENABLED</a></li>
-<li><a href="#MSTEAMS_ENABLED">MSTEAMS_ENABLED</a></li>
-<li><a href="#NTFY_SH_TOKEN">NTFY_SH_TOKEN</a></li>
-<li><a href="#NTFY_SH_TOKEN_FILE">NTFY_SH_TOKEN_FILE</a></li>
-<li><a href="#OPSGENIE_ENABLED">OPSGENIE_ENABLED</a></li>
-<li><a href="#PAGERTREE_ENABLED">PAGERTREE_ENABLED</a></li>
-<li><a href="#PD_APP_ID">PD_APP_ID</a></li>
-<li><a href="#PD_ENABLED">PD_ENABLED</a></li>
 <li><a href="#PING_BODY_LIMIT">PING_BODY_LIMIT</a></li>
 <li><a href="#PING_ENDPOINT">PING_ENDPOINT</a></li>
 <li><a href="#PROMETHEUS_ENABLED">PROMETHEUS_ENABLED</a></li>
-<li><a href="#PUSHBULLET_CLIENT_ID">PUSHBULLET_CLIENT_ID</a></li>
-<li><a href="#PUSHBULLET_CLIENT_SECRET">PUSHBULLET_CLIENT_SECRET</a></li>
-<li><a href="#PUSHBULLET_CLIENT_SECRET_FILE">PUSHBULLET_CLIENT_SECRET_FILE</a></li>
-<li><a href="#PUSHOVER_API_TOKEN">PUSHOVER_API_TOKEN</a></li>
-<li><a href="#PUSHOVER_API_TOKEN_FILE">PUSHOVER_API_TOKEN_FILE</a></li>
-<li><a href="#PUSHOVER_EMERGENCY_EXPIRATION">PUSHOVER_EMERGENCY_EXPIRATION</a></li>
-<li><a href="#PUSHOVER_EMERGENCY_RETRY_DELAY">PUSHOVER_EMERGENCY_RETRY_DELAY</a></li>
-<li><a href="#PUSHOVER_SUBSCRIPTION_URL">PUSHOVER_SUBSCRIPTION_URL</a></li>
 <li><a href="#REGISTRATION_OPEN">REGISTRATION_OPEN</a></li>
 <li><a href="#REMOTE_USER_HEADER">REMOTE_USER_HEADER</a></li>
-<li><a href="#ROCKETCHAT_ENABLED">ROCKETCHAT_ENABLED</a></li>
 <li><a href="#RP_ID">RP_ID</a></li>
 <li><a href="#SECRET_KEY">SECRET_KEY</a></li>
 <li><a href="#SECRET_KEY_FILE">SECRET_KEY_FILE</a></li>
 <li><a href="#SECURE_PROXY_SSL_HEADER">SECURE_PROXY_SSL_HEADER</a></li>
-<li><a href="#SHELL_ENABLED">SHELL_ENABLED</a></li>
-<li><a href="#SIGNAL_CLI_SOCKET">SIGNAL_CLI_SOCKET</a></li>
 <li><a href="#SITE_LOGO_URL">SITE_LOGO_URL</a></li>
 <li><a href="#SITE_NAME">SITE_NAME</a></li>
 <li><a href="#SITE_ROOT">SITE_ROOT</a></li>
@@ -78,23 +45,7 @@ from environment variables. Below is a list of environment variables it reads an
 <li><a href="#SLACK_CLIENT_SECRET">SLACK_CLIENT_SECRET</a></li>
 <li><a href="#SLACK_CLIENT_SECRET_FILE">SLACK_CLIENT_SECRET_FILE</a></li>
 <li><a href="#SLACK_ENABLED">SLACK_ENABLED</a></li>
-<li><a href="#SPIKE_ENABLED">SPIKE_ENABLED</a></li>
-<li><a href="#TELEGRAM_BOT_NAME">TELEGRAM_BOT_NAME</a></li>
-<li><a href="#TELEGRAM_TOKEN">TELEGRAM_TOKEN</a></li>
-<li><a href="#TELEGRAM_TOKEN_FILE">TELEGRAM_TOKEN_FILE</a></li>
-<li><a href="#TRELLO_APP_KEY">TRELLO_APP_KEY</a></li>
-<li><a href="#TRELLO_APP_KEY_FILE">TRELLO_APP_KEY_FILE</a></li>
-<li><a href="#TWILIO_ACCOUNT">TWILIO_ACCOUNT</a></li>
-<li><a href="#TWILIO_AUTH">TWILIO_AUTH</a></li>
-<li><a href="#TWILIO_AUTH_FILE">TWILIO_AUTH_FILE</a></li>
-<li><a href="#TWILIO_FROM">TWILIO_FROM</a></li>
-<li><a href="#TWILIO_MESSAGING_SERVICE_SID">TWILIO_MESSAGING_SERVICE_SID</a></li>
-<li><a href="#TWILIO_USE_WHATSAPP">TWILIO_USE_WHATSAPP</a></li>
-<li><a href="#VICTOROPS_ENABLED">VICTOROPS_ENABLED</a></li>
 <li><a href="#WEBHOOKS_ENABLED">WEBHOOKS_ENABLED</a></li>
-<li><a href="#WHATSAPP_DOWN_CONTENT_SID">WHATSAPP_DOWN_CONTENT_SID</a></li>
-<li><a href="#WHATSAPP_UP_CONTENT_SID">WHATSAPP_UP_CONTENT_SID</a></li>
-<li><a href="#ZULIP_ENABLED">ZULIP_ENABLED</a></li>
 </ul>
 
 ## `ADMINS` {: #ADMINS }
@@ -130,27 +81,6 @@ ALLOWED_HOSTS=first.example.org,second.example.org
 Aside from the comma-separated syntax, this is a standard Django setting.
 Read more about it in the
 [Django documentation](https://docs.djangoproject.com/en/6.1/ref/settings/#allowed-hosts).
-
-## `APPRISE_ENABLED` {: #APPRISE_ENABLED }
-
-Default: `False`
-
-A boolean that turns on/off the [Apprise](https://github.com/caronc/apprise)
-integration.
-
-Before enabling the Apprise integration, make sure the `apprise` package is installed.
-`uv sync` installs it as a part of the development dependencies. If you use
-`uv sync --no-dev`, add the `apprise` extra:
-
-```bash
-uv sync --no-dev --extra apprise
-```
-
-`uv sync` makes the environment match the command exactly, so pass every
-extra you use each time (for example, `--extra apprise --extra uwsgi`).
-After a `--no-dev` install, run commands with `uv run --no-sync` or from an
-activated virtual environment: a plain `uv run` syncs the environment first
-and installs the development dependencies again.
 
 ## `DB` {: #DB }
 
@@ -239,40 +169,6 @@ Default: `healthchecks@example.org`
 This is a standard Django setting, read more in
 [Django documentation](https://docs.djangoproject.com/en/6.1/ref/settings/#default-from-email).
 
-## `DISCORD_CLIENT_ID` {: #DISCORD_CLIENT_ID }
-
-Default: `None`
-
-The Discord Client ID, required by the Discord integration.
-
-To set up the Discord integration:
-
-* Register a new application at
-  [https://discord.com/developers/applications](https://discord.com/developers/applications)
-* Add a Redirect URI to your Discord application. The URI format is
-  `SITE_ROOT/integrations/add_discord/`. For example, if `your SITE_ROOT`
-  is `https://my-hc.example.org` then the Redirect URI would be
-  `https://my-hc.example.org/integrations/add_discord/`
-* Look up your Discord app's _Client ID_ and _Client Secret_. Put them
-  in the `DISCORD_CLIENT_ID` and `DISCORD_CLIENT_SECRET` environment
-  variables.
-
-## `DISCORD_CLIENT_SECRET` {: #DISCORD_CLIENT_SECRET }
-
-Default: `None`
-
-The Discord Client Secret, required by the Discord integration. Look it up at
-[https://discord.com/developers/applications](https://discord.com/developers/applications).
-
-## `DISCORD_CLIENT_SECRET_FILE` {: #DISCORD_CLIENT_SECRET_FILE }
-
-Default: `None`
-
-If set, must contain a filesystem path pointing to a readable file. Healthchecks will
-read the contents of the file into the [DISCORD_CLIENT_SECRET](#DISCORD_CLIENT_SECRET)
-setting. If `DISCORD_CLIENT_SECRET` and `DISCORD_CLIENT_SECRET_FILE` are both set,
-`DISCORD_CLIENT_SECRET_FILE` takes precedence.
-
 ## `EMAIL_HOST` {: #EMAIL_HOST }
 
 Default: `""` (empty string)
@@ -355,68 +251,6 @@ If you are setting up a private healthchecks instance where
 you trust your users, you can opt to disable the verification step. In that case,
 set `EMAIL_USE_VERIFICATION` to `False`.
 
-## `GITHUB_CLIENT_ID` {: #GITHUB_CLIENT_ID }
-
-Default: `None`
-
-The GitHub Client ID, required by the GitHub Issues integration.
-
-To set up the GitHub Issues integration:
-
-* [Register a new GitHub App](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/registering-a-github-app)
-  (not OAuth app).
-* In GitHub App settings, under **General › About**, look up the **Client ID** and **Public link** values and put
-  them in the Healthchecks `GITHUB_CLIENT_ID` and `GITHUB_PUBLIC_LINK` environment
-  variables respectively.
-* Under **General › Client secrets**, generate a client secret, and put it in the
-  Healthchecks `GITHUB_CLIENT_SECRET` environment variable.
-* Under **General › Identifying and authorizing users**, set the **Callback URL**.
-  The URL format is `SITE_ROOT/integrations/add_github/`.
-  For example, if `your SITE_ROOT` is `https://my-hc.example.org` then the
-  Callback URL would be `https://my-hc.example.org/integrations/add_github/`.
-* Under **General › Post installation**, set **Setup URL** to the same value.
-* Under **General › Private keys**, generate a private key and put it in the
-  Healthchecks `GITHUB_PRIVATE_KEY` environment variable.
-* Under **Permissions & events › Repository permissions**, set access for permission
-  "Issues" to "Read and write".
-
-## `GITHUB_CLIENT_SECRET` {: #GITHUB_CLIENT_SECRET }
-
-Default: `None`
-
-The GitHub App's Client Secret, required by the GitHub Issues integration.
-
-## `GITHUB_CLIENT_SECRET_FILE` {: #GITHUB_CLIENT_SECRET_FILE }
-
-Default: `None`
-
-If set, must contain a filesystem path pointing to a readable file. Healthchecks will
-read the contents of the file into the [GITHUB_CLIENT_SECRET](#GITHUB_CLIENT_SECRET)
-setting. If `GITHUB_CLIENT_SECRET` and `GITHUB_CLIENT_SECRET_FILE` are both set,
-`GITHUB_CLIENT_SECRET_FILE` takes precedence.
-
-## `GITHUB_PRIVATE_KEY` {: #GITHUB_PRIVATE_KEY }
-
-Default: `None`
-
-The GitHub App's private key, required by the GitHub Issues integration.
-
-## `GITHUB_PRIVATE_KEY_FILE` {: #GITHUB_PRIVATE_KEY_FILE }
-
-Default: `None`
-
-If set, must contain a filesystem path pointing to a readable file. Healthchecks will
-read the contents of the file into the [GITHUB_PRIVATE_KEY](#GITHUB_PRIVATE_KEY)
-setting. If `GITHUB_PRIVATE_KEY` and `GITHUB_PRIVATE_KEY_FILE` are both set,
-`GITHUB_PRIVATE_KEY_FILE` takes precedence.
-
-## `GITHUB_PUBLIC_LINK` {: #GITHUB_PUBLIC_LINK }
-
-Default: `None`
-
-A URL pointing to the  GitHub App's public page on the GitHub website, required by
-the GitHub Issues integration.
-
 ## `http_proxy` and `https_proxy` {: #http_proxy}
 
 Default: `""` (empty string)
@@ -450,9 +284,8 @@ internal addresses is a security risk.
 Only enable this setting if you run your Healthchecks instance in a trusted
 environment, and need to integrate with services running in your internal network.
 
-This setting affects all integration types except Apprise, not just webhooks. For
-example, if you run a Gotify instance on `localhost`, you will need to enable
-`INTEGRATIONS_ALLOW_PRIVATE_IPS` to be able to use it via the Gotify integration.
+This setting affects all integration types that make HTTP requests, not just
+webhooks: the Slack integration is subject to it as well.
 
 This setting affects all outbound HTTP requests, including those made
 while setting up new integrations (e.g. during the OAuth2 authorization flow).
@@ -461,127 +294,11 @@ This setting also affects connections to the proxy server when the `http_proxy` 
 `https_proxy` environment variables are set. If your proxy server has a private
 IP address, you will need to enable `INTEGRATIONS_ALLOW_PRIVATE_IPS` to use it.
 
-This setting *does not* have effect on the Apprise integration, as the Apprise library
-uses its own HTTP client. Apprise can make requests to private IPs regardless
-of this setting.
-
 ## `MASTER_BADGE_LABEL` {: #MASTER_BADGE_LABEL }
 
 Default: same as `SITE_NAME`
 
 The label for the "Overall Status" status badge.
-
-## `MATRIX_ACCESS_TOKEN` {: #MATRIX_ACCESS_TOKEN }
-
-Default: `None`
-
-The [Matrix](https://matrix.org/) bot user's access token, required by the Matrix
-integration.
-
-To set up the Matrix integration:
-
-* Register a bot user (for posting notifications) in your preferred Matrix homeserver.
-* Use the [Login API call](https://www.matrix.org/docs/guides/client-server-api#login)
-  to retrieve bot user's access token. You can run it as shown in the documentation,
-  using curl in the command shell.
-* Set the `MATRIX_` environment variables. Example:
-
-```ini
-MATRIX_ACCESS_TOKEN=[a long string of characters returned by the login call]
-MATRIX_HOMESERVER=https://matrix.org
-MATRIX_USER_ID=@mychecks:matrix.org
-```
-
-## `MATRIX_ACCESS_TOKEN_FILE` {: #MATRIX_ACCESS_TOKEN_FILE }
-
-Default: `None`
-
-If set, must contain a filesystem path pointing to a readable file. Healthchecks will
-read the contents of the file into the [MATRIX_ACCESS_TOKEN](#MATRIX_ACCESS_TOKEN)
-setting. If `MATRIX_ACCESS_TOKEN` and `MATRIX_ACCESS_TOKEN_FILE` are both set,
-`MATRIX_ACCESS_TOKEN_FILE` takes precedence.
-
-## `MATRIX_HOMESERVER` {: #MATRIX_HOMESERVER }
-
-Default: `None`
-
-The Matrix bot's homeserver address, required by the Matrix integration.
-
-## `MATRIX_USER_ID` {: #MATRIX_USER_ID }
-
-Default: `None`
-
-The Matrix bot's user identifier, required by the Matrix integration.
-
-## `MATTERMOST_ENABLED` {: #MATTERMOST_ENABLED }
-
-Default: `True`
-
-A boolean that turns on/off the Mattermost integration. Enabled by default.
-
-## `MSTEAMS_ENABLED` {: #MSTEAMS_ENABLED }
-
-Default: `True`
-
-A boolean that turns on/off the MS Teams integration. Enabled
-
-## `NTFY_SH_TOKEN` {: #NTFY_SH_TOKEN }
-
-Default: `None`
-
-The default access token to use when sending ntfy notifications to the hosted ntfy.sh
-server. This token will be only used when sending to the ntfy server at
-`https://ntfy.sh` and when the user has not specified their own access token
-when setting up the ntfy integration.
-
-Use this setting if your Healthchecks instance is hitting ntfy.sh free plan's
-[daily sending limit](https://docs.ntfy.sh/publish/#limitations) and you want to ensure
-reliable notification delivery for ntfy integrations that do not bring their own
-access token.
-
-## `NTFY_SH_TOKEN_FILE` {: #NTFY_SH_TOKEN_FILE }
-
-Default: `None`
-
-If set, must contain a filesystem path pointing to a readable file. Healthchecks will
-read the contents of the file into the [NTFY_SH_TOKEN](#NTFY_SH_TOKEN) setting.
-If `NTFY_SH_TOKEN` and `NTFY_SH_TOKEN_FILE` are both set, `NTFY_SH_TOKEN_FILE` takes
-precedence.
-
-## `OPSGENIE_ENABLED` {: #OPSGENIE_ENABLED }
-
-Default: `True`
-
-A boolean that turns on/off the Opsgenie integration. Enabled by default.
-
-## `PAGERTREE_ENABLED` {: #PAGERTREE_ENABLED }
-
-Default: `True`
-
-A boolean that turns on/off the PagerTree integration. Enabled by default.
-
-## `PD_APP_ID` {: #PD_APP_ID }
-
-Default: `None`
-
-PagerDuty application ID. If set, enables the PagerDuty
-[Simple Install Flow](https://developer.pagerduty.com/docs/app-integration-development/events-integration/).
-If `None`, Healthchecks will fall back to the even simpler flow where users manually
-copy integration keys from PagerDuty and paste them in Healthchecks.
-
-To set up:
-
-* Register a PagerDuty app at [PagerDuty](https://pagerduty.com/) › Developer Mode › My Apps
-* In the newly created app, add the "Events Integration" functionality
-* Specify a Redirect URL: `https://your-domain.com/integrations/add_pagerduty/`
-* Copy the displayed app_id value (PXXXXX) and put it in the `PD_APP_ID` environment
-  variable
-
-## `PD_ENABLED` {: #PD_ENABLED }
-
-Default: `True`
-
-A boolean that turns on/off the PagerDuty integration. Enabled by default.
 
 ## `PING_BODY_LIMIT` {: #PING_BODY_LIMIT }
 
@@ -630,96 +347,6 @@ https://ping.my-hc.example.org/1fj9XWM6Ns8vLGTmnPGk9g/dummy-slug
 Default: `True`
 
 A boolean that turns on/off the Prometheus integration. Enabled by default.
-
-## `PUSHBULLET_CLIENT_ID` {: #PUSHBULLET_CLIENT_ID }
-
-Default: `None`
-
-The Pushbullet Client ID, required by the Pushbullet integration.
-
-To set up the Pushbullet integration:
-
-* Add a new OAuth client at
-  [https://www.pushbullet.com/#settings/clients](https://www.pushbullet.com/#settings/clients)
-* Add a `redirect_uri` to your OAuth client. The URI format is
-  `SITE_ROOT/integrations/add_pushbullet/`. For example, if `your SITE_ROOT`
-  is `https://my-hc.example.org` then the `redirect_uri` would be
-  `https://my-hc.example.org/integrations/add_pushbullet/`
-* Look up your OAuth client's `client_id` and `client_secret` values. Put them
-  in the `PUSHBULLET_CLIENT_ID` and `PUSHBULLET_CLIENT_SECRET` environment
-  variables.
-
-Read more about setting up a Pushbullet OAuth client in the
-[Pushbullet OAuth2 guide](https://docs.pushbullet.com/#oauth2).
-
-## `PUSHBULLET_CLIENT_SECRET` {: #PUSHBULLET_CLIENT_SECRET }
-
-Default: `None`
-
-The Pushbullet Client Secret, required by the Pushbullet integration. Look it up at
-[https://www.pushbullet.com/#settings/clients](https://www.pushbullet.com/#settings/clients).
-
-## `PUSHBULLET_CLIENT_SECRET_FILE` {: #PUSHBULLET_CLIENT_SECRET_FILE }
-
-Default: `None`
-
-If set, must contain a filesystem path pointing to a readable file. Healthchecks will
-read the contents of the file into the
-[PUSHBULLET_CLIENT_SECRET](#PUSHBULLET_CLIENT_SECRET) setting. If
-`PUSHBULLET_CLIENT_SECRET` and `PUSHBULLET_CLIENT_SECRET_FILE` are both set,
-`PUSHBULLET_CLIENT_SECRET_FILE` takes precedence.
-
-## `PUSHOVER_API_TOKEN` {: #PUSHOVER_API_TOKEN }
-
-Default: `None`
-
-The [Pushover](https://pushover.net/) API token, required by the Pushover integration.
-
-To enable the Pushover integration:
-
-* Register a new Pushover application at
-  [https://pushover.net/apps/build](https://pushover.net/apps/build).
-* Within the Pushover application configuration, enable subscriptions.
-  Make sure the subscription type is set to "URL". Also make sure the redirect
-  URL is configured to point back to the root of the Healthchecks instance
-  (e.g., `https://my-hc.example.org/`).
-* Put the Pushover application's _API Token_ and the _Subscription URL_ in
-  `PUSHOVER_API_TOKEN` and `PUSHOVER_SUBSCRIPTION_URL` environment
-  variables. The Pushover subscription URL should look similar to
-  `https://pushover.net/subscribe/yourAppName-randomAlphaNumericData`.
-
-## `PUSHOVER_API_TOKEN_FILE` {: #PUSHOVER_API_TOKEN_FILE }
-
-Default: `None`
-
-If set, must contain a filesystem path pointing to a readable file. Healthchecks will
-read the contents of the file into the [PUSHOVER_API_TOKEN](#PUSHOVER_API_TOKEN)
-setting. If `PUSHOVER_API_TOKEN` and `PUSHOVER_API_TOKEN_FILE` are both set,
-`PUSHOVER_API_TOKEN_FILE` takes precedence.
-
-## `PUSHOVER_EMERGENCY_EXPIRATION` {: #PUSHOVER_EMERGENCY_EXPIRATION }
-
-Default: `86400` (24 hours)
-
-Specifies how many seconds an emergency Pushover notification
-will continue to be retried for.
-
-More information in [Pushover API documentation](https://pushover.net/api#priority).
-
-## `PUSHOVER_EMERGENCY_RETRY_DELAY` {: #PUSHOVER_EMERGENCY_RETRY_DELAY }
-
-Default: `300` (5 minutes)
-
-Specifies how often (in seconds) the Pushover servers will send the same notification
-to the user.
-
-More information in [Pushover API documentation](https://pushover.net/api#priority).
-
-## `PUSHOVER_SUBSCRIPTION_URL` {: #PUSHOVER_SUBSCRIPTION_URL }
-
-Default: `None`
-
-The Pushover Subscription URL, required by the Pushover integration.
 
 ## `REGISTRATION_OPEN` {: #REGISTRATION_OPEN }
 
@@ -775,12 +402,6 @@ using the `local_settings.py` file instead of environment variables, and specify
 REMOTE_USER_HEADER = "HTTP_X_AUTHENTICATED_USER"
 AUTHENTICATION_BACKENDS = ["hc.accounts.backends.CustomHeaderBackend"]
 ```
-
-## `ROCKETCHAT_ENABLED` {: #ROCKETCHAT_ENABLED }
-
-Default: `True`
-
-A boolean that turns on/off the Rocket.Chat integration. Enabled by default.
 
 ## `RP_ID` {: #RP_ID }
 
@@ -849,50 +470,6 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 This environment variable maps to a standard Django setting, read more in
 [Django documentation](https://docs.djangoproject.com/en/6.1/ref/settings/#secure-proxy-ssl-header).
-
-## `SHELL_ENABLED` {: #SHELL_ENABLED }
-
-Default: `False`
-
-A boolean that turns on/off the "Shell Commands" integration.
-
-The "Shell Commands" integration runs user-defined local shell commands when checks
-go up or down. This integration is disabled by default and can be enabled by setting
-the `SHELL_ENABLED` environment variable to `True`.
-
-Note: be careful when using "Shell Commands" integration, and only enable it when
-you fully trust the users of your Healthchecks instance. The commands will be executed
-by the `manage.py sendalerts` process and will run with its system permissions.
-
-## `SIGNAL_CLI_SOCKET` {: #SIGNAL_CLI_SOCKET }
-
-Default: `None`
-
-The path to the signal-cli UNIX socket, or the hostname:port of the signal-cli
-TCP socket.
-
-Example (UNIX socket):
-
-```ini
-SIGNAL_CLI_SOCKET=/tmp/signal-cli.socket
-```
-
-Example (TCP socket):
-
-```ini
-SIGNAL_CLI_SOCKET=example.org:7583
-```
-
-Healthchecks uses [signal-cli](https://github.com/AsamK/signal-cli) to send Signal
-notifications. Healthchecks interacts with signal-cli over UNIX or TCP socket (requires
-signal-cli 0.11.10 or later).
-
-To enable the Signal integration:
-
-* Set up and configure signal-cli to expose JSON RPC on an UNIX or TCP socket
-  ([instructions](https://github.com/AsamK/signal-cli/wiki/JSON-RPC-service)).
-  Example: `signal-cli -a +xxxxxx daemon --socket /tmp/signal-cli-socket`
-* Put the socket's location in the `SIGNAL_CLI_SOCKET` environment variable.
 
 ## `SITE_LOGO_URL` {: #SITE_LOGO_URL }
 
@@ -1015,188 +592,8 @@ Default: `True`
 
 A boolean that turns on/off the Healthchecks integration for Slack. Enabled by default.
 
-## `SPIKE_ENABLED` {: #SPIKE_ENABLED }
-
-Default: `True`
-
-A boolean that turns on/off the Spike.sh integration. Enabled by default.
-
-## `TELEGRAM_BOT_NAME` {: #TELEGRAM_BOT_NAME }
-
-Default: `ExampleBot`
-
-The [Telegram](https://telegram.org/) bot name, required by the Telegram integration.
-
-To set up the Telegram integration:
-
-* Create a Telegram bot by talking to the
-[BotFather](https://core.telegram.org/bots#6-botfather). Set the bot's name,
-description, user picture, and add a "/start" command.
-* After creating the bot you will have the bot's name and token. Put them
-in `TELEGRAM_BOT_NAME` and `TELEGRAM_TOKEN` environment variables.
-* Run the `settelegramwebhook` management command. This command tells Telegram
-where to forward channel messages by invoking Telegram's
-[setWebhook](https://core.telegram.org/bots/api#setwebhook) API call:
-
-```bash
-$ ./manage.py settelegramwebhook
-Done, Telegram's webhook set to: https://my-monitoring-project.com/integrations/telegram/bot/
-```
-
-For this to work, your `SITE_ROOT` must be publicly accessible and use the "https://"
-scheme.
-
-## `TELEGRAM_TOKEN` {: #TELEGRAM_TOKEN }
-
-Default: `None`
-
-The Telegram bot user's authentication token, required by the Telegram integration.
-
-## `TELEGRAM_TOKEN_FILE` {: #TELEGRAM_TOKEN_FILE }
-
-Default: `None`
-
-If set, must contain a filesystem path pointing to a readable file. Healthchecks will
-read the contents of the file into the [TELEGRAM_TOKEN](#TELEGRAM_TOKEN) setting.
-If `TELEGRAM_TOKEN` and `TELEGRAM_TOKEN_FILE` are both set, `TELEGRAM_TOKEN_FILE` takes
-precedence.
-
-## `TRELLO_APP_KEY` {: #TRELLO_APP_KEY }
-
-Default: `None`
-
-The [Trello](https://trello.com/) app key, required by the Trello integration.
-
-To set up the Trello integration, get a developer API key from
-[https://trello.com/app-key](https://trello.com/app-key) and put it in the
-`TRELLO_APP_KEY` environment variable.
-
-## `TRELLO_APP_KEY_FILE` {: #TRELLO_APP_KEY_FILE }
-
-Default: `None`
-
-If set, must contain a filesystem path pointing to a readable file. Healthchecks will
-read the contents of the file into the [TRELLO_APP_KEY](#TRELLO_APP_KEY) setting.
-If `TRELLO_APP_KEY` and `TRELLO_APP_KEY_FILE` are both set, `TRELLO_APP_KEY_FILE` takes
-precedence.
-
-## `TWILIO_ACCOUNT` {: #TWILIO_ACCOUNT }
-
-Default: `None`
-
-Twilio Account SID, required by the SMS, Call, and WhatsApp integrations.
-
-## `TWILIO_AUTH` {: #TWILIO_AUTH }
-
-Default: `None`
-
-Twilio Auth token, required by the SMS, Call, and WhatsApp integrations.
-
-## `TWILIO_AUTH_FILE` {: #TWILIO_AUTH_FILE }
-
-Default: `None`
-
-If set, must contain a filesystem path pointing to a readable file. Healthchecks will
-read the contents of the file into the [TWILIO_AUTH](#TWILIO_AUTH) setting.
-If `TWILIO_AUTH` and `TWILIO_AUTH_FILE` are both set, `TWILIO_AUTH_FILE` takes
-precedence.
-
-## `TWILIO_FROM` {: #TWILIO_FROM }
-
-Default: `None`
-
-The Twilio phone number to use as the sender for SMS and WhatsApp notifications,
-and as the caller for Call integrations.
-
-Example:
-
-```ini
-TWILIO_FROM=+15017122661
-```
-
-## `TWILIO_MESSAGING_SERVICE_SID` {: #TWILIO_MESSAGING_SERVICE_SID }
-
-Default: `None`
-
-The Twilio Messaging Service SID for sending SMS and WhatsApp notifications.
-
-`TWILIO_MESSAGING_SERVICE_SID` is **required** for sending WhatsApp notifications.
-
-`TWILIO_MESSAGING_SERVICE_SID` is **optional** for sending SMS notifications. If specified,
-Healthchecks will pass it in the "MessagingServiceSid" field to Twilio API. This will
-result in Twilio using a Messaging Service instead of a plain sender number to deliver
-the SMS messages. If not specified, Healthchecks will fall back to using
-the "From" field with the value configured in [TWILIO_FROM](#TWILIO_FROM).
-
-Example:
-
-```ini
-TWILIO_MESSAGING_SERVICE_SID=MGe56e622d540e6badc52ae0ac4af028c6
-```
-
-## `TWILIO_USE_WHATSAPP` {: #TWILIO_USE_WHATSAPP }
-
-Default: `False`
-
-A boolean that turns on/off the WhatsApp integration. For the WhatsApp integration
-to work, you will also need to specify:
-
-* [TWILIO_ACCOUNT](#TWILIO_ACCOUNT)
-* [TWILIO_AUTH](#TWILIO_AUTH)
-* [TWILIO_FROM](#TWILIO_FROM)
-* [TWILIO_MESSAGING_SERVICE_SID](#TWILIO_MESSAGING_SERVICE_SID)
-* [WHATSAPP_DOWN_CONTENT_SID](#WHATSAPP_DOWN_CONTENT_SID)
-* [WHATSAPP_UP_CONTENT_SID](#WHATSAPP_UP_CONTENT_SID).
-
-## `VICTOROPS_ENABLED` {: #VICTOROPS_ENABLED }
-
-Default: `True`
-
-A boolean that turns on/off the Splunk On-Call (VictorOps) integration.
-Enabled by default.
-
 ## `WEBHOOKS_ENABLED` {: #WEBHOOKS_ENABLED }
 
 Default: `True`
 
 A boolean that turns on/off the Webhooks integration. Enabled by default.
-
-## `WHATSAPP_DOWN_CONTENT_SID` {: #WHATSAPP_DOWN_CONTENT_SID }
-
-Default: `None`
-
-Identifier of the Twilio content template to use for WhatsApp "down" notifications.
-Required by the WhatsApp integration.
-
-Meta requires WhatsApp message templates to be pre-registered and approved.
-Create a content template in your Twilio account with the following contents:
-
-````
-The check “{{1}}” is DOWN.
-````
-
-You can tweak the message contents as needed, but make sure it has a single placeholder
-similar to the above example.
-
-## `WHATSAPP_UP_CONTENT_SID` {: #WHATSAPP_UP_CONTENT_SID }
-
-Default: `None`
-
-Identifier of the Twilio content template to use for WhatsApp "up" notifications.
-Required by the WhatsApp integration.
-
-Meta requires WhatsApp message templates to be pre-registered and approved.
-Create a content template in your Twilio account with the following contents:
-
-````
-The check “{{1}}” is now UP.
-````
-
-You can tweak the message contents as needed, but make sure it has a single placeholder
-similar to the above example.
-
-## `ZULIP_ENABLED` {: #ZULIP_ENABLED }
-
-Default: `True`
-
-A boolean that turns on/off the Zulip integration. Enabled by default.

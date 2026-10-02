@@ -500,7 +500,7 @@ you can specify integrations by their names. For this to work, your integrations
 need non-empty unique names, and they must not contain commas.
 The names must match exactly, whitespace is significant.</p>
 <p>Example:</p>
-<p><pre>{"channels": "Email to Alice,SMS to Alice"}</pre></p>
+<p><pre>{"channels": "Email to Alice,Slack to Alice"}</pre></p>
 </dd>
 <dt>unique</dt>
 <dd>
@@ -784,7 +784,7 @@ you can specify integrations by their names. For this to work, your integrations
 need non-empty and unique names, and they must not contain commas. The names
 must match exactly, whitespace is significant.</p>
 <p>Example:</p>
-<p><pre>{"channels": "Email to Alice,SMS to Alice"}</pre></p>
+<p><pre>{"channels": "Email to Alice,Slack to Alice"}</pre></p>
 </dd>
 <dt>start_kw</dt>
 <dd>
@@ -1308,8 +1308,8 @@ return these flips as well.</p>
 <span class="w">    </span><span class="p">},</span>
 <span class="w">    </span><span class="p">{</span>
 <span class="w">      </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"746a083e-f542-4554-be1a-707ce16d3acc"</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"My Phone"</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sms"</span>
+<span class="w">      </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Team Slack"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"slack"</span>
 <span class="w">    </span><span class="p">}</span>
 <span class="w">  </span><span class="p">]</span>
 <span class="p">}</span>

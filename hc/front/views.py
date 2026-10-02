@@ -1165,32 +1165,10 @@ def channels(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
         "project": project,
         "channels": channels,
         "num_checks": project.check_set.count(),
-        "enable_apprise": settings.APPRISE_ENABLED is True,
-        "enable_call": bool(settings.TWILIO_AUTH),
-        "enable_discord": bool(settings.DISCORD_CLIENT_ID),
-        "enable_github": bool(settings.GITHUB_CLIENT_ID),
-        "enable_matrix": bool(settings.MATRIX_ACCESS_TOKEN),
-        "enable_mattermost": settings.MATTERMOST_ENABLED is True,
-        "enable_msteams": settings.MSTEAMS_ENABLED is True,
-        "enable_opsgenie": settings.OPSGENIE_ENABLED is True,
-        "enable_pagertree": settings.PAGERTREE_ENABLED is True,
-        "enable_pd": settings.PD_ENABLED is True,
         "enable_prometheus": settings.PROMETHEUS_ENABLED is True,
-        "enable_pushbullet": bool(settings.PUSHBULLET_CLIENT_ID),
-        "enable_pushover": bool(settings.PUSHOVER_API_TOKEN),
-        "enable_rocketchat": settings.ROCKETCHAT_ENABLED is True,
-        "enable_shell": settings.SHELL_ENABLED is True,
-        "enable_signal": bool(settings.SIGNAL_CLI_SOCKET),
         "enable_slack": settings.SLACK_ENABLED is True,
         "enable_slack_btn": bool(settings.SLACK_CLIENT_ID),
-        "enable_sms": bool(settings.TWILIO_AUTH),
-        "enable_spike": settings.SPIKE_ENABLED is True,
-        "enable_telegram": bool(settings.TELEGRAM_TOKEN),
-        "enable_trello": bool(settings.TRELLO_APP_KEY),
-        "enable_victorops": settings.VICTOROPS_ENABLED is True,
         "enable_webhooks": settings.WEBHOOKS_ENABLED is True,
-        "enable_whatsapp": settings.TWILIO_USE_WHATSAPP,
-        "enable_zulip": settings.ZULIP_ENABLED is True,
     }
 
     return render(request, "front/channels.html", ctx)
@@ -1276,30 +1254,10 @@ def edit_channel(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
         from hc.integrations.webhook.views import webhook_form
 
         return webhook_form(request, channel)
-    elif channel.kind == "sms":
-        from hc.integrations.sms.views import sms_form
-
-        return sms_form(request, channel)
-    elif channel.kind == "signal":
-        from hc.integrations.signal.views import signal_form
-
-        return signal_form(request, channel)
-    elif channel.kind == "whatsapp":
-        from hc.integrations.whatsapp.views import whatsapp_form
-
-        return whatsapp_form(request, channel)
-    elif channel.kind == "ntfy":
-        from hc.integrations.ntfy.views import ntfy_form
-
-        return ntfy_form(request, channel)
     elif channel.kind == "group":
         from hc.integrations.group.views import group_form
 
         return group_form(request, channel)
-    elif channel.kind == "gotify":
-        from hc.integrations.gotify.views import gotify_form
-
-        return gotify_form(request, channel)
 
     return HttpResponseBadRequest()
 
@@ -1336,16 +1294,6 @@ def log_events(request: HttpRequest, code: UUID) -> HttpResponse:
         # to specify "return any events after *this* point".
         response["X-Last-Event-Timestamp"] = str(events[0].created.timestamp())
     return response
-
-
-def contact_vcf(request: HttpRequest) -> HttpResponse:
-    ctx = {
-        "email": settings.DEFAULT_FROM_EMAIL,
-        "site_name": settings.SITE_NAME,
-        "tel": settings.TWILIO_FROM,
-        "site_root": settings.SITE_ROOT,
-    }
-    return render(request, "contact.vcf", ctx, content_type="text/vcard")
 
 
 # Forks: add custom views after this line

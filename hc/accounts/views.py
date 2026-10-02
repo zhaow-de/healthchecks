@@ -48,8 +48,6 @@ POST_LOGIN_ROUTES = (
     "hc-log",
     "hc-channels",
     "hc-add-slack",
-    "hc-add-pushover",
-    "hc-add-telegram",
     "hc-project-settings",
     "hc-uncloak",
 )

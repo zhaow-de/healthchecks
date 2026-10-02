@@ -15,7 +15,6 @@ from hc.front.templatetags.hc_extras import (
     first5,
     hc_duration,
     mask_key,
-    mask_phone,
     mask_ro_key,
     mask_rw_key,
     site_hostname,
@@ -155,7 +154,3 @@ class MiscFiltersTestCase(TestCase):
     def test_first5_works(self) -> None:
         rid = UUID("63832bb7-ddd5-4f2d-bf0a-cac885212963")
         self.assertEqual(first5(rid), "63832")
-
-    def test_mask_phone_works(self) -> None:
-        self.assertEqual(mask_phone("+37112345678"), "+371******678")
-        self.assertEqual(mask_phone("+123456"), "+123456")

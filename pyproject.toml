@@ -13,7 +13,6 @@ dependencies = [
     "psycopg==3.3.6",
     "pycurl==7.48.0",
     "pydantic==2.13.5",
-    "pyjwt[crypto]==2.13.0",
     "pyotp==2.10.0",
     "segno==1.6.6",
     "statsd==4.0.1",
@@ -23,16 +22,12 @@ dependencies = [
 # Optional runtime features. Install with "uv sync --extra <name>".
 # The Docker image is built with all of them.
 [project.optional-dependencies]
-apprise = ["apprise==1.13.1"]
 psycopg-c = ["psycopg[c]"]
 uwsgi = ["uwsgi"]
 
 [dependency-groups]
 # Installed by default by "uv sync" and "uv run".
 dev = [
-    # The test suite covers the apprise code path. Keep this pin equal to the
-    # extra above; "uv lock" fails if they disagree.
-    "apprise==1.13.1",
     "markdown==3.10.2",
     "pre-commit>=4.6.2",
     "pygments==2.21.0",

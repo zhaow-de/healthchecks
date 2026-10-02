@@ -42,12 +42,6 @@ class ChannelModelTestCase(BaseTestCase):
             ),
         )
 
-    def test_it_handles_json_opsgenie_value(self) -> None:
-        c = Channel(kind="opsgenie")
-        c.value = json.dumps({"key": "abc", "region": "eu"})
-        self.assertEqual(c.opsgenie.key, "abc")
-        self.assertEqual(c.opsgenie.region, "eu")
-
     def test_slack_team_reads_team_name(self) -> None:
         c = Channel(kind="slack")
         c.value = json.dumps({"team_name": "Foo Team", "incoming_webhook": {}})

@@ -125,7 +125,3 @@ def deletion_scheduled(to: list[str], ctx: dict[str, Any]) -> None:
 
 def sudo_code(to: str, ctx: dict[str, Any]) -> None:
     send(make_message("sudo-code", to, ctx))
-
-
-def signal_rate_limited(to: str, ctx: dict[str, Any]) -> None:
-    send(make_message("signal-rate-limited", to, ctx))

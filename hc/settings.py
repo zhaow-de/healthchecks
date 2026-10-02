@@ -97,36 +97,11 @@ INSTALLED_APPS = (
     "hc.api",
     "hc.front",
     "hc.logs",
-    "hc.integrations.apprise",
-    "hc.integrations.call",
-    "hc.integrations.discord",
     "hc.integrations.email",
-    "hc.integrations.github",
-    "hc.integrations.googlechat",
-    "hc.integrations.gotify",
     "hc.integrations.group",
-    "hc.integrations.matrix",
-    "hc.integrations.mattermost",
-    "hc.integrations.msteamsw",
-    "hc.integrations.ntfy",
-    "hc.integrations.opsgenie",
-    "hc.integrations.pagertree",
-    "hc.integrations.pd",
-    "hc.integrations.po",
     "hc.integrations.prometheus",
-    "hc.integrations.pushbullet",
-    "hc.integrations.rocketchat",
-    "hc.integrations.shell",
-    "hc.integrations.signal",
     "hc.integrations.slack",
-    "hc.integrations.sms",
-    "hc.integrations.spike",
-    "hc.integrations.telegram",
-    "hc.integrations.trello",
-    "hc.integrations.victorops",
     "hc.integrations.webhook",
-    "hc.integrations.whatsapp",
-    "hc.integrations.zulip",
 )
 
 
@@ -320,98 +295,18 @@ STATSD_HOST = os.getenv("STATSD_HOST")
 
 # Integrations
 
-# Apprise
-APPRISE_ENABLED = envbool("APPRISE_ENABLED", "False")
-
-# Discord integration
-DISCORD_CLIENT_ID = os.getenv("DISCORD_CLIENT_ID")
-DISCORD_CLIENT_SECRET = envsecret("DISCORD_CLIENT_SECRET")
-
-# GitHub Issues
-GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID")
-GITHUB_CLIENT_SECRET = envsecret("GITHUB_CLIENT_SECRET")
-GITHUB_PRIVATE_KEY = envsecret("GITHUB_PRIVATE_KEY")
-GITHUB_PUBLIC_LINK = os.getenv("GITHUB_PUBLIC_LINK")
-
-# Matrix
-MATRIX_HOMESERVER = os.getenv("MATRIX_HOMESERVER")
-MATRIX_USER_ID = os.getenv("MATRIX_USER_ID")
-MATRIX_ACCESS_TOKEN = envsecret("MATRIX_ACCESS_TOKEN")
-
-# Mattermost
-MATTERMOST_ENABLED = envbool("MATTERMOST_ENABLED", "True")
-
-# MS Teams
-MSTEAMS_ENABLED = envbool("MSTEAMS_ENABLED", "True")
-
-# ntfy.sh
-NTFY_SH_TOKEN = envsecret("NTFY_SH_TOKEN")
-
-# Opsgenie
-OPSGENIE_ENABLED = envbool("OPSGENIE_ENABLED", "True")
-
-# PagerTree
-PAGERTREE_ENABLED = envbool("PAGERTREE_ENABLED", "True")
-
-# PagerDuty
-PD_ENABLED = envbool("PD_ENABLED", "True")
-PD_APP_ID = os.getenv("PD_APP_ID")
-
 # Prometheus
 PROMETHEUS_ENABLED = envbool("PROMETHEUS_ENABLED", "True")
 
-# Pushover integration
-PUSHOVER_API_TOKEN = envsecret("PUSHOVER_API_TOKEN")
-PUSHOVER_SUBSCRIPTION_URL = os.getenv("PUSHOVER_SUBSCRIPTION_URL")
-PUSHOVER_EMERGENCY_RETRY_DELAY = int(os.getenv("PUSHOVER_EMERGENCY_RETRY_DELAY", "300"))
-PUSHOVER_EMERGENCY_EXPIRATION = int(os.getenv("PUSHOVER_EMERGENCY_EXPIRATION", "86400"))
-
-# Pushbullet integration
-PUSHBULLET_CLIENT_ID = os.getenv("PUSHBULLET_CLIENT_ID")
-PUSHBULLET_CLIENT_SECRET = envsecret("PUSHBULLET_CLIENT_SECRET")
-
-# Rocket.Chat
-ROCKETCHAT_ENABLED = envbool("ROCKETCHAT_ENABLED", "True")
-
-# Local shell commands
-SHELL_ENABLED = envbool("SHELL_ENABLED", "False")
-
-# Signal
-SIGNAL_CLI_SOCKET = os.getenv("SIGNAL_CLI_SOCKET")
 
 # Slack integration
 SLACK_CLIENT_ID = os.getenv("SLACK_CLIENT_ID")
 SLACK_CLIENT_SECRET = envsecret("SLACK_CLIENT_SECRET")
 SLACK_ENABLED = envbool("SLACK_ENABLED", "True")
 
-# Spike.sh
-SPIKE_ENABLED = envbool("SPIKE_ENABLED", "True")
-
-# Telegram integration
-TELEGRAM_BOT_NAME = os.getenv("TELEGRAM_BOT_NAME", "ExampleBot")
-TELEGRAM_TOKEN = envsecret("TELEGRAM_TOKEN")
-
-# SMS and WhatsApp (Twilio) integration
-TWILIO_ACCOUNT = os.getenv("TWILIO_ACCOUNT")
-TWILIO_AUTH = envsecret("TWILIO_AUTH")
-TWILIO_FROM = os.getenv("TWILIO_FROM")
-TWILIO_MESSAGING_SERVICE_SID = os.getenv("TWILIO_MESSAGING_SERVICE_SID")
-TWILIO_USE_WHATSAPP = envbool("TWILIO_USE_WHATSAPP", "False")
-WHATSAPP_DOWN_CONTENT_SID = os.getenv("WHATSAPP_DOWN_CONTENT_SID")
-WHATSAPP_UP_CONTENT_SID = os.getenv("WHATSAPP_UP_CONTENT_SID")
-
-# Trello (https://trello.com/app-key)
-TRELLO_APP_KEY = envsecret("TRELLO_APP_KEY")
-
-# VictorOps
-VICTOROPS_ENABLED = envbool("VICTOROPS_ENABLED", "True")
-
 # Webhooks
 WEBHOOKS_ENABLED = envbool("WEBHOOKS_ENABLED", "True")
 INTEGRATIONS_ALLOW_PRIVATE_IPS = envbool("INTEGRATIONS_ALLOW_PRIVATE_IPS", "False")
-
-# Zulip
-ZULIP_ENABLED = envbool("ZULIP_ENABLED", "True")
 
 # Read additional configuration from hc/local_settings.py if it exists
 if (BASE_DIR / "hc/local_settings.py").exists():

@@ -14,7 +14,7 @@ class ApiConfig(AppConfig):
     name = "hc.api"
 
 
-@register()  # W001, W002, W005, W006, E002, E003
+@register()  # W001, W002, W005, E002, E003
 def settings_check(
     app_configs: Sequence[AppConfig] | None,
     databases: Sequence[str] | None,
@@ -67,15 +67,6 @@ def settings_check(
                 "settings.TIME_ZONE is not 'UTC'",
                 hint="Healthchecks is designed to use UTC internally, changing this setting will break things",
                 id="hc.api.E003",
-            )
-        )
-
-    if settings.APPRISE_ENABLED and not settings.INTEGRATIONS_ALLOW_PRIVATE_IPS:
-        items.append(
-            Warning(
-                "Apprise can access private IPs regardless of the settings.INTEGRATIONS_ALLOW_PRIVATE_IPS value",
-                hint="See https://zcrypto-hc.zhaow.me/docs/self_hosted_configuration/#INTEGRATIONS_ALLOW_PRIVATE_IPS",
-                id="hc.api.W006",
             )
         )
 

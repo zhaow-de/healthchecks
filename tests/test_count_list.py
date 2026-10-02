@@ -138,13 +138,13 @@ def test_a_named_entry_runs_alone_and_an_unknown_name_is_refused():
 
 _CLIENT_EXEMPTIONS = {
     "hc/lib/curl.py": "import pycurl\n",
-    "hc/integrations/apprise/transport.py": "import apprise\n",
-    "hc/integrations/apprise/tests/test_notify.py": "import apprise\nimport requests\n",
+    "hc/integrations/webhook/tests/test_notify.py": "import apprise\nimport requests\n",
 }
 
 
+@pytest.mark.parametrize("module", ["webhook", "apprise"])
 @pytest.mark.parametrize("line", ["import apprise", "from apprise import Apprise", "import apprise.plugins", "import requests"])
-def test_http_clients_outside_hc_lib_curl_counts_a_second_module_that_imports_apprise(tmp_path, line):
+def test_http_clients_outside_hc_lib_curl_counts_a_module_that_imports_a_client(tmp_path, module, line):
     def count() -> str:
         done = subprocess.run(
             ["bash", str(SCRIPT), "http-clients-outside-hc-lib-curl"], cwd=tmp_path, capture_output=True, text=True, timeout=120
@@ -152,8 +152,8 @@ def test_http_clients_outside_hc_lib_curl_counts_a_second_module_that_imports_ap
         assert done.returncode == 0, done.stdout + done.stderr
         return done.stdout
 
-    transport = tmp_path / "hc" / "integrations" / "webhook" / "transport.py"
-    for path, text in {**_CLIENT_EXEMPTIONS, "hc/integrations/webhook/transport.py": "from hc.lib import curl\n"}.items():
+    transport = tmp_path / "hc" / "integrations" / module / "transport.py"
+    for path, text in {**_CLIENT_EXEMPTIONS, f"hc/integrations/{module}/transport.py": "from hc.lib import curl\n"}.items():
         (tmp_path / path).parent.mkdir(parents=True, exist_ok=True)
         (tmp_path / path).write_text(text)
     subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)

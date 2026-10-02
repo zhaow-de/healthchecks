@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-import re
 from datetime import datetime, timezone
 from datetime import timedelta as td
 
@@ -123,49 +121,6 @@ class OnCalendarForm(forms.Form):
 class AddUrlForm(forms.Form):
     error_css_class = "has-error"
     value = LaxURLField(max_length=1000, assume_scheme="https")
-
-
-class PhoneNumberForm(forms.Form):
-    error_css_class = "has-error"
-    label = forms.CharField(max_length=100, required=False)
-    phone = forms.CharField()
-
-    def clean_phone(self) -> str:
-        v = self.cleaned_data["phone"]
-        assert isinstance(v, str)
-
-        stripped = v.encode("ascii", "ignore").decode("ascii")
-        stripped = stripped.replace(" ", "").replace("-", "")
-        if not re.match(r"^\+\d{5,15}$", stripped):
-            raise forms.ValidationError("Invalid phone number format.")
-
-        return stripped
-
-    def get_json(self) -> str:
-        return json.dumps({"value": self.cleaned_data["phone"]})
-
-
-class PhoneUpDownForm(PhoneNumberForm):
-    up = forms.BooleanField(required=False, initial=True)
-    down = forms.BooleanField(required=False, initial=True)
-
-    def clean(self) -> None:
-        super().clean()
-
-        down = self.cleaned_data.get("down")
-        up = self.cleaned_data.get("up")
-
-        if not down and not up:
-            self.add_error("down", "Please select at least one.")
-
-    def get_json(self) -> str:
-        return json.dumps(
-            {
-                "value": self.cleaned_data["phone"],
-                "up": self.cleaned_data["up"],
-                "down": self.cleaned_data["down"],
-            }
-        )
 
 
 class ChannelNameForm(forms.Form):

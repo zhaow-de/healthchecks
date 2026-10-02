@@ -2,13 +2,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, NoReturn
 
-from django.template.loader import render_to_string
-
-from hc.front.templatetags.hc_extras import sortchecks
 from hc.lib import curl
 
 if TYPE_CHECKING:
-    from hc.api.models import Channel, Check, Flip, Notification, Ping
+    from hc.api.models import Channel, Flip, Notification, Ping
 
 
 def get_ping_body_bytes(ping: Ping | None) -> bytes | None:
@@ -58,24 +55,6 @@ class Transport:
 
         return False
 
-    def down_checks(self, check: Check) -> list[Check] | None:
-        """Return a sorted list of other checks in the same project that are down.
-
-        If there are no other hecks in the project, return None instead of empty list.
-        Templates can check for None to decide whether to show or not show the
-        "All other checks are up" note.
-
-        """
-
-        siblings = self.channel.project.check_set.exclude(id=check.id)
-        if not siblings.exists():
-            return None
-
-        down_siblings = list(siblings.filter(status="down"))
-        sortchecks(down_siblings, "name")
-
-        return down_siblings
-
     def last_ping(self, flip: Flip) -> Ping | None:
         """Return the last Ping object received before this flip."""
 
@@ -89,11 +68,6 @@ class Transport:
         q = q.filter(created__lte=flip.created)
 
         return q.last()
-
-    def tmpl(self, template_name: str, **ctx: Any) -> str:
-        # \xa0 is non-breaking space. It causes SMS messages to use UCS2 encoding
-        # and cost twice the money.
-        return render_to_string(template_name, ctx).strip().replace("\xa0", " ")
 
 
 class HttpTransport(Transport):
@@ -177,30 +151,6 @@ class HttpTransport(Transport):
     ) -> None:
         cls.request(
             "post",
-            url,
-            retry=retry,
-            params=params,
-            data=data,
-            json=json,
-            headers=headers,
-            auth=auth,
-        )
-
-    # Convenience wrapper around self.request for making "PUT" requests
-    @classmethod
-    def put(
-        cls,
-        url: str,
-        retry: bool = True,
-        *,
-        params: curl.Params = None,
-        data: curl.Data = None,
-        json: Any = None,
-        headers: curl.Headers = None,
-        auth: curl.Auth = None,
-    ) -> None:
-        cls.request(
-            "put",
             url,
             retry=retry,
             params=params,

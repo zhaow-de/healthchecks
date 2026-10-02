@@ -134,11 +134,6 @@ table.channels-table > tbody > tr > th {
     line-height: 40px;
 }
 
-.btn img.ai-icon {
-    height: 1.4em;
-    margin-right: 2px;
-}
-
 .add-integration h2 {
     margin-top: 0;
 }
@@ -168,23 +163,6 @@ table.channels-table > tbody > tr > th {
     font-weight: 300;
 }
 
-.ai-step .marker-wrap {
-    position: relative;
-    clear: both;
-}
-
-.ai-step .marker {
-    width: 20px;
-    height: 20px;
-    margin-left: -10px;
-    margin-top: -10px;
-    background: #2abb66;
-    position: absolute;
-    border-radius: 10px;
-    opacity: 0;
-    animation: marker-ripple 1.2s ease-out infinite;
-}
-
 .ai-step p,
 .ai-step ul {
     margin-left: 80px;
@@ -194,33 +172,9 @@ table.channels-table > tbody > tr > th {
     padding-left: 20px;
 }
 
-@keyframes marker-ripple {
-    0%,
-    35% {
-        transform: scale(0);
-        opacity: 0.5;
-    }
-    50% {
-        transform: scale(1.5);
-        opacity: 0.3;
-    }
-    100% {
-        opacity: 0;
-        transform: scale(4);
-    }
-}
-
 .ai-guide-screenshot {
     max-width: 100%;
     border: 6px solid var(--border-color);
-}
-
-.add-integration li.link-to-github {
-    padding: 16px 0;
-}
-
-.link-to-github p {
-    margin-bottom: 0;
 }
 
 .page-channels .ic-delete {
@@ -229,17 +183,4 @@ table.channels-table > tbody > tr > th {
 
 .channel-modal .modal-body {
     padding: 15px 40px;
-}
-
-body.dark img.kind-mattermost,
-body.dark img.kind-matrix {
-    filter: invert();
-}
-
-body.dark img.kind-github {
-    content: url("../img/github-white.png");
-}
-
-img.kind-ntfy {
-    filter: drop-shadow(1px 1px 1px rgba(0, 0, 0, 0.2));
 }

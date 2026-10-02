@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
-import socket
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -17,7 +16,6 @@ from cronsim import CronSim
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.humanize.templatetags.humanize import naturaltime
-from django.core.mail import mail_admins
 from django.core.signing import TimestampSigner
 from django.db import IntegrityError, models, transaction
 from django.db.models import F, QuerySet
@@ -45,67 +43,14 @@ REASONS = (("", "Unknown"), ("timeout", "Timeout"), ("fail", "Fail signal"))
 
 
 TRANSPORTS: dict[str, tuple[str, type[transports.Transport] | str]] = {
-    "apprise": ("Apprise", "hc.integrations.apprise.transport.Apprise"),
-    "call": ("Phone Call", "hc.integrations.call.transport.Call"),
-    "discord": ("Discord", "hc.integrations.discord.transport.Discord"),
     "email": ("Email", "hc.integrations.email.transport.Email"),
-    "github": ("GitHub", "hc.integrations.github.transport.GitHub"),
-    "googlechat": ("Google Chat", "hc.integrations.googlechat.transport.GoogleChat"),
-    "gotify": ("Gotify", "hc.integrations.gotify.transport.Gotify"),
     "group": ("Group", "hc.integrations.group.transport.Group"),
-    "matrix": ("Matrix", "hc.integrations.matrix.transport.Matrix"),
-    "mattermost": ("Mattermost", "hc.integrations.mattermost.transport.Mattermost"),
-    "msteamsw": (
-        "Microsoft Teams",
-        "hc.integrations.msteamsw.transport.MsTeamsWorkflow",
-    ),
-    "ntfy": ("ntfy", "hc.integrations.ntfy.transport.Ntfy"),
-    "opsgenie": ("Opsgenie", "hc.integrations.opsgenie.transport.Opsgenie"),
-    "pagertree": ("PagerTree", "hc.integrations.pagertree.transport.PagerTree"),
-    "pd": ("PagerDuty", "hc.integrations.pd.transport.PagerDuty"),
-    "po": ("Pushover", "hc.integrations.po.transport.Pushover"),
-    "pushbullet": ("Pushbullet", "hc.integrations.pushbullet.transport.Pushbullet"),
-    "rocketchat": ("Rocket.Chat", "hc.integrations.rocketchat.transport.RocketChat"),
-    "shell": ("Shell Command", "hc.integrations.shell.transport.Shell"),
-    "signal": ("Signal", "hc.integrations.signal.transport.Signal"),
     "slack": ("Slack", "hc.integrations.slack.transport.Slack"),
-    "sms": ("SMS", "hc.integrations.sms.transport.Sms"),
-    "spike": ("Spike", "hc.integrations.spike.transport.Spike"),
-    "telegram": ("Telegram", "hc.integrations.telegram.transport.Telegram"),
-    "trello": ("Trello", "hc.integrations.trello.transport.Trello"),
-    "victorops": ("Splunk On-Call", "hc.integrations.victorops.transport.VictorOps"),
     "webhook": ("Webhook", "hc.integrations.webhook.transport.Webhook"),
-    "whatsapp": ("WhatsApp", "hc.integrations.whatsapp.transport.WhatsApp"),
-    "zulip": ("Zulip", "hc.integrations.zulip.transport.Zulip"),
 }
 
 
 CHANNEL_KINDS = [(kind, label_cls[0]) for kind, label_cls in TRANSPORTS.items()]
-
-PO_PRIORITIES = {
-    -3: "disabled",
-    -2: "lowest",
-    -1: "low",
-    0: "normal",
-    1: "high",
-    2: "emergency",
-}
-
-NTFY_PRIORITIES = {
-    5: "max priority",
-    4: "high priority",
-    3: "default priority",
-    2: "low priority",
-    1: "min priority",
-    0: "disabled",
-}
-
-GOTIFY_PRIORITIES = {
-    0: "disabled",
-    2: "low priority",
-    5: "normal priority",
-    9: "high priority",
-}
 
 
 def isostring(dt: datetime | None) -> str | None:
@@ -708,11 +653,6 @@ class Ping(models.Model):
 
         return None
 
-    def get_body_size(self) -> int:
-        if self.body_raw:
-            return len(self.body_raw)
-        return 0
-
     def get_kind_display(self) -> str:
         if self.kind == "ign":
             return "Ignored"
@@ -816,37 +756,6 @@ class WebhookSpec(BaseModel):
     headers: dict[str, str]
 
 
-class TelegramConf(BaseModel):
-    id: int
-    thread_id: int | None = None
-    type: str | None = None
-    name: str | None = None
-
-
-class ShellConf(BaseModel):
-    cmd_down: str
-    cmd_up: str
-
-
-class PdConf(BaseModel):
-    service_key: str
-    account: str | None = None
-
-    @classmethod
-    def load(cls, data: Any) -> PdConf:
-        # Is it plain service_key value?
-        if not data.startswith("{"):
-            return cls.model_validate({"service_key": data})
-
-        return super().model_validate_json(data)
-
-
-class PhoneConf(BaseModel):
-    value: str
-    notify_up: bool | None = Field(None, alias="up")
-    notify_down: bool | None = Field(None, alias="down")
-
-
 class EmailConf(BaseModel):
     value: str
     notify_up: bool = Field(alias="up")
@@ -859,86 +768,6 @@ class EmailConf(BaseModel):
             return cls.model_validate({"value": data, "up": True, "down": True})
 
         return super().model_validate_json(data)
-
-
-class OpsgenieConf(BaseModel):
-    key: str
-    region: str
-
-
-class ZulipConf(BaseModel):
-    bot_email: str
-    api_key: str
-    mtype: str
-    to: str
-    site: str = ""
-    topic: str = ""
-
-    def model_post_init(self, context: Any) -> None:
-        if self.site == "":
-            # Fallback if we don't have the site value:
-            # derive it from bot's email
-            _, domain = self.bot_email.split("@")
-            self.site = f"https://{domain}"
-
-    def formatted_to(self) -> str:
-        # If we are sending a direct message to a user specified by id,
-        # Zulip expects a list of integers (formatted as JSON), not a bare integer:
-        if self.mtype == "private" and self.to.isdigit():
-            return f"[{self.to}]"
-        return self.to
-
-
-class NtfyConf(BaseModel):
-    topic: str
-    url: str
-    priority: int
-    priority_up: int
-    token: str = ""
-
-    @property
-    def priority_display(self) -> str:
-        parts = []
-        if self.priority in NTFY_PRIORITIES:
-            s = NTFY_PRIORITIES[self.priority]
-            parts.append(f"down: {s}")
-        if self.priority_up in NTFY_PRIORITIES:
-            s = NTFY_PRIORITIES[self.priority_up]
-            parts.append(f"up: {s}")
-
-        return ", ".join(parts)
-
-
-class TrelloConf(BaseModel):
-    token: str
-    list_id: str
-    board_name: str
-    list_name: str
-
-
-class GitHubConf(BaseModel):
-    installation_id: int
-    repo: str
-    labels: list[str]
-
-
-class GotifyConf(BaseModel):
-    url: str
-    token: str
-    priority: int | None = Field(None, ge=0, le=9)
-    priority_up: int | None = Field(None, ge=0, le=9)
-
-    @property
-    def priority_display(self) -> str:
-        parts = []
-        if self.priority in GOTIFY_PRIORITIES:
-            s = GOTIFY_PRIORITIES[self.priority]
-            parts.append(f"down: {s}")
-        if self.priority_up in GOTIFY_PRIORITIES:
-            s = GOTIFY_PRIORITIES[self.priority_up]
-            parts.append(f"up: {s}")
-
-        return ", ".join(parts)
 
 
 class Channel(models.Model):
@@ -960,17 +789,8 @@ class Channel(models.Model):
             return self.name
         if self.kind == "email":
             return f"Email to {self.email.value}"
-        elif self.kind == "sms":
-            return f"SMS to {self.phone.value}"
         elif self.kind == "slack":
             return f"Slack {self.slack_channel}"
-        elif self.kind == "telegram":
-            return f"Telegram {self.telegram.name}"
-        elif self.kind == "zulip":
-            if self.zulip.mtype == "stream":
-                return f"Zulip stream {self.zulip.to}"
-            if self.zulip.mtype == "private":
-                return f"Zulip user {self.zulip.to}"
 
         return self.get_kind_display()
 
@@ -981,12 +801,7 @@ class Channel(models.Model):
         return self.kind in (
             "email",
             "webhook",
-            "sms",
-            "signal",
-            "whatsapp",
-            "ntfy",
             "group",
-            "gotify",
         )
 
     def assign_all_checks(self) -> None:
@@ -1009,32 +824,6 @@ class Channel(models.Model):
         signed_token = signer.sign(self.make_token())
         args = [self.code, signed_token]
         return absolute_reverse("hc-unsubscribe-alerts", args=args)
-
-    def send_signal_captcha_alert(self, challenge: str, raw: str) -> None:
-        subject = "Signal CAPTCHA proof required"
-        message = f"Challenge token: {challenge}"
-        hostname = socket.gethostname()
-        submit_url = absolute_reverse("hc-signal-captcha", query={"host": hostname, "challenge": challenge})
-        html_message = f"""
-            On host <b>{hostname}</b>, run:<br>
-            <pre>manage.py submitchallenge {challenge} CAPTCHA-SOLUTION-HERE</pre><br>
-            <br>
-            Alternatively, <a href="{submit_url}">submit CAPTCHA solution here</a>.<br>
-            <br>
-            Message from Signal:<br>
-            <pre>{raw}</pre>
-        """
-        mail_admins(subject, message, html_message=html_message)
-
-    def send_signal_rate_limited_notice(self, message: str, plaintext: str) -> None:
-        email = self.project.owner.email
-        ctx = {
-            "recipient": self.phone.value,
-            "subject": plaintext.split("\n")[0],
-            "message": message,
-            "plaintext": plaintext,
-        }
-        emails.signal_rate_limited(email, ctx)
 
     @property
     def transport(self) -> transports.Transport:
@@ -1090,17 +879,6 @@ class Channel(models.Model):
     def icon_path(self) -> str:
         return f"img/{self.kind}.png"
 
-    @property
-    def json(self) -> Any:
-        return json.loads(self.value)
-
-    @property
-    def po_priority(self) -> str:
-        assert self.kind == "po"
-        parts = self.value.split("|")
-        prio = int(parts[1])
-        return PO_PRIORITIES[prio]
-
     def webhook_spec(self, status: str) -> WebhookSpec:
         assert self.kind == "webhook"
         assert status in ("up", "down")
@@ -1120,11 +898,6 @@ class Channel(models.Model):
     @property
     def up_webhook_spec(self) -> WebhookSpec:
         return self.webhook_spec("up")
-
-    @property
-    def shell(self) -> ShellConf:
-        assert self.kind == "shell"
-        return ShellConf.model_validate_json(self.value)
 
     @property
     def slack_team(self) -> str | None:
@@ -1156,7 +929,7 @@ class Channel(models.Model):
 
     @property
     def slack_webhook_url(self) -> str:
-        assert self.kind in ("slack", "mattermost")
+        assert self.kind == "slack"
         if not self.value.startswith("{"):
             return self.value
 
@@ -1166,73 +939,13 @@ class Channel(models.Model):
         return v
 
     @property
-    def discord_webhook_url(self) -> str:
-        assert self.kind == "discord"
-        url = self.json["webhook"]["url"]
-        assert isinstance(url, str)
-        # Discord migrated to discord.com,
-        # and is dropping support for discordapp.com on 7 November 2020
-        if url.startswith("https://discordapp.com/"):
-            url = "https://discord.com/" + url[23:]
-
-        return url
-
-    @property
-    def telegram(self) -> TelegramConf:
-        assert self.kind == "telegram"
-        return TelegramConf.model_validate_json(self.value)
-
-    def update_telegram_id(self, new_chat_id: int) -> None:
-        doc = json.loads(self.value)
-        doc["id"] = new_chat_id
-        self.value = json.dumps(doc)
-        self.save()
-
-    @property
-    def pd(self) -> PdConf:
-        assert self.kind == "pd"
-        return PdConf.load(self.value)
-
-    @property
-    def phone(self) -> PhoneConf:
-        assert self.kind in ("call", "sms", "whatsapp", "signal")
-        return PhoneConf.model_validate_json(self.value)
-
-    @property
-    def trello(self) -> TrelloConf:
-        assert self.kind == "trello"
-        return TrelloConf.model_validate_json(self.value, strict=True)
-
-    @property
     def email(self) -> EmailConf:
         return EmailConf.load(self.value)
-
-    @property
-    def opsgenie(self) -> OpsgenieConf:
-        return OpsgenieConf.model_validate_json(self.value)
-
-    @property
-    def zulip(self) -> ZulipConf:
-        return ZulipConf.model_validate_json(self.value)
-
-    @property
-    def github(self) -> GitHubConf:
-        return GitHubConf.model_validate_json(self.value)
-
-    @property
-    def gotify(self) -> GotifyConf:
-        assert self.kind == "gotify"
-        return GotifyConf.model_validate_json(self.value, strict=True)
 
     @property
     def group_channels(self) -> QuerySet[Channel]:
         assert self.kind == "group"
         return Channel.objects.filter(project=self.project, code__in=self.value.split(","))
-
-    @property
-    def ntfy(self) -> NtfyConf:
-        assert self.kind == "ntfy"
-        return NtfyConf.model_validate_json(self.value, strict=True)
 
 
 class Notification(models.Model):
@@ -1247,9 +960,6 @@ class Notification(models.Model):
 
     class Meta:
         get_latest_by = "created"
-
-    def status_url(self) -> str:
-        return absolute_reverse("hc-api-notification-status", args=[self.code])
 
 
 class FlipDict(TypedDict):
@@ -1403,42 +1113,6 @@ class TokenBucket(models.Model):
 
         # 20 password attempts per day
         return TokenBucket.authorize(f"pw-{hashed}", 20, 3600 * 24)
-
-    @staticmethod
-    def authorize_telegram(telegram_id: int) -> bool:
-        # 6 messages for a single chat per minute:
-        return TokenBucket.authorize(f"tg-{telegram_id}", 6, 60)
-
-    @staticmethod
-    def authorize_signal(phone: str) -> bool:
-        salted_encoded = (phone + settings.SECRET_KEY).encode()
-        hashed = hashlib.sha1(salted_encoded).hexdigest()
-
-        # 6 messages for a single recipient per minute:
-        return TokenBucket.authorize(f"signal-{hashed}", 6, 60)
-
-    @staticmethod
-    def authorize_signal_verification(user: User) -> bool:
-        value = f"signal-verify-{user.id}"
-
-        # 50 signal recipient verifications per day
-        return TokenBucket.authorize(value, 50, 3600 * 24)
-
-    @staticmethod
-    def authorize_pushover(user_key: str) -> bool:
-        salted_encoded = (user_key + settings.SECRET_KEY).encode()
-        hashed = hashlib.sha1(salted_encoded).hexdigest()
-
-        # 6 messages for a single user key per minute:
-        return TokenBucket.authorize(f"po-{hashed}", 6, 60)
-
-    @staticmethod
-    def authorize_ntfy(server: str, topic: str) -> bool:
-        salted_encoded = f"{server}-{topic}-{settings.SECRET_KEY}".encode()
-        hashed = hashlib.sha1(salted_encoded).hexdigest()
-
-        # 6 messages for a single topic per minute:
-        return TokenBucket.authorize(f"ntfy-{hashed}", 6, 60)
 
     @staticmethod
     def authorize_sudo_code(user: User) -> bool:

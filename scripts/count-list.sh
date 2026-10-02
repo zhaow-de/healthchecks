@@ -296,8 +296,8 @@ VERSIONS
 c_changelog_files() { git ls-files | grep -ciE '(^|/)changelog\.md$'; }
 
 # The non-test Python under hc/ -- outside every `tests/` directory -- that imports one of CLIENTS, a submodule
-# included. Exempt: hc/lib/curl.py, the one client, and apprise under hc/integrations/apprise/, the one transport that
-# bypasses hc.lib.curl. A vendor SDK is not in CLIENTS, so a transport built on one reads 0.
+# included. Exempt: hc/lib/curl.py, the one client. apprise stays in CLIENTS: it makes its own HTTP requests, past the
+# private-IP block. A vendor SDK is not in CLIENTS, so a transport built on one reads 0.
 c_http_clients_outside_hc_lib_curl() {
   uv run python - <<'HTTPCLIENTS'
 import ast
@@ -327,8 +327,6 @@ for path in sorted(p for p in listed.stdout.split("\0") if p):
         else:
             continue
         hits = [m for m in modules if any(m == c or m.startswith(c + ".") for c in CLIENTS)]
-        if path.startswith("hc/integrations/apprise/"):
-            hits = [m for m in hits if m != "apprise" and not m.startswith("apprise.")]
         if hits:
             found.append(f"{path}:{node.lineno}: {hits[0]}")
 for hit in found:

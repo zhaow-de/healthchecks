@@ -35,10 +35,6 @@ class PingModelTestCase(BaseTestCase):
         with self.assertNumQueries(0):
             self.assertIsNone(p.duration)
 
-    def test_get_body_size_works(self) -> None:
-        self.assertEqual(Ping(body_raw=b"hello").get_body_size(), 5)
-        self.assertEqual(Ping().get_body_size(), 0)
-
     def test_get_kind_display_works(self) -> None:
         samples = [
             (None, None, "Success"),

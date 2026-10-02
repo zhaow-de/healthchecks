@@ -173,7 +173,6 @@ branches as its commit sha, and the newest build of <code>main</code> as <code>l
   You do not need to run them separately.</li>
 <li>Ship with the PostgreSQL database driver.</li>
 <li>Serve static files using the whitenoise library.</li>
-<li>Have the apprise library preinstalled.</li>
 <li>Do <em>not</em> handle TLS termination. In a production setup, you will want to put
   the Healthchecks container behind a reverse proxy or load balancer that handles TLS
   termination.</li>

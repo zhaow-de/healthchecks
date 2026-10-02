@@ -29,7 +29,6 @@ from django.shortcuts import get_object_or_404
 from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
 from oncalendar import OnCalendar, OnCalendarError
 from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 from pydantic_core import PydanticCustomError
@@ -790,47 +789,6 @@ def check_badge(request: HttpRequest, states: int, badge_key: UUID, fmt: str) ->
 
     svg = get_badge_svg(check.name_then_code(), status)
     return HttpResponse(svg, content_type="image/svg+xml")
-
-
-@csrf_exempt
-@require_POST
-def notification_status(request: HttpRequest, code: UUID) -> HttpResponse:
-    """Handle notification delivery status callbacks."""
-
-    try:
-        cutoff = now() - td(hours=1)
-        notification = Notification.objects.get(code=code, created__gt=cutoff)
-    except Notification.DoesNotExist:
-        # If the notification does not exist, or is more than a hour old,
-        # return HTTP 200 so the other party doesn't retry over and over again:
-        return HttpResponse()
-
-    error, mark_disabled = None, False
-
-    # Look for "error" and "mark_disabled" keys:
-    if request.POST.get("error"):
-        error = request.POST["error"][:200]
-        mark_disabled = bool(request.POST.get("mark_disabled"))
-
-    # Handle "MessageStatus" key from Twilio
-    if request.POST.get("MessageStatus") in ("failed", "undelivered"):
-        status = request.POST["MessageStatus"]
-        error = f"Delivery failed (status={status})."
-
-    # Handle "CallStatus" key from Twilio
-    if request.POST.get("CallStatus") == "failed":
-        error = "Delivery failed (status=failed)."
-
-    if error:
-        notification.error = error
-        notification.save(update_fields=["error"])
-
-        channel_q = Channel.objects.filter(id=notification.channel_id)
-        channel_q.update(last_error=error)
-        if mark_disabled:
-            channel_q.update(disabled=True)
-
-    return HttpResponse()
 
 
 def metrics(request: HttpRequest) -> HttpResponse:

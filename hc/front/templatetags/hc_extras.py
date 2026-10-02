@@ -294,14 +294,6 @@ def add6days(dt: datetime) -> datetime:
     return dt + timedelta(days=6)
 
 
-@register.filter
-def mask_phone(phone: str) -> str:
-    if len(phone) > 7:
-        return phone[:4] + "******" + phone[-3:]
-
-    return phone
-
-
 @register.simple_tag(takes_context=True)
 def sort_url(context: dict[str, Any], sort: str) -> SafeString:
     request = context["request"]

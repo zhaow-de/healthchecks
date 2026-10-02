@@ -25,11 +25,9 @@ class SlackFields(list[JSONValue]):
         self.append(field)
 
 
-class Slackalike(HttpTransport):
-    """Base class for transports that use Slack-compatible incoming webhooks."""
-
+class Slack(HttpTransport):
     def payload(self, flip: Flip) -> JSONDict:
-        """Prepare JSON-serializable payload for Slack-compatible incoming webhook."""
+        """Prepare JSON-serializable payload for Slack incoming webhook."""
         check = flip.owner
         name = check.name_then_code()
         fields = SlackFields()
@@ -88,16 +86,9 @@ class Slackalike(HttpTransport):
     def fix_asterisks(self, s: str) -> str:
         """Escape asterisks so that they are not recognized as Markdown syntax."""
 
-        # The base implementation prepends asterisks with "Combining Grapheme Joiner"
-        # characters but subclasses can override this function and escape
-        # asterisks differently
+        # Prepend asterisks with "Combining Grapheme Joiner" characters
         return s.replace("*", "\u034f*")
 
-    def notify(self, flip: Flip, notification: Notification) -> None:
-        self.post(self.channel.slack_webhook_url, json=self.payload(flip))
-
-
-class Slack(Slackalike):
     @classmethod
     def raise_for_response(cls, response: curl.Response) -> NoReturn:
         message = f"Received status code {response.status_code}"

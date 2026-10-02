@@ -507,7 +507,7 @@ channels
 
     Example:
 
-    <pre>{"channels": "Email to Alice,SMS to Alice"}</pre>
+    <pre>{"channels": "Email to Alice,Slack to Alice"}</pre>
 
 unique
 :   array of string values, optional, default value: [].
@@ -854,7 +854,7 @@ channels
 
     Example:
 
-    <pre>{"channels": "Email to Alice,SMS to Alice"}</pre>
+    <pre>{"channels": "Email to Alice,Slack to Alice"}</pre>
 
 start_kw
 :   string, optional, default value: "".
@@ -1487,8 +1487,8 @@ curl --header "X-Api-Key: your-api-key" SITE_ROOT/api/v3/channels/
     },
     {
       "id": "746a083e-f542-4554-be1a-707ce16d3acc",
-      "name": "My Phone",
-      "kind": "sms"
+      "name": "Team Slack",
+      "kind": "slack"
     }
   ]
 }

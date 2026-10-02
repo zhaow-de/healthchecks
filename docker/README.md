@@ -44,9 +44,8 @@ termination.
 * `migrate`, `sendalerts`, `sendreports` – when running with Docker, you
   also do  not need to manually run these. They are run automatically on
   container startup (you can find them listed in [uwsgi.ini](uwsgi.ini)).
-* `createsuperuser`, `prunetokenbucket`, `pruneusers`,
-  `settelegramwebhook` – you need to run them **inside the container**, not on
-  the host system. Do it like so:
+* `createsuperuser`, `prunetokenbucket`, `pruneusers` – you need to run them
+  **inside the container**, not on the host system. Do it like so:
 
   ```sh
   docker compose run web /opt/healthchecks/manage.py <command>
@@ -176,7 +175,6 @@ The Docker images built from the Dockerfile in this directory:
   You do not need to run them separately.
 * Ship with the PostgreSQL database driver.
 * Serve static files using the whitenoise library.
-* Have the apprise library preinstalled.
 * Do *not* handle TLS termination. In a production setup, you will want to put
   the Healthchecks container behind a reverse proxy or load balancer that handles TLS
   termination.

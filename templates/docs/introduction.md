@@ -130,8 +130,8 @@ SITE_NAME will assume failure and send out alerts.
 ---
 
 An **Integration** is a specific method for delivering monitoring alerts when a check's
-change states. SITE_NAME supports many types of integrations: email,
-webhooks, SMS, Slack, PagerDuty, etc. You can set up multiple integrations.
+change states. SITE_NAME supports several types of integrations: email,
+webhooks, Slack, etc. You can set up multiple integrations.
 For each check, you can specify which integrations it should use.
 
 For more information on integrations, see

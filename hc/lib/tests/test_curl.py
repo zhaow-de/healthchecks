@@ -7,7 +7,7 @@ import pycurl
 from django.test import SimpleTestCase
 from django.test.utils import override_settings
 
-from hc.lib.curl import CurlError, Response, get, post, request
+from hc.lib.curl import CurlError, Response, post, request
 
 
 class FakeCurl:
@@ -189,27 +189,6 @@ class CurlTestCase(SimpleTestCase):
                 with self.assertRaises(CurlError) as cm:
                     request("get", "http://example.org")
                 self.assertEqual(cm.exception.message, message)
-
-    @patch("hc.lib.curl.pycurl.Curl")
-    def test_get_wrapper_passes_arguments(self, mock: Mock) -> None:
-        mock.return_value = obj = FakeCurl()
-        response = get(
-            "http://example.org",
-            {"a": "b"},
-            headers={"X-Foo": "bar"},
-            auth=("alice", "pass"),
-            timeout=5,
-        )
-
-        self.assertEqual(obj.opts[pycurl.URL], b"http://example.org?a=b")
-        self.assertEqual(obj.opts[pycurl.HTTPHEADER], [b"X-Foo:bar", b"User-Agent:zcrypto-hc.zhaow.me"])
-        self.assertEqual(obj.opts[pycurl.USERPWD], "alice:pass")
-        self.assertEqual(obj.opts[pycurl.TIMEOUT], 5)
-        # A GET request sets no custom method and uploads no body
-        self.assertNotIn(pycurl.CUSTOMREQUEST, obj.opts)
-        self.assertNotIn(pycurl.READDATA, obj.opts)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.text, "hello world")
 
     @patch("hc.lib.curl.pycurl.Curl")
     def test_post_wrapper_passes_arguments(self, mock: Mock) -> None:

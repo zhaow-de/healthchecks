@@ -193,7 +193,6 @@ The Docker images built from the Dockerfile in the `/docker/` directory:
   You do not need to run them separately.
 * Ship with the PostgreSQL database driver.
 * Serve static files using the whitenoise library.
-* Have the apprise library preinstalled.
 * Do *not* handle TLS termination. In a production setup, you will want to put
   the Healthchecks container behind a reverse proxy or load balancer that handles TLS
   termination.

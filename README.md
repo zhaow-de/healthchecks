@@ -29,9 +29,10 @@ Healthchecks is a cron job monitoring service. It listens for HTTP requests
 ("pings") from your cron jobs and scheduled tasks ("checks").
 When a ping does not arrive on time, Healthchecks sends out alerts.
 
-Healthchecks comes with a web dashboard, API, 25+ integrations for
-delivering notifications, monthly email reports, WebAuthn 2FA support,
-team management features: projects, team members, read-only access.
+Healthchecks comes with a web dashboard, API, integrations for
+delivering notifications (email, webhooks, Slack, groups), a Prometheus
+metrics endpoint, monthly email reports, WebAuthn 2FA support, team
+management features: projects, team members, read-only access.
 
 The building blocks are:
 
@@ -322,140 +323,6 @@ The legacy and app-based flows only affect the user experience during the initia
 setup of Slack integrations. The contents of notifications posted to Slack are the same
 regardless of the setup flow used.
 
-### Discord
-
-To enable Discord integration, you will need to:
-
-* register a new application on https://discord.com/developers/applications/me
-* add a redirect URI to your Discord application. The URI format is
-  `SITE_ROOT/integrations/add_discord/`. For example, if you are running a
-  development server on `localhost:8000` then the redirect URI would be
-  `http://localhost:8000/integrations/add_discord/`
-* Look up your Discord app's Client ID and Client Secret. Put them
-  in `DISCORD_CLIENT_ID` and `DISCORD_CLIENT_SECRET` environment
-  variables.
-
-
-### Pushover
-
-Pushover integration works by creating an application on Pushover.net which
-is then subscribed to by Healthchecks users. The registration workflow is as follows:
-
-* On Healthchecks, the user adds a "Pushover" integration to a project
-* Healthchecks redirects user's browser to a Pushover.net subscription page
-* User approves adding the Healthchecks subscription to their Pushover account
-* Pushover.net HTTP redirects back to Healthchecks with a subscription token
-* Healthchecks saves the subscription token and uses it for sending Pushover
-  notifications
-
-To enable the Pushover integration, you will need to:
-
-* Register a new application on Pushover via https://pushover.net/apps/build.
-* Within the Pushover 'application' configuration, enable subscriptions.
-  Make sure the subscription type is set to "URL". Also make sure the redirect
-  URL is configured to point back to the root of the Healthchecks instance
-  (e.g., `http://healthchecks.example.com/`).
-* Put the Pushover application API Token and the Pushover subscription URL in
-  `PUSHOVER_API_TOKEN` and `PUSHOVER_SUBSCRIPTION_URL` environment
-  variables. The Pushover subscription URL should look similar to
-  `https://pushover.net/subscribe/yourAppName-randomAlphaNumericData`.
-
-### Signal
-
-Healthchecks uses [signal-cli](https://github.com/AsamK/signal-cli) to send Signal
-notifications. Healthchecks interacts with signal-cli over UNIX or TCP socket.
-Healthchecks requires signal-cli version 0.11.10 or later.
-
-To enable the Signal integration via UNIX socket:
-
-* Set up and configure signal-cli to expose JSON RPC on an UNIX socket
-  ([instructions](https://github.com/AsamK/signal-cli/wiki/JSON-RPC-service)).
-  Example: `signal-cli -a +xxxxxx daemon --socket /tmp/signal-cli-socket`
-* Put the socket's location in the `SIGNAL_CLI_SOCKET` environment variable.
-
-To enable the Signal integration via TCP socket:
-
-* Set up and configure signal-cli to expose JSON RPC on a TCP socket.
-  Example: `signal-cli -a +xxxxxx daemon --tcp 127.0.0.1:7583`
-* Put the socket's hostname and port in the `SIGNAL_CLI_SOCKET` environment variable
-  using "hostname:port" syntax, example: `127.0.0.1:7583`.
-
-
-### Telegram
-
-* Create a Telegram bot by talking to the
-[BotFather](https://core.telegram.org/bots#6-botfather). Set the bot's name,
-description, user picture, and add a "/start" command.
-* After creating the bot you will have the bot's name and token. Put them
-in `TELEGRAM_BOT_NAME` and `TELEGRAM_TOKEN` environment variables.
-* Run `settelegramwebhook` management command. This command tells Telegram
-where to forward channel messages by invoking Telegram's
-[setWebhook](https://core.telegram.org/bots/api#setwebhook) API call:
-
-    ```sh
-    ./manage.py settelegramwebhook
-    Done, Telegram's webhook set to: https://my-monitoring-project.com/integrations/telegram/bot/
-    ```
-
-For this to work, your `SITE_ROOT` must be correct and must use the "https://"
-scheme.
-
-### Apprise
-
-To enable Apprise integration, you will need to:
-
-* ensure you have apprise installed in your local environment. `uv sync` installs
-  it as a part of the development dependencies. If you use `uv sync --no-dev`,
-  add the `apprise` extra:
-
-  ```bash
-  uv sync --no-dev --extra apprise
-  ```
-
-  `uv sync` makes the environment match the command exactly, so pass every
-  extra you use each time (for example, `--extra apprise --extra uwsgi`).
-  After a `--no-dev` install, run commands with `uv run --no-sync` or from an
-  activated virtual environment: a plain `uv run` syncs the environment first
-  and installs the development dependencies again.
-* enable the apprise functionality by setting the `APPRISE_ENABLED` environment variable.
-
-### Shell Commands
-
-The "Shell Commands" integration runs user-defined local shell commands when checks
-go up or down. This integration is disabled by default, and can be enabled by setting
-the `SHELL_ENABLED` environment variable to `True`.
-
-Note: be careful when using "Shell Commands" integration, and only enable it when
-you fully trust the users of your Healthchecks instance. The commands will be executed
-by the `manage.py sendalerts` process, and will run with the same system permissions as
-the `sendalerts` process.
-
-### Matrix
-
-To enable the Matrix integration you will need to:
-
-* Register a bot user (for posting notifications) in your preferred homeserver.
-* Use the [Login API call](https://www.matrix.org/docs/guides/client-server-api#login)
-  to retrieve bot user's access token. You can run it as shown in the documentation,
-  using curl in command shell.
-* Set the `MATRIX_` environment variables. Example:
-
-```
-MATRIX_HOMESERVER=https://matrix.org
-MATRIX_USER_ID=@mychecks:matrix.org
-MATRIX_ACCESS_TOKEN=[a long string of characters returned by the login call]
-```
-
-### PagerDuty Simple Install Flow
-
-To enable PagerDuty [Simple Install Flow](https://developer.pagerduty.com/docs/app-integration-development/events-integration/),
-
-* Register a PagerDuty app at [PagerDuty](https://pagerduty.com/) › Developer Mode › My Apps
-* In the newly created app, add the "Events Integration" functionality
-* Specify a Redirect URL: `https://your-domain.com/integrations/add_pagerduty/`
-* Copy the displayed app_id value (PXXXXX) and put it in the `PD_APP_ID` environment
-  variable
-
 ## Running in Production
 
 Here is a non-exhaustive list of pointers and things to check before launching a
@@ -529,7 +396,6 @@ The Docker images:
   You do not need to run them separately.
 * Ship with the PostgreSQL database driver.
 * Serve static files using the whitenoise library.
-* Have the apprise library preinstalled.
 * Do *not* handle TLS termination. In a production setup, you will want to put
   the Healthchecks container behind a reverse proxy or load balancer that handles TLS
   termination.
