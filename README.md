@@ -1,8 +1,25 @@
+![Version](https://img.shields.io/badge/version-v4.5.0-blue)
+![License](https://img.shields.io/badge/license-MIT%20%2B%20BSD--3--Clause-blue)
+![Python Version from PEP 621 TOML](https://img.shields.io/python/required-version-toml?tomlFilePath=https://raw.githubusercontent.com/zhaow-de/healthchecks/develop/pyproject.toml)
+![coverage](https://img.shields.io/coverallsCoverage/github/zhaow-de/healthchecks)
+
 # Healthchecks
 
-![Version](https://img.shields.io/badge/version-v4.5.0-blue)
-![Tests](https://img.shields.io/github/actions/workflow/status/zhaow-de/healthchecks/tests.yml?label=tests)
-![Coveralls](https://img.shields.io/coverallsCoverage/github/zhaow-de/healthchecks)
+This project is a hard fork of
+[healthchecks/healthchecks](https://github.com/healthchecks/healthchecks):
+
+* It changes the tooling and harness strategy from zero-AI to AI-first. The
+  original project accepts no AI-generated or AI-assisted contributions; this
+  one is developed with AI agents, guided by [CLAUDE.md](CLAUDE.md) and the
+  rules, skills and workflows under [.claude/](.claude/).
+* It removes the features that the
+  [zcrypto-kraken](https://github.com/zhaow-de/zcrypto-kraken) project does not
+  need.
+* It introduces the MIT license on top of the original BSD 3-clause license:
+  this repository's changes are under MIT, and the code from the original
+  project stays under its BSD 3-clause license. Both are in [LICENSE](LICENSE).
+* It stays 100% compatible with the original project's
+  [API v3](templates/docs/api.md).
 
 Healthchecks is a cron job monitoring service. It listens for HTTP requests
 and email messages ("pings") from your cron jobs and scheduled tasks ("checks").
@@ -16,51 +33,18 @@ The building blocks are:
 
 * Python 3.14
 * Django 6.1
-* PostgreSQL, MySQL or MariaDB
+* SQLite (the default), PostgreSQL, MySQL or MariaDB
 
-This repository's changes are licensed under the MIT license. The code
-from the original Healthchecks project remains under its BSD 3-clause
-license. Both are in [LICENSE](LICENSE).
-
-Healthchecks is available as a hosted service
-at [https://zcrypto-hc.zhaow.me/](https://zcrypto-hc.zhaow.me/).
+This fork's own instance runs at
+[https://zcrypto-hc.zhaow.me/](https://zcrypto-hc.zhaow.me/).
 
 A [Dockerfile](docker/)
 and [pre-built Docker images](https://github.com/zhaow-de/healthchecks/pkgs/container/healthchecks) are
 available.
 
-Screenshots:
-
-The "My Checks" screen. Shows the status of all your cron jobs
-in a live-updating dashboard.
-
-![Screenshot of My Checks page](/static/img/my_checks.png?raw=true "My Checks Page")
-
-Each check has configurable Period and Grace Time parameters. Period is the expected
-time between pings. Grace Time specifies how long to wait before sending out alerts
-when a job is running late.
-
-![Screenshot of Period/Grace dialog](/static/img/period_grace.png?raw=true "Period/Grace Dialog")
-
-Alternatively, you can define the expected schedules using a cron expressions.
-Healthchecks uses the [cronsim](https://github.com/cuu508/cronsim) library to
-parse and evaluate cron expressions.
-
-![Screenshot of Cron dialog](/static/img/cron.png?raw=true "Cron Dialog")
-
-Check details page, with a live-updating event log.
-
-![Screenshot of Check Details page](/static/img/check_details.png?raw=true "Check Details Page")
-
-Healthchecks provides status badges with public but hard-to-guess URLs.
-You can use them in your READMEs, dashboards, or status pages.
-
-![Screenshot of Badges page](/static/img/badges.png?raw=true "Status Badges")
-
-
 ## Setting Up for Development
 
-If you are planning to developing Healthchecks, please read
+If you are planning to develop Healthchecks, please read
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
 To set up Healthchecks development environment:
@@ -104,8 +88,18 @@ To set up Healthchecks development environment:
 * Run tests:
 
   ```sh
-  uv run ./manage.py test
+  uv run pytest hc -n auto
   ```
+
+  pytest drives the Django test suite under `hc/` through pytest-django, and
+  `-n auto` (pytest-xdist) spreads it over every CPU core. Add
+  `--cov --cov-report=term` for a coverage report (pytest-cov), as CI does.
+  Django's own runner runs the same tests one at a time:
+  `uv run ./manage.py test`.
+
+  The tests of the commit and review tooling under `tests/` run with
+  `uv run pytest -n auto`. CI runs both on every pull request, the Django suite
+  on SQLite, PostgreSQL, MySQL and MariaDB.
 
 * Run development server:
 
@@ -180,7 +174,7 @@ environment variables:
     EMAIL_USE_TLS = True
     ```
 
-Healthchecks use these environment variables to construct the `settings.MAILERS`
+Healthchecks uses these environment variables to construct the `settings.MAILERS`
 dictionary (a standard Django setting, [docs](https://docs.djangoproject.com/en/6.1/ref/settings/#std-setting-MAILERS)).
 
 ## Receiving Emails
@@ -439,7 +433,7 @@ To enable the Pushover integration, you will need to:
 ### Signal
 
 Healthchecks uses [signal-cli](https://github.com/AsamK/signal-cli) to send Signal
-notifications. Healthcecks interacts with signal-cli over UNIX or TCP socket.
+notifications. Healthchecks interacts with signal-cli over UNIX or TCP socket.
 Healthchecks requires signal-cli version 0.11.2 or later.
 
 To enable the Signal integration via UNIX socket:
