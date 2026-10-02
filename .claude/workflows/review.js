@@ -1,0 +1,158 @@
+export const meta = {
+  name: 'review',
+  description: 'The wide review of a whole branch: two lenses, one skeptic per Critical or Important',
+  whenToUse: 'The wide review a branch owes once it is complete; again only when a fix adds an endpoint, a guard or files outside the first read’s range. args: {repo, range, tip, reportDir, ledger, lenses?, drive?, model?}',
+  phases: [
+    { title: 'Read', detail: 'one read-only reader per lens, in parallel' },
+    { title: 'Refute', detail: 'one skeptic per Critical and Important' },
+  ],
+}
+
+// --- inputs ------------------------------------------------------------------------------------
+const { repo, range, tip, reportDir, ledger, drive, model } = args || {}
+const badModel = model != null && model !== 'opus' && model !== 'fable' // the gate's own floor for a whole-branch read; a grader's cap is the pre-review's
+if (!repo || !range || !tip || !reportDir || badModel) throw new Error('args: {repo, range, tip, reportDir, ledger, lenses?, drive?, model?: opus or fable, the read floor merge-gate.py holds}')
+if (drive && drive.length > 400) throw new Error(`drive is ${drive.length} characters, at most 400: one sentence naming what the standing brief does not cover — cut every clause that names a figure, a path or a command, the brief re-measures those itself`)
+const DEFAULT_LENSES = [
+  { name: 'behaviour', brief: 'What the range changes, driven: each view, endpoint, management command, model method, transport, template or script the messages name, exercised in your worktree through the test that reaches it or the Django test client, with the input it names and for everyone it applies to — owner, team member, read-only member and outsider (`alice`, `bob` and `charlie` of `hc.test.BaseTestCase`), a read-write and a read-only API key, API v1, v2 and v3 where a view branches on `request.v`, a `SITE_ROOT` that carries a path where a URL is built; anything legitimate now refused; any ping, flip, `sendalerts` or notification behaviour changed where no test drives it; every query, lock and migration read for PostgreSQL, MySQL and MariaDB as well, which CI runs and you do not; a docs source or a dependency pin changed without the file generated from it; every citation of a rule, a setting or a docs page read as written.' },
+  { name: 'guards', brief: 'Every test and assertion the range adds or changes: does it fail when the behaviour it names breaks, can it pass vacuously (an absence, a substring the page always carries, a mock of `hc.api.transports.curl.request` that is never called or whose call arguments nothing reads), does each fails-without-the-change verdict a message records reproduce through the label it names with a mutation that parses, and do the access cases cover owner, member and outsider where the change sits behind an access helper or an API key.' },
+]
+const lenses = Array.isArray(args.lenses) && args.lenses.length ? args.lenses : DEFAULT_LENSES
+for (const l of lenses) {
+  if (!l.name || !l.brief || !/^[a-z0-9-]+$/.test(l.name)) throw new Error(`lens needs a slug name and a brief: ${JSON.stringify(l)}`)
+}
+if (new Set(lenses.map((l) => l.name)).size !== lenses.length) throw new Error(`lens names must be distinct: ${lenses.map((l) => l.name).join(', ')}`)
+
+// --- shared with pre-review.js and re-review.js; tests/test_review_workflows.py holds GRADING, SCOPE and RULES equal across the three ---
+const GRADING = `Critical = a defect that reaches a user or a pinging job as a 500 or an unhandled exception, or stops a \`sendalerts\`, \`sendreports\` or \`smtpd\` loop; loses, double-counts or mis-records a ping; drops, delays, duplicates or misroutes an alert or a report; refuses something legitimate; lets someone read or change a check, a channel or a project they have no access to, or lets a read-only member or a read-only API key write; makes an outbound request that bypasses \`hc.lib.curl\`'s private-IP block (Apprise is the standing exception); destroys or invalidates stored data, or instructs someone to; a migration that fails on one of SQLite, PostgreSQL, MySQL and MariaDB; changes ping-to-alert behaviour no test drives; a count that reads 0 over a set that misses the violation's usual shape; a guard — a test, an access check, a rate limit, a hook, the merge gate — that passes when it should refuse. Important = a claim a commit message makes that does not reproduce with the command it quotes, a probe verdict earned by something other than the guard it names, a number typed rather than pasted from the run it describes, a test that can pass vacuously, prose that, acted on as written, breaks something no test stops, or a change that alters behaviour or a guard's reach whatever its size. Minor = everything else in prose: wrong, dead, self-contradictory, naming a site a reader cannot find, or a comment or docstring a reader would not act on.`
+const SCOPE = `Run a test, and re-run a probe, only through the label its message records or the narrowest one that reaches the change — a method or a class, \`uv run ./manage.py test <dotted label>\` or \`uv run pytest tests/<file>::<test>\` — never a whole module; re-derive a number only where the range's correctness rests on it; never run the full suite, \`uv run pre-commit run -a\` or the whole count list — they are CI's and the author's. About 40 tool calls: when the range is graded, stop and write.`
+const RULES = `READ-ONLY in the repo checkout, its gitignored files included — \`hc/local_settings.py\`, \`hc.sqlite\`, \`.venv\`, \`.local/\`: no edits, no commits, no checkout, no stash, and no \`manage.py\` command there, which outside the test runner works on that checkout's unversioned database. Plain blocking commands only, no background jobs, no subagents, and no agent tools (\`ListAgents\`, \`SendMessage\`): you read a range, you do not coordinate. Never run \`gh\`, never push, and send nothing to the network: a transport is driven with \`hc.api.transports.curl.request\` mocked, as its tests do. Never print \`hc/local_settings.py\` or a \`.env\` file, which hold credentials, and never run a test with \`DB\` set: SQLite in memory is the only database you touch.`
+const CHECKOUT = (label) => `Run every git command with \`-C ${repo}\`. Probes and drives run in a detached worktree of your own at the tip — \`git -C ${repo} worktree add --detach ${reportDir}/wt-${label} ${tip}\`, whose first \`uv run\` builds its \`.venv\` from the uv cache in seconds; it holds no \`hc/local_settings.py\` and no \`hc.sqlite\`, so a drive outside the test runner starts with \`uv run ./manage.py migrate\` there — never in the checkout and never in another agent's worktree: a sibling's mutation rewrites its tree while it runs. Remove yours with \`git -C ${repo} worktree remove --force\` before you finish.`
+
+// --- schemas -----------------------------------------------------------------------------------
+const FINDING = {
+  type: 'object',
+  properties: {
+    severity: { type: 'string', enum: ['Critical', 'Important', 'Minor'] },
+    path: { type: 'string', description: 'repo-relative path, or a commit sha for a message finding' },
+    line: { type: 'integer', description: '1-based line, 0 when the finding has no line' },
+    claim: { type: 'string', description: 'one sentence, the defect as a claim' },
+    evidence: { type: 'string', description: 'what was run or read, and what it showed' },
+    consequence: { type: 'string', description: 'what goes wrong if the claim stands' },
+  },
+  required: ['severity', 'path', 'line', 'claim', 'evidence', 'consequence'],
+}
+const REPORT = {
+  type: 'object',
+  properties: {
+    verdict: { type: 'string', description: 'three sentences at most, including whether the range is pushable' },
+    findings: { type: 'array', items: FINDING },
+    executed: { type: 'array', items: { type: 'string' }, description: 'every command relied on, with its summary line' },
+    reportPath: { type: 'string' },
+  },
+  required: ['verdict', 'findings', 'executed', 'reportPath'],
+}
+const VERDICT = {
+  type: 'object',
+  properties: {
+    refuted: { type: 'boolean', description: 'true when the finding does not hold as claimed; default to true when uncertain' },
+    reason: { type: 'string', description: 'the command or reading that decides it' },
+  },
+  required: ['refuted', 'reason'],
+}
+
+// --- prompts -----------------------------------------------------------------------------------
+// One report per lens per tip, as pre-review's and re-review's: a second review of the branch keeps its first.
+const lensPath = (name) => `${reportDir}/${name}-${tip}.md`
+
+const readerPrompt = (lens) => `You are one of ${lenses.length} independent readers, a different agent from the author, of \`git log ${range}\` at tip \`${tip}\` in ${repo}. ${RULES} ${CHECKOUT(`read-${lens.name}`)} ${SCOPE} Grading: ${GRADING}
+
+YOUR LENS — ${lens.name}: ${lens.brief} The other lenses are ${lenses.filter((o) => o.name !== lens.name).map((o) => o.name).join(', ') || 'none'}; leave their ground to them. The pre-review has already graded the range's prose and re-run its message claims: grade prose only where acting on it as written breaks something, and re-measure a claim only where the range's correctness rests on it.${drive ? ` Beyond the standing brief, drive this: ${drive}` : ''}
+
+Ask of every surface the range adds or keeps whether it should exist at all, before asking whether it is true: a surface that should not exist outranks every truth finding about it. Read \`git diff ${range}\` first, then each commit message. Write a Markdown report to ${lensPath(lens.name)} with \`## Verdict\`, \`## Findings\` (one \`### [Severity] path:line — claim\` heading per finding with evidence and a \`Consequence:\` line) and \`## Executed\`, then return the structured output with the same findings; the report and the structure must agree.`
+
+const refutePrompt = (f) => `You are the skeptic. ${RULES} ${CHECKOUT(`refute-${f.id}`)} ${SCOPE}
+
+A reader graded this ${f.severity}: at \`${f.path}:${f.line}\` — ${f.claim}
+Its evidence: ${f.evidence}
+Its consequence: ${f.consequence}
+
+Try to REFUTE it: reproduce what the evidence claims, and decide whether the claim holds as stated at this tip — including whether its consequence follows (a test that stops it, a pre-branch behaviour that was no better). Default to refuted=true when you cannot make it hold. Return the structured output; write nothing to the repo.`
+
+// --- Ledger: the order of reviews, refused rather than remembered --------------------------------------
+const ledgerPath = `${reportDir}/ledger.jsonl`
+if (!Array.isArray(ledger) || ledger.some((e) => !e || typeof e !== 'object')) throw new Error(`review refuses ${tip}: \`ledger\` is not the array \`uv run python scripts/review-ledger.py read ${reportDir} --tip ${tip}\` prints — pass it`)
+// A pre-review covers one tip: the one it read, compared as written, short or long — never an ancestor of it — or a later tip whose tree and commit messages are that tip's, a re-dated or re-signed commit having moved the name and nothing the pre-review grades.
+const sameTip = (e) => typeof e.tip === 'string' && (e.tip === tip || (e.tip.length >= 7 && tip.length >= 7 && (e.tip.startsWith(tip) || tip.startsWith(e.tip))))
+if (ledger.some((e) => e.against !== undefined && !sameTip({ tip: e.against }))) throw new Error(`review refuses ${tip}: ${ledgerPath} was read against another tip — read it again with --tip ${tip}`)
+if (!ledger.some((e) => e.kind === 'pre-review' && (sameTip(e) || e.sameTreeAndMessages === true))) throw new Error(`review refuses ${tip}: ${ledgerPath} records no pre-review of this tip — run pre-review on it first, over the amended commit alone after a message-only amend, and append the row it returns`)
+
+// --- Read: one reader per lens; the union needs all of them, so the barrier is right ------------
+phase('Read')
+const opts = (label, phaseName, effort) => ({ label, phase: phaseName, agentType: 'general-purpose', effort, ...(model ? { model } : {}) })
+const reports = (await parallel(lenses.map((l) => () => agent(readerPrompt(l), { ...opts(`read:${l.name}`, 'Read', 'high'), schema: REPORT })))).map((r, i) => (r ? { ...r, lens: lenses[i].name } : null))
+const dropped = lenses.filter((_, i) => !reports[i]).map((l) => l.name)
+if (dropped.length) log(`readers that returned nothing: ${dropped.join(', ')}`)
+const live = reports.filter(Boolean)
+if (!live.length) throw new Error('no reader returned a report')
+
+// --- the union: cluster on path:line, keep the maximum severity, never re-grade downward; every lens's wording is kept
+const RANK = { Critical: 3, Important: 2, Minor: 1 }
+const key = (f) => `${f.path}:${f.line}`
+const union = new Map()
+for (const r of live) {
+  for (const f of r.findings) {
+    const k = key(f)
+    const prev = union.get(k)
+    if (!prev) union.set(k, { ...f, lenses: [r.lens], claims: [{ lens: r.lens, severity: f.severity, claim: f.claim }] })
+    else {
+      prev.lenses.push(r.lens)
+      prev.claims.push({ lens: r.lens, severity: f.severity, claim: f.claim })
+      if (RANK[f.severity] > RANK[prev.severity]) Object.assign(prev, { severity: f.severity, claim: f.claim, evidence: f.evidence, consequence: f.consequence })
+    }
+  }
+}
+const findings = [...union.values()].sort((a, b) => RANK[b.severity] - RANK[a.severity]).map((f, i) => ({ ...f, id: i + 1 }))
+const count = (sev, list) => list.filter((f) => f.severity === sev).length
+log(`union over ${live.length} lenses: ${count('Critical', findings)} Critical / ${count('Important', findings)} Important / ${count('Minor', findings)} Minor`)
+
+// --- Refute: one skeptic per Critical and Important; a finding dies when the skeptic refutes it ------
+phase('Refute')
+const graded = (
+  await parallel(
+    findings.map((f) => () =>
+      f.severity === 'Minor'
+        ? Promise.resolve({ ...f, refuted: false, skeptic: null })
+        : agent(refutePrompt(f), { ...opts(`refute:${f.id}`, 'Refute', 'medium'), schema: VERDICT }).then((v) => {
+            if (!v) log(`finding ${f.id}: the skeptic returned nothing; it stands unrefuted`)
+            return { ...f, refuted: Boolean(v && v.refuted), skeptic: v }
+          }),
+    ),
+  )
+).filter(Boolean)
+const standing = graded.filter((f) => !f.refuted)
+log(`after refutation: ${count('Critical', standing)} Critical / ${count('Important', standing)} Important / ${count('Minor', standing)} Minor standing, ${graded.length - standing.length} refuted`)
+
+// --- Refutation: returned for the caller to append ------------------------------------------------
+// The lenses write their reports before any skeptic runs, and a skeptic writes nothing to the repo, so without this block
+// each lens report heads every refuted finding by its first severity, and its next reader reports one this read answered.
+const oneLine = (t) => String(t == null ? '' : t).replace(/\s+/g, ' ').replace(/\|/g, '\\|').slice(0, 300)
+const refutation = graded.length
+  ? `## Refutation\n\nWritten after the skeptics ran, over the union of every lens; a row here outranks the severity in a heading above.\n\n| # | severity | site | lenses | verdict |\n| --- | --- | --- | --- | --- |\n${graded
+      .map((f) => `| ${f.id} | ${f.severity} | \`${f.path}:${f.line}\` | ${f.lenses.join(', ')} | ${f.severity === 'Minor' ? 'no skeptic: a Minor is reported, never refuted' : f.refuted ? `REFUTED — ${oneLine(f.skeptic && f.skeptic.reason)}` : `stands — ${oneLine(f.skeptic && f.skeptic.reason) || 'the skeptic could not refute it'}`} |`)
+      .join('\n')}`
+  : '## Refutation\n\nNo finding was graded, so no skeptic ran.'
+const lensReports = live.map((r) => lensPath(r.lens))
+log(`ledger: write the returned refutation to a file, then uv run python scripts/review-ledger.py append ${reportDir} --kind review --range ${range} --tip ${tip} --refutation <that file> ${lensReports.map((p) => `--report ${p}`).join(' ')}`)
+for (const r of live) if (r.reportPath && r.reportPath !== lensPath(r.lens)) log(`lens ${r.lens} says it wrote ${r.reportPath}, not ${lensPath(r.lens)}: the refutation block goes to the path this workflow names`)
+
+return {
+  range,
+  tip,
+  row: { kind: 'review', range, tip },
+  refutation,
+  lenses: live.map((r) => ({ name: r.lens, verdict: r.verdict, reportPath: lensPath(r.lens), executed: r.executed })),
+  droppedLenses: dropped,
+  counts: { Critical: count('Critical', standing), Important: count('Important', standing), Minor: count('Minor', standing), refuted: graded.length - standing.length },
+  findings: graded,
+}
