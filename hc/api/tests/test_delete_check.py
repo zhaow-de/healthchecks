@@ -52,3 +52,13 @@ class DeleteCheckTestCase(BaseTestCase):
         doc = r.json()
         self.assertEqual(doc["status"], "new")
         self.assertTrue(doc["started"])
+
+    def test_it_rejects_check_from_another_project(self) -> None:
+        charlies_check = Check.objects.create(project=self.charlies_project)
+
+        url = f"/api/v2/checks/{charlies_check.code}"
+        r = self.client.delete(url, HTTP_X_API_KEY="X" * 32)
+        self.assertEqual(r.status_code, 403)
+
+        # The check should still exist
+        self.assertTrue(Check.objects.filter(id=charlies_check.id).exists())

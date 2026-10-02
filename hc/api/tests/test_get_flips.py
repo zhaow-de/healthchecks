@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from datetime import timedelta as td
 
+from django.utils.timezone import now
+
 from hc.api.models import Check, Flip
 from hc.test import BaseTestCase, TestHttpResponse
 
@@ -97,3 +99,31 @@ class GetFlipsTestCase(BaseTestCase):
     def test_it_handles_missing_api_key(self) -> None:
         r = self.client.get(self.url)
         self.assertContains(r, "missing api key", status_code=401)
+
+    def test_it_filters_by_seconds(self) -> None:
+        recent = Flip.objects.create(
+            owner=self.a1,
+            created=now() - td(minutes=5),
+            old_status="up",
+            new_status="down",
+        )
+
+        r = self.get(qs="?seconds=3600")
+        self.assertEqual(r.status_code, 200)
+
+        doc = r.json()
+        self.assertEqual(len(doc["flips"]), 1)
+        self.assertEqual(doc["flips"][0]["timestamp"], recent.created.replace(microsecond=0).isoformat())
+        self.assertEqual(doc["flips"][0]["up"], 0)
+
+    def test_it_rejects_check_from_another_project(self) -> None:
+        charlies_check = Check.objects.create(project=self.charlies_project)
+
+        url = f"/api/v1/checks/{charlies_check.code}/flips/"
+        r = self.client.get(url, HTTP_X_API_KEY="X" * 32)
+        self.assertEqual(r.status_code, 403)
+
+    def test_it_handles_missing_unique_key(self) -> None:
+        url = f"/api/v1/checks/{'a' * 40}/flips/"
+        r = self.client.get(url, HTTP_X_API_KEY="X" * 32)
+        self.assertEqual(r.status_code, 404)

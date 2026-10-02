@@ -96,3 +96,13 @@ class FlipModelTestCase(BaseTestCase):
         # The check is not saved, and does not have a primary key.
         # down_duration cannot fetch its flips and should return None.
         self.assertIsNone(flip.down_duration)
+
+    def test_reason_long_works(self) -> None:
+        self.flip.reason = "timeout"
+        self.assertEqual(self.flip.reason_long(), "success signal did not arrive on time, grace time passed")
+
+        self.flip.reason = "fail"
+        self.assertEqual(self.flip.reason_long(), "received a failure signal")
+
+        self.flip.reason = ""
+        self.assertIsNone(self.flip.reason_long())

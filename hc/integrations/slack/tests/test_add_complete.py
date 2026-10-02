@@ -115,3 +115,29 @@ class AddSlackCompleteTestCase(BaseTestCase):
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get("/integrations/add_slack_btn/?code=12345678&state=foo")
         self.assertEqual(r.status_code, 404)
+
+    @patch("hc.integrations.slack.views.curl.post", autospec=True)
+    def test_it_requires_session_state(self, mock_post: Mock) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get("/integrations/add_slack_btn/?code=12345678&state=foo")
+        self.assertEqual(r.status_code, 403)
+
+        mock_post.assert_not_called()
+        self.assertFalse(Channel.objects.exists())
+
+    @patch("hc.integrations.slack.views.curl.post", autospec=True)
+    def test_it_handles_access_denied(self, mock_post: Mock) -> None:
+        session = self.client.session
+        session["add_slack"] = ("foo", str(self.project.code))
+        session.save()
+
+        url = "/integrations/add_slack_btn/?error=access_denied&state=foo"
+
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(url, follow=True)
+        self.assertRedirects(r, self.channels_url)
+        self.assertContains(r, "Slack setup was cancelled.")
+
+        mock_post.assert_not_called()
+        self.assertFalse(Channel.objects.exists())
+        self.assertNotIn("add_slack", self.client.session)

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from unittest.mock import Mock
+from contextlib import redirect_stdout
+from io import StringIO
+from unittest.mock import Mock, patch
 
 from aiosmtpd.smtp import Envelope, Session
+from django.core.management import call_command
 from django.test.utils import override_settings
 
 from hc.api.management.commands.smtpd import PingHandler, _process_message
@@ -350,3 +353,42 @@ class SmtpdTestCase(BaseTestCase):
         ping = Ping.objects.latest("id")
         self.assertEqual(ping.scheme, "email")
         self.assertEqual(ping.kind, "fail")
+
+    @patch("hc.api.management.commands.smtpd.close_old_connections")
+    @patch("hc.api.management.commands.smtpd.connection")
+    def test_it_refreshes_stale_db_connection(self, connection: Mock, close_old_connections: Mock) -> None:
+        # Outside of a transaction (as in the running smtpd) it must drop
+        # timed-out db connections before looking up the check
+        connection.in_atomic_block = False
+
+        result = _process_message("1.2.3.4", "foo@example.org", self.email, b"hello world")
+
+        close_old_connections.assert_called_once_with()
+        self.assertEqual(result, f"Processed ping for {self.email}")
+        self.assertEqual(Ping.objects.get().ua, "Email from foo@example.org")
+
+    @patch("hc.api.management.commands.smtpd.time.sleep", side_effect=KeyboardInterrupt)
+    @patch("hc.api.management.commands.smtpd.Controller")
+    def test_command_listens_until_interrupted(self, controller: Mock, sleep: Mock) -> None:
+        printed = StringIO()
+        with redirect_stdout(printed):
+            call_command("smtpd", "--host", "127.0.0.1", "--port", "2525", stdout=StringIO())
+
+        handler = controller.call_args.args[0]
+        self.assertIsInstance(handler, PingHandler)
+        self.assertEqual(controller.call_args.kwargs, {"hostname": "127.0.0.1", "port": 2525})
+        controller.return_value.start.assert_called_once_with()
+        controller.return_value.stop.assert_called_once_with()
+        sleep.assert_called_once_with(2**32)
+        self.assertEqual(
+            printed.getvalue(),
+            "Starting SMTP listener on 127.0.0.1:2525 ...\nInterrupt received, exiting.\n",
+        )
+
+    @patch("hc.api.management.commands.smtpd.time.sleep", side_effect=KeyboardInterrupt)
+    @patch("hc.api.management.commands.smtpd.Controller")
+    def test_command_listens_on_port_25_by_default(self, controller: Mock, sleep: Mock) -> None:
+        with redirect_stdout(StringIO()):
+            call_command("smtpd", stdout=StringIO())
+
+        self.assertEqual(controller.call_args.kwargs, {"hostname": "0.0.0.0", "port": 25})

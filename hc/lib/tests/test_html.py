@@ -20,6 +20,11 @@ class Html2TextTestCase(TestCase):
         sample = """<b>S</b>UCCESS"""
         self.assertEqual(html2text(sample), "SUCCESS")
 
+    def test_it_skips_pre(self) -> None:
+        sample = """<p>Output:</p><pre>line 1\nline 2</pre><p>Done</p>"""
+        self.assertEqual(html2text(sample), "Output:line 1 line 2Done")
+        self.assertEqual(html2text(sample, skip_pre=True), "Output:Done")
+
 
 class ExtractSignalTestCase(TestCase):
     def test_b_works(self) -> None:

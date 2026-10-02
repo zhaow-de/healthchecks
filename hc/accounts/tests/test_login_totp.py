@@ -32,6 +32,14 @@ class LoginTotpTestCase(BaseTestCase):
         r = self.client.get(self.url)
         self.assertEqual(r.status_code, 400)
 
+    def test_it_requires_2fa_user_in_session(self) -> None:
+        session = self.client.session
+        session.pop("2fa_user")
+        session.save()
+
+        r = self.client.get(self.url)
+        self.assertEqual(r.status_code, 400)
+
     def test_it_requires_totp_secret(self) -> None:
         self.profile.totp = None
         self.profile.save()

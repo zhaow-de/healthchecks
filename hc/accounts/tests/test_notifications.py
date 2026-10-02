@@ -94,3 +94,17 @@ class NotificationsTestCase(BaseTestCase):
 
         self.profile.refresh_from_db()
         self.assertEqual(self.profile.nag_period.total_seconds(), 3600)
+
+    def test_it_clears_next_nag_date_when_disabling_nag(self) -> None:
+        self.profile.nag_period = td(seconds=3600)
+        self.profile.next_nag_date = now() + td(minutes=30)
+        self.profile.save()
+
+        self.client.login(username="alice@example.org", password="password")
+
+        r = self.client.post(self.url, self._payload(nag_period="0"))
+        self.assertEqual(r.status_code, 200)
+
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.nag_period.total_seconds(), 0)
+        self.assertIsNone(self.profile.next_nag_date)

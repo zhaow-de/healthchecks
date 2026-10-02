@@ -94,6 +94,15 @@ class LogTestCase(BaseTestCase):
         r = self.client.get(self.url(u=ts))
         self.assertNotContains(r, "hello world")
 
+    def test_it_accepts_end_parameter(self) -> None:
+        # The flip and the notification are one hour old, the ping is from 2000
+        end = str((now() - td(hours=2)).timestamp())
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(self.url() + "&" + urlencode({"end": end}))
+        self.assertContains(r, "hello world", status_code=200)
+        self.assertNotContains(r, "Sent an email to alice@example.org")
+        self.assertNotContains(r, "new ➔ down")
+
     def test_it_rejects_bad_u_parameter(self) -> None:
         self.client.login(username="alice@example.org", password="password")
 

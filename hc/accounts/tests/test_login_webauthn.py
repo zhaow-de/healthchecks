@@ -99,6 +99,25 @@ class LoginWebAuthnTestCase(BaseTestCase):
         r = self.client.post(url, {"response": "dummy response"})
         self.assertRedirects(r, self.channels_url)
 
+    def test_it_requires_2fa_user_in_session(self) -> None:
+        session = self.client.session
+        session.pop("2fa_user")
+        session.save()
+
+        r = self.client.get(self.url)
+        self.assertEqual(r.status_code, 400)
+
+    @patch("hc.accounts.views.GetHelper.verify")
+    def test_it_rejects_missing_response(self, mock_verify: Mock) -> None:
+        session = self.client.session
+        session["state"] = "dummy-state"
+        session.save()
+
+        r = self.client.post(self.url, {})
+        self.assertEqual(r.status_code, 400)
+        self.assertFalse(mock_verify.called)
+        self.assertNotIn("_auth_user_id", self.client.session)
+
     def test_it_handles_bad_json(self) -> None:
         session = self.client.session
         session["state"] = "dummy-state"

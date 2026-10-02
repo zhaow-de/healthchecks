@@ -81,3 +81,13 @@ class CopyCheckTestCase(BaseTestCase):
 
         q = Check.objects.filter(name="A" * 90 + "... (copy)")
         self.assertTrue(q.exists())
+
+    def test_it_clears_too_long_slug(self) -> None:
+        self.check.slug = "a" * 100
+        self.check.save()
+
+        self.client.login(username="alice@example.org", password="password")
+        self.client.post(self.copy_url)
+
+        copy = Check.objects.get(name="Foo (copy)")
+        self.assertEqual(copy.slug, "")

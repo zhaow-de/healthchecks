@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 import re
 from datetime import timedelta as td
+from io import StringIO
 from unittest.mock import Mock, patch
 
 from django.core import mail
@@ -10,7 +12,7 @@ from django.utils.timezone import now
 
 from hc.accounts.management.commands.senddeletionscheduled import Command
 from hc.accounts.models import Member, Project
-from hc.api.models import Channel, Check
+from hc.api.models import Channel, Check, Flip, Notification
 from hc.test import BaseTestCase
 
 MOCK_SLEEP = Mock()
@@ -127,3 +129,48 @@ class SendDeletionScheduledTestCase(BaseTestCase):
         cmd.handle()
 
         self.assertEqual(len(mail.outbox), 1)
+
+    def test_it_reports_channel_errors(self) -> None:
+        self.profile.deletion_scheduled_date = now() + td(days=5)
+        self.profile.save()
+
+        self.channel.email_verified = False
+        self.channel.save()
+
+        stdout = StringIO()
+        Command(stdout=stdout).handle()
+
+        self.assertIn("   Error sending notification: Email not verified", stdout.getvalue())
+        # Only the deletion warning goes out, the unverified channel gets nothing
+        self.assertEqual([m.subject for m in mail.outbox], ["Account Deletion Warning"])
+        self.channel.refresh_from_db()
+        self.assertEqual(self.channel.last_error, "Email not verified")
+
+    def test_it_retries_channels_that_ignore_down_events(self) -> None:
+        self.profile.deletion_scheduled_date = now() + td(days=5)
+        self.profile.save()
+
+        self.channel.value = json.dumps({"value": "alerts@example.org", "up": True, "down": False})
+        self.channel.save()
+
+        statuses: list[str] = []
+        real_notify = Channel.notify
+
+        def spy(channel: Channel, flip: Flip, is_test: bool = False) -> str:
+            # Read the status at call time: the command mutates the same dummy
+            # check between the two calls, so call_args_list would show "up" twice.
+            statuses.append(flip.owner.status)
+            return real_notify(channel, flip, is_test=is_test)
+
+        stdout = StringIO()
+        with patch.object(Channel, "notify", autospec=True, side_effect=spy):
+            Command(stdout=stdout).handle()
+
+        # The first attempt is a no-op, so the command retries with the dummy
+        # check's status set to "up"...
+        self.assertEqual(statuses, ["down", "up"])
+        # ...but Channel.notify() decides on the flip's new_status, which stays
+        # "down": the retry is a no-op too and the up-only channel gets nothing.
+        self.assertIn("   Error sending notification: no-op", stdout.getvalue())
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertFalse(Notification.objects.exists())

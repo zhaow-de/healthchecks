@@ -8,6 +8,7 @@ from django.test.utils import override_settings
 from django.utils.timezone import now
 
 from hc.api.models import Channel, Check, Flip, Notification, Ping
+from hc.integrations.slack.transport import Slackalike
 from hc.lib.curl import CurlError
 from hc.test import BaseTestCase
 
@@ -336,3 +337,51 @@ class NotifySlackTestCase(BaseTestCase):
         attachment = mock_post.call_args.kwargs["json"]["attachments"][0]
         fields = {f["title"]: f["value"] for f in attachment["fields"]}
         self.assertNotIn("Last Ping Body", fields)
+
+    @patch("hc.api.transports.curl.request", autospec=True)
+    def test_it_shows_description_project_and_tags(self, mock_post: Mock) -> None:
+        self._setup_data("123")
+        self.check.desc = "Nightly *backup*"
+        self.check.tags = "foo bar"
+        self.check.save()
+        mock_post.return_value.status_code = 200
+
+        self.channel.notify(self.flip)
+
+        attachment = mock_post.call_args.kwargs["json"]["attachments"][0]
+        fields = {f["title"]: f for f in attachment["fields"]}
+        # The description is a full-width field, the others are short
+        self.assertEqual(fields["Description"], {"title": "Description", "value": "Nightly *backup*"})
+        self.assertEqual(fields["Project"]["value"], "Alices Project")
+        self.assertTrue(fields["Project"]["short"])
+        self.assertEqual(fields["Tags"]["value"], "`foo` `bar`")
+
+    @patch("hc.api.transports.curl.request", autospec=True)
+    def test_it_handles_check_without_pings(self, mock_post: Mock) -> None:
+        self._setup_data("123")
+        self.ping.delete()
+        mock_post.return_value.status_code = 200
+
+        self.channel.notify(self.flip)
+
+        attachment = mock_post.call_args.kwargs["json"]["attachments"][0]
+        fields = {f["title"]: f["value"] for f in attachment["fields"]}
+        self.assertEqual(fields["Total Pings"], "0")
+        self.assertEqual(fields["Last Ping"], "Never")
+        self.assertNotIn("Last Ping Body", fields)
+
+    @override_settings(SLACK_ENABLED=False)
+    @patch("hc.api.transports.curl.request", autospec=True)
+    def test_slackalike_base_posts_without_slack_setting(self, mock_post: Mock) -> None:
+        self._setup_data("https://example.org/hook")
+        mock_post.return_value.status_code = 200
+
+        # Slackalike is the base of Slack-compatible transports: unlike Slack,
+        # it does not consult SLACK_ENABLED
+        transport = Slackalike(self.channel)
+        transport.notify(self.flip, Notification(channel=self.channel))
+
+        method, url = mock_post.call_args.args
+        self.assertEqual((method, url), ("post", "https://example.org/hook"))
+        payload = mock_post.call_args.kwargs["json"]
+        self.assertEqual(payload["attachments"][0]["fallback"], 'The check "Foobar" is DOWN.')

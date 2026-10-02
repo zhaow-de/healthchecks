@@ -90,3 +90,9 @@ class BadgesTestCase(BaseTestCase):
         self.assertContains(r, "%3A%2F%2F")  # url-encoded "://"
         self.assertContains(r, "foo.shields")
         self.assertContains(r, "![foo]")
+
+    def test_it_rejects_invalid_form(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        payload = {"target": "all", "fmt": "png", "states": "2"}
+        r = self.client.post(self.url, payload)
+        self.assertEqual(r.status_code, 400)

@@ -6,7 +6,7 @@ from django.conf import settings
 from django.core import mail
 from django.test.utils import override_settings
 
-from hc.accounts.models import Credential
+from hc.accounts.models import Credential, Project
 from hc.api.models import Check, TokenBucket
 from hc.test import BaseTestCase
 
@@ -248,3 +248,10 @@ class LoginTestCase(BaseTestCase):
 
         r = self.client.post("/accounts/login/", form)
         self.assertRedirects(r, self.checks_url)
+
+    def test_it_redirects_to_index_if_user_has_several_projects(self) -> None:
+        Project.objects.create(owner=self.alice, name="Second Project")
+        form = {"action": "login", "email": "alice@example.org", "password": "password"}
+
+        r = self.client.post("/accounts/login/", form)
+        self.assertRedirects(r, "/")

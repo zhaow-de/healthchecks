@@ -6,7 +6,7 @@ from datetime import timedelta as td
 import time_machine
 from django.test.utils import override_settings
 
-from hc.api.models import Check, Flip, Ping
+from hc.api.models import Channel, Check, Flip, Ping
 from hc.test import BaseTestCase
 
 
@@ -303,3 +303,40 @@ class DetailsTestCase(BaseTestCase):
         r = self.client.get(self.url)
         self.assertContains(r, "DOWN – Foo – Mychecks", status_code=200)
         self.assertContains(r, "favicon_down.svg")
+
+    def test_it_lists_group_channels_separately(self) -> None:
+        email = Channel.objects.create(project=self.project, kind="email", name="Alice's Inbox")
+        group = Channel.objects.create(project=self.project, kind="group", name="On-call Group")
+        group.value = str(email.code)
+        group.save()
+        group.checks.add(self.check)
+
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(self.url)
+        self.assertContains(r, "Notification Groups", status_code=200)
+        self.assertContains(r, "On-call Group")
+        self.assertContains(r, "Alice&#x27;s Inbox")
+
+        # The group channel is listed before the regular channel heading,
+        # the regular channel after it
+        html = r.content.decode()
+        groups_pos = html.index("Notification Groups")
+        methods_pos = html.index("Notification Methods")
+        self.assertLess(groups_pos, html.index("On-call Group"))
+        self.assertLess(html.index("On-call Group"), methods_pos)
+        self.assertLess(methods_pos, html.index("Alice&#x27;s Inbox"))
+
+    def test_it_omits_notification_groups_heading_without_groups(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(self.url)
+        self.assertNotContains(r, "Notification Groups", status_code=200)
+
+    def test_superuser_can_view_any_check(self) -> None:
+        self.charlie.is_superuser = True
+        self.charlie.save()
+
+        self.client.login(username="charlie@example.org", password="password")
+        r = self.client.get(self.url)
+        self.assertContains(r, "How To Ping", status_code=200)
+        # Superusers get read-write access
+        self.assertContains(r, "edit-timeout")

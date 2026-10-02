@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from datetime import timedelta as td
+from zoneinfo import ZoneInfo
 
 import time_machine
 from django.conf import settings
@@ -299,3 +300,35 @@ class ProfileModelTestCase(BaseTestCase):
         self.profile.next_nag_date = now()
         self.profile.update_next_nag_date()
         self.assertIsNone(self.profile.next_nag_date)
+
+    def test_choose_next_report_date_handles_daily(self) -> None:
+        self.profile.reports = "daily"
+        self.profile.tz = "Europe/Riga"
+
+        result = self.profile.choose_next_report_date()
+        assert result
+        local = result.astimezone(ZoneInfo("Europe/Riga"))
+        # CURRENT_TIME is 04:00 on Jan 13 in Riga, the next report goes out
+        # between 9AM and 11AM local time the next day
+        self.assertEqual(local.date(), date(2020, 1, 14))
+        self.assertIn(local.hour, (9, 10))
+
+    def test_choose_next_report_date_handles_off(self) -> None:
+        self.profile.reports = "off"
+        self.assertIsNone(self.profile.choose_next_report_date())
+
+    def test_is_past_over_limit_grace_works(self) -> None:
+        self.assertFalse(self.profile.is_past_over_limit_grace())
+
+        self.profile.over_limit_date = now() - td(days=30)
+        self.assertFalse(self.profile.is_past_over_limit_grace())
+
+        self.profile.over_limit_date = now() - td(days=32)
+        self.assertTrue(self.profile.is_past_over_limit_grace())
+
+    def test_schedule_for_deletion_works(self) -> None:
+        with time_machine.travel(CURRENT_TIME, tick=False):
+            self.profile.schedule_for_deletion()
+
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.deletion_scheduled_date, CURRENT_TIME + td(days=31))

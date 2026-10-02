@@ -266,3 +266,24 @@ class UpdateTimeoutTestCase(BaseTestCase):
         self.client.login(username="bob@example.org", password="password")
         r = self.client.post(self.url, data=payload)
         self.assertEqual(r.status_code, 403)
+
+    def test_it_rejects_out_of_range_simple_timeout(self) -> None:
+        payload = {"kind": "simple", "timeout": 1, "grace": 60}
+
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.post(self.url, data=payload)
+        self.assertEqual(r.status_code, 400)
+
+        self.check.refresh_from_db()
+        self.assertEqual(self.check.timeout, td(days=1))
+
+    def test_it_redirects_back_to_details_page(self) -> None:
+        referer = f"/checks/{self.check.code}/details/"
+        payload = {"kind": "simple", "timeout": 3600, "grace": 60}
+
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.post(self.url, data=payload, HTTP_REFERER=referer)
+        self.assertRedirects(r, referer)
+
+        self.check.refresh_from_db()
+        self.assertEqual(self.check.timeout.total_seconds(), 3600)

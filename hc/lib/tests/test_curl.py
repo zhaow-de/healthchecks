@@ -7,7 +7,7 @@ import pycurl
 from django.test import SimpleTestCase
 from django.test.utils import override_settings
 
-from hc.lib.curl import CurlError, request
+from hc.lib.curl import CurlError, Response, get, post, request
 
 
 class FakeCurl:
@@ -170,3 +170,80 @@ class CurlTestCase(SimpleTestCase):
     def test_it_accepts_private_ip(self, mock: Mock) -> None:
         mock.return_value = FakeCurl(ip="127.0.0.1")
         request("get", "http://example.org")
+
+    @patch("hc.lib.curl.pycurl.Curl")
+    def test_it_maps_pycurl_errors_to_messages(self, mock: Mock) -> None:
+        samples = [
+            (pycurl.E_OPERATION_TIMEDOUT, "Connection timed out"),
+            (pycurl.E_COULDNT_RESOLVE_HOST, "Could not resolve host"),
+            (pycurl.E_COULDNT_CONNECT, "Connection failed"),
+            (pycurl.E_TOO_MANY_REDIRECTS, "Too many redirects"),
+            (pycurl.E_SSL_CONNECT_ERROR, "TLS handshake failed"),
+            (pycurl.E_PEER_FAILED_VERIFICATION, "TLS handshake failed"),
+            (pycurl.E_RECV_ERROR, f"HTTP request failed, code: {pycurl.E_RECV_ERROR}"),
+        ]
+
+        for errcode, message in samples:
+            with self.subTest(errcode=errcode):
+                mock.return_value.perform.side_effect = pycurl.error(errcode, "")
+                with self.assertRaises(CurlError) as cm:
+                    request("get", "http://example.org")
+                self.assertEqual(cm.exception.message, message)
+
+    @patch("hc.lib.curl.pycurl.Curl")
+    def test_get_wrapper_passes_arguments(self, mock: Mock) -> None:
+        mock.return_value = obj = FakeCurl()
+        response = get(
+            "http://example.org",
+            {"a": "b"},
+            headers={"X-Foo": "bar"},
+            auth=("alice", "pass"),
+            timeout=5,
+        )
+
+        self.assertEqual(obj.opts[pycurl.URL], b"http://example.org?a=b")
+        self.assertEqual(obj.opts[pycurl.HTTPHEADER], [b"X-Foo:bar", b"User-Agent:healthchecks.io"])
+        self.assertEqual(obj.opts[pycurl.USERPWD], "alice:pass")
+        self.assertEqual(obj.opts[pycurl.TIMEOUT], 5)
+        # A GET request sets no custom method and uploads no body
+        self.assertNotIn(pycurl.CUSTOMREQUEST, obj.opts)
+        self.assertNotIn(pycurl.READDATA, obj.opts)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.text, "hello world")
+
+    @patch("hc.lib.curl.pycurl.Curl")
+    def test_post_wrapper_passes_arguments(self, mock: Mock) -> None:
+        mock.return_value = obj = FakeCurl()
+        post(
+            "http://example.org",
+            params={"a": "b"},
+            json={"foo": 1},
+            auth=("alice", "pass"),
+            timeout=7,
+        )
+
+        self.assertEqual(obj.opts[pycurl.CUSTOMREQUEST], "POST")
+        self.assertEqual(obj.opts[pycurl.URL], b"http://example.org?a=b")
+        self.assertEqual(obj.opts[pycurl.READDATA].getvalue(), b'{"foo": 1}')
+        self.assertIn(b"Content-Type:application/json", obj.opts[pycurl.HTTPHEADER])
+        self.assertEqual(obj.opts[pycurl.USERPWD], "alice:pass")
+        self.assertEqual(obj.opts[pycurl.TIMEOUT], 7)
+
+    @patch("hc.lib.curl.pycurl.Curl")
+    def test_post_wrapper_sends_form_data(self, mock: Mock) -> None:
+        mock.return_value = obj = FakeCurl()
+        post("http://example.org", {"a": "b"})
+
+        self.assertEqual(obj.opts[pycurl.CUSTOMREQUEST], "POST")
+        self.assertEqual(obj.opts[pycurl.POSTFIELDS], "a=b")
+
+
+class ResponseTestCase(SimpleTestCase):
+    def test_json_decodes_content(self) -> None:
+        response = Response(200, b'{"ok": true, "items": [1, 2]}')
+        self.assertEqual(response.json(), {"ok": True, "items": [1, 2]})
+
+    def test_json_raises_on_invalid_content(self) -> None:
+        response = Response(200, b"not json")
+        with self.assertRaises(ValueError):
+            response.json()

@@ -61,6 +61,18 @@ class AddWebauthnTestCase(BaseTestCase):
         # state should have been removed from the session
         self.assertNotIn("state", self.client.session)
 
+    def test_it_rejects_missing_name(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        self.set_sudo_flag()
+
+        session = self.client.session
+        session["state"] = "dummy state"
+        session.save()
+
+        r = self.client.post(self.url, {"response": "dummy response"})
+        self.assertEqual(r.status_code, 400)
+        self.assertFalse(Credential.objects.exists())
+
     def test_it_handles_bad_response_json(self) -> None:
         self.client.login(username="alice@example.org", password="password")
         self.set_sudo_flag()

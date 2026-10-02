@@ -5,10 +5,12 @@ from datetime import timedelta as td
 from unittest.mock import Mock, patch
 
 import time_machine
+from django.db import IntegrityError
+from django.db.models import QuerySet
 from django.test.utils import override_settings
 from django.utils.timezone import now
 
-from hc.api.models import Channel, Check, Flip, Notification, Ping
+from hc.api.models import MAX_DURATION, Channel, Check, Flip, Notification, Ping
 from hc.test import BaseTestCase
 
 CURRENT_TIME = datetime(2020, 1, 15, tzinfo=timezone.utc)
@@ -456,3 +458,77 @@ class CheckModelTestCase(BaseTestCase):
 
         # rename_and_delete should handle an already deleted check gracefully:
         same_check.rename_and_delete()
+
+    def test_rename_and_delete_retries_once_after_integrity_error(self) -> None:
+        check = Check.objects.create(project=self.project)
+
+        real_delete = QuerySet.delete
+        calls: list[QuerySet[Check]] = []
+
+        def flaky_delete(qs: QuerySet[Check]) -> tuple[int, dict[str, int]]:
+            calls.append(qs)
+            if len(calls) == 1:
+                # Simulate a concurrent ping inserted between rename and delete
+                raise IntegrityError("FOREIGN KEY constraint failed")
+            return real_delete(qs)
+
+        with patch.object(QuerySet, "delete", autospec=True, side_effect=flaky_delete):
+            check.rename_and_delete()
+
+        self.assertEqual(len(calls), 2)
+        self.assertFalse(Check.objects.filter(id=check.id).exists())
+
+    def test_str_uses_name_then_code(self) -> None:
+        check = Check.objects.create(project=self.project, name="Backups")
+        self.assertEqual(str(check), f"Backups ({check.id})")
+
+        unnamed = Check.objects.create(project=self.project)
+        self.assertEqual(str(unnamed), f"{unnamed.code} ({unnamed.id})")
+
+    def test_get_absolute_url_is_relative_details_url(self) -> None:
+        check = Check.objects.create(project=self.project)
+        self.assertEqual(check.get_absolute_url(), f"/checks/{check.code}/details/")
+        self.assertEqual(check.details_url(full=False), f"/checks/{check.code}/details/")
+
+    def test_clamped_last_duration_returns_short_durations(self) -> None:
+        check = Check(project=self.project)
+        self.assertIsNone(check.clamped_last_duration())
+
+        check.last_duration = td(minutes=5)
+        self.assertEqual(check.clamped_last_duration(), td(minutes=5))
+
+        check.last_duration = MAX_DURATION
+        self.assertIsNone(check.clamped_last_duration())
+
+    def test_to_dict_includes_last_duration(self) -> None:
+        check = Check.objects.create(project=self.project, last_duration=td(seconds=61, microseconds=500))
+        self.assertEqual(check.to_dict()["last_duration"], 61)
+
+        check.last_duration = None
+        self.assertNotIn("last_duration", check.to_dict())
+
+    @override_settings(S3_BUCKET=None)
+    def test_every_hundredth_ping_prunes_old_pings(self) -> None:
+        self.profile.ping_log_limit = 10
+        self.profile.save()
+
+        check = Check.objects.create(project=self.project, n_pings=99)
+        Ping.objects.create(owner=check, n=1, created=CURRENT_TIME)
+        Ping.objects.create(owner=check, n=95, created=CURRENT_TIME)
+
+        check.ping("1.2.3.4", "http", "get", "", b"", "success", None)
+
+        # Ping #100 triggers pruning: with the limit of 10, only n > 90 is kept
+        self.assertEqual(sorted(check.ping_set.values_list("n", flat=True)), [95, 100])
+
+    @override_settings(S3_BUCKET=None)
+    def test_other_pings_do_not_prune(self) -> None:
+        self.profile.ping_log_limit = 10
+        self.profile.save()
+
+        check = Check.objects.create(project=self.project, n_pings=98)
+        Ping.objects.create(owner=check, n=1, created=CURRENT_TIME)
+
+        check.ping("1.2.3.4", "http", "get", "", b"", "success", None)
+
+        self.assertEqual(sorted(check.ping_set.values_list("n", flat=True)), [1, 99])

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from django.test.utils import override_settings
 
-from hc.api.apps import settings_check
+from hc.api.apps import mariadb_uuid_check, settings_check
 from hc.test import BaseTestCase
 
 
@@ -32,3 +32,13 @@ class SystemChecksCase(BaseTestCase):
     def test_it_checks_apprise_and_private_ips(self) -> None:
         ids = [item.id for item in settings_check(None, None)]
         self.assertEqual(ids, ["hc.api.W006"])
+
+    @override_settings(TIME_ZONE="Europe/Riga")
+    def test_it_checks_time_zone_is_utc(self) -> None:
+        ids = [item.id for item in settings_check(None, None)]
+        self.assertEqual(ids, ["hc.api.E003"])
+
+    def test_mariadb_uuid_check_passes_on_migrated_database(self) -> None:
+        # The test database is fully migrated, so the check has nothing to report
+        # on any database vendor
+        self.assertEqual(mariadb_uuid_check(None, None), [])

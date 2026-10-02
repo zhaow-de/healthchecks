@@ -54,3 +54,13 @@ class ChannelChecksTestCase(BaseTestCase):
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(url)
         self.assertContains(r, "there are currently no checks", status_code=200)
+
+    def test_superuser_can_access_any_channel(self) -> None:
+        self.charlie.is_superuser = True
+        self.charlie.save()
+
+        url = f"/integrations/{self.channel.code}/checks/"
+        self.client.login(username="charlie@example.org", password="password")
+        r = self.client.get(url)
+        self.assertContains(r, "Database Backups")
+        self.assertContains(r, "Assign Checks to Integration", status_code=200)

@@ -8,6 +8,7 @@ from django.test.utils import override_settings
 from django.utils.timezone import now
 
 from hc.api.models import Channel, Check, Flip, Notification, Ping
+from hc.api.transports import TransportError
 from hc.lib.curl import CurlError
 from hc.test import BaseTestCase
 
@@ -238,6 +239,24 @@ class NotifyWebhookTestCase(BaseTestCase):
 
         mock_get.assert_not_called()
         self.assertEqual(Notification.objects.count(), 0)
+
+    @patch("hc.api.transports.curl.request", autospec=True)
+    def test_webhook_transport_refuses_empty_url(self, mock_get: Mock) -> None:
+        definition = {
+            "method_down": "GET",
+            "url_down": "",
+            "body_down": "",
+            "headers_down": {},
+        }
+
+        self._setup_data(json.dumps(definition))
+        # Channel.notify skips an empty URL as a no-op; the transport itself
+        # refuses one when called directly
+        with self.assertRaises(TransportError) as cm:
+            self.channel.transport.notify(self.flip, Notification(channel=self.channel))
+
+        self.assertEqual(cm.exception.message, "Empty webhook URL")
+        mock_get.assert_not_called()
 
     @patch("hc.api.transports.curl.request", autospec=True)
     def test_webhooks_handle_unicode_post_body(self, mock_request: Mock) -> None:

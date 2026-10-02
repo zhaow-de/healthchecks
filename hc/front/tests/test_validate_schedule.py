@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+from unittest.mock import Mock, patch
 from urllib.parse import urlencode
 
 from hc.test import BaseTestCase
@@ -35,3 +37,18 @@ class ValidateScheduleTestCase(BaseTestCase):
             r = self.client.get(self._url(v, "oncalendar"))
             self.assertEqual(r.status_code, 200)
             self.assertFalse(r.json()["result"])
+
+    @patch("hc.front.validators.OnCalendar")
+    def test_it_rejects_oncalendar_line_with_too_many_components(self, oncalendar: Mock) -> None:
+        # The oncalendar library rejects such lines too; it is stubbed to accept
+        # anything, so this checks the validator's own field count
+        oncalendar.return_value = iter([datetime(2000, 1, 2, tzinfo=timezone.utc)])
+
+        r = self.client.get(self._url("Mon 2020-01-01 12:00 UTC extra", "oncalendar"))
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(r.json()["result"])
+        oncalendar.assert_not_called()
+
+    def test_it_rejects_unknown_kind(self) -> None:
+        r = self.client.get(self._url("* * * * *", "surprise"))
+        self.assertEqual(r.status_code, 400)

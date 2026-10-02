@@ -3,6 +3,7 @@ from __future__ import annotations
 from unittest.mock import Mock, patch
 
 from django.test import TestCase
+from django.test.utils import override_settings
 
 
 class ServeDocTestCase(TestCase):
@@ -29,3 +30,18 @@ class ServeDocTestCase(TestCase):
         # but the view should still reject them, before any filesystem
         # operations
         self.assertEqual(len(mock_base_dir.mock_calls), 0)
+
+    @override_settings(SITE_ROOT="http://example.org")
+    def test_it_does_not_replace_placeholders_in_self_hosted_docs(self) -> None:
+        r = self.client.get("/docs/self_hosted_configuration/")
+        self.assertContains(r, '<a href="#SITE_ROOT">SITE_ROOT</a>', status_code=200)
+
+    @override_settings(PING_BODY_LIMIT=1234)
+    def test_it_formats_ping_body_limit_in_bytes(self) -> None:
+        r = self.client.get("/docs/attaching_logs/")
+        self.assertContains(r, "will log the first 1234 bytes (1234 bytes)", status_code=200)
+
+    @override_settings(PING_BODY_LIMIT=20000)
+    def test_it_formats_ping_body_limit_in_kilobytes(self) -> None:
+        r = self.client.get("/docs/attaching_logs/")
+        self.assertContains(r, "will log the first 20 kB (20000 bytes)", status_code=200)

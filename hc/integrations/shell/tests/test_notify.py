@@ -135,3 +135,39 @@ class NotifyTestCase(BaseTestCase):
             self.channel.notify(self.flip)
 
             mock_system.assert_called_with(escaped_cmd)
+
+    @patch("hc.integrations.shell.transport.os.system")
+    @override_settings(SHELL_ENABLED=True)
+    def test_shell_handles_up_events(self, mock_system: Mock) -> None:
+        definition = {"cmd_down": "logger down", "cmd_up": "logger $NAME is $STATUS"}
+        self._setup_data("shell", json.dumps(definition), status="up")
+        self.check.name = "Database"
+        self.check.save()
+        mock_system.return_value = 0
+
+        self.channel.notify(self.flip)
+        mock_system.assert_called_once_with("logger Database is up")
+
+        n = Notification.objects.get()
+        self.assertEqual(n.error, "")
+        self.assertEqual(n.check_status, "up")
+
+    @patch("hc.integrations.shell.transport.os.system")
+    @override_settings(SHELL_ENABLED=True)
+    def test_shell_skips_down_event_without_command(self, mock_system: Mock) -> None:
+        definition = {"cmd_down": "", "cmd_up": "logger up"}
+        self._setup_data("shell", json.dumps(definition), status="down")
+
+        self.assertEqual(self.channel.notify(self.flip), "no-op")
+        mock_system.assert_not_called()
+        self.assertFalse(Notification.objects.exists())
+
+    @patch("hc.integrations.shell.transport.os.system")
+    @override_settings(SHELL_ENABLED=True)
+    def test_shell_skips_up_event_without_command(self, mock_system: Mock) -> None:
+        definition = {"cmd_down": "logger down", "cmd_up": ""}
+        self._setup_data("shell", json.dumps(definition), status="up")
+
+        self.assertEqual(self.channel.notify(self.flip), "no-op")
+        mock_system.assert_not_called()
+        self.assertFalse(Notification.objects.exists())

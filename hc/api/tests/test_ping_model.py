@@ -6,6 +6,7 @@ from unittest.mock import Mock, patch
 from uuid import uuid4
 
 from hc.api.models import MAX_DURATION, Check, Ping, prepare_durations
+from hc.lib.s3 import GetObjectError
 from hc.test import BaseTestCase
 
 EPOCH = datetime(2020, 1, 1, tzinfo=timezone.utc)
@@ -34,6 +35,40 @@ class PingModelTestCase(BaseTestCase):
         p = Ping.objects.create(owner=self.check, created=EPOCH, n=1)
         with self.assertNumQueries(0):
             self.assertIsNone(p.duration)
+
+    def test_get_body_decodes_body_raw(self) -> None:
+        p = Ping(owner=self.check, body_raw=b"hello \xff world")
+        self.assertEqual(p.get_body(), "hello � world")
+
+    def test_get_body_handles_no_body(self) -> None:
+        p = Ping(owner=self.check)
+        self.assertIsNone(p.get_body())
+
+    @patch("hc.api.models.get_object")
+    def test_get_body_handles_object_storage_error(self, get_object: Mock) -> None:
+        get_object.side_effect = GetObjectError()
+        p = Ping.objects.create(owner=self.check, n=1, object_size=1000)
+
+        self.assertIsNone(p.get_body())
+        get_object.assert_called_once_with(str(self.check.code), 1)
+
+    def test_get_body_size_prefers_body_raw(self) -> None:
+        self.assertEqual(Ping(body_raw=b"hello").get_body_size(), 5)
+        self.assertEqual(Ping(object_size=1234).get_body_size(), 1234)
+        self.assertEqual(Ping().get_body_size(), 0)
+
+    def test_get_kind_display_works(self) -> None:
+        samples = [
+            (None, None, "Success"),
+            ("start", None, "Start"),
+            ("fail", None, "Failure"),
+            ("fail", 123, "Exit status 123"),
+            ("ign", None, "Ignored"),
+            ("log", None, "Log"),
+        ]
+        for kind, exitstatus, expected in samples:
+            p = Ping(kind=kind, exitstatus=exitstatus)
+            self.assertEqual(p.get_kind_display(), expected)
 
 
 class PrepareDurationsTestCase(BaseTestCase):

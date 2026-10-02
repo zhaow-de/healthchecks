@@ -137,3 +137,22 @@ class MetricsTestCase(BaseTestCase):
 
         self.assertContains(r, f"hc_check_up{alice_spec} 1")
         self.assertContains(r, f"hc_check_grace{alice_spec} 1")
+
+    def test_it_reports_down_check(self) -> None:
+        self.check.status = "down"
+        self.check.save()
+
+        Check.objects.create(project=self.project, name="Bob Was Here", tags="foo bar")
+
+        r = self.client.get(self.url)
+        self.assertEqual(r.status_code, 200)
+
+        alice_spec = '{name="Alice Was Here", tags="foo", unique_key="%s"}'
+        alice_spec = alice_spec % self.check.unique_key
+
+        self.assertContains(r, f"hc_check_up{alice_spec} 0")
+        # A tag is down if any of its checks is down
+        self.assertContains(r, 'hc_tag_up{tag="foo"} 0')
+        self.assertContains(r, 'hc_tag_up{tag="bar"} 1')
+        self.assertContains(r, "hc_checks_total 2")
+        self.assertContains(r, "hc_checks_down_total 1")

@@ -145,3 +145,10 @@ class GetPingsTestCase(BaseTestCase):
             ping["body_url"],
             f"http://testserver/api/v3/checks/{self.a1.code}/pings/1/body",
         )
+
+    def test_it_rejects_check_from_another_project(self) -> None:
+        charlies_check = Check.objects.create(project=self.charlies_project)
+
+        self.url = f"/api/v3/checks/{charlies_check.code}/pings/"
+        r = self.get()
+        self.assertEqual(r.status_code, 403)

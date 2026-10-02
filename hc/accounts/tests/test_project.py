@@ -107,6 +107,27 @@ class ProjectTestCase(BaseTestCase):
         self.project.refresh_from_db()
         self.assertEqual(self.project.api_key, "")
 
+    def test_it_revokes_readonly_key(self) -> None:
+        self.project.api_key_readonly = "R" * 32
+        self.project.save()
+
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.post(self.url, {"revoke_key": "api_key_readonly"})
+        self.assertEqual(r.status_code, 200)
+
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.api_key_readonly, "")
+        self.assertEqual(self.project.api_key, "X" * 32)
+
+    def test_it_revokes_ping_key(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.post(self.url, {"revoke_key": "ping_key"})
+        self.assertEqual(r.status_code, 200)
+
+        self.project.refresh_from_db()
+        self.assertIsNone(self.project.ping_key)
+        self.assertEqual(self.project.api_key, "X" * 32)
+
     def test_it_requires_rw_access_to_revoke_api_key(self) -> None:
         self.bobs_membership.role = "r"
         self.bobs_membership.save()

@@ -202,3 +202,49 @@ class MyChecksTestCase(BaseTestCase):
 
         self.assertContains(r, 'data-timeout="123"')
         self.assertContains(r, 'data-grace="456"')
+
+    def test_superuser_can_view_any_project(self) -> None:
+        self.charlie.is_superuser = True
+        self.charlie.save()
+
+        self.client.login(username="charlie@example.org", password="password")
+        r = self.client.get(self.url)
+        self.assertContains(r, "Alice Was Here", status_code=200)
+        # Superusers get read-write access, so the pause button is shown
+        self.assertContains(r, "btn pause")
+
+    def test_it_filters_by_status(self) -> None:
+        self.check.last_ping = now()
+        self.check.status = "up"
+        self.check.save()
+
+        down = Check.objects.create(project=self.project, name="Down Check", status="down")
+
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(self.url + "?status=down")
+        self.assertContains(r, f'<tr id="{down.code}" class="checks-row" >', status_code=200)
+        self.assertContains(r, f'<tr id="{self.check.code}" class="checks-row" style="display: none">')
+
+    def test_status_filter_matches_started_checks(self) -> None:
+        self.check.last_ping = now()
+        self.check.last_start = now()
+        self.check.status = "up"
+        self.check.save()
+
+        idle = Check.objects.create(project=self.project, name="Idle Check", status="up", last_ping=now())
+
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(self.url + "?status=started")
+        self.assertContains(r, f'<tr id="{self.check.code}" class="checks-row" >', status_code=200)
+        self.assertContains(r, f'<tr id="{idle.code}" class="checks-row" style="display: none">')
+
+    def test_it_shows_last_duration_header(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(self.url)
+        self.assertNotContains(r, "Last Duration", status_code=200)
+
+        self.check.last_duration = td(seconds=75)
+        self.check.save()
+
+        r = self.client.get(self.url)
+        self.assertContains(r, "Last Duration", status_code=200)

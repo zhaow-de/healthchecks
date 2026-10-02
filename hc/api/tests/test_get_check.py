@@ -153,3 +153,19 @@ class GetCheckTestCase(BaseTestCase):
         doc = r.json()
         self.assertEqual(doc["status"], "new")
         self.assertTrue(doc["started"])
+
+    def test_it_rejects_check_from_another_project(self) -> None:
+        charlies_check = Check.objects.create(project=self.charlies_project)
+
+        r = self.get(charlies_check.code)
+        self.assertEqual(r.status_code, 403)
+
+    def test_it_handles_missing_unique_key(self) -> None:
+        r = self.get("a" * 40)
+        self.assertEqual(r.status_code, 404)
+
+    def test_unique_key_lookup_is_scoped_to_project(self) -> None:
+        charlies_check = Check.objects.create(project=self.charlies_project)
+
+        r = self.get(charlies_check.unique_key)
+        self.assertEqual(r.status_code, 404)

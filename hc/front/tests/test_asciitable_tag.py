@@ -39,3 +39,9 @@ class AsciiTableTestCase(BaseTestCase):
 
         with self.assertRaises(TemplateSyntaxError):
             t.render(Context())
+
+    def test_it_handles_cell_without_table(self) -> None:
+        t = Template("""{% load asciitable %}{% cell %}Text{% endcell %}""")
+
+        with self.assertRaisesMessage(TemplateSyntaxError, "The cell tag used without outer table tag"):
+            t.render(Context())

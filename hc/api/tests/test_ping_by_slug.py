@@ -119,3 +119,10 @@ class PingBySlugTestCase(BaseTestCase):
         # Autoprovisioning should fail now:
         r = self.client.get(f"/ping/{self.project.ping_key}/foo3?create=1")
         self.assertEqual(r.status_code, 404)
+
+    def test_auto_provisioning_handles_wrong_ping_key(self) -> None:
+        self.check.delete()
+
+        r = self.client.get("/ping/rrrrrrrrrrrrrrrrrrrrrr/foo?create=1")
+        self.assertEqual(r.status_code, 404)
+        self.assertFalse(Check.objects.exists())
