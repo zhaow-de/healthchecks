@@ -216,13 +216,13 @@ This is a standard Django setting, read more in
 
 Default: `prefer`
 
-PostgreSQL-specific, [details](https://www.postgresql.org/docs/10/libpq-connect.html#LIBPQ-CONNECT-SSLMODE)
+PostgreSQL-specific, [details](https://www.postgresql.org/docs/18/libpq-connect.html#LIBPQ-CONNECT-SSLMODE)
 
 ## `DB_TARGET_SESSION_ATTRS` {: #DB_TARGET_SESSION_ATTRS }
 
 Default: `read-write`
 
-PostgreSQL-specific, [details](https://www.postgresql.org/docs/10/libpq-connect.html#LIBPQ-CONNECT-TARGET-SESSION-ATTRS)
+PostgreSQL-specific, [details](https://www.postgresql.org/docs/18/libpq-connect.html#LIBPQ-CONNECT-TARGET-SESSION-ATTRS)
 
 ## `DB_USER` {: #DB_USER }
 

@@ -128,27 +128,53 @@ docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">ex
 
 <h2>Upgrading Database</h2>
 <p>When you upgrade the database version in <code>docker-compose.yml</code> (for example,
-from <code>postgres:12</code> to <code>postgres:16</code>), you will also need to upgrade your postgres
+from <code>postgres:16</code> to <code>postgres:18</code>), you will also need to upgrade your postgres
 data directory. One way to do this is using the
 <a href="https://hub.docker.com/r/pgautoupgrade/pgautoupgrade">pgautoupgrade</a> container.</p>
+<p>Starting with <code>postgres:18</code>, the image keeps its data in <code>/var/lib/postgresql/18/docker</code>
+and expects the data volume to be mounted at <code>/var/lib/postgresql</code>, not at
+<code>/var/lib/postgresql/data</code> as earlier versions did. The upgrade below moves your data
+into the new layout, so both the upgrade command and <code>docker-compose.yml</code> mount the
+volume at <code>/var/lib/postgresql</code>.</p>
 <p>Steps:</p>
 <ul>
-<li>As the very first step, <strong>take a full backup of your database</strong>.</li>
+<li>As the very first step, <strong>take a full backup of your database</strong>, for example:
+  <code>docker compose exec -T db pg_dumpall -U postgres &gt; healthchecks-backup.sql</code></li>
 <li>Stop the <code>db</code> and <code>web</code> containers: <code>docker compose stop</code></li>
-<li>Look up the name of the postgres data volume name using <code>docker volume ls</code></li>
-<li>Run <code>pgautoupgrade</code> like so:</li>
+<li>Look up the name of the postgres data volume using <code>docker volume ls</code></li>
+<li>Run <code>pgautoupgrade</code> like so (with the old <code>/var/lib/postgresql/data</code> mount target
+  it exits without upgrading anything):</li>
 </ul>
 <div class="highlight"><pre><span></span><code><span class="n">docker</span><span class="w"> </span><span class="n">run</span><span class="w"> </span><span class="o">--</span><span class="n">rm</span><span class="w"> </span><span class="o">--</span><span class="n">name</span><span class="w"> </span><span class="n">pgauto</span><span class="w"> </span><span class="o">-</span><span class="n">it</span><span class="w"> </span>\
-<span class="w">   </span><span class="o">--</span><span class="n">mount</span><span class="w"> </span><span class="n">type</span><span class="o">=</span><span class="n">volume</span><span class="p">,</span><span class="n">source</span><span class="o">=&lt;</span><span class="n">pg</span><span class="o">-</span><span class="n">volume</span><span class="o">-</span><span class="n">name</span><span class="o">-</span><span class="n">here</span><span class="o">&gt;</span><span class="p">,</span><span class="n">target</span><span class="o">=/</span><span class="k">var</span><span class="o">/</span><span class="n">lib</span><span class="o">/</span><span class="n">postgresql</span><span class="o">/</span><span class="n">data</span><span class="w"> </span>\
+<span class="w">   </span><span class="o">--</span><span class="n">mount</span><span class="w"> </span><span class="n">type</span><span class="o">=</span><span class="n">volume</span><span class="p">,</span><span class="n">source</span><span class="o">=&lt;</span><span class="n">pg</span><span class="o">-</span><span class="n">volume</span><span class="o">-</span><span class="n">name</span><span class="o">-</span><span class="n">here</span><span class="o">&gt;</span><span class="p">,</span><span class="n">target</span><span class="o">=/</span><span class="k">var</span><span class="o">/</span><span class="n">lib</span><span class="o">/</span><span class="n">postgresql</span><span class="w"> </span>\
 <span class="w">   </span><span class="o">-</span><span class="n">e</span><span class="w"> </span><span class="n">POSTGRES_PASSWORD</span><span class="o">=</span><span class="n">password</span><span class="w"> </span>\
 <span class="w">   </span><span class="o">-</span><span class="n">e</span><span class="w"> </span><span class="n">PGAUTO_ONESHOT</span><span class="o">=</span><span class="n">yes</span><span class="w"> </span>\
-<span class="w">   </span><span class="n">pgautoupgrade</span><span class="o">/</span><span class="n">pgautoupgrade</span><span class="p">:</span><span class="mi">16</span><span class="o">-</span><span class="n">bookworm</span>
+<span class="w">   </span><span class="n">pgautoupgrade</span><span class="o">/</span><span class="n">pgautoupgrade</span><span class="p">:</span><span class="mi">18</span><span class="o">-</span><span class="n">trixie</span>
 </code></pre></div>
 
 <ul>
-<li>Update the <code>docker-compose.yml</code> file to use the <code>postgres:16</code> image</li>
-<li>Start containers: <code>docker compose up</code></li>
+<li>Update the <code>docker-compose.yml</code> file to use the <code>postgres:18</code> image and to mount
+  the data volume at <code>/var/lib/postgresql</code> (with the old mount target, <code>postgres:18</code>
+  exits with an error that starts
+  <code>Error: in 18+, these Docker images are configured to store database data</code>):</li>
 </ul>
+<div class="highlight"><pre><span></span><code><span class="nt">services</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">db</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres:18</span>
+<span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">db-data:/var/lib/postgresql</span>
+</code></pre></div>
+
+<ul>
+<li>Start containers: <code>docker compose up</code></li>
+<li>If the <code>db</code> container logs a warning that a database <code>has a collation version mismatch</code>,
+  the database was created by a <code>postgres</code> image built on an older Debian release
+  (such as bookworm). <code>pgautoupgrade</code> has already reindexed every database, so record
+  the new collation version:</li>
+</ul>
+<div class="highlight"><pre><span></span><code>echo "SELECT format('ALTER DATABASE %I REFRESH COLLATION VERSION', datname) FROM pg_database WHERE datallowconn \gexec" | docker compose exec -T db psql -U postgres
+</code></pre></div>
+
 <h2>Pre-built Images</h2>
 <p>Pre-built Docker images are available
 <a href="https://github.com/zhaow-de/healthchecks/pkgs/container/healthchecks">on the GitHub Container Registry</a>

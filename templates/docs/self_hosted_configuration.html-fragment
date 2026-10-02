@@ -174,10 +174,10 @@ precedence.</p>
 <a href="https://docs.djangoproject.com/en/6.1/ref/settings/#port">Django documentation</a>.</p>
 <h2 id="DB_SSLMODE"><code>DB_SSLMODE</code></h2>
 <p>Default: <code>prefer</code></p>
-<p>PostgreSQL-specific, <a href="https://www.postgresql.org/docs/10/libpq-connect.html#LIBPQ-CONNECT-SSLMODE">details</a></p>
+<p>PostgreSQL-specific, <a href="https://www.postgresql.org/docs/18/libpq-connect.html#LIBPQ-CONNECT-SSLMODE">details</a></p>
 <h2 id="DB_TARGET_SESSION_ATTRS"><code>DB_TARGET_SESSION_ATTRS</code></h2>
 <p>Default: <code>read-write</code></p>
-<p>PostgreSQL-specific, <a href="https://www.postgresql.org/docs/10/libpq-connect.html#LIBPQ-CONNECT-TARGET-SESSION-ATTRS">details</a></p>
+<p>PostgreSQL-specific, <a href="https://www.postgresql.org/docs/18/libpq-connect.html#LIBPQ-CONNECT-TARGET-SESSION-ATTRS">details</a></p>
 <h2 id="DB_USER"><code>DB_USER</code></h2>
 <p>Default: <code>postgres</code></p>
 <p>This is a standard Django setting, read more in

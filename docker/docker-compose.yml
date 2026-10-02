@@ -3,9 +3,9 @@ volumes:
 
 services:
   db:
-    image: postgres:16
+    image: postgres:18
     volumes:
-      - db-data:/var/lib/postgresql/data
+      - db-data:/var/lib/postgresql
     environment:
       - POSTGRES_DB=$DB_NAME
       - POSTGRES_PASSWORD=$DB_PASSWORD

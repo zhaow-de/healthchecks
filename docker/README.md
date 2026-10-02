@@ -127,27 +127,55 @@ http-request set-header X-Forwarded-Proto http unless { ssl_fc }
 ## Upgrading Database
 
 When you upgrade the database version in `docker-compose.yml` (for example,
-from `postgres:12` to `postgres:16`), you will also need to upgrade your postgres
+from `postgres:16` to `postgres:18`), you will also need to upgrade your postgres
 data directory. One way to do this is using the
 [pgautoupgrade](https://hub.docker.com/r/pgautoupgrade/pgautoupgrade) container.
 
+Starting with `postgres:18`, the image keeps its data in `/var/lib/postgresql/18/docker`
+and expects the data volume to be mounted at `/var/lib/postgresql`, not at
+`/var/lib/postgresql/data` as earlier versions did. The upgrade below moves your data
+into the new layout, so both the upgrade command and `docker-compose.yml` mount the
+volume at `/var/lib/postgresql`.
+
 Steps:
 
-* As the very first step, **take a full backup of your database**.
+* As the very first step, **take a full backup of your database**, for example:
+  `docker compose exec -T db pg_dumpall -U postgres > healthchecks-backup.sql`
 * Stop the `db` and `web` containers: `docker compose stop`
-* Look up the name of the postgres data volume name using `docker volume ls`
-* Run `pgautoupgrade` like so:
+* Look up the name of the postgres data volume using `docker volume ls`
+* Run `pgautoupgrade` like so (with the old `/var/lib/postgresql/data` mount target
+  it exits without upgrading anything):
 
 ```
 docker run --rm --name pgauto -it \
-   --mount type=volume,source=<pg-volume-name-here>,target=/var/lib/postgresql/data \
+   --mount type=volume,source=<pg-volume-name-here>,target=/var/lib/postgresql \
    -e POSTGRES_PASSWORD=password \
    -e PGAUTO_ONESHOT=yes \
-   pgautoupgrade/pgautoupgrade:16-bookworm
+   pgautoupgrade/pgautoupgrade:18-trixie
 ```
 
-* Update the `docker-compose.yml` file to use the `postgres:16` image
+* Update the `docker-compose.yml` file to use the `postgres:18` image and to mount
+  the data volume at `/var/lib/postgresql` (with the old mount target, `postgres:18`
+  exits with an error that starts
+  `Error: in 18+, these Docker images are configured to store database data`):
+
+```yaml
+services:
+  db:
+    image: postgres:18
+    volumes:
+      - db-data:/var/lib/postgresql
+```
+
 * Start containers: `docker compose up`
+* If the `db` container logs a warning that a database `has a collation version mismatch`,
+  the database was created by a `postgres` image built on an older Debian release
+  (such as bookworm). `pgautoupgrade` has already reindexed every database, so record
+  the new collation version:
+
+```
+echo "SELECT format('ALTER DATABASE %I REFRESH COLLATION VERSION', datname) FROM pg_database WHERE datallowconn \gexec" | docker compose exec -T db psql -U postgres
+```
 
 ## Pre-built Images
 
