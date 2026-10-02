@@ -71,7 +71,7 @@ on the value of the `SMTPD_PORT` environment value:
   (see the "ports" section under the "web" service in `docker-compose.yml`).
 
 The conditional logic lives in uWSGI configuration file,
-[uwsgi.ini](https://github.com/healthchecks/healthchecks/blob/master/docker/uwsgi.ini).
+[uwsgi.ini](https://github.com/zhaow-de/healthchecks/blob/main/docker/uwsgi.ini).
 
 See also: the [PING_EMAIL_DOMAIN](../self_hosted_configuration/#PING_EMAIL_DOMAIN)
 environment variable for customizing the domain part of the email addresses.

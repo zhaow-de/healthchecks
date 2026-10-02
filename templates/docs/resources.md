@@ -2,7 +2,7 @@
 
 A collection of third-party software projects that integrate with SITE_NAME.
 Please submit additions and corrections
-[on GitHub](https://github.com/healthchecks/healthchecks/issues).
+[on GitHub](https://github.com/zhaow-de/healthchecks/issues).
 
 ## Command Runners, Shell Wrappers
 

@@ -43,7 +43,7 @@ termination.
   and their results are baked in the image (you can find them listed in the [Dockerfile](Dockerfile)).
 * `migrate`, `sendalerts`, `sendreports`, `smtpd` – when running with Docker, you
   also do  not need to manually run these. They are run automatically on
-  container startup (you can find them listed in [uwsgi.ini](https://github.com/healthchecks/healthchecks/blob/master/docker/uwsgi.ini)).
+  container startup (you can find them listed in [uwsgi.ini](uwsgi.ini)).
 * `createsuperuser`, `pruneobjects`, `prunetokenbucket`, `pruneusers`,
   `settelegramwebhook` – you need to run them **inside the container**, not on
   the host system. Do it like so:
@@ -92,7 +92,7 @@ on the value of the `SMTPD_PORT` environment value:
   (see the "ports" section under the "web" service in `docker-compose.yml`).
 
 The conditional logic lives in uWSGI configuration file,
-[uwsgi.ini](https://github.com/healthchecks/healthchecks/blob/master/docker/uwsgi.ini).
+[uwsgi.ini](uwsgi.ini).
 
 ## TLS Termination and CSRF Protection
 
@@ -163,7 +163,7 @@ The Docker images built from the Dockerfile in this directory:
 * Use uWSGI as the web server. uWSGI is configured to perform database migrations
   on startup, and to run `sendalerts`, `sendreports`, and `smtpd` in the background.
   You do not need to run them separately. The SMTP listener (`manage.py smtpd`) is
-  started conditionally, [based on the value of the `SMTPD_PORT` environment variable](https://github.com/healthchecks/healthchecks/tree/master/docker#smtp-listener-configuration-via-smtpd_port).
+  started conditionally, [based on the value of the `SMTPD_PORT` environment variable](#smtp-listener-configuration-via-smtpd_port).
 * Ship with the PostgreSQL database driver.
 * Serve static files using the whitenoise library.
 * Have the apprise library preinstalled.

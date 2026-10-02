@@ -69,7 +69,7 @@ def make_message(
 
 
 def send(message: Message, block: bool = False) -> None:
-    assert settings.MAILERS, "No SMTP configuration, see https://github.com/healthchecks/healthchecks#sending-emails"
+    assert settings.MAILERS, "No SMTP configuration, see https://github.com/zhaow-de/healthchecks#sending-emails"
 
     t = EmailThread(message)
     if block or hasattr(settings, "BLOCKING_EMAILS"):

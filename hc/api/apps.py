@@ -46,7 +46,7 @@ def settings_check(
         items.append(
             Warning(
                 "No SMTP configuration, cannot send email",
-                hint="See https://github.com/healthchecks/healthchecks#sending-emails",
+                hint="See https://github.com/zhaow-de/healthchecks#sending-emails",
                 id="hc.api.W002",
             )
         )
