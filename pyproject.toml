@@ -4,19 +4,19 @@ name = "healthchecks"
 version = "4.5.0"
 requires-python = "==3.14.*"
 dependencies = [
-    "cronsim==2.7",
-    "django[argon2]==6.1.1",
-    "django-compressor==4.6",
-    "django-stubs-ext==6.1.1",
-    "fido2==2.2.1",
-    "oncalendar==1.1",
-    "psycopg==3.3.6",
-    "pycurl==7.48.0",
-    "pydantic==2.13.5",
-    "pyotp==2.10.0",
-    "segno==1.6.6",
-    "statsd==4.0.1",
-    "whitenoise==6.12.0",
+    "cronsim>=2.7",
+    "django[argon2]>=6.1.1",
+    "django-compressor>=4.6",
+    "django-stubs-ext>=6.1.1",
+    "fido2>=2.2.1",
+    "oncalendar>=1.1",
+    "psycopg>=3.3.6",
+    "pycurl>=7.48.0",
+    "pydantic>=2.13.5",
+    "pyotp>=2.10.0",
+    "segno>=1.6.6",
+    "statsd>=4.0.1",
+    "whitenoise>=6.12.0",
 ]
 
 # Optional runtime features. Install with "uv sync --extra <name>".
@@ -28,15 +28,15 @@ uwsgi = ["uwsgi"]
 [dependency-groups]
 # Installed by default by "uv sync" and "uv run".
 dev = [
-    "markdown==3.10.2",
+    "markdown>=3.11",
     "pre-commit>=4.6.2",
-    "pygments==2.21.0",
+    "pygments>=2.21.0",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "pytest-django>=4.14.0",
     "pytest-xdist>=3.8.0",
-    "ruff>=0.16.4",
-    "time-machine==3.5.1",
+    "ruff>=0.16.10",
+    "time-machine>=3.5.1",
 ]
 
 [tool.pytest.ini_options]
@@ -60,4 +60,3 @@ omit = ["*/tests/*", "*/migrations/*"]
 [tool.uv]
 # Healthchecks is an application run via manage.py, not an installable package.
 package = false
-required-version = ">=0.12.19"
