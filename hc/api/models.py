@@ -201,6 +201,9 @@ class Check(models.Model):
     grace = models.DurationField(default=DEFAULT_GRACE)
     schedule = models.CharField(max_length=100, default="* * * * *")
     tz = models.CharField(max_length=36, default="UTC")
+    # filter_subject and filter_body are inert, kept for compatibility with the original
+    # Healthchecks API v3: this instance takes no email pings, so the API only stores
+    # and returns them.
     filter_subject = models.BooleanField(default=False)
     filter_body = models.BooleanField(default=False)
     filter_http_body = models.BooleanField(default=False)
@@ -273,23 +276,6 @@ class Check(models.Model):
 
     def cloaked_url(self) -> str:
         return absolute_reverse("hc-uncloak", args=[self.unique_key])
-
-    def email(self) -> str | None:
-        """Return check's ping email address in user's preferred style.
-
-        Note: this method reads self.project. If project is not loaded already,
-        this causes a SQL query.
-
-        """
-        if self.project_id and self.project.show_slugs:
-            if not self.slug:
-                return None
-
-            # If ping_key is not set, use dummy placeholder
-            key = self.project.ping_key or "{ping_key}"
-            return f"{key}+{self.slug}@{settings.PING_EMAIL_DOMAIN}"
-
-        return f"{self.code}@{settings.PING_EMAIL_DOMAIN}"
 
     def clamped_last_duration(self) -> td | None:
         if self.last_duration and self.last_duration < MAX_DURATION:
@@ -430,7 +416,7 @@ class Check(models.Model):
         return hashlib.sha1(code_half.encode()).hexdigest()
 
     def filter_any(self) -> bool:
-        return self.filter_subject or self.filter_body or self.filter_http_body
+        return self.filter_http_body
 
     def to_dict(self, *, readonly: bool = False) -> CheckDict:
         result: CheckDict = {

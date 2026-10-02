@@ -25,6 +25,13 @@ class CheckModelTestCase(BaseTestCase):
         check.tags = " "
         self.assertEqual(check.tags_list(), [])
 
+    def test_filter_any_ignores_the_email_filters(self) -> None:
+        check = Check(filter_subject=True, filter_body=True)
+        self.assertFalse(check.filter_any())
+
+        check.filter_http_body = True
+        self.assertTrue(check.filter_any())
+
     def test_get_status_handles_new_check(self) -> None:
         check = Check()
         self.assertEqual(check.get_status(), "new")

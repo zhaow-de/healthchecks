@@ -7,7 +7,7 @@ from django.utils.timezone import now
 from hc.api.models import Check, Ping
 from hc.test import BaseTestCase
 
-PLAINTEXT_EMAIL = b"""Content-Type: multipart/alternative; boundary=bbb
+MIME_BODY = b"""Content-Type: multipart/alternative; boundary=bbb
 
 --bbb
 Content-Type: text/plain;charset=utf-8
@@ -17,34 +17,6 @@ aGVsbG8gd29ybGQ=
 
 --bbb
 """
-
-BAD_BASE64_EMAIL = b"""Content-Type: multipart/alternative; boundary=bbb
-
---bbb
-Content-Type: text/plain;charset=utf-8
-Content-Transfer-Encoding: base64
-
-!!!
-
---bbb
-"""
-
-HTML_EMAIL = b"""Content-Type: multipart/alternative; boundary=bbb
-
---bbb
-Content-Type: text/html;charset=utf-8
-Content-Transfer-Encoding: base64
-
-PGI+aGVsbG88L2I+
-
---bbb
-"""
-
-PLAINTEXT_UTF8_EMAIL = """Content-Type: text/plain; charset=UTF-8; format=flowed
-Content-Transfer-Encoding: 8bit
-
-glāžšķūņu rūķīši
-""".encode()
 
 
 class PingDetailsTestCase(BaseTestCase):
@@ -161,64 +133,25 @@ class PingDetailsTestCase(BaseTestCase):
         r = self.client.get(self.url)
         self.assertContains(r, "(exit status 0)", status_code=200)
 
-    def test_it_decodes_plaintext_email_body(self) -> None:
-        Ping.objects.create(owner=self.check, n=1, scheme="email", body_raw=PLAINTEXT_EMAIL)
+    def test_it_shows_mime_body_verbatim(self) -> None:
+        # A legacy email-scheme row: its body must not be parsed as MIME any more
+        Ping.objects.create(owner=self.check, n=1, scheme="email", body_raw=MIME_BODY)
 
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.url)
 
-        self.assertContains(r, "email-body-plain", status_code=200)
-        self.assertNotContains(r, "email-body-html")
+        # aGVsbG8gd29ybGQ= is base64("hello world"): no MIME decoding happens
+        self.assertContains(r, "aGVsbG8gd29ybGQ=", status_code=200)
+        self.assertNotContains(r, "hello world")
+        self.assertNotContains(r, "email-body-")
 
-        # aGVsbG8gd29ybGQ= is base64("hello world")
-        self.assertContains(r, "aGVsbG8gd29ybGQ=")
-        self.assertContains(r, "hello world")
-
-    def test_it_handles_utf8_encoded_plaintext(self) -> None:
-        Ping.objects.create(owner=self.check, n=1, scheme="email", body_raw=PLAINTEXT_UTF8_EMAIL)
+    def test_it_handles_utf8_body(self) -> None:
+        Ping.objects.create(owner=self.check, n=1, body_raw="glāžšķūņu rūķīši".encode())
 
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.url)
 
-        self.assertContains(r, "<pre>glāžšķūņu rūķīši")
-
-    def test_it_handles_bad_base64_in_email_body(self) -> None:
-        Ping.objects.create(owner=self.check, n=1, scheme="email", body_raw=BAD_BASE64_EMAIL)
-
-        self.client.login(username="alice@example.org", password="password")
-        r = self.client.get(self.url)
-
-        self.assertContains(r, "!!!", status_code=200)
-        self.assertNotContains(r, "email-body-plain")
-        self.assertNotContains(r, "email-body-html")
-
-    def test_it_decodes_html_email_body(self) -> None:
-        Ping.objects.create(owner=self.check, n=1, scheme="email", body_raw=HTML_EMAIL)
-
-        self.client.login(username="alice@example.org", password="password")
-        r = self.client.get(self.url)
-
-        self.assertNotContains(r, "email-body-plain", status_code=200)
-        fragment = """<div id="email-body-html" class="tab-pane active">"""
-        self.assertContains(r, fragment)
-
-        # PGI+aGVsbG88L2I+ is base64("<b>hello</b>")
-        self.assertContains(r, "PGI+aGVsbG88L2I+")
-        self.assertContains(r, "&lt;b&gt;hello&lt;/b&gt;")
-
-    def test_it_decodes_email_subject(self) -> None:
-        Ping.objects.create(
-            owner=self.check,
-            n=1,
-            scheme="email",
-            body_raw=b"Subject: =?UTF-8?B?aGVsbG8gd29ybGQ=?=",
-        )
-
-        self.client.login(username="alice@example.org", password="password")
-        r = self.client.get(self.url)
-
-        # aGVsbG8gd29ybGQ= is base64("hello world")
-        self.assertContains(r, "hello world", status_code=200)
+        self.assertContains(r, "<pre>glāžšķūņu rūķīši", status_code=200)
 
     def test_it_shows_ignored_nonzero_exitstatus(self) -> None:
         Ping.objects.create(owner=self.check, n=1, kind="ign", exitstatus=42)

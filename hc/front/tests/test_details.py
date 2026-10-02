@@ -48,6 +48,40 @@ class DetailsTestCase(BaseTestCase):
         self.assertContains(r, "Europe/Riga")
         self.assertContains(r, "Europe/Berlin")
 
+    @override_settings(PING_ENDPOINT="http://ping.example.org/")
+    def test_it_shows_no_ping_email_address(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(self.url)
+        self.assertContains(r, f"http://ping.example.org/{self.check.code}", status_code=200)
+        self.assertNotContains(r, f"{self.check.code}@")
+        self.assertNotContains(r, "sending email")
+        self.assertNotContains(r, 'href="#email"')
+
+    def test_it_disables_keywords_for_email_filters_alone(self) -> None:
+        self.check.filter_subject = True
+        self.check.filter_body = True
+        self.check.save()
+
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(self.url)
+        self.assertNotContains(r, "email messages", status_code=200)
+        self.assertNotContains(r, 'name="filter_subject"')
+        self.assertNotContains(r, 'name="filter_body"')
+        self.assertContains(r, 'name="filter_http_body"')
+        # filter_any() ignores the inert email filters, so the keyword inputs
+        # stay disabled
+        html = r.content.decode()
+        for kw in ("start_kw", "success_kw", "failure_kw"):
+            tag = html[html.index(f'id="{kw}"') :]
+            self.assertIn("disabled", tag[: tag.index("/>")])
+
+        self.check.filter_http_body = True
+        self.check.save()
+        r = self.client.get(self.url)
+        html = r.content.decode()
+        tag = html[html.index('id="start_kw"') :]
+        self.assertNotIn("disabled", tag[: tag.index("/>")])
+
     def test_it_suggests_tags_from_other_checks(self) -> None:
         self.check.tags = "foo bar"
         self.check.save()

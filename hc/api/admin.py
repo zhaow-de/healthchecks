@@ -85,7 +85,7 @@ class SchemeListFilter(admin.SimpleListFilter):
     parameter_name = "scheme"
 
     def lookups(self, request: HttpRequest, model_admin: ModelAdmin[Check]) -> Lookups:
-        return (("http", "HTTP"), ("https", "HTTPS"), ("email", "Email"))
+        return (("http", "HTTP"), ("https", "HTTPS"))
 
     def queryset(self, request: HttpRequest, queryset: QuerySet[Ping]) -> QuerySet[Ping]:
         if self.value():

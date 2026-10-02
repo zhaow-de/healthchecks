@@ -56,26 +56,6 @@ To adjust the number of uWSGI processes (for example, to save memory), set:
 
 Read more about configuring uWSGI in [uWSGI documentation](https://uwsgi-docs.readthedocs.io/en/latest/Configuration.html#environment-variables).
 
-## SMTP Listener Configuration via `SMTPD_PORT` {: #SMTPD_PORT }
-
-Healthchecks comes with a `smtpd` management command, which runs a SMTP listener
-service. With the command running, you can ping your checks by sending email messages
-to `your-uuid-here@hc.example.org` email addresses.
-
-The container is configured to start the SMTP listener conditionally, based
-on the value of the `SMTPD_PORT` environment value:
-
-* If `SMTPD_PORT` environment variable is not set, the SMTP listener will not run.
-* If `SMTPD_PORT` is set, the listener will run and listen on the specified port.
-  You may also need to edit `docker-compose.yml` to expose the listening port
-  (see the "ports" section under the "web" service in `docker-compose.yml`).
-
-The conditional logic lives in uWSGI configuration file,
-[uwsgi.ini](https://github.com/zhaow-de/healthchecks/blob/main/docker/uwsgi.ini).
-
-See also: the [PING_EMAIL_DOMAIN](../self_hosted_configuration/#PING_EMAIL_DOMAIN)
-environment variable for customizing the domain part of the email addresses.
-
 ## Reverse Proxy, TLS Termination, and CSRF Protection {: #tls-termination }
 
 If you plan to expose your Healthchecks instance to the public internet, make sure you
@@ -209,7 +189,7 @@ The Docker images built from the Dockerfile in the `/docker/` directory:
 
 * Support the amd64 architecture only.
 * Use uWSGI as the web server. uWSGI is configured to perform database migrations
-  on startup, and to run `sendalerts`, `sendreports`, and `smtpd` in the background.
+  on startup, and to run `sendalerts` and `sendreports` in the background.
   You do not need to run them separately.
 * Ship with the PostgreSQL database driver.
 * Serve static files using the whitenoise library.

@@ -84,8 +84,7 @@
     padding: 0;
 }
 
-#show-usage-modal pre,
-#show-usage-modal #email {
+#show-usage-modal pre {
     margin: 0;
     padding: 15px;
 }

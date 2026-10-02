@@ -312,77 +312,9 @@ class NotifyEmailTestCase(BaseTestCase):
         self.assertNotIn("X-Bounce-ID", email.extra_headers)
 
     @override_settings(DEFAULT_FROM_EMAIL="alerts@example.org")
-    def test_it_displays_last_ping_subject_and_adds_attachment(self) -> None:
-        self.ping.scheme = "email"
-        self.ping.body_raw = b"""Subject: Foo bar baz
-
-Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod
-tempor incididunt ut labore et dolore magna aliqua.
-
-"""
-        self.ping.save()
-
-        self.channel.notify(self.flip)
-
-        self.assertEmailContainsText("Last ping subject: Foo bar baz")
-        self.assertEmailContainsHtml("<b>Last Ping Subject</b><br>Foo bar baz")
-
-        self.assertEmailContains("See the attachment")
-        self.assertEmailNotContains("Lorem ipsum")
-
-        message = mail.outbox[0]
-        attachment = message.attachments[0]
-        self.assertIn("Lorem ipsum", attachment.content.as_string())
-
-    @override_settings(DEFAULT_FROM_EMAIL="alerts@example.org")
-    def test_it_removes_message_rfc822_parts_from_last_ping_body(self) -> None:
-        self.ping.scheme = "email"
-        self.ping.body_raw = b"""MIME-Version: 1.0
-Subject: Outer subject
-Content-Type: multipart/mixed; boundary="00000000000068ccbb0650421339"
-
---00000000000068ccbb0650421339
-Content-Type: text/plain; charset="UTF-8"
-
-Hello 456
-
---00000000000068ccbb0650421339
-Content-Type: message/rfc822; name="Hello.eml"
-Content-Disposition: attachment; filename="Hello.eml"
-
-MIME-Version: 1.0
-Subject: Inner subject
-Content-Type: text/plain; charset="UTF-8"
-
-Hello 123
-
-
---00000000000068ccbb0650421339--
-"""
-        self.ping.save()
-
-        self.channel.notify(self.flip)
-
-        self.assertEmailContainsText("Last ping subject: Outer subject")
-        self.assertEmailContains("See the attachment")
-
-        message = mail.outbox[0]
-        attachment = message.attachments[0]
-        attachment_str = attachment.content.as_string()
-        self.assertIn("Outer subject", attachment_str)
-        self.assertIn("Hello 456", attachment_str)
-        # The message/rfc822 part should have been removed
-        self.assertNotIn("Inner subject", attachment_str)
-        self.assertNotIn("Hello 123", attachment_str)
-
-    @override_settings(DEFAULT_FROM_EMAIL="alerts@example.org")
     @patch("hc.lib.emails.send")
     def test_it_handles_non_ascii_in_last_ping_body(self, send: Mock) -> None:
-        self.ping.scheme = "email"
-        self.ping.body_raw = """Subject: testing
-
-glāžšķūņu rūķīši
-""".encode()
+        self.ping.body_raw = "glāžšķūņu rūķīši".encode()
         self.ping.save()
 
         self.channel.notify(self.flip)
@@ -393,58 +325,6 @@ glāžšķūņu rūķīši
         # If it does not, the real SMTP backend will throw an exception
         message = send.call_args.args[0]
         message.message(policy=email.policy.SMTP).as_bytes()
-
-    @patch("hc.lib.emails.send")
-    def test_it_wraps_long_8bit_body(self, send: Mock) -> None:
-        self.ping.scheme = "email"
-        self.ping.body_raw = f"""Subject: testing
-Content-Transfer-Encoding: 8bit
-
-{"0123456789" * 10}
-""".encode()
-        self.ping.save()
-
-        self.channel.notify(self.flip)
-
-        self.assertTrue(send.called)
-
-        # Make sure the email message has no lines longer than 80 characters
-        message = send.call_args.args[0]
-        eml = message.message(policy=email.policy.SMTP).as_bytes().decode()
-        for line in eml.split("\n"):
-            self.assertLess(len(line), 80)
-
-    @patch("hc.lib.emails.send")
-    def test_it_wraps_long_8bit_mime_part(self, send: Mock) -> None:
-        self.ping.scheme = "email"
-        self.ping.body_raw = f"""Subject: testing
-Content-Type: multipart/alternative; boundary="0000000000003d3077065730508f"
-
---0000000000003d3077065730508f
-Content-Type: text/plain; charset="UTF-8"
-Content-Transfer-Encoding: 8bit
-
-{"0123456789" * 10}
-
---0000000000003d3077065730508f
-Content-Type: text/html; charset="UTF-8"
-Content-Transfer-Encoding: 8bit
-
-<div>{"0123456789" * 10}</div>
-
---0000000000003d3077065730508f--
-""".encode()
-        self.ping.save()
-
-        self.channel.notify(self.flip)
-
-        self.assertTrue(send.called)
-
-        # Make sure the email message has no lines longer than 80 characters
-        message = send.call_args.args[0]
-        eml = message.message(policy=email.policy.SMTP).as_bytes().decode()
-        for line in eml.split("\n"):
-            self.assertLess(len(line), 80)
 
     @patch("hc.integrations.email.transport.logger")
     @patch("hc.lib.emails.send", Mock(side_effect=SMTPServerDisconnected))

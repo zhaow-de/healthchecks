@@ -59,22 +59,6 @@ variables in <code>docker/.env</code>. For example, to disable HTTP request logg
 </code></pre></div>
 
 <p>Read more about configuring uWSGI in <a href="https://uwsgi-docs.readthedocs.io/en/latest/Configuration.html#environment-variables">uWSGI documentation</a>.</p>
-<h2 id="SMTPD_PORT">SMTP Listener Configuration via <code>SMTPD_PORT</code></h2>
-<p>Healthchecks comes with a <code>smtpd</code> management command, which runs a SMTP listener
-service. With the command running, you can ping your checks by sending email messages
-to <code>your-uuid-here@hc.example.org</code> email addresses.</p>
-<p>The container is configured to start the SMTP listener conditionally, based
-on the value of the <code>SMTPD_PORT</code> environment value:</p>
-<ul>
-<li>If <code>SMTPD_PORT</code> environment variable is not set, the SMTP listener will not run.</li>
-<li>If <code>SMTPD_PORT</code> is set, the listener will run and listen on the specified port.
-  You may also need to edit <code>docker-compose.yml</code> to expose the listening port
-  (see the "ports" section under the "web" service in <code>docker-compose.yml</code>).</li>
-</ul>
-<p>The conditional logic lives in uWSGI configuration file,
-<a href="https://github.com/zhaow-de/healthchecks/blob/main/docker/uwsgi.ini">uwsgi.ini</a>.</p>
-<p>See also: the <a href="../self_hosted_configuration/#PING_EMAIL_DOMAIN">PING_EMAIL_DOMAIN</a>
-environment variable for customizing the domain part of the email addresses.</p>
 <h2 id="tls-termination">Reverse Proxy, TLS Termination, and CSRF Protection</h2>
 <p>If you plan to expose your Healthchecks instance to the public internet, make sure you
 put a TLS-terminating reverse proxy or a load balancer in front of it.</p>
@@ -185,7 +169,7 @@ branches as its commit sha, and the newest build of <code>main</code> as <code>l
 <ul>
 <li>Support the amd64 architecture only.</li>
 <li>Use uWSGI as the web server. uWSGI is configured to perform database migrations
-  on startup, and to run <code>sendalerts</code>, <code>sendreports</code>, and <code>smtpd</code> in the background.
+  on startup, and to run <code>sendalerts</code> and <code>sendreports</code> in the background.
   You do not need to run them separately.</li>
 <li>Ship with the PostgreSQL database driver.</li>
 <li>Serve static files using the whitenoise library.</li>

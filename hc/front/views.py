@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import email
 import os
 import re
 import sqlite3
@@ -565,17 +564,12 @@ def filtering_rules(request: AuthenticatedHttpRequest, code: UUID) -> HttpRespon
 
     form = forms.FilteringRulesForm(request.POST)
     if form.is_valid():
-        update_fields = (
-            "filter_subject",
-            "filter_body",
-            "filter_http_body",
-            "filter_default_fail",
-            "start_kw",
-            "success_kw",
-            "failure_kw",
-            "methods",
-            "manual_resume",
-        )
+        update_fields = ["filter_http_body", "methods", "manual_resume"]
+        # The dialog disables the keyword inputs while HTTP body filtering is off, so they
+        # arrive empty. Clear the stored keywords then only if the inert API v3 email flags
+        # do not keep them: an API client may have set the keywords along with those flags.
+        if form.cleaned_data["filter_http_body"] or not (check.filter_subject or check.filter_body):
+            update_fields += ["filter_default_fail", "start_kw", "success_kw", "failure_kw"]
         for field in update_fields:
             setattr(check, field, form.cleaned_data[field])
         check.save(update_fields=update_fields)
@@ -740,38 +734,8 @@ def ping_details(request: AuthenticatedHttpRequest, code: UUID, n: int | None = 
         "check": check,
         "ping": ping,
         "body": body_bytes.decode(errors="replace") if body_bytes else None,
-        "plain": None,
-        "html": None,
-        "active": None,
         "tz_switches": _tz_switches(request.profile, check),
     }
-
-    if ping.scheme == "email" and body_bytes:
-        # Don't use message_from_string here, it seems to mangle
-        # UTF8 in message body.
-        parsed = email.message_from_bytes(body_bytes, policy=email.policy.SMTP)
-        ctx["subject"] = parsed.get("subject", "")
-
-        # The "active" tab is set to show the value that's successfully parsed last.
-        # Per the current implementation, this means that if both plain text and HTML
-        # content are present, the ping details dialog will initially display the HTML
-        # content, otherwise - only one content type exists, and we default to that
-        # (either plain text or HTML, at least one of them should exist in a
-        # valid email).
-        #
-        # NOTE: If both plain text and html have not been parsed successfully the
-        # "active" tab is not set at all, but currently this is not an issue since in
-        # this case the "ping details" template does not render any tabs.
-
-        plain_mime_part = parsed.get_body(("plain",))
-        if plain_mime_part:
-            ctx["plain"] = plain_mime_part.get_content()
-            ctx["active"] = "plain"
-
-        html_mime_part = parsed.get_body(("html",))
-        if html_mime_part:
-            ctx["html"] = html_mime_part.get_content()
-            ctx["active"] = "html"
 
     return render(request, "front/ping_details.html", ctx)
 

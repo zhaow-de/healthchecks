@@ -41,7 +41,7 @@ termination.
 * `collectstatic`, `compress` – when running with Docker, you do
   not need to manually run these. These are run while building the container image,
   and their results are baked in the image (you can find them listed in the [Dockerfile](Dockerfile)).
-* `migrate`, `sendalerts`, `sendreports`, `smtpd` – when running with Docker, you
+* `migrate`, `sendalerts`, `sendreports` – when running with Docker, you
   also do  not need to manually run these. They are run automatically on
   container startup (you can find them listed in [uwsgi.ini](uwsgi.ini)).
 * `createsuperuser`, `prunetokenbucket`, `pruneusers`,
@@ -76,23 +76,6 @@ the LISTEN_IPV6 environment variable:
 Unfortunately this cannot be enabled by default because on an IPv4-only system
 uWSGI would crash while trying to open an IPv6 socket
 (see [issue #1207](https://github.com/healthchecks/healthchecks/issues/1207)).
-
-## SMTP Listener Configuration via `SMTPD_PORT`
-
-Healthchecks comes with a `smtpd` management command, which runs a SMTP listener
-service. With the command running, you can ping your checks by sending email messages
-to `your-uuid-here@your-hc-domain.com` email addresses.
-
-The container is configured to start the SMTP listener conditionally, based
-on the value of the `SMTPD_PORT` environment value:
-
-* If `SMTPD_PORT` environment variable is not set, the SMTP listener will not run.
-* If `SMTPD_PORT` is set, the listener will run and listen on the specified port.
-  You may also need to edit `docker-compose.yml` to expose the listening port
-  (see the "ports" section under the "web" service in `docker-compose.yml`).
-
-The conditional logic lives in uWSGI configuration file,
-[uwsgi.ini](uwsgi.ini).
 
 ## TLS Termination and CSRF Protection
 
@@ -189,9 +172,8 @@ The Docker images built from the Dockerfile in this directory:
 
 * Support the amd64 architecture only.
 * Use uWSGI as the web server. uWSGI is configured to perform database migrations
-  on startup, and to run `sendalerts`, `sendreports`, and `smtpd` in the background.
-  You do not need to run them separately. The SMTP listener (`manage.py smtpd`) is
-  started conditionally, [based on the value of the `SMTPD_PORT` environment variable](#smtp-listener-configuration-via-smtpd_port).
+  on startup, and to run `sendalerts` and `sendreports` in the background.
+  You do not need to run them separately.
 * Ship with the PostgreSQL database driver.
 * Serve static files using the whitenoise library.
 * Have the apprise library preinstalled.

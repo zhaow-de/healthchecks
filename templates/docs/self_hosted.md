@@ -118,23 +118,6 @@ EMAIL_USE_TLS=True
 Healthchecks uses these environment variables to construct the `settings.MAILERS`
 dictionary (a standard Django setting, [docs](https://docs.djangoproject.com/en/6.1/ref/settings/#std-setting-MAILERS)).
 
-## Receiving Emails
-
-Healthchecks comes with a `smtpd` management command, which starts up an
-SMTP listener service. With the command running, you can ping your
-checks by sending email messages.
-
-Start the SMTP listener on port 2525:
-
-    $ ./manage.py smtpd --port 2525
-
-Send a test email:
-
-    $ curl --url 'smtp://127.0.0.1:2525' \
-        --mail-from 'foo@example.org' \
-        --mail-rcpt '11111111-1111-1111-1111-111111111111@my-hc.example.org' \
-        -F '='
-
 ## Sending Status Notifications
 
 The `sendalerts` management command continuously polls the database for any checks

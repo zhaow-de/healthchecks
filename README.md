@@ -19,10 +19,14 @@ This project is a hard fork of
   this repository's changes are under MIT, and the code from the original
   project stays under its BSD 3-clause license. Both are in [LICENSE](LICENSE).
 * It stays 100% compatible with the original project's
-  [API v3](templates/docs/api.md).
+  [API v3](templates/docs/api.md). It takes no email pings, so the email-only
+  fields `filter_subject`, `filter_body`, `subject` and `subject_fail` are
+  inert and kept for compatibility only: the API accepts and returns them, and
+  they turn on no filtering (`subject` and `subject_fail` still set
+  `success_kw` and `failure_kw`, as in the original).
 
 Healthchecks is a cron job monitoring service. It listens for HTTP requests
-and email messages ("pings") from your cron jobs and scheduled tasks ("checks").
+("pings") from your cron jobs and scheduled tasks ("checks").
 When a ping does not arrive on time, Healthchecks sends out alerts.
 
 Healthchecks comes with a web dashboard, API, 25+ integrations for
@@ -178,28 +182,6 @@ environment variables:
 
 Healthchecks uses these environment variables to construct the `settings.MAILERS`
 dictionary (a standard Django setting, [docs](https://docs.djangoproject.com/en/6.1/ref/settings/#std-setting-MAILERS)).
-
-## Receiving Emails
-
-Healthchecks comes with a `smtpd` management command, which starts up a
-SMTP listener service. With the command running, you can ping your
-checks by sending email messages
-to `your-uuid-here@my-monitoring-project.com` email addresses.
-
-Start the SMTP listener on port 2525:
-
-```sh
-./manage.py smtpd --port 2525
-```
-
-Send a test email:
-
-```sh
-curl --url 'smtp://127.0.0.1:2525' \
-    --mail-from 'foo@example.org' \
-    --mail-rcpt '11111111-1111-1111-1111-111111111111@my-monitoring-project.com' \
-    -F '='
-```
 
 ## Sending Alerts and Reports
 
@@ -543,7 +525,7 @@ as `ghcr.io/zhaow-de/healthchecks`: a release as `vX.Y.Z`, every build of the
 The Docker images:
 
 * Use uWSGI as the web server. uWSGI is configured to perform database migrations
-  on startup, and to run `sendalerts`, `sendreports`, and `smtpd` in the background.
+  on startup, and to run `sendalerts` and `sendreports` in the background.
   You do not need to run them separately.
 * Ship with the PostgreSQL database driver.
 * Serve static files using the whitenoise library.

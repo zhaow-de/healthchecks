@@ -39,9 +39,6 @@
                     <li class="hidden-xs">
                         <a href="#powershell" data-toggle="tab">PowerShell</a>
                     </li>
-                    <li class="hidden-xs">
-                        <a href="#email" data-toggle="tab">Email</a>
-                    </li>
                 </ul>
             </div>
             <div class="modal-body">
@@ -90,16 +87,6 @@
                     <div class="tab-pane" id="powershell">
                         {% include "front/snippets/powershell.html" %}
                         {% include "front/snippets/powershell_inline.html" %}
-                    </div>
-                    <div class="tab-pane" id="email">
-                        <p>
-                            Signal success or failure by sending an
-                            email message to <a href="mailto:{{ check.email }}">{{ check.email }}</a>.
-                        </p>
-                        <p>
-                            <a href="{% url 'hc-serve-doc' 'email' %}">Read more</a>
-                            about pinging via email.
-                        </p>
                     </div>
                     {% endwith %}
                 </div>

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import time
-from email.message import EmailMessage
 from email.utils import make_msgid
 from smtplib import SMTPDataError, SMTPServerDisconnected
 from threading import Thread
@@ -90,15 +89,8 @@ def transfer_request(to: str, ctx: dict[str, Any]) -> None:
     send(make_message("transfer-request", to, ctx))
 
 
-def alert(
-    to: str,
-    ctx: dict[str, Any],
-    headers: dict[str, str],
-    attachment: EmailMessage | None = None,
-) -> None:
+def alert(to: str, ctx: dict[str, Any], headers: dict[str, str]) -> None:
     m = make_message("alert", to, ctx, headers=headers)
-    if attachment:
-        m.attach("last-ping.eml", attachment, "message/rfc822")
     send(m, block=True)
 
 

@@ -39,15 +39,6 @@ class LogTestCase(BaseTestCase):
         self.assertContains(r, "Europe/Riga")
         self.assertContains(r, "Europe/Berlin")
 
-    def test_it_displays_email(self) -> None:
-        self.ping.scheme = "email"
-        self.ping.ua = "email from server@example.org"
-        self.ping.save()
-
-        self.client.login(username="alice@example.org", password="password")
-        r = self.client.get(self.url)
-        self.assertContains(r, "email from server@example.org", status_code=200)
-
     def test_team_access_works(self) -> None:
         # Logging in as bob, not alice. Bob has team access so this
         # should work.

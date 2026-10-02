@@ -78,7 +78,7 @@ class ApiAdminTestCase(BaseTestCase):
     def test_it_filters_pings(self) -> None:
         http_get = Ping.objects.create(owner=self.check, scheme="http", method="GET")
         https_post = Ping.objects.create(owner=self.check, scheme="https", method="POST", kind="start")
-        email_fail = Ping.objects.create(owner=self.check, scheme="email", method="email", kind="fail")
+        http_fail = Ping.objects.create(owner=self.check, scheme="http", method="HEAD", kind="fail")
 
         self.client.login(username="alice@example.org", password="password")
         url = reverse("admin:api_ping_changelist")
@@ -91,13 +91,14 @@ class ApiAdminTestCase(BaseTestCase):
         # The sidebar offers each filter's choices
         r = self.client.get(url)
         self.assertContains(r, '<a href="?scheme=https">HTTPS</a>', html=True)
+        self.assertNotContains(r, "?scheme=email")
         self.assertContains(r, '<a href="?method=DELETE">DELETE</a>', html=True)
         self.assertContains(r, '<a href="?kind=fail">fail</a>', html=True)
 
-        self.assertEqual(ids({}), {http_get.id, https_post.id, email_fail.id})
-        self.assertEqual(ids({"scheme": "email"}), {email_fail.id})
+        self.assertEqual(ids({}), {http_get.id, https_post.id, http_fail.id})
+        self.assertEqual(ids({"scheme": "http"}), {http_get.id, http_fail.id})
         self.assertEqual(ids({"method": "POST"}), {https_post.id})
-        self.assertEqual(ids({"kind": "fail"}), {email_fail.id})
+        self.assertEqual(ids({"kind": "fail"}), {http_fail.id})
         self.assertEqual(ids({"scheme": "https", "kind": "start"}), {https_post.id})
 
     def test_it_shows_channel_columns(self) -> None:

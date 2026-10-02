@@ -14,8 +14,6 @@ class FilteringRulesTestCase(BaseTestCase):
 
     def test_it_works(self) -> None:
         payload = {
-            "filter_subject": "on",
-            "filter_body": "on",
             "filter_http_body": "on",
             "start_kw": "START",
             "success_kw": "SUCCESS",
@@ -30,8 +28,6 @@ class FilteringRulesTestCase(BaseTestCase):
         self.assertRedirects(r, self.redirect_url)
 
         self.check.refresh_from_db()
-        self.assertTrue(self.check.filter_subject)
-        self.assertTrue(self.check.filter_body)
         self.assertTrue(self.check.filter_http_body)
         self.assertEqual(self.check.start_kw, "START")
         self.assertEqual(self.check.success_kw, "SUCCESS")
@@ -54,8 +50,6 @@ class FilteringRulesTestCase(BaseTestCase):
         self.assertEqual(self.check.methods, "")
 
     def test_it_clears_filtering_fields(self) -> None:
-        self.check.filter_subject = True
-        self.check.filter_body = True
         self.check.filter_http_body = True
         self.check.filter_default_fail = True
         self.check.start_kw = "START"
@@ -68,13 +62,60 @@ class FilteringRulesTestCase(BaseTestCase):
         self.assertRedirects(r, self.redirect_url)
 
         self.check.refresh_from_db()
-        self.assertFalse(self.check.filter_subject)
-        self.assertFalse(self.check.filter_body)
         self.assertFalse(self.check.filter_http_body)
         self.assertFalse(self.check.filter_default_fail)
         self.assertEqual(self.check.start_kw, "")
         self.assertEqual(self.check.success_kw, "")
         self.assertEqual(self.check.failure_kw, "")
+
+    def test_it_ignores_email_filter_fields(self) -> None:
+        payload = {"filter_subject": "on", "filter_body": "on", "methods": ""}
+
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.post(self.url, data=payload)
+        self.assertRedirects(r, self.redirect_url)
+
+        self.check.refresh_from_db()
+        self.assertFalse(self.check.filter_subject)
+        self.assertFalse(self.check.filter_body)
+
+    def test_it_keeps_keywords_that_the_inert_email_flags_hold(self) -> None:
+        # An API client set keywords together with the inert filter_subject flag; the
+        # dashboard had HTTP body filtering on, and the user now turns it off
+        self.check.filter_subject = True
+        self.check.filter_http_body = True
+        self.check.start_kw = "START"
+        self.check.success_kw = "SUCCESS"
+        self.check.failure_kw = "ERROR"
+        self.check.filter_default_fail = True
+        self.check.save()
+
+        # The dialog submits no keywords while HTTP body filtering is off
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.post(self.url, data={"methods": "POST"})
+        self.assertRedirects(r, self.redirect_url)
+
+        self.check.refresh_from_db()
+        self.assertEqual(self.check.methods, "POST")
+        self.assertFalse(self.check.filter_http_body)
+        self.assertTrue(self.check.filter_subject)
+        self.assertEqual(self.check.start_kw, "START")
+        self.assertEqual(self.check.success_kw, "SUCCESS")
+        self.assertEqual(self.check.failure_kw, "ERROR")
+        self.assertTrue(self.check.filter_default_fail)
+
+    def test_it_replaces_keywords_when_filtering_http_bodies(self) -> None:
+        self.check.filter_subject = True
+        self.check.success_kw = "OLD"
+        self.check.save()
+
+        payload = {"filter_http_body": "on", "success_kw": "NEW", "methods": ""}
+        self.client.login(username="alice@example.org", password="password")
+        self.client.post(self.url, data=payload)
+
+        self.check.refresh_from_db()
+        self.assertTrue(self.check.filter_http_body)
+        self.assertEqual(self.check.success_kw, "NEW")
 
     def test_it_clears_manual_resume_flag(self) -> None:
         self.check.manual_resume = True
@@ -92,8 +133,7 @@ class FilteringRulesTestCase(BaseTestCase):
         self.bobs_membership.save()
 
         payload = {
-            "filter_subject": "on",
-            "filter_body": "on",
+            "filter_http_body": "on",
             "success_kw": "SUCCESS",
             "failure_kw": "ERROR",
             "methods": "POST",

@@ -186,6 +186,12 @@ curl --header "X-Api-Key: your-api-key" SITE_ROOT/api/v3/checks/
 The possible values for the `status` field are: `new`, `up`, `grace`, `down`,
 and `paused`.
 
+The `filter_subject`, `filter_body`, `subject`, and `subject_fail` fields are inert,
+kept for compatibility with the original Healthchecks API v3 only. SITE_NAME does
+not accept email pings, so these fields have no effect: `filter_subject` and
+`filter_body` return the stored values, and `subject` and `subject_fail` return
+`success_kw` and `failure_kw` when `filter_subject` is `true`, and `""` otherwise.
+
 When using the read-only API key, SITE_NAME omits the following fields from responses:
 `uuid`, `ping_url`, `update_url`, `pause_url`, `resume_url`, `channels`.  It adds an
 extra `unique_key` field. The `unique_key` identifier is stable across API calls, and
@@ -316,6 +322,12 @@ curl --header "X-Api-Key: your-api-key" SITE_ROOT/api/v3/checks/<uuid>
 
 The possible values for the `status` field are: `new`, `up`, `grace`, `down`,
 and `paused`.
+
+The `filter_subject`, `filter_body`, `subject`, and `subject_fail` fields are inert,
+kept for compatibility with the original Healthchecks API v3 only. SITE_NAME does
+not accept email pings, so these fields have no effect: `filter_subject` and
+`filter_body` return the stored values, and `subject` and `subject_fail` return
+`success_kw` and `failure_kw` when `filter_subject` is `true`, and `""` otherwise.
 
 ### Example Read-Only Response
 
@@ -522,68 +534,87 @@ unique
 start_kw
 :   string, optional, default value: "".
 
-    Specifies the keywords for classifying inbound email messages and HTTP pings as
-    start signals. Separate multiple keywords using commas. Keywords are
-    case-sensitive.
+    Specifies the keywords for classifying HTTP pings as start signals.
+    Separate multiple keywords using commas. Keywords are case-sensitive.
 
-    Use this field in combination with the `filter_subject`, `filter_body`,
-    and `filter_http_body` fields.
+    Use this field in combination with the `filter_http_body` field.
 
     Example:
 
-    <pre>{"filter_subject": true, "start_kw": "STARTED"}</pre>
+    <pre>{"filter_http_body": true, "start_kw": "STARTED"}</pre>
 
-    In this example, SITE_NAME classifies an inbound email as a start signal if the
-    Subject line contains the word "STARTED".
+    In this example, SITE_NAME classifies an HTTP ping as a start signal if the
+    request body contains the word "STARTED".
 
 success_kw
 :   string, optional, default value: "".
 
-    Specifies the keywords for classifying inbound email messages and HTTP pings as
-    success signals. Separate multiple keywords using commas. Keywords are
-    case-sensitive.
+    Specifies the keywords for classifying HTTP pings as success signals.
+    Separate multiple keywords using commas. Keywords are case-sensitive.
 
-    Use this field in combination with the `filter_subject`, `filter_body`,
-    and `filter_http_body` fields.
+    Use this field in combination with the `filter_http_body` field.
 
     Example:
 
-    <pre>{"filter_subject": true, "success_kw": "SUCCESS,COMPLETED"}</pre>
+    <pre>{"filter_http_body": true, "success_kw": "SUCCESS,COMPLETED"}</pre>
 
-    In this example, an inbound email message counts as success if the Subject line
+    In this example, an HTTP ping counts as success if the request body
     contains either the word "SUCCESS" or the word "COMPLETED".
 
 failure_kw
 :   string, optional, default value: "".
 
-    Specifies the keywords for classifying inbound email messages and HTTP pings as
-    failure signals. Separate multiple keywords using commas. Keywords are
-    case-sensitive.
+    Specifies the keywords for classifying HTTP pings as failure signals.
+    Separate multiple keywords using commas. Keywords are case-sensitive.
 
-    Use this field in combination with the `filter_subject`, `filter_body`,
-    and `filter_http_body` fields.
+    Use this field in combination with the `filter_http_body` field.
 
     Example:
 
-    <pre>{"filter_subject": true, "failure_kw": "FAILED,ERROR"}</pre>
+    <pre>{"filter_http_body": true, "failure_kw": "FAILED,ERROR"}</pre>
 
-    In this example, an inbound email message counts as failure if the Subject line
+    In this example, an HTTP ping counts as failure if the request body
     contains either the word "FAILED" or the word "ERROR".
 
 filter_subject
 :   boolean, optional, default value: false.
 
-    Enables filtering of inbound email messages by looking for keywords in their
-    subject lines. See also the `start_kw`, `success_kw`, and `failure_kw` fields.
+    Inert, kept for compatibility with the original Healthchecks API v3 only.
+    In the original, it enables keyword filtering on the subject line of inbound
+    email messages. SITE_NAME does not accept email pings: it stores and returns
+    the value, but the value has no effect on pings.
 
 filter_body
 :   boolean, optional, default value: false.
 
-    Enables filtering of inbound email messages by looking for keywords in the
-    message body. See also the `start_kw`, `success_kw`, and `failure_kw` fields.
+    Inert, kept for compatibility with the original Healthchecks API v3 only.
+    In the original, it enables keyword filtering on the body of inbound email
+    messages. SITE_NAME does not accept email pings: it stores and returns the
+    value, but the value has no effect on pings.
 
-    SITE_NAME supports both plain text and HTML email messages, and looks for
-    keywords both in the plain text and the HTML message contents.
+subject
+:   string, optional.
+
+    Inert as an email setting, kept for compatibility with the original
+    Healthchecks API v3 only. Deprecated in the original, where it sets the
+    success keywords for inbound email messages. SITE_NAME does not accept email
+    pings, but maps the value as the original does: it sets `success_kw` to the
+    value, and sets the inert `filter_subject` to `true` if `success_kw` or
+    `failure_kw` is non-empty (`false` otherwise). `success_kw` also applies to
+    HTTP pings when `filter_http_body` is `true`. An explicit `success_kw` in the
+    same request takes precedence.
+
+subject_fail
+:   string, optional.
+
+    Inert as an email setting, kept for compatibility with the original
+    Healthchecks API v3 only. Deprecated in the original, where it sets the
+    failure keywords for inbound email messages. SITE_NAME does not accept email
+    pings, but maps the value as the original does: it sets `failure_kw` to the
+    value, and sets the inert `filter_subject` to `true` if `success_kw` or
+    `failure_kw` is non-empty (`false` otherwise). `failure_kw` also applies to
+    HTTP pings when `filter_http_body` is `true`. An explicit `failure_kw` in the
+    same request takes precedence.
 
 filter_http_body
 :   boolean, optional, default value: false.
@@ -595,12 +626,11 @@ filter_http_body
 filter_default_fail
 :   boolean, optional, default value: false.
 
-    Determines the handling of email and HTTP pings when keyword filtering is enabled,
+    Determines the handling of HTTP pings when keyword filtering is enabled,
     but no keywords match.
 
-    Keyword filtering is enabled for inbound email messages if either `filter_subject`
-    or `filter_body` (or both) is set to `true`. Keyword filtering is enabled for HTTP
-    pings if `filter_http_body` is set to `true`.
+    Keyword filtering is enabled for HTTP pings if `filter_http_body` is set to
+    `true`. The inert `filter_subject` and `filter_body` fields do not enable it.
 
     If `filter_default_fail=false`, and no keywords match, the ping will be ignored.
 
@@ -829,68 +859,87 @@ channels
 start_kw
 :   string, optional, default value: "".
 
-    Specifies the keywords for classifying inbound email messages and HTTP pings as
-    start signals. Separate multiple keywords using commas. Keywords are
-    case-sensitive.
+    Specifies the keywords for classifying HTTP pings as start signals.
+    Separate multiple keywords using commas. Keywords are case-sensitive.
 
-    Use this field in combination with the `filter_subject`, `filter_body`,
-    and `filter_http_body` fields.
+    Use this field in combination with the `filter_http_body` field.
 
     Example:
 
-    <pre>{"filter_subject": true, "start_kw": "STARTED"}</pre>
+    <pre>{"filter_http_body": true, "start_kw": "STARTED"}</pre>
 
-    In this example, SITE_NAME classifies an inbound email as a start signal if the
-    Subject line contains the word "STARTED".
+    In this example, SITE_NAME classifies an HTTP ping as a start signal if the
+    request body contains the word "STARTED".
 
 success_kw
 :   string, optional, default value: "".
 
-    Specifies the keywords for classifying inbound email messages and HTTP pings as
-    success signals. Separate multiple keywords using commas. Keywords are
-    case-sensitive.
+    Specifies the keywords for classifying HTTP pings as success signals.
+    Separate multiple keywords using commas. Keywords are case-sensitive.
 
-    Use this field in combination with the `filter_subject`, `filter_body`,
-    and `filter_http_body` fields.
+    Use this field in combination with the `filter_http_body` field.
 
     Example:
 
-    <pre>{"filter_subject": true, "success_kw": "SUCCESS,COMPLETED"}</pre>
+    <pre>{"filter_http_body": true, "success_kw": "SUCCESS,COMPLETED"}</pre>
 
-    In this example, an inbound email message counts as success if the Subject line
+    In this example, an HTTP ping counts as success if the request body
     contains either the word "SUCCESS" or the word "COMPLETED".
 
 failure_kw
 :   string, optional, default value: "".
 
-    Specifies the keywords for classifying inbound email messages and HTTP pings as
-    failure signals. Separate multiple keywords using commas. Keywords are
-    case-sensitive.
+    Specifies the keywords for classifying HTTP pings as failure signals.
+    Separate multiple keywords using commas. Keywords are case-sensitive.
 
-    Use this field in combination with the `filter_subject`, `filter_body`,
-    and `filter_http_body` fields.
+    Use this field in combination with the `filter_http_body` field.
 
     Example:
 
-    <pre>{"filter_subject": true, "failure_kw": "FAILED,ERROR"}</pre>
+    <pre>{"filter_http_body": true, "failure_kw": "FAILED,ERROR"}</pre>
 
-    In this example, an inbound email message counts as failure if the Subject line
+    In this example, an HTTP ping counts as failure if the request body
     contains either the word "FAILED" or the word "ERROR".
 
 filter_subject
 :   boolean, optional, default value: false.
 
-    Enables filtering of inbound email messages by looking for keywords in their
-    subject lines. See also the `start_kw`, `success_kw`, and `failure_kw` fields.
+    Inert, kept for compatibility with the original Healthchecks API v3 only.
+    In the original, it enables keyword filtering on the subject line of inbound
+    email messages. SITE_NAME does not accept email pings: it stores and returns
+    the value, but the value has no effect on pings.
 
 filter_body
 :   boolean, optional, default value: false.
 
-    Enables filtering of inbound email messages by looking for keywords in the
-    message body. See also the `start_kw`, `success_kw`, and `failure_kw` fields.
+    Inert, kept for compatibility with the original Healthchecks API v3 only.
+    In the original, it enables keyword filtering on the body of inbound email
+    messages. SITE_NAME does not accept email pings: it stores and returns the
+    value, but the value has no effect on pings.
 
-    SITE_NAME supports both plain text and HTML email messages, and looks for
-    keywords both in the plain text and the HTML message contents.
+subject
+:   string, optional.
+
+    Inert as an email setting, kept for compatibility with the original
+    Healthchecks API v3 only. Deprecated in the original, where it sets the
+    success keywords for inbound email messages. SITE_NAME does not accept email
+    pings, but maps the value as the original does: it sets `success_kw` to the
+    value, and sets the inert `filter_subject` to `true` if `success_kw` or
+    `failure_kw` is non-empty (`false` otherwise). `success_kw` also applies to
+    HTTP pings when `filter_http_body` is `true`. An explicit `success_kw` in the
+    same request takes precedence.
+
+subject_fail
+:   string, optional.
+
+    Inert as an email setting, kept for compatibility with the original
+    Healthchecks API v3 only. Deprecated in the original, where it sets the
+    failure keywords for inbound email messages. SITE_NAME does not accept email
+    pings, but maps the value as the original does: it sets `failure_kw` to the
+    value, and sets the inert `filter_subject` to `true` if `success_kw` or
+    `failure_kw` is non-empty (`false` otherwise). `failure_kw` also applies to
+    HTTP pings when `filter_http_body` is `true`. An explicit `failure_kw` in the
+    same request takes precedence.
 
 filter_http_body
 :   boolean, optional, default value: false.
@@ -902,12 +951,11 @@ filter_http_body
 filter_default_fail
 :   boolean, optional, default value: false.
 
-    Determines the handling of email and HTTP pings when keyword filtering is enabled,
+    Determines the handling of HTTP pings when keyword filtering is enabled,
     but no keywords match.
 
-    Keyword filtering is enabled for inbound email messages if either `filter_subject`
-    or `filter_body` (or both) is set to `true`. Keyword filtering is enabled for HTTP
-    pings if `filter_http_body` is set to `true`.
+    Keyword filtering is enabled for HTTP pings if `filter_http_body` is set to
+    `true`. The inert `filter_subject` and `filter_body` fields do not enable it.
 
     If `filter_default_fail=false`, and no keywords match, the ping will be ignored.
 

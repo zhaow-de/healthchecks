@@ -52,7 +52,6 @@ from environment variables. Below is a list of environment variables it reads an
 <li><a href="#PD_APP_ID">PD_APP_ID</a></li>
 <li><a href="#PD_ENABLED">PD_ENABLED</a></li>
 <li><a href="#PING_BODY_LIMIT">PING_BODY_LIMIT</a></li>
-<li><a href="#PING_EMAIL_DOMAIN">PING_EMAIL_DOMAIN</a></li>
 <li><a href="#PING_ENDPOINT">PING_ENDPOINT</a></li>
 <li><a href="#PROMETHEUS_ENABLED">PROMETHEUS_ENABLED</a></li>
 <li><a href="#PUSHBULLET_CLIENT_ID">PUSHBULLET_CLIENT_ID</a></li>
@@ -594,34 +593,8 @@ it altogether by setting this value to `None`.
 
 Healthchecks stores ping bodies in the database, in the `api_ping` table, for every
 ping it keeps: each check keeps its most recent pings up to the account's ping log
-limit (100 by default), pruned every 100 pings. `PING_BODY_LIMIT` applies to pings
-sent over HTTP; a ping sent by email is stored whole. Keep `PING_BODY_LIMIT`, and the
+limit (100 by default), pruned every 100 pings. Keep `PING_BODY_LIMIT`, and the
 bodies your jobs send, no bigger than the output you actually need to read.
-
-## `PING_EMAIL_DOMAIN` {: #PING_EMAIL_DOMAIN }
-
-Default: `localhost`
-
-The domain to use for generating ping email addresses. Example:
-
-```ini
-PING_EMAIL_DOMAIN=hc.example.org
-```
-
-In this example, Healthchecks would generate ping email addresses similar
-to `3f1a7317-8e96-437c-a17d-b0d550b51e86@hc.example.org`.
-
-This setting only controls how the ping email addresses are constructed, and
-does not by itself enable the ping-by-sending-email functionality. To receive
-emails, you will also need:
-
-* A DNS record pointing `hc.example.org` to your Healthchecks
-  instance's IP address.
-* `manage.py smtpd` (Healthchecks' SMTP listener service) running, listening
-  on port 25, and reachable from the outside world. If you are using the
-  [pre-built Docker image](https://github.com/zhaow-de/healthchecks/pkgs/container/healthchecks),
-  see [the instructions here](../self_hosted_docker/#SMTPD_PORT) for enabling the SMTP
-  listener service.
 
 ## `PING_ENDPOINT` {: #PING_ENDPOINT }
 
