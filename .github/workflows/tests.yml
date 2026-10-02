@@ -79,7 +79,7 @@ jobs:
         env:
           DB: ${{ matrix.db }}
           SECRET_KEY: dummy-key
-        run: uv run --no-sync pytest hc --cov --cov-report=lcov:coverage.lcov
+        run: uv run --no-sync pytest hc -n auto --cov --cov-report=lcov:coverage.lcov
       - name: Upload coverage to Coveralls
         if: matrix.db == 'sqlite'
         uses: coverallsapp/github-action@v2
@@ -127,7 +127,7 @@ jobs:
       - name: Install Dependencies
         run: uv sync --locked --extra mysql
       - name: Run Tests
-        run: uv run --no-sync pytest
+        run: uv run --no-sync pytest -n auto
 
   suite:
     # This `name:` is the required context in .github/settings.yml and the check-run the open-pr and release skills wait for.

@@ -43,6 +43,7 @@ dev = [
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "pytest-django>=4.14.0",
+    "pytest-xdist>=3.8.0",
     "ruff>=0.16.4",
     "time-machine==3.5.1",
 ]
@@ -50,6 +51,7 @@ dev = [
 [tool.pytest.ini_options]
 # `uv run pytest` runs the tests of the commit tooling under tests/. `uv run pytest hc` runs the
 # application's tests under hc/ through pytest-django, the same tests `uv run ./manage.py test` runs.
+# `-n auto` (pytest-xdist) spreads either run over every core, as CI does.
 testpaths = ["tests"]
 DJANGO_SETTINGS_MODULE = "hc.settings"
 # Without this an unregistered mark is a warning, and a misspelt one silently selects nothing.

@@ -21,7 +21,8 @@ the next version number is computed from them. Every pull request runs the
   hygiene and YAML.
 * Prefer simplicity over cleverness.
 * If you are fixing a bug or adding a feature, add a test. Run
-  `uv run ./manage.py test` and `uv run pytest` before opening a pull request.
+  `uv run pytest hc -n auto` (the Django suite) and `uv run pytest -n auto` (the
+  tooling tests) before opening a pull request.
 
 ## Adding Documentation
 
