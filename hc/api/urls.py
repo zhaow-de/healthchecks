@@ -76,8 +76,6 @@ urlpatterns = [
     path("ping/<uuid:code>/", include(uuid_urls)),
     path("ping/<slug:ping_key>/<slug:slug>", views.ping_by_slug),
     path("ping/<slug:ping_key>/<slug:slug>/", include(slug_urls)),
-    path("api/v1/", include(api_urls)),
-    path("api/v2/", include(api_urls)),
     path("api/v3/", include(api_urls)),
     path(
         "badge/<slug:badge_key>/<slug:signature>/<quoted:tag>.<slug:fmt>",

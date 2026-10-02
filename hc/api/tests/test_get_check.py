@@ -34,8 +34,8 @@ class GetCheckTestCase(BaseTestCase):
         self.c1 = Channel.objects.create(project=self.project)
         self.a1.channel_set.add(self.c1)
 
-    def get(self, code: UUID | str, api_key: str = "X" * 32, v: int = 1) -> TestHttpResponse:
-        url = f"/api/v{v}/checks/{code}"
+    def get(self, code: UUID | str, api_key: str = "X" * 32) -> TestHttpResponse:
+        url = f"/api/v3/checks/{code}"
         return self.client.get(url, HTTP_X_API_KEY=api_key)
 
     @override_settings(SITE_ROOT="http://testserver")
@@ -70,7 +70,7 @@ class GetCheckTestCase(BaseTestCase):
         self.assertFalse(doc["filter_http_body"])
         self.assertFalse(doc["filter_default_fail"])
         self.assertEqual(doc["badge_url"], f"http://testserver/b/2/{self.a1.badge_key}.svg")
-        self.assertEqual(doc["update_url"], f"http://testserver/api/v1/checks/{self.a1.code}")
+        self.assertEqual(doc["update_url"], f"http://testserver/api/v3/checks/{self.a1.code}")
 
     def test_it_handles_invalid_uuid(self) -> None:
         r = self.get("not-an-uuid")
@@ -99,7 +99,7 @@ class GetCheckTestCase(BaseTestCase):
         self.assertEqual(doc["desc"], "This is description")
 
     def test_it_rejects_post_unique_key(self) -> None:
-        r = self.csrf_client.post(f"/api/v1/checks/{self.a1.unique_key}")
+        r = self.csrf_client.post(f"/api/v3/checks/{self.a1.unique_key}")
         self.assertEqual(r.status_code, 405)
 
     def test_readonly_key_works(self) -> None:
@@ -114,7 +114,7 @@ class GetCheckTestCase(BaseTestCase):
         for key in ("uuid", "ping_url", "update_url", "pause_url", "resume_url"):
             self.assertNotContains(r, key)
 
-    def test_v1_reports_status_started(self) -> None:
+    def test_it_reports_started_separately(self) -> None:
         self.a1.last_start = now()
         self.a1.save()
 
@@ -122,34 +122,24 @@ class GetCheckTestCase(BaseTestCase):
         self.assertEqual(r.status_code, 200)
 
         doc = r.json()
-        self.assertEqual(doc["status"], "started")
-        self.assertTrue(doc["started"])
-
-    def test_v2_reports_started_separately(self) -> None:
-        self.a1.last_start = now()
-        self.a1.save()
-
-        r = self.get(self.a1.code, v=2)
-        self.assertEqual(r.status_code, 200)
-
-        doc = r.json()
         self.assertEqual(doc["status"], "new")
         self.assertTrue(doc["started"])
 
-    def test_v1_by_unique_key_reports_status_started(self) -> None:
+    def test_it_reports_a_running_up_check_as_up_and_started(self) -> None:
+        self.a1.status = "up"
+        self.a1.last_ping = now()
+        self.a1.last_start = now()
+        self.a1.save()
+
+        doc = self.get(self.a1.code).json()
+        self.assertEqual(doc["status"], "up")
+        self.assertTrue(doc["started"])
+
+    def test_by_unique_key_it_reports_started_separately(self) -> None:
         self.a1.last_start = now()
         self.a1.save()
 
         r = self.get(self.a1.unique_key)
-        doc = r.json()
-        self.assertEqual(doc["status"], "started")
-        self.assertTrue(doc["started"])
-
-    def test_v2_by_unique_key_reports_started_separately(self) -> None:
-        self.a1.last_start = now()
-        self.a1.save()
-
-        r = self.get(self.a1.unique_key, v=2)
         doc = r.json()
         self.assertEqual(doc["status"], "new")
         self.assertTrue(doc["started"])

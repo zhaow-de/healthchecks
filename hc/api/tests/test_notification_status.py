@@ -21,7 +21,7 @@ class NotificationStatusTestCase(BaseTestCase):
         self.n = Notification(owner=self.check, channel=self.channel)
         self.n.save()
 
-        self.url = f"/api/v1/notifications/{self.n.code}/status"
+        self.url = f"/api/v3/notifications/{self.n.code}/status"
 
     def test_it_handles_twilio_failed_status(self) -> None:
         r = self.csrf_client.post(self.url, {"MessageStatus": "failed"})
@@ -67,7 +67,7 @@ class NotificationStatusTestCase(BaseTestCase):
 
     def test_it_handles_missing_notification(self) -> None:
         fake_code = "07c2f548-9850-4b27-af5d-6c9dc157ec02"
-        url = f"/api/v1/notifications/{fake_code}/status"
+        url = f"/api/v3/notifications/{fake_code}/status"
         r = self.csrf_client.post(url, {"MessageStatus": "failed"})
         self.assertEqual(r.status_code, 200)
 

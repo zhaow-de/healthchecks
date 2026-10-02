@@ -1,10 +1,4 @@
 <h1>Management API v3</h1>
-<p>Version:
-<select onchange="document.location = this.value">
-    <option value="../apiv1/">v1</option>
-    <option value="../apiv2/">v2</option>
-    <option value="../api/" selected>v3</option>
-</select></p>
 <p>With the Management API, you can programmatically manage checks and integrations
 in your account.</p>
 <h2>API Endpoints</h2>
@@ -96,11 +90,6 @@ in your account.</p>
 </tr>
 </tbody>
 </table>
-<h2>Changes From v2</h2>
-<p>Management API v3 adds the ability to specify custom check slugs, instead of
-auto-generating them from check names. The <a href="#create-check">Create a new check</a>
-and <a href="#update-check">Update an existing check</a> calls accept a new <code>slug</code>
-parameter, and use it instead of generating the slug from the check's name.</p>
 <h2>Authentication</h2>
 <p>Your requests to SITE_NAME Management API must authenticate using an
 API key. All API keys are project-specific. There are no account-wide API keys.
@@ -405,9 +394,8 @@ values if omitted.</p>
 <dd>
 <p>string, optional, default value: ""</p>
 <p>Name for the new check.</p>
-<p>Changed in API v3: the check's slug is no longer automatically generated
-from the check's name. Instead, the client can specify the slug explicitly
-via the <code>slug</code> field.</p>
+<p>The check's slug is not generated from its name: set it with the <code>slug</code>
+field.</p>
 </dd>
 <dt>slug</dt>
 <dd>
@@ -673,9 +661,8 @@ parameter, SITE_NAME will leave its value unchanged.</p>
 <dd>
 <p>string, optional.</p>
 <p>Name for the check.</p>
-<p>Changed in API v3: the check's slug is no longer automatically generated
-from the check's name. Instead, the client can specify the slug explicitly
-via the <code>slug</code> field.</p>
+<p>The check's slug is not generated from its name: set it with the <code>slug</code>
+field.</p>
 </dd>
 <dt>slug</dt>
 <dd>

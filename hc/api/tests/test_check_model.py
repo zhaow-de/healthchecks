@@ -122,15 +122,6 @@ class CheckModelTestCase(BaseTestCase):
 
         self.assertEqual(check.get_status(), "down")
 
-    def test_get_status_handles_started(self) -> None:
-        check = Check()
-        check.last_ping = now() - td(hours=2)
-        # Last start was 5 minutes ago, display status should be "started"
-        check.last_start = now() - td(minutes=5)
-        for status in ("new", "paused", "up", "down"):
-            check.status = status
-            self.assertEqual(check.get_status(with_started=True), "started")
-
     def test_get_status_handles_down_then_started_and_expired(self) -> None:
         check = Check(status="down")
         # Last ping was 2 days ago
@@ -138,7 +129,6 @@ class CheckModelTestCase(BaseTestCase):
         # Last start was 2 hours ago - the check is past its grace time
         check.last_start = now() - td(hours=2)
 
-        self.assertEqual(check.get_status(with_started=True), "down")
         self.assertEqual(check.get_status(), "down")
 
     def test_get_status_handles_up_then_started(self) -> None:
@@ -148,7 +138,6 @@ class CheckModelTestCase(BaseTestCase):
         # Last start was 5 minutes ago
         check.last_start = now() - td(minutes=5)
 
-        self.assertEqual(check.get_status(with_started=True), "started")
         # A started check still is considered "up":
         self.assertEqual(check.get_status(), "up")
 
@@ -159,7 +148,6 @@ class CheckModelTestCase(BaseTestCase):
         # Last start was 2 hours ago - the check is past its grace time
         check.last_start = now() - td(hours=2)
 
-        self.assertEqual(check.get_status(with_started=True), "down")
         self.assertEqual(check.get_status(), "down")
 
     def test_get_status_handles_paused_then_started_and_expired(self) -> None:
@@ -167,14 +155,12 @@ class CheckModelTestCase(BaseTestCase):
         # Last start was 2 hours ago - the check is past its grace time
         check.last_start = now() - td(hours=2)
 
-        self.assertEqual(check.get_status(with_started=True), "down")
         self.assertEqual(check.get_status(), "down")
 
     def test_get_status_handles_started_and_mia(self) -> None:
         check = Check()
         check.last_start = now() - td(hours=2)
 
-        self.assertEqual(check.get_status(with_started=True), "down")
         self.assertEqual(check.get_status(), "down")
 
     def test_next_ping_with_cron_syntax(self) -> None:

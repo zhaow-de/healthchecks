@@ -18,7 +18,7 @@ class GetBadgesTestCase(BaseTestCase):
         self.a1.tags = "foo bar"
         self.a1.save()
 
-        self.url = "/api/v1/badges/"
+        self.url = "/api/v3/badges/"
 
     def get(self, api_key: str = "X" * 32, qs: str = "") -> TestHttpResponse:
         return self.client.get(self.url + qs, HTTP_X_API_KEY=api_key)

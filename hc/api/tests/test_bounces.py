@@ -27,7 +27,7 @@ class BounceTestCase(BaseTestCase):
         self.n = Notification(owner=self.check, channel=self.channel)
         self.n.save()
 
-        self.url = "/api/v2/bounces/"
+        self.url = "/api/v3/bounces/"
 
     def post(
         self,

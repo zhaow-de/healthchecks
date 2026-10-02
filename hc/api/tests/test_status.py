@@ -4,7 +4,7 @@ from hc.test import BaseTestCase
 
 
 class StatusTestCase(BaseTestCase):
-    url = "/api/v1/status/"
+    url = "/api/v3/status/"
 
     def test_it_works(self) -> None:
         r = self.client.get(self.url)

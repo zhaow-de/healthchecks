@@ -351,15 +351,12 @@ class Check(models.Model):
     def cached_status(self) -> str:
         return self.get_status()
 
-    def get_status(self, *, with_started: bool = False) -> str:
+    def get_status(self) -> str:
         """Return current status for display."""
         frozen_now = now()
 
-        if self.last_start:
-            if frozen_now >= self.last_start + self.grace:
-                return "down"
-            elif with_started:
-                return "started"
+        if self.last_start and frozen_now >= self.last_start + self.grace:
+            return "down"
 
         if self.status in ("new", "paused", "down"):
             return self.status
@@ -435,8 +432,7 @@ class Check(models.Model):
     def filter_any(self) -> bool:
         return self.filter_subject or self.filter_body or self.filter_http_body
 
-    def to_dict(self, *, readonly: bool = False, v: int = 3) -> CheckDict:
-        with_started = v == 1
+    def to_dict(self, *, readonly: bool = False) -> CheckDict:
         result: CheckDict = {
             "name": self.name,
             "slug": self.slug,
@@ -444,7 +440,7 @@ class Check(models.Model):
             "desc": self.desc,
             "grace": int(self.grace.total_seconds()),
             "n_pings": self.n_pings,
-            "status": self.get_status(with_started=with_started),
+            "status": self.get_status(),
             "started": self.last_start is not None,
             "last_ping": isostring(self.last_ping),
             "next_ping": isostring(self.get_grace_start()),
@@ -475,7 +471,7 @@ class Check(models.Model):
 
             # Optimization: construct API URLs manually instead of using reverse().
             # This is significantly quicker when returning hundreds of checks.
-            update_url = f"{settings.SITE_ROOT}/api/v{v}/checks/{self.code}"
+            update_url = f"{settings.SITE_ROOT}/api/v3/checks/{self.code}"
             result["update_url"] = update_url
             result["pause_url"] = update_url + "/pause"
             result["resume_url"] = update_url + "/resume"
@@ -682,11 +678,11 @@ class Ping(models.Model):
     exitstatus = models.SmallIntegerField(null=True)
     rid = models.UUIDField(null=True)
 
-    def to_dict(self, owner_code: uuid.UUID, v: int) -> PingDict:
+    def to_dict(self, owner_code: uuid.UUID) -> PingDict:
         if self.has_body():
             # Optimization: construct API URLs manually instead of using reverse().
             # This is significantly quicker when returning hundreds of pings.
-            body_url = f"{settings.SITE_ROOT}/api/v{v}/checks/{owner_code}/pings/{self.n}/body"
+            body_url = f"{settings.SITE_ROOT}/api/v3/checks/{owner_code}/pings/{self.n}/body"
 
         else:
             body_url = None

@@ -13,7 +13,7 @@ class ListChannelsTestCase(BaseTestCase):
         self.c1.name = "Email to Alice"
         self.c1.save()
 
-        self.url = "/api/v1/channels/"
+        self.url = "/api/v3/channels/"
 
     def get(self) -> TestHttpResponse:
         return self.client.get(self.url, HTTP_X_API_KEY="X" * 32)

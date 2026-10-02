@@ -18,7 +18,7 @@ class GetPingBodyTestCase(BaseTestCase):
         self.ping.body_raw = b"Foo\nBar\nBaz"
         self.ping.save()
 
-        self.url = f"/api/v1/checks/{self.check.code}/pings/1/body"
+        self.url = f"/api/v3/checks/{self.check.code}/pings/1/body"
 
     def test_it_works(self) -> None:
         r = self.client.get(self.url, HTTP_X_API_KEY="X" * 32)

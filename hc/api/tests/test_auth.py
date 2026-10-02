@@ -7,11 +7,11 @@ from hc.test import BaseTestCase, TestHttpResponse
 
 class AuthTestCase(BaseTestCase):
     def get(self, key: str) -> TestHttpResponse:
-        return self.client.get("/api/v1/checks/", HTTP_X_API_KEY=key)
+        return self.client.get("/api/v3/checks/", HTTP_X_API_KEY=key)
 
     def post(self, key: str) -> TestHttpResponse:
         return self.client.post(
-            "/api/v1/checks/",
+            "/api/v3/checks/",
             {"name": "Foo"},
             content_type="application/json",
             HTTP_X_API_KEY=key,

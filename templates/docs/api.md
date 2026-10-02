@@ -1,12 +1,5 @@
 # Management API v3
 
-Version:
-<select onchange="document.location = this.value">
-    <option value="../apiv1/">v1</option>
-    <option value="../apiv2/">v2</option>
-    <option value="../api/" selected>v3</option>
-</select>
-
 With the Management API, you can programmatically manage checks and integrations
 in your account.
 
@@ -35,13 +28,6 @@ Endpoint Name                                         | Endpoint Address
 [List project's badges](#list-badges)                 | `GET SITE_ROOT/api/v3/badges/`
 **Service status**                                    |
 [Check database connectivity](#status)                | `GET SITE_ROOT/api/v3/status/`
-
-## Changes From v2
-
-Management API v3 adds the ability to specify custom check slugs, instead of
-auto-generating them from check names. The [Create a new check](#create-check)
-and [Update an existing check](#update-check) calls accept a new `slug`
-parameter, and use it instead of generating the slug from the check's name.
 
 ## Authentication
 
@@ -388,9 +374,8 @@ name
 
     Name for the new check.
 
-    Changed in API v3: the check's slug is no longer automatically generated
-    from the check's name. Instead, the client can specify the slug explicitly
-    via the `slug` field.
+    The check's slug is not generated from its name: set it with the `slug`
+    field.
 
 slug
 :   string, optional, default value: ""
@@ -719,9 +704,8 @@ name
 
     Name for the check.
 
-    Changed in API v3: the check's slug is no longer automatically generated
-    from the check's name. Instead, the client can specify the slug explicitly
-    via the `slug` field.
+    The check's slug is not generated from its name: set it with the `slug`
+    field.
 
 slug
 :   string, optional
