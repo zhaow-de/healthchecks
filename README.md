@@ -92,10 +92,8 @@ To set up Healthchecks development environment:
   ```
 
   pytest drives the Django test suite under `hc/` through pytest-django, and
-  `-n auto` (pytest-xdist) spreads it over every CPU core. Add
-  `--cov --cov-report=term` for a coverage report (pytest-cov), as CI does.
-  Django's own runner runs the same tests one at a time:
-  `uv run ./manage.py test`.
+  `-n auto` (pytest-xdist) spreads it over every CPU core. Add `--cov` for a
+  coverage report; `uv run ./manage.py test` runs the same tests serially.
 
   The tests of the commit and review tooling under `tests/` run with
   `uv run pytest -n auto`. CI runs both on every pull request, the Django suite

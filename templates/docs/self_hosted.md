@@ -1,10 +1,9 @@
 # Self-Hosted Healthchecks
 
-Healthchecks is open-source, and is licensed under the BSD 3-clause license.
+Healthchecks is open-source. The code from the original Healthchecks project is
+licensed under the BSD 3-clause license, and this fork's changes under the MIT license.
 
-As an alternative to using the hosted service at
-[https://zcrypto-hc.zhaow.me](https://zcrypto-hc.zhaow.me), you have the option to host a
-Healthchecks instance yourself.
+You have the option to host a Healthchecks instance yourself.
 
 The building blocks are:
 
@@ -116,7 +115,7 @@ EMAIL_HOST_PASSWORD = "example-password"
 EMAIL_USE_TLS = True
 ```
 
-Healthchecks use these environment variables to construct the `settings.MAILERS`
+Healthchecks uses these environment variables to construct the `settings.MAILERS`
 dictionary (a standard Django setting, [docs](https://docs.djangoproject.com/en/6.1/ref/settings/#std-setting-MAILERS)).
 
 ## Receiving Emails
