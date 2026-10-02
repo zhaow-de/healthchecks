@@ -444,7 +444,7 @@ ZULIP_ENABLED = envbool("ZULIP_ENABLED", "True")
 if (BASE_DIR / "hc/local_settings.py").exists():
     from .local_settings import *
 
-# Overrides for testing, under `manage.py test` and under pytest
+# Overrides for testing
 if sys.argv[1:2] == ["test"] or "pytest" in sys.modules:
     # For speed:
     PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]

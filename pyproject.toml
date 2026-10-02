@@ -51,7 +51,6 @@ dev = [
 [tool.pytest.ini_options]
 # `uv run pytest` runs the tests of the commit tooling under tests/. `uv run pytest hc` runs the
 # application's tests under hc/ through pytest-django, the same tests `uv run ./manage.py test` runs.
-# `-n auto` (pytest-xdist) spreads either run over every core, as CI does.
 testpaths = ["tests"]
 DJANGO_SETTINGS_MODULE = "hc.settings"
 # Without this an unregistered mark is a warning, and a misspelt one silently selects nothing.

@@ -39,6 +39,4 @@ class SystemChecksCase(BaseTestCase):
         self.assertEqual(ids, ["hc.api.E003"])
 
     def test_mariadb_uuid_check_passes_on_migrated_database(self) -> None:
-        # The test database is fully migrated, so the check has nothing to report
-        # on any database vendor
         self.assertEqual(mariadb_uuid_check(None, None), [])

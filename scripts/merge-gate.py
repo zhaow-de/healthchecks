@@ -56,8 +56,8 @@ def _outside_code_spans(line: str) -> str:
 
 
 def _as_a_reader_sees_it(body: str, *, keep_collapsed: bool = False) -> str:
-    """The body with everything a rendered PR hides removed: comments (terminated or not, `--!>` included), fenced
-    blocks (nested or not), `<details>` blocks, and quoted lines.
+    """The body without comments (terminated or not, `--!>` included), fenced blocks (nested or not), `<details>`
+    blocks and quoted lines.
 
     `keep_collapsed` keeps what a renderer still shows, `<details>` content and quoted lines: the read line must be plainly
     visible, so it is judged without them, and the checklist is judged with them, as GitHub draws a box inside either.
@@ -194,11 +194,11 @@ def _before_anything_that_can_hide(body: str) -> str:
 
 
 def _hidden_hint(body: str, pattern: re.Pattern[str]) -> str:
-    """A clause for the refusal when the line IS in the body and is hidden from the rendered page."""
+    """A clause for the refusal when the line IS in the body but sits where it does not count."""
     if pattern.search(body) and not pattern.search(_as_a_reader_sees_it(body)):
         return (
-            " — the line is in the body but hidden from the rendered page: an HTML comment (terminated or not), a "
-            "fenced block, a `<details>` block, or a quoted line"
+            " — the line is in the body but inside an HTML comment (terminated or not), a fenced block, a "
+            "`<details>` block or a quote"
         )
     return ""
 

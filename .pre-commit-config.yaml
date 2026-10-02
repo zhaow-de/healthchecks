@@ -1,9 +1,8 @@
 # Installed per clone by `uv run pre-commit install`. The generated hooks exec this checkout's
 # `.venv/bin/python` by absolute path, falling back to a `pre-commit` on PATH, else refusing every
 # commit until `uv sync` rebuilds `.venv`.
-# `uv run pre-commit run -a` runs the pre-commit stage alone; the two commit-msg hooks need a message
-# file and run from the installed hook, and `--range <base>..<head>` on either script judges commits
-# already made.
+# `uv run pre-commit run -a` runs the pre-commit stage alone; message-citations, the one commit-msg
+# hook, needs a message file and runs from the installed hook.
 
 # Files committed exactly as a tool writes them. Each of these tools writes its output without a
 # final newline, so a fixer's edit would be undone the next time the tool runs:
@@ -91,9 +90,8 @@ repos:
       - id: shellcheck
         types: [shell]
 
-  # Enforcement for the one-kind-per-commit rule. Only separates claude-kind from everything else;
-  # feat/fix commits legitimately mix code, tests, templates and docs. SKIP=staged-kind commits the
-  # mix.
+  # The one-kind-per-commit rule keeps claude-kind files apart; feat/fix commits legitimately mix code,
+  # tests, templates and docs.
   - repo: local
     hooks:
       - id: staged-kind
@@ -102,7 +100,6 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
-      # The script's docstring names what it judges on the index and at HEAD, and what it leaves alone.
       - id: message-citations
         name: every citation in the message resolves
         entry: uv run python scripts/message-citations.py

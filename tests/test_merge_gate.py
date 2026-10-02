@@ -545,7 +545,7 @@ def test_the_refusal_says_when_the_line_is_there_but_hidden():
     """An author looking straight at the line needs to be told it is invisible, not that it is missing."""
     body = f"## Summary\n\n<!--\nRead before push by: Claude Fable 5.1 at {TIP}\n-->\n\n- [x] done\n"
     fails = _eval(_pr(body=body))
-    assert len(fails) == 1 and "hidden from the rendered page" in fails[0]
+    assert len(fails) == 1 and "the line is in the body but inside" in fails[0]
 
 
 @pytest.mark.parametrize(

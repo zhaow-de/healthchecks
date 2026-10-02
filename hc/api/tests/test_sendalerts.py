@@ -365,8 +365,6 @@ class SendAlertsTestCase(BaseTestCase):
             with self.assertRaisesRegex(ValueError, "bad schedule"):
                 Command().handle_going_down()
 
-        # alert_after should be pushed an hour forward, so sendalerts
-        # does not trip on the same check again in a crash loop
         check.refresh_from_db()
         self.assertEqual(check.alert_after, CURRENT_TIME + td(hours=1))
         self.assertEqual(check.status, "up")

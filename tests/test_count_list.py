@@ -1,5 +1,3 @@
-"""Tests for `scripts/count-list.sh`."""
-
 from __future__ import annotations
 
 import pathlib
