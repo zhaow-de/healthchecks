@@ -25,8 +25,7 @@ class LogTestCase(BaseTestCase):
         self.ping = Ping.objects.create(owner=self.check, n=1)
         self.ping.body_raw = b"hello world"
 
-        # Older MySQL versions don't store microseconds. This makes sure
-        # the ping is older than any notifications we may create later:
+        # Make sure the ping is older than any notifications we may create later:
         self.ping.created = "2000-01-01T00:00:00+00:00"
         self.ping.save()
 

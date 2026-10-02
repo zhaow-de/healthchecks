@@ -211,8 +211,8 @@ DATABASES: Mapping[str, Any] = {
     }
 }
 
-# You can switch database engine to postgres or mysql using environment
-# variable 'DB'. Travis CI does this.
+# You can switch database engine to postgres using environment
+# variable 'DB'.
 if os.getenv("DB") == "postgres":
     DATABASES = {
         "default": {
@@ -229,19 +229,6 @@ if os.getenv("DB") == "postgres":
                 "sslmode": os.getenv("DB_SSLMODE", "prefer"),
                 "target_session_attrs": os.getenv("DB_TARGET_SESSION_ATTRS", "read-write"),
             },
-        }
-    }
-
-if os.getenv("DB") in ["mysql", "mariadb"]:
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.mysql",
-            "HOST": os.getenv("DB_HOST", ""),
-            "PORT": os.getenv("DB_PORT", ""),
-            "NAME": os.getenv("DB_NAME", "hc"),
-            "USER": os.getenv("DB_USER", "root"),
-            "PASSWORD": envsecret("DB_PASSWORD", ""),
-            "TEST": {"CHARSET": "UTF8"},
         }
     }
 

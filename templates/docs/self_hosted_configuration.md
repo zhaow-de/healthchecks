@@ -166,7 +166,7 @@ and installs the development dependencies again.
 
 Default: `sqlite`
 
-The database engine to use. Possible values: `sqlite`, `postgres`, `mysql`.
+The database engine to use. Possible values: `sqlite`, `postgres`.
 
 ## `DB_CONN_MAX_AGE` {: #DB_CONN_MAX_AGE }
 
@@ -184,7 +184,7 @@ This is a standard Django setting, read more in
 
 ## `DB_NAME` {: #DB_NAME }
 
-Default: `hc` (PostgreSQL, MySQL) or `/path/to/projectdir/hc.sqlite` (SQLite)
+Default: `hc` (PostgreSQL) or `/path/to/projectdir/hc.sqlite` (SQLite)
 
 This is a standard Django setting, read more in
 [Django documentation](https://docs.djangoproject.com/en/6.1/ref/settings/#name).
@@ -226,7 +226,7 @@ PostgreSQL-specific, [details](https://www.postgresql.org/docs/10/libpq-connect.
 
 ## `DB_USER` {: #DB_USER }
 
-Default: `postgres` (PostgreSQL) or `root` (MySQL)
+Default: `postgres`
 
 This is a standard Django setting, read more in
 [Django documentation](https://docs.djangoproject.com/en/6.1/ref/settings/#user).

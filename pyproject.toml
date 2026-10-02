@@ -26,7 +26,6 @@ dependencies = [
 [project.optional-dependencies]
 apprise = ["apprise==1.13.1"]
 minio = ["minio==7.2.20"]
-mysql = ["mysqlclient"]
 psycopg-c = ["psycopg[c]"]
 uwsgi = ["uwsgi"]
 

@@ -5,8 +5,8 @@ licensed under the BSD 3-clause license, and this fork's changes under the MIT l
 <p>The building blocks are:</p>
 <ul>
 <li>Python 3.14</li>
-<li>Django 6.0</li>
-<li>PostgreSQL or MySQL</li>
+<li>Django 6.1</li>
+<li>SQLite (the default) or PostgreSQL</li>
 </ul>
 <h2>Setting Up for Development</h2>
 <p>You can set up a development environment on your local system to develop a new

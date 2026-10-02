@@ -183,7 +183,7 @@ The Docker images built from the Dockerfile in the `/docker/` directory:
 * Use uWSGI as the web server. uWSGI is configured to perform database migrations
   on startup, and to run `sendalerts`, `sendreports`, and `smtpd` in the background.
   You do not need to run them separately.
-* Ship with both PostgreSQL and MySQL database drivers.
+* Ship with the PostgreSQL database driver.
 * Serve static files using the whitenoise library.
 * Have the apprise library preinstalled.
 * Do *not* handle TLS termination. In a production setup, you will want to put

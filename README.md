@@ -33,7 +33,7 @@ The building blocks are:
 
 * Python 3.14
 * Django 6.1
-* SQLite (the default), PostgreSQL, MySQL or MariaDB
+* SQLite (the default) or PostgreSQL
 
 This fork's own instance runs at
 [https://zcrypto-hc.zhaow.me/](https://zcrypto-hc.zhaow.me/).
@@ -97,7 +97,7 @@ To set up Healthchecks development environment:
 
   The tests of the commit and review tooling under `tests/` run with
   `uv run pytest -n auto`. CI runs both on every pull request, the Django suite
-  on SQLite, PostgreSQL, MySQL and MariaDB.
+  on SQLite and PostgreSQL.
 
 * Run development server:
 
@@ -595,7 +595,7 @@ The Docker images:
 * Use uWSGI as the web server. uWSGI is configured to perform database migrations
   on startup, and to run `sendalerts`, `sendreports`, and `smtpd` in the background.
   You do not need to run them separately.
-* Ship with both PostgreSQL and MySQL database drivers.
+* Ship with the PostgreSQL database driver.
 * Serve static files using the whitenoise library.
 * Have the apprise library preinstalled.
 * Do *not* handle TLS termination. In a production setup, you will want to put

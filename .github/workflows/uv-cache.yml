@@ -28,4 +28,4 @@ jobs:
         # Installs the version specified in .python-version, as tests.yml does.
         run: uv python install
       - name: Install Dependencies
-        run: uv sync --locked --extra mysql
+        run: uv sync --locked

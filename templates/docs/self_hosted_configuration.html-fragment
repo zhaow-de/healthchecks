@@ -145,7 +145,7 @@ activated virtual environment: a plain <code>uv run</code> syncs the environment
 and installs the development dependencies again.</p>
 <h2 id="DB"><code>DB</code></h2>
 <p>Default: <code>sqlite</code></p>
-<p>The database engine to use. Possible values: <code>sqlite</code>, <code>postgres</code>, <code>mysql</code>.</p>
+<p>The database engine to use. Possible values: <code>sqlite</code>, <code>postgres</code>.</p>
 <h2 id="DB_CONN_MAX_AGE"><code>DB_CONN_MAX_AGE</code></h2>
 <p>Default: <code>0</code></p>
 <p>This is a standard Django setting, read more in
@@ -155,7 +155,7 @@ and installs the development dependencies again.</p>
 <p>This is a standard Django setting, read more in
 <a href="https://docs.djangoproject.com/en/6.1/ref/settings/#host">Django documentation</a>.</p>
 <h2 id="DB_NAME"><code>DB_NAME</code></h2>
-<p>Default: <code>hc</code> (PostgreSQL, MySQL) or <code>/path/to/projectdir/hc.sqlite</code> (SQLite)</p>
+<p>Default: <code>hc</code> (PostgreSQL) or <code>/path/to/projectdir/hc.sqlite</code> (SQLite)</p>
 <p>This is a standard Django setting, read more in
 <a href="https://docs.djangoproject.com/en/6.1/ref/settings/#name">Django documentation</a>.</p>
 <h2 id="DB_PASSWORD"><code>DB_PASSWORD</code></h2>
@@ -179,7 +179,7 @@ precedence.</p>
 <p>Default: <code>read-write</code></p>
 <p>PostgreSQL-specific, <a href="https://www.postgresql.org/docs/10/libpq-connect.html#LIBPQ-CONNECT-TARGET-SESSION-ATTRS">details</a></p>
 <h2 id="DB_USER"><code>DB_USER</code></h2>
-<p>Default: <code>postgres</code> (PostgreSQL) or <code>root</code> (MySQL)</p>
+<p>Default: <code>postgres</code></p>
 <p>This is a standard Django setting, read more in
 <a href="https://docs.djangoproject.com/en/6.1/ref/settings/#user">Django documentation</a>.</p>
 <h2 id="DEBUG"><code>DEBUG</code></h2>

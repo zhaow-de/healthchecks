@@ -8,8 +8,8 @@ You have the option to host a Healthchecks instance yourself.
 The building blocks are:
 
 * Python 3.14
-* Django 6.0
-* PostgreSQL or MySQL
+* Django 6.1
+* SQLite (the default) or PostgreSQL
 
 ## Setting Up for Development
 

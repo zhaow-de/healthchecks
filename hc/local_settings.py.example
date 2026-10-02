@@ -14,17 +14,6 @@
 #     }
 # }
 
-# Uncomment to use MySQL:
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.mysql',
-#         'NAME': 'your-database-name-here',
-#         'USER': 'your-database-user-here',
-#         'PASSWORD': 'your-database-password-here',
-#         'TEST': {'CHARSET': 'UTF8'}
-#     }
-# }
-
 # Email
 # EMAIL_HOST = "your-smtp-server-here.com"
 # EMAIL_PORT = 587

@@ -164,7 +164,7 @@ The Docker images built from the Dockerfile in this directory:
   on startup, and to run `sendalerts`, `sendreports`, and `smtpd` in the background.
   You do not need to run them separately. The SMTP listener (`manage.py smtpd`) is
   started conditionally, [based on the value of the `SMTPD_PORT` environment variable](https://github.com/healthchecks/healthchecks/tree/master/docker#smtp-listener-configuration-via-smtpd_port).
-* Ship with both PostgreSQL and MySQL database drivers.
+* Ship with the PostgreSQL database driver.
 * Serve static files using the whitenoise library.
 * Have the apprise library preinstalled.
 * Do *not* handle TLS termination. In a production setup, you will want to put
