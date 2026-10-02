@@ -734,8 +734,6 @@ specify <code>SITE_LOGO_URL</code>. Notice that the logo must be placed in <code
 <code>static</code>. This is because <code>manage.py collectstatic</code> has already been run in the base
 image's build time, and the web server will not recognize any new files placed in the
 <code>static</code> directory.</p>
-<p>Please do not use the Healthchecks.io logo (the one with the dark green background) on
-self-hosted instances. This logo is not part of the Healthchecks open-source project.</p>
 <h2 id="SITE_NAME"><code>SITE_NAME</code></h2>
 <p>Default: <code>Mychecks</code></p>
 <p>The display name of this Healthchecks instance. Healthchecks uses it throughout

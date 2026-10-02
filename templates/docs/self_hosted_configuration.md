@@ -1030,9 +1030,6 @@ specify `SITE_LOGO_URL`. Notice that the logo must be placed in `static-collecte
 image's build time, and the web server will not recognize any new files placed in the
 `static` directory.
 
-Please do not use the Healthchecks.io logo (the one with the dark green background) on
-self-hosted instances. This logo is not part of the Healthchecks open-source project.
-
 ## `SITE_NAME` {: #SITE_NAME }
 
 Default: `Mychecks`

@@ -453,9 +453,7 @@ To enable the Signal integration via TCP socket:
 
 * Create a Telegram bot by talking to the
 [BotFather](https://core.telegram.org/bots#6-botfather). Set the bot's name,
-description, user picture, and add a "/start" command. To avoid user confusion,
-please do not use the Healthchecks.io logo as your bot's user picture, use
-your own logo.
+description, user picture, and add a "/start" command.
 * After creating the bot you will have the bot's name and token. Put them
 in `TELEGRAM_BOT_NAME` and `TELEGRAM_TOKEN` environment variables.
 * Run `settelegramwebhook` management command. This command tells Telegram

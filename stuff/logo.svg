@@ -1,12 +1,12 @@
-<svg width="724" height="724" viewBox="150 150 724 724" xmlns="http://www.w3.org/2000/svg">
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="gradHex" x1="218" y1="172" x2="806" y2="852" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#22D3EE"/>
       <stop offset="1" stop-color="#3B82F6"/>
     </linearGradient>
     <linearGradient id="gradLine" x1="338" y1="618" x2="688" y2="424" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#DC2626"/>
-      <stop offset="1" stop-color="#F87171"/>
+      <stop offset="0" stop-color="#10B981"/>
+      <stop offset="1" stop-color="#34D399"/>
     </linearGradient>
   </defs>
 
@@ -19,9 +19,9 @@
            fill="none" stroke="url(#gradHex)" stroke-width="34" stroke-linejoin="round"/>
 
   <!-- algorithmic prediction: dashed forward segment -->
-  <line x1="688" y1="424" x2="748" y2="382" stroke="#FCA5A5" stroke-width="12"
+  <line x1="688" y1="424" x2="748" y2="382" stroke="#6EE7B7" stroke-width="12"
         stroke-linecap="round" stroke-dasharray="4 22" opacity="0.9"/>
-  <circle cx="748" cy="382" r="13" fill="none" stroke="#FCA5A5" stroke-width="7"/>
+  <circle cx="748" cy="382" r="13" fill="none" stroke="#6EE7B7" stroke-width="7"/>
 
   <!-- ascending signal line -->
   <polyline points="338,618 458,558 578,492 688,424"
@@ -29,11 +29,11 @@
             stroke-linecap="round" stroke-linejoin="round"/>
 
   <!-- data nodes -->
-  <circle cx="338" cy="618" r="15" fill="#DC2626"/>
-  <circle cx="458" cy="558" r="15" fill="#E33B3B"/>
-  <circle cx="578" cy="492" r="15" fill="#EF4444"/>
+  <circle cx="338" cy="618" r="15" fill="#10B981"/>
+  <circle cx="458" cy="558" r="15" fill="#14B583"/>
+  <circle cx="578" cy="492" r="15" fill="#22C48D"/>
 
   <!-- emphasized latest node -->
-  <circle cx="688" cy="424" r="26" fill="none" stroke="#F87171" stroke-width="8" opacity="0.55"/>
-  <circle cx="688" cy="424" r="19" fill="#F87171"/>
+  <circle cx="688" cy="424" r="26" fill="none" stroke="#34D399" stroke-width="8" opacity="0.55"/>
+  <circle cx="688" cy="424" r="19" fill="#34D399"/>
 </svg>

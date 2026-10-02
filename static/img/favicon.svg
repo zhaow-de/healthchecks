@@ -1,6 +1,39 @@
-<svg width="120mm" height="120mm" version="1.1" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
- <g transform="translate(-27.502 -156.01)">
-  <path d="m38.253 241.39 2.9915-19.772 23.014-0.13391 11.092-63.965 18.257-2e-3 7.7596 46.333-13.449 0.0645-9.8934 57.109-18.286-9e-3 -3.23-19.585z" fill="#33333f"/>
-  <path d="m94.923 274.5-9.4557-56.483 1.4735-8.4919 16.484 0.0429 2.4469 12.936 30.88 0.0734-2.1276 19.624-16.084 0.0801-5.347 32.207z" fill="#5cb85f"/>
- </g>
+<svg width="724" height="724" viewBox="150 150 724 724" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gradHex" x1="218" y1="172" x2="806" y2="852" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#22D3EE"/>
+      <stop offset="1" stop-color="#3B82F6"/>
+    </linearGradient>
+    <linearGradient id="gradLine" x1="338" y1="618" x2="688" y2="424" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#10B981"/>
+      <stop offset="1" stop-color="#34D399"/>
+    </linearGradient>
+  </defs>
+
+  <!-- subtle chart baseline / axis -->
+  <line x1="300" y1="672" x2="724" y2="672" stroke="#22D3EE" stroke-width="6"
+        stroke-linecap="round" stroke-dasharray="2 26" opacity="0.35"/>
+
+  <!-- hexagon container (crypto / network node) -->
+  <polygon points="512,172 806,342 806,682 512,852 218,682 218,342"
+           fill="none" stroke="url(#gradHex)" stroke-width="34" stroke-linejoin="round"/>
+
+  <!-- algorithmic prediction: dashed forward segment -->
+  <line x1="688" y1="424" x2="748" y2="382" stroke="#6EE7B7" stroke-width="12"
+        stroke-linecap="round" stroke-dasharray="4 22" opacity="0.9"/>
+  <circle cx="748" cy="382" r="13" fill="none" stroke="#6EE7B7" stroke-width="7"/>
+
+  <!-- ascending signal line -->
+  <polyline points="338,618 458,558 578,492 688,424"
+            fill="none" stroke="url(#gradLine)" stroke-width="16"
+            stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- data nodes -->
+  <circle cx="338" cy="618" r="15" fill="#10B981"/>
+  <circle cx="458" cy="558" r="15" fill="#14B583"/>
+  <circle cx="578" cy="492" r="15" fill="#22C48D"/>
+
+  <!-- emphasized latest node -->
+  <circle cx="688" cy="424" r="26" fill="none" stroke="#34D399" stroke-width="8" opacity="0.55"/>
+  <circle cx="688" cy="424" r="19" fill="#34D399"/>
 </svg>
