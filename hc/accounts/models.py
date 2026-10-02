@@ -63,13 +63,8 @@ class ProfileManager(models.Manager["Profile"]):
         try:
             return user.profile
         except Profile.DoesNotExist:
-            profile = Profile(user=user)
-            if not settings.USE_PAYMENTS:
-                # If not using payments, set high limits
-                profile.check_limit = 10000
-                profile.sms_limit = 10000
-                profile.call_limit = 10000
-
+            # A new account gets high limits; an administrator can lower them in the admin
+            profile = Profile(user=user, check_limit=10000, sms_limit=10000, call_limit=10000)
             profile.save()
             return profile
 

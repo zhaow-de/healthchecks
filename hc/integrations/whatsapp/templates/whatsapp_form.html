@@ -22,15 +22,6 @@ WhatsApp Settings - {% site_name %}
         {{ site_name }} uses a third-party service, Twilio, to send SMS messages.
     </p>
 
-    {% if show_pricing and profile.sms_limit == 0 %}
-    <p class="alert alert-info">
-        <strong>Paid plan required.</strong>
-        WhatsApp messaging is not available on the free plan–sending the messages
-        cost too much! Please upgrade to a
-        <a href="{% url 'hc-billing' %}">paid plan</a> to enable WhatsApp messaging.
-    </p>
-    {% endif %}
-
     <h2>Integration Settings</h2>
 
     <form method="post" class="form-horizontal">

@@ -33,8 +33,8 @@ each check's details pages:
 ## SMS, WhatsApp, and Phone Call Monthly Quotas
 
 SITE_NAME sets a quota on the maximum number of SMS, WhatsApp, and phone-call
-notifications an account can send per month. The specific limit depends on the
-account's billing plan. The quota automatically resets at the start of each month.
+notifications an account can send per month. The site administrator sets the
+limit for each account. The quota automatically resets at the start of each month.
 The "unused" sends from one month do not carry over to the next month.
 
 When an account exceeds its monthly limit, SITE_NAME will:

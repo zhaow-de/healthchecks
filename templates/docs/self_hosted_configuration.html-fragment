@@ -89,7 +89,6 @@ from environment variables. Below is a list of environment variables it reads an
 <li><a href="#TWILIO_FROM">TWILIO_FROM</a></li>
 <li><a href="#TWILIO_MESSAGING_SERVICE_SID">TWILIO_MESSAGING_SERVICE_SID</a></li>
 <li><a href="#TWILIO_USE_WHATSAPP">TWILIO_USE_WHATSAPP</a></li>
-<li><a href="#USE_PAYMENTS">USE_PAYMENTS</a></li>
 <li><a href="#VICTOROPS_ENABLED">VICTOROPS_ENABLED</a></li>
 <li><a href="#WEBHOOKS_ENABLED">WEBHOOKS_ENABLED</a></li>
 <li><a href="#WHATSAPP_DOWN_CONTENT_SID">WHATSAPP_DOWN_CONTENT_SID</a></li>
@@ -842,9 +841,6 @@ to work, you will also need to specify:</p>
 <li><a href="#WHATSAPP_DOWN_CONTENT_SID">WHATSAPP_DOWN_CONTENT_SID</a></li>
 <li><a href="#WHATSAPP_UP_CONTENT_SID">WHATSAPP_UP_CONTENT_SID</a>.</li>
 </ul>
-<h2 id="USE_PAYMENTS"><code>USE_PAYMENTS</code></h2>
-<p>Default: <code>False</code></p>
-<p>A boolean that turns on/off billing features.</p>
 <h2 id="VICTOROPS_ENABLED"><code>VICTOROPS_ENABLED</code></h2>
 <p>Default: <code>True</code></p>
 <p>A boolean that turns on/off the Splunk On-Call (VictorOps) integration.

@@ -2,8 +2,7 @@
 
 In SITE_NAME, a **Check** represents a single service you want to
 monitor. For example, when monitoring cron jobs, you would create a separate check for
-each cron job you wish to monitor. SITE_NAME pricing plans are structured primarily
-around how many checks you can have in your account. You can create checks
+each cron job you wish to monitor. You can create checks
 in the SITE_NAME web interface or via [Management API](../api/).
 
 ## Name, Tags, Description

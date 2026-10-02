@@ -1,8 +1,7 @@
 <h1>Configuring Checks</h1>
 <p>In SITE_NAME, a <strong>Check</strong> represents a single service you want to
 monitor. For example, when monitoring cron jobs, you would create a separate check for
-each cron job you wish to monitor. SITE_NAME pricing plans are structured primarily
-around how many checks you can have in your account. You can create checks
+each cron job you wish to monitor. You can create checks
 in the SITE_NAME web interface or via <a href="../api/">Management API</a>.</p>
 <h2>Name, Tags, Description</h2>
 <p>Describe each check using an optional name, slug, tags, and description fields.</p>

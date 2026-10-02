@@ -70,7 +70,6 @@ class NumChecksFilter(admin.SimpleListFilter):
 
 class ProfileAnnotations(TypedDict):
     num_checks: int
-    plan: str
 
 
 @admin.register(Profile)
@@ -161,13 +160,9 @@ class ProfileAdmin(ModelAdmin[Profile]):
         )
         qs = qs.annotate(num_checks=Subquery(subquery))
 
-        qs = qs.annotate(plan=F("user__subscription__plan_name"))
         return qs
 
     def email(self, obj: WithAnnotations[Profile, ProfileAnnotations]) -> str:
-        if obj.plan:
-            return format_html("{} <span>{}</span>", obj.user.email, obj.plan)
-
         return obj.user.email
 
     @admin.display(ordering="user__date_joined")

@@ -36,6 +36,5 @@ def add(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
         "project": project,
         "twilio_from": settings.TWILIO_FROM,
         "form": form,
-        "profile": project.owner_profile,
     }
     return render(request, "add_call.html", ctx)

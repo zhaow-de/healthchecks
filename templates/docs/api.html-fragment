@@ -603,8 +603,7 @@ field values.</dd>
 <dt>401 Unauthorized</dt>
 <dd>The API key is either missing or invalid.</dd>
 <dt>403 Forbidden</dt>
-<dd>The account has hit its check limit. For free accounts,
-the limit is 20 checks per account.</dd>
+<dd>The account has hit its check limit.</dd>
 </dl>
 <h3>Example Request</h3>
 <div class="highlight"><pre><span></span><code>curl<span class="w"> </span>SITE_ROOT/api/v3/checks/<span class="w"> </span><span class="se">\</span>
@@ -1081,8 +1080,8 @@ check that was just deleted.</p>
 <p><code>GET SITE_ROOT/api/v3/checks/&lt;uuid&gt;/pings/</code></p>
 <p>Returns a list of pings this check has received.</p>
 <p>This endpoint returns pings in reverse order (most recent first), and the total
-number of returned pings depends on the account's billing plan: 100 for free accounts,
-1000 for paid accounts.</p>
+number of returned pings depends on the account's ping log limit (100 by default), up to
+at most 1000.</p>
 <h3>Response Codes</h3>
 <dl>
 <dt>200 OK</dt>

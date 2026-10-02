@@ -72,7 +72,6 @@ METRICS_KEY = os.getenv("METRICS_KEY")
 DEBUG = envbool("DEBUG", "True")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "healthchecks@example.org")
 SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL")
-USE_PAYMENTS = envbool("USE_PAYMENTS", "False")
 REGISTRATION_OPEN = envbool("REGISTRATION_OPEN", "True")
 if admins := os.getenv("ADMINS"):
     ADMINS = admins.split(",")
@@ -98,7 +97,6 @@ INSTALLED_APPS = (
     "hc.api",
     "hc.front",
     "hc.logs",
-    "hc.payments",
     "hc.integrations.apprise",
     "hc.integrations.call",
     "hc.integrations.discord",
@@ -171,7 +169,6 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "hc.front.context_processors.branding",
-                "hc.payments.context_processors.payments",
             ]
         },
     }

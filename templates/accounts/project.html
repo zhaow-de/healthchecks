@@ -29,8 +29,8 @@
                     <strong>{{ num_checks }} check{{ num_checks|pluralize}}</strong>,
                     but your account only has space for
                     <strong>{{ num_available }} additional check{{ num_available|pluralize }}</strong>.
-                    To accept the transfer, please
-                    <a href="{% url 'hc-billing' %}">upgrade your account first!</a>
+                    To accept the transfer, ask the site administrator to raise
+                    your account's check limit first.
                 </p>
                 {% endwith%}
                 {% endif %}
@@ -423,7 +423,6 @@
                             Team Member
                             <span class="help-block">
                                 Can create and manage checks and integrations.
-                                Cannot access your account's billing settings.
                             </span>
                         </label>
                         <label class="radio-container">

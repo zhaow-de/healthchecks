@@ -91,7 +91,6 @@ from environment variables. Below is a list of environment variables it reads an
 <li><a href="#TWILIO_FROM">TWILIO_FROM</a></li>
 <li><a href="#TWILIO_MESSAGING_SERVICE_SID">TWILIO_MESSAGING_SERVICE_SID</a></li>
 <li><a href="#TWILIO_USE_WHATSAPP">TWILIO_USE_WHATSAPP</a></li>
-<li><a href="#USE_PAYMENTS">USE_PAYMENTS</a></li>
 <li><a href="#VICTOROPS_ENABLED">VICTOROPS_ENABLED</a></li>
 <li><a href="#WEBHOOKS_ENABLED">WEBHOOKS_ENABLED</a></li>
 <li><a href="#WHATSAPP_DOWN_CONTENT_SID">WHATSAPP_DOWN_CONTENT_SID</a></li>
@@ -1179,12 +1178,6 @@ to work, you will also need to specify:
 * [TWILIO_MESSAGING_SERVICE_SID](#TWILIO_MESSAGING_SERVICE_SID)
 * [WHATSAPP_DOWN_CONTENT_SID](#WHATSAPP_DOWN_CONTENT_SID)
 * [WHATSAPP_UP_CONTENT_SID](#WHATSAPP_UP_CONTENT_SID).
-
-## `USE_PAYMENTS` {: #USE_PAYMENTS }
-
-Default: `False`
-
-A boolean that turns on/off billing features.
 
 ## `VICTOROPS_ENABLED` {: #VICTOROPS_ENABLED }
 

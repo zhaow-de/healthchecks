@@ -10,7 +10,6 @@ from django.utils.timezone import now
 from hc.accounts.management.commands.sendinactivitynotices import Command
 from hc.accounts.models import Member
 from hc.api.models import Check, Ping
-from hc.payments.models import Subscription
 from hc.test import BaseTestCase
 
 MOCK_SLEEP = Mock()
@@ -76,16 +75,6 @@ class SendInactivityNoticesTestCase(BaseTestCase):
 
         result = Command(stdout=Mock()).handle()
         self.assertEqual(counts(result), [0, 0, 0])
-
-    def test_it_checks_subscription(self) -> None:
-        # alice has a subscription
-        Subscription.objects.create(user=self.alice, subscription_id="abc123")
-
-        result = Command(stdout=Mock()).handle()
-        self.assertEqual(counts(result), [0, 0, 0])
-
-        self.profile.refresh_from_db()
-        self.assertIsNone(self.profile.deletion_notice_date)
 
     def test_it_checks_recently_active_team_members(self) -> None:
         # bob has access to alice's project

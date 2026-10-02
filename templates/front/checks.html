@@ -18,12 +18,12 @@
         <div id="my-checks-limit-notice">
             <p>
             {% if request.user == project.owner %}
-            Your account is currently over its check limit. Please upgrade, or reduce
-            the number of checks in your account.
+            Your account is currently over its check limit. Please reduce the number
+            of checks in your account, or ask the site administrator to raise the limit.
             {% else %}
             The account <strong>{{ project.owner.email }}</strong> is currently
             over its check limit. Please ask <strong>{{ project.owner.email }}</strong>
-            to upgrade their account.
+            to reduce the number of checks.
             {% endif %}
 
             Accounts that remain over the limit for more
@@ -35,25 +35,12 @@
                     <td>{{ project.owner.email }}</td>
                 </tr>
                 <tr>
-                    <th>Current Plan:</th>
-                    <td>
-                        {% if project.owner.subscription and project.owner.subscription.plan_name %}
-                        {{ project.owner.subscription.plan_name }}
-                        {% else %}
-                        Hobbyist (free)
-                        {% endif %}
-                    </td>
-                </tr>
-                <tr>
                     <th>Checks Used:</th>
                     <td class="at-limit">
                         <span>{{ project.owner.profile.num_checks_used }} of {{ project.owner.profile.check_limit }}</span>
                     </td>
                 </tr>
             </table>
-            {% if request.user == project.owner %}
-            <p><a class="btn btn-default" href="{% url 'hc-billing' %}">Billing Details and Plan Upgrades</a></p>
-            {% endif %}
         </div>
     </div>
 </div>
@@ -185,11 +172,12 @@
     <div class="col-sm-12 text-center">
         <div class="alert alert-info">
             <strong>There are more things to monitor.</strong>
-            To add more checks, please
+            To add more checks,
             {% if request.user == project.owner %}
-            <a href="{% url 'hc-billing' %}">upgrade your account</a>.
+            ask the site administrator to raise your account's check limit.
             {% else %}
-            ask <strong>{{ project.owner.email }}</strong> to upgrade their account.
+            ask the site administrator to raise the check limit of
+            <strong>{{ project.owner.email }}</strong>.
             {% endif %}
         </div>
     </div>

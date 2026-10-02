@@ -19,15 +19,6 @@ class AddSmsTestCase(BaseTestCase):
         self.assertContains(r, "Add SMS Integration")
         self.assertContains(r, "Get a SMS message")
 
-    @override_settings(USE_PAYMENTS=True)
-    def test_it_warns_about_limits(self) -> None:
-        self.profile.sms_limit = 0
-        self.profile.save()
-
-        self.client.login(username="alice@example.org", password="password")
-        r = self.client.get(self.url)
-        self.assertContains(r, "upgrade to a")
-
     def test_it_creates_channel(self) -> None:
         form = {"label": "My Phone", "phone": "+1234567890", "down": True}
 

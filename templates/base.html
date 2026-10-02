@@ -142,15 +142,6 @@
             {% endif %}
 
             <ul id="global-links" class="nav navbar-nav navbar-right">
-                {% if show_pricing %}
-                <li {% if page == 'pricing' %} class="active" {% endif %}>
-                    {% if project %}
-                    <a href="{% url 'hc-p-pricing' project.code %}">Pricing</a>
-                    {% else %}
-                    <a href="{% url 'hc-pricing' %}">Pricing</a>
-                    {% endif %}
-                </li>
-                {% endif %}
 
                 <li {% if page == 'docs' %} class="active" {% endif %}>
                     <a href="{% url 'hc-docs' %}">Docs</a>

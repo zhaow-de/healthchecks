@@ -88,7 +88,7 @@ class TransferProjectTestCase(BaseTestCase):
         self.client.login(username="bob@example.org", password="password")
         r = self.client.get(self.url)
         self.assertContains(r, "would like to transfer")
-        self.assertNotContains(r, "upgrade your account first")
+        self.assertNotContains(r, "ask the site administrator to raise")
 
     def test_it_shows_transfer_request_with_limit_notice(self) -> None:
         self.bobs_membership.transfer_request_date = now()
@@ -99,7 +99,7 @@ class TransferProjectTestCase(BaseTestCase):
 
         self.client.login(username="bob@example.org", password="password")
         r = self.client.get(self.url)
-        self.assertContains(r, "upgrade your account first")
+        self.assertContains(r, "ask the site administrator to raise")
 
     def test_accept_works(self) -> None:
         self.bobs_membership.transfer_request_date = now()

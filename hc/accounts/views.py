@@ -39,7 +39,6 @@ from hc.accounts.models import Credential, Member, Profile, Project
 from hc.api.models import Channel, Check, TokenBucket
 from hc.lib.tz import all_timezones
 from hc.lib.webauthn import CreateHelper, GetHelper
-from hc.payments.models import Subscription
 
 logger = logging.getLogger(__name__)
 
@@ -683,10 +682,6 @@ def close(request: AuthenticatedHttpRequest) -> HttpResponse:
 
     if request.method == "POST":
         if request.POST.get("confirmation") == request.user.email:
-            # Cancel their subscription:
-            if sub := Subscription.objects.filter(user=user).first():
-                sub.cancel()
-
             # Deleting user also deletes its profile, checks, channels etc.
             user.delete()
 

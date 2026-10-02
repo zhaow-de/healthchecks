@@ -1243,7 +1243,6 @@ def channels(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
         "enable_webhooks": settings.WEBHOOKS_ENABLED is True,
         "enable_whatsapp": settings.TWILIO_USE_WHATSAPP,
         "enable_zulip": settings.ZULIP_ENABLED is True,
-        "use_payments": settings.USE_PAYMENTS,
     }
 
     return render(request, "front/channels.html", ctx)

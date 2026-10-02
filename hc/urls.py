@@ -18,7 +18,6 @@ urlpatterns = [
     path(prefix, include("hc.accounts.urls")),
     path(prefix, include("hc.api.urls")),
     path(prefix, include("hc.front.urls")),
-    path(prefix, include("hc.payments.urls")),
     path(prefix, include("hc.integrations.apprise.urls")),
     path(prefix, include("hc.integrations.call.urls")),
     path(prefix, include("hc.integrations.discord.urls")),

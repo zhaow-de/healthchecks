@@ -636,8 +636,7 @@ filter_default_fail
 :   The API key is either missing or invalid.
 
 403 Forbidden
-:   The account has hit its check limit. For free accounts,
-    the limit is 20 checks per account.
+:   The account has hit its check limit.
 
 ### Example Request
 
@@ -1220,8 +1219,8 @@ curl SITE_ROOT/api/v3/checks/7918b17b-a745-4db1-8575-9d2e07c97f79 \
 Returns a list of pings this check has received.
 
 This endpoint returns pings in reverse order (most recent first), and the total
-number of returned pings depends on the account's billing plan: 100 for free accounts,
-1000 for paid accounts.
+number of returned pings depends on the account's ping log limit (100 by default), up to
+at most 1000.
 
 ### Response Codes
 

@@ -45,9 +45,8 @@ to do this either from the web dashboard, or through [Management API](../api/).
 
 ## Auto Provisioning and Account Limits
 
-Each SITE_NAME account has a specific limit of how many checks it is allowed to
-create: 20 checks for free accounts; 100 or 1000 checks for paid accounts. To reduce
-friction and the risk of silent failures, the auto provisioning functionality
-**is allowed to temporarily exceed the account’s check limit up to two times**.
+Each SITE_NAME account has a limit of how many checks it is allowed to create,
+which the site administrator sets. To reduce friction and the risk of silent failures,
+the auto provisioning functionality **is allowed to temporarily exceed the account’s check limit up to two times**.
 Meaning, if your account is already maxed out, auto provisioning will still be able to
 create new checks until you hit two times the limit.

@@ -44,7 +44,6 @@ def sms_form(request: HttpRequest, channel: Channel) -> HttpResponse:
         "project": channel.project,
         "twilio_from": settings.TWILIO_FROM,
         "form": form,
-        "profile": channel.project.owner_profile,
         "is_new": adding,
     }
     return render(request, "sms_form.html", ctx)

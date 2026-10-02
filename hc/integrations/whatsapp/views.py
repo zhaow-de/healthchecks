@@ -42,7 +42,6 @@ def whatsapp_form(request: HttpRequest, channel: Channel) -> HttpResponse:
         "page": "channels",
         "project": channel.project,
         "form": form,
-        "profile": channel.project.owner_profile,
         "is_new": adding,
     }
     return render(request, "whatsapp_form.html", ctx)
