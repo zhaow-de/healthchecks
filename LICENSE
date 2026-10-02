@@ -20,13 +20,13 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
--------------------------------------------------------------------
-Original BSD License
--------------------------------------------------------------------
-
 This project is derived from Healthchecks (https://github.com/healthchecks/healthchecks)
 by Pēteris Caune and other contributors of healthchecks.io, which is licensed under
 the BSD 3-Clause License below. That license still applies to the code taken from it.
+
+-------------------------------------------------------------------
+Original BSD License
+-------------------------------------------------------------------
 
 Copyright (c) 2015, Pēteris Caune and other contributors
 All rights reserved.

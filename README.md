@@ -61,7 +61,7 @@ You can use them in your READMEs, dashboards, or status pages.
 ## Setting Up for Development
 
 If you are planning to developing Healthchecks, please read
-[CONTRIBUTING.md](https://github.com/healthchecks/healthchecks/tree/master/CONTRIBUTING.md).
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 To set up Healthchecks development environment:
 
