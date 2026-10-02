@@ -34,7 +34,6 @@ class Command(BaseCommand):
                 self.stdout.write(f"[{check.num_flips}] Sending notice to {email} about '{check.name}'")
 
                 ctx = {
-                    "email": email,
                     "check": check,
                     "num_flips": check.num_flips,
                     "support_email": settings.SUPPORT_EMAIL,

@@ -388,7 +388,7 @@ SLACK_ENABLED = envbool("SLACK_ENABLED", "True")
 # Spike.sh
 SPIKE_ENABLED = envbool("SPIKE_ENABLED", "True")
 
-# Telegram integration -- override in local_settings.py
+# Telegram integration
 TELEGRAM_BOT_NAME = os.getenv("TELEGRAM_BOT_NAME", "ExampleBot")
 TELEGRAM_TOKEN = envsecret("TELEGRAM_TOKEN")
 

@@ -14,10 +14,19 @@
 #     }
 # }
 
-# Email
-# EMAIL_HOST = "your-smtp-server-here.com"
-# EMAIL_PORT = 587
-# EMAIL_HOST_USER = "username"
-# EMAIL_HOST_PASSWORD = "password"
-# EMAIL_USE_TLS = True
-# EMAIL_USE_SSL = False
+# Email: configure SMTP through MAILERS, not through EMAIL_BACKEND, EMAIL_HOST,
+# EMAIL_PORT or the other EMAIL_* backend settings Django 6.1 deprecates:
+# hc/settings.py always defines MAILERS, and Django refuses them alongside it.
+# MAILERS = {
+#     "default": {
+#         "BACKEND": "django.core.mail.backends.smtp.EmailBackend",
+#         "OPTIONS": {
+#             "host": "your-smtp-server-here.com",
+#             "port": 587,
+#             "username": "username",
+#             "password": "password",
+#             "use_tls": True,
+#             "use_ssl": False,
+#         },
+#     },
+# }

@@ -90,13 +90,13 @@ environment variables:</p>
 <ul>
 <li>Implicit TLS (<em>recommended</em>):</li>
 </ul>
-<div class="highlight"><pre><span></span><code><span class="n">DEFAULT_FROM_EMAIL</span> <span class="o">=</span> <span class="s2">"valid-sender-address@example.org"</span>
-<span class="n">EMAIL_HOST</span> <span class="o">=</span> <span class="s2">"smtp.example.org"</span>
-<span class="n">EMAIL_PORT</span> <span class="o">=</span> <span class="mi">465</span>
-<span class="n">EMAIL_HOST_USER</span> <span class="o">=</span> <span class="s2">"example-username"</span>
-<span class="n">EMAIL_HOST_PASSWORD</span> <span class="o">=</span> <span class="s2">"example-password"</span>
-<span class="n">EMAIL_USE_TLS</span> <span class="o">=</span> <span class="kc">False</span>
-<span class="n">EMAIL_USE_SSL</span> <span class="o">=</span> <span class="kc">True</span>
+<div class="highlight"><pre><span></span><code><span class="na">DEFAULT_FROM_EMAIL</span><span class="o">=</span><span class="s">valid-sender-address@example.org</span>
+<span class="na">EMAIL_HOST</span><span class="o">=</span><span class="s">smtp.example.org</span>
+<span class="na">EMAIL_PORT</span><span class="o">=</span><span class="s">465</span>
+<span class="na">EMAIL_HOST_USER</span><span class="o">=</span><span class="s">example-username</span>
+<span class="na">EMAIL_HOST_PASSWORD</span><span class="o">=</span><span class="s">example-password</span>
+<span class="na">EMAIL_USE_TLS</span><span class="o">=</span><span class="s">False</span>
+<span class="na">EMAIL_USE_SSL</span><span class="o">=</span><span class="s">True</span>
 </code></pre></div>
 
 <p>Port 465 should be the preferred method according to <a href="https://tools.ietf.org/html/rfc8314#section-3.3">RFC8314 Section 3.3: Implicit
@@ -105,12 +105,12 @@ to use a TLS certificate and not an SSL one.</p>
 <ul>
 <li>Explicit TLS:</li>
 </ul>
-<div class="highlight"><pre><span></span><code><span class="n">DEFAULT_FROM_EMAIL</span> <span class="o">=</span> <span class="s2">"valid-sender-address@example.org"</span>
-<span class="n">EMAIL_HOST</span> <span class="o">=</span> <span class="s2">"smtp.example.org"</span>
-<span class="n">EMAIL_PORT</span> <span class="o">=</span> <span class="mi">587</span>
-<span class="n">EMAIL_HOST_USER</span> <span class="o">=</span> <span class="s2">"example-username"</span>
-<span class="n">EMAIL_HOST_PASSWORD</span> <span class="o">=</span> <span class="s2">"example-password"</span>
-<span class="n">EMAIL_USE_TLS</span> <span class="o">=</span> <span class="kc">True</span>
+<div class="highlight"><pre><span></span><code><span class="na">DEFAULT_FROM_EMAIL</span><span class="o">=</span><span class="s">valid-sender-address@example.org</span>
+<span class="na">EMAIL_HOST</span><span class="o">=</span><span class="s">smtp.example.org</span>
+<span class="na">EMAIL_PORT</span><span class="o">=</span><span class="s">587</span>
+<span class="na">EMAIL_HOST_USER</span><span class="o">=</span><span class="s">example-username</span>
+<span class="na">EMAIL_HOST_PASSWORD</span><span class="o">=</span><span class="s">example-password</span>
+<span class="na">EMAIL_USE_TLS</span><span class="o">=</span><span class="s">True</span>
 </code></pre></div>
 
 <p>Healthchecks uses these environment variables to construct the <code>settings.MAILERS</code>

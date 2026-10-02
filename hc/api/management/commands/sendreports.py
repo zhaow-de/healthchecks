@@ -16,7 +16,7 @@ from hc.accounts.models import NO_NAG, Profile
 
 
 class Command(BaseCommand):
-    help = "Send due monthly reports and nags"
+    help = "Send due reports and nags"
     tmpl = "Sent monthly report to %s"
 
     def pause(self) -> None:
@@ -28,7 +28,7 @@ class Command(BaseCommand):
             action="store_true",
             dest="loop",
             default=False,
-            help="Keep running indefinitely in a 300 second wait loop",
+            help="Keep running indefinitely, checking for due reports and nags every 60 seconds",
         )
 
     def handle_one_report(self) -> bool:
@@ -112,7 +112,7 @@ class Command(BaseCommand):
             if not connection.in_atomic_block:
                 close_old_connections()
 
-            # Monthly reports
+            # Daily, weekly and monthly reports
             while not self.shutdown and self.handle_one_report():
                 pass
 

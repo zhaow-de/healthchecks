@@ -11,7 +11,7 @@ from hc.lib.html import html2text
 
 
 class Command(BaseCommand):
-    help = "Renders Markdown to HTML"
+    help = "Rebuilds the docs search index in search.db"
 
     def handle(self, **options: Any) -> None:
         con = sqlite3.connect(settings.BASE_DIR / "search.db")

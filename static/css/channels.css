@@ -143,11 +143,6 @@ table.channels-table > tbody > tr > th {
     margin-top: 0;
 }
 
-.setup-guide h2,
-.integration-settings h2 {
-    margin: 0 0 1em 0;
-}
-
 .ai-step {
     margin: 2em 0;
     counter-increment: ai-step;

@@ -33,12 +33,5 @@ class ProjectModelTestCase(BaseTestCase):
 
         self.assertEqual(self.project.get_n_down(), 2)
 
-    def test_dashboard_url_requires_readonly_key(self) -> None:
-        self.assertIsNone(self.project.dashboard_url())
-
-    def test_dashboard_url_works(self) -> None:
-        self.project.api_key_readonly = "R" * 32
-        self.assertEqual(self.project.dashboard_url(), f"/tv/#{'R' * 32}=Alices%20Project")
-
     def test_get_absolute_url_works(self) -> None:
         self.assertEqual(self.project.get_absolute_url(), f"/projects/{self.project.code}/checks/")

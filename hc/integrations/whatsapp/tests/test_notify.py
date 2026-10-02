@@ -123,7 +123,7 @@ class NotifyWhatsAppTestCase(BaseTestCase):
         payload = mock_post.call_args.kwargs["data"]
         self.assertIn("Foo > Bar & Co", payload["ContentVariables"])
 
-    @patch("hc.api.transports.logger.debug", autospec=True)
+    @patch("hc.integrations.whatsapp.transport.logger.debug", autospec=True)
     @patch("hc.api.transports.curl.request", autospec=True)
     def test_it_disables_channel_on_21211(self, mock_post: Mock, debug: Mock) -> None:
         # Twilio's error 21211 is "Invalid 'To' Phone Number"

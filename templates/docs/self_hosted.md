@@ -90,14 +90,14 @@ environment variables:
 
 - Implicit TLS (*recommended*):
 
-```python
-DEFAULT_FROM_EMAIL = "valid-sender-address@example.org"
-EMAIL_HOST = "smtp.example.org"
-EMAIL_PORT = 465
-EMAIL_HOST_USER = "example-username"
-EMAIL_HOST_PASSWORD = "example-password"
-EMAIL_USE_TLS = False
-EMAIL_USE_SSL = True
+```ini
+DEFAULT_FROM_EMAIL=valid-sender-address@example.org
+EMAIL_HOST=smtp.example.org
+EMAIL_PORT=465
+EMAIL_HOST_USER=example-username
+EMAIL_HOST_PASSWORD=example-password
+EMAIL_USE_TLS=False
+EMAIL_USE_SSL=True
 ```
 
 Port 465 should be the preferred method according to [RFC8314 Section 3.3: Implicit
@@ -106,13 +106,13 @@ to use a TLS certificate and not an SSL one.
 
 - Explicit TLS:
 
-```python
-DEFAULT_FROM_EMAIL = "valid-sender-address@example.org"
-EMAIL_HOST = "smtp.example.org"
-EMAIL_PORT = 587
-EMAIL_HOST_USER = "example-username"
-EMAIL_HOST_PASSWORD = "example-password"
-EMAIL_USE_TLS = True
+```ini
+DEFAULT_FROM_EMAIL=valid-sender-address@example.org
+EMAIL_HOST=smtp.example.org
+EMAIL_PORT=587
+EMAIL_HOST_USER=example-username
+EMAIL_HOST_PASSWORD=example-password
+EMAIL_USE_TLS=True
 ```
 
 Healthchecks uses these environment variables to construct the `settings.MAILERS`

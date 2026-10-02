@@ -20,7 +20,7 @@ class Email(Transport):
         if m.is_multipart():
             parts = m.get_payload()
             # If is_multipart=True then get_payload() returns list[Message].
-            # Mypy does not know this, hence the assert.
+            # A type checker does not know this, hence the assert.
             assert isinstance(parts, list)
             # use list() here so we don't mutate the same list we're iterating
             for part in list(parts):

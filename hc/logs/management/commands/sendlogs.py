@@ -10,8 +10,6 @@ from django.utils.timezone import now
 from hc.lib.urls import absolute_reverse
 from hc.logs.models import Record
 
-YEAR_AGO = now() - td(days=365)
-
 
 class Command(BaseCommand):
     help = """Send notification to admins about new log events."""

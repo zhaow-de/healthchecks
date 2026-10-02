@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from uuid import UUID
 
 from django.contrib.auth.decorators import login_required
@@ -12,8 +11,6 @@ from hc.api.models import Channel
 from hc.front import forms
 from hc.front.decorators import require_setting
 from hc.front.views import _get_rw_project_for_user
-
-logger = logging.getLogger(__name__)
 
 
 @require_setting("PAGERTREE_ENABLED")

@@ -722,12 +722,6 @@ class Ping(models.Model):
 
         return None
 
-    def get_body(self) -> str | None:
-        if body_bytes := self.get_body_bytes():
-            return body_bytes.decode(errors="replace")
-
-        return None
-
     def get_body_size(self) -> int:
         if self.body_raw:
             return len(self.body_raw)

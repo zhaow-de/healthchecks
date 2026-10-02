@@ -122,7 +122,11 @@ you can set via environment variables.
 
 In addition, Healthchecks reads settings from the `hc/local_settings.py` file if it
 exists. You can set or override any [standard Django setting](https://docs.djangoproject.com/en/6.1/ref/settings/)
-in this file. You can copy the provided `hc/local_settings.py.example` as
+in this file, except `EMAIL_BACKEND`, `EMAIL_HOST`, `EMAIL_PORT` and the other
+email backend settings Django 6.1 deprecates: Healthchecks always defines `MAILERS`,
+and Django refuses them alongside it, so configure SMTP in this file through `MAILERS`
+(see [EMAIL_HOST](https://zcrypto-hc.zhaow.me/docs/self_hosted_configuration/#EMAIL_HOST)).
+You can copy the provided `hc/local_settings.py.example` as
 `hc/local_settings.py` and use it as a starting point.
 
 If a setting is specified both as environment variable and in `hc/local_settings.py`,
@@ -148,14 +152,14 @@ links and alerts to users. Specify your SMTP credentials using the following
 environment variables:
 
 - Implicit TLS (*recommended*):
-    ```python
-    DEFAULT_FROM_EMAIL = "valid-sender-address@example.org"
-    EMAIL_HOST = "smtp.example.org"
-    EMAIL_PORT = 465
-    EMAIL_HOST_USER = "example-username"
-    EMAIL_HOST_PASSWORD = "example-password"
-    EMAIL_USE_TLS = False
-    EMAIL_USE_SSL = True
+    ```ini
+    DEFAULT_FROM_EMAIL=valid-sender-address@example.org
+    EMAIL_HOST=smtp.example.org
+    EMAIL_PORT=465
+    EMAIL_HOST_USER=example-username
+    EMAIL_HOST_PASSWORD=example-password
+    EMAIL_USE_TLS=False
+    EMAIL_USE_SSL=True
     ```
 
     Port 465 should be the preferred method according to [RFC8314 Section 3.3: Implicit
@@ -163,13 +167,13 @@ environment variables:
     to use a TLS certificate and not an SSL one.
 
 - Explicit TLS:
-    ```python
-    DEFAULT_FROM_EMAIL = "valid-sender-address@example.org"
-    EMAIL_HOST = "smtp.example.org"
-    EMAIL_PORT = 587
-    EMAIL_HOST_USER = "example-username"
-    EMAIL_HOST_PASSWORD = "example-password"
-    EMAIL_USE_TLS = True
+    ```ini
+    DEFAULT_FROM_EMAIL=valid-sender-address@example.org
+    EMAIL_HOST=smtp.example.org
+    EMAIL_PORT=587
+    EMAIL_HOST_USER=example-username
+    EMAIL_HOST_PASSWORD=example-password
+    EMAIL_USE_TLS=True
     ```
 
 Healthchecks uses these environment variables to construct the `settings.MAILERS`
@@ -378,7 +382,7 @@ To enable the Pushover integration, you will need to:
 
 Healthchecks uses [signal-cli](https://github.com/AsamK/signal-cli) to send Signal
 notifications. Healthchecks interacts with signal-cli over UNIX or TCP socket.
-Healthchecks requires signal-cli version 0.11.2 or later.
+Healthchecks requires signal-cli version 0.11.10 or later.
 
 To enable the Signal integration via UNIX socket:
 

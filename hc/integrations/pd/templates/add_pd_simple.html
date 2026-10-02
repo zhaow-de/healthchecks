@@ -46,30 +46,28 @@
 
     <h2>Setup Guide</h2>
 
-    {% if not connect_url %}
-        <div class="row ai-step">
-            <div class="col-sm-6">
-                <span class="step-no"></span>
-                <p>
-                    {% if request.user.is_authenticated %}
-                    Go
-                    {% else %}
-                    After logging in, go
-                    {% endif %}
+    <div class="row ai-step">
+        <div class="col-sm-6">
+            <span class="step-no"></span>
+            <p>
+                {% if request.user.is_authenticated %}
+                Go
+                {% else %}
+                After logging in, go
+                {% endif %}
 
-                    to the <strong>Integrations</strong> page,
-                    and click on <strong>Add Integration</strong> next to the
-                    PagerDuty integration.
-                </p>
-            </div>
-            <div class="col-sm-6">
-                <img
-                    class="ai-guide-screenshot"
-                    alt="Screenshot"
-                    src="{% static 'img/setup_pd_simple_0.png' %}">
-            </div>
+                to the <strong>Integrations</strong> page,
+                and click on <strong>Add Integration</strong> next to the
+                PagerDuty integration.
+            </p>
         </div>
-    {% endif %}
+        <div class="col-sm-6">
+            <img
+                class="ai-guide-screenshot"
+                alt="Screenshot"
+                src="{% static 'img/setup_pd_simple_0.png' %}">
+        </div>
+    </div>
 
     <div class="row ai-step">
         <div class="col-sm-6">

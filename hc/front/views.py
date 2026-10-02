@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import email
-import logging
 import os
 import re
 import sqlite3
@@ -63,8 +62,6 @@ from hc.lib.badges import get_badge_url
 from hc.lib.string import is_valid_uuid_string
 from hc.lib.tz import all_timezones
 from hc.lib.urls import absolute_reverse
-
-logger = logging.getLogger(__name__)
 
 VALID_SORT_VALUES = ("name", "-name", "last_ping", "-last_ping", "created")
 STATUS_TEXT_TMPL = get_template("front/log_status_text.html")
@@ -292,7 +289,6 @@ def checks(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
         "channels": channels,
         "num_down": num_down,
         "tags": tags_counts,
-        "ping_endpoint": settings.PING_ENDPOINT,
         "common_timezones": _common_timezones(checks),
         "timezones": all_timezones,
         "project": project,

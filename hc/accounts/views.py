@@ -372,8 +372,6 @@ def project(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
         "project": project,
         "is_owner": is_owner,
         "is_manager": is_manager,
-        "show_api_keys": "show_api_keys" in request.GET,
-        "enable_prometheus": settings.PROMETHEUS_ENABLED is True,
     }
 
     if request.method == "POST":
@@ -542,7 +540,6 @@ def notifications(request: AuthenticatedHttpRequest) -> HttpResponse:
         "status": "default",
         "page": "profile",
         "profile": profile,
-        "timezones": all_timezones,
     }
 
     if request.method == "POST":

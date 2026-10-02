@@ -37,12 +37,10 @@ documentation page:
 ## Developing a New Integration
 
 Before starting work on a new integration, please open an issue and
-discuss it first. We use several criteria when deciding whether to work on an
-integration or accept a pull request:
+discuss it first. This fork keeps only the integrations its own deployment
+uses, so a new one is added when that deployment needs it. Beyond that need,
+we ask:
 
-* Most important: is there substantial end-user (ideally, paying or would-be-paying
-  end user) interest, across GitHub issues, private emails, social media?
-* Would it be fun to work on?
 * Is the service we are integrating with developer-friendly? Does it have an open
   and well-documented API? Can we develop and test the integration while avoiding
   sales calls, contract signing, paid subscriptions?

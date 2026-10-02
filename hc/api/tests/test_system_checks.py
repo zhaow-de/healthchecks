@@ -6,7 +6,7 @@ from hc.api.apps import settings_check
 from hc.test import BaseTestCase
 
 
-@override_settings(EMAIL_HOST="localhost", APPRISE_ENABLED=False)
+@override_settings(APPRISE_ENABLED=False)
 class SystemChecksCase(BaseTestCase):
     @override_settings(SITE_ROOT="example.com")
     def test_it_validates_site_root_syntax(self) -> None:

@@ -21,7 +21,6 @@ from hc.front.templatetags.hc_extras import (
     site_hostname,
     sortchecks,
     support_email,
-    underline,
 )
 
 
@@ -153,9 +152,6 @@ class BreakUnderscoreTestCase(TestCase):
 
 
 class MiscFiltersTestCase(TestCase):
-    def test_underline_works(self) -> None:
-        self.assertEqual(underline("Hello"), "=====")
-
     def test_first5_works(self) -> None:
         rid = UUID("63832bb7-ddd5-4f2d-bf0a-cac885212963")
         self.assertEqual(first5(rid), "63832")

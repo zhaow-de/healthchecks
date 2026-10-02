@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING, Any, NoReturn
 
 from django.template.loader import render_to_string
@@ -12,15 +11,9 @@ if TYPE_CHECKING:
     from hc.api.models import Channel, Check, Flip, Notification, Ping
 
 
-logger = logging.getLogger(__name__)
-
-
 def get_ping_body_bytes(ping: Ping | None) -> bytes | None:
     """Return ping body as bytes for a given Ping object."""
-    if ping and ping.has_body():
-        return ping.get_body_bytes()
-
-    return None
+    return ping.get_body_bytes() if ping else None
 
 
 def get_ping_body(ping: Ping | None, maxlen: int | None = None) -> str | None:
@@ -101,13 +94,6 @@ class Transport:
         # \xa0 is non-breaking space. It causes SMS messages to use UCS2 encoding
         # and cost twice the money.
         return render_to_string(template_name, ctx).strip().replace("\xa0", " ")
-
-
-class RemovedTransport(Transport):
-    """Dummy transport class for obsolete integrations."""
-
-    def is_noop(self, status: str) -> bool:
-        return True
 
 
 class HttpTransport(Transport):

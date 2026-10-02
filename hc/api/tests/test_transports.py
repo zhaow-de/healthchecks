@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from unittest.mock import patch
-
 from django.utils.timezone import now
 
 from hc.api.models import Channel, Check, Flip, Notification
-from hc.api.transports import RemovedTransport, Transport
+from hc.api.transports import Transport
 from hc.test import BaseTestCase
 
 
@@ -29,18 +27,3 @@ class TransportBaseTestCase(BaseTestCase):
         transport = Transport(self.channel)
         self.assertFalse(transport.is_noop("down"))
         self.assertFalse(transport.is_noop("up"))
-
-    def test_removed_transport_is_noop(self) -> None:
-        transport = RemovedTransport(self.channel)
-        self.assertTrue(transport.is_noop("down"))
-        self.assertTrue(transport.is_noop("up"))
-
-    def test_channel_with_removed_transport_sends_nothing(self) -> None:
-        self.channel.kind = "retired"
-        self.channel.save()
-
-        with patch.dict("hc.api.models.TRANSPORTS", {"retired": ("Retired", RemovedTransport)}):
-            self.assertIsInstance(self.channel.transport, RemovedTransport)
-            self.assertEqual(self.channel.notify(self.flip), "no-op")
-
-        self.assertFalse(Notification.objects.exists())

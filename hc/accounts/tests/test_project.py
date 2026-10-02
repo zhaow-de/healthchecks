@@ -393,15 +393,3 @@ class ProjectTestCase(BaseTestCase):
 
         r = self.client.get(self.url)
         self.assertNotContains(r, "#set-project-name-modal", status_code=200)
-        self.assertNotContains(r, "Show API Keys")
-
-    @override_settings(PROMETHEUS_ENABLED=False)
-    def test_it_hides_prometheus_link_if_prometheus_not_enabled(self) -> None:
-        self.project.api_key_readonly = "R" * 32
-        self.project.save()
-
-        self.client.login(username="alice@example.org", password="password")
-        r = self.client.post(self.url, {"show_api_keys": "1"})
-        self.assertEqual(r.status_code, 200)
-
-        self.assertNotContains(r, "Prometheus metrics endpoint")

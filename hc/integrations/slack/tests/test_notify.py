@@ -200,7 +200,7 @@ class NotifySlackTestCase(BaseTestCase):
         self.channel.refresh_from_db()
         self.assertTrue(self.channel.disabled)
 
-    @patch("hc.api.transports.logger.debug", autospec=True)
+    @patch("hc.integrations.slack.transport.logger.debug", autospec=True)
     @patch("hc.api.transports.curl.request", autospec=True)
     def test_it_disables_channel_on_400_invalid_token(self, mock_post: Mock, debug: Mock) -> None:
         self._setup_data("123")

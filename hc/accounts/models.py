@@ -7,7 +7,6 @@ from datetime import datetime
 from datetime import timedelta as td
 from secrets import token_urlsafe
 from typing import TYPE_CHECKING, Any
-from urllib.parse import quote, urlencode
 from zoneinfo import ZoneInfo
 
 from django.conf import settings
@@ -424,13 +423,6 @@ class Project(models.Model):
 
     def transfer_request(self) -> Member | None:
         return self.member_set.filter(transfer_request_date__isnull=False).first()
-
-    def dashboard_url(self) -> str | None:
-        if not self.api_key_readonly:
-            return None
-
-        frag = urlencode({self.api_key_readonly: str(self)}, quote_via=quote)
-        return reverse("hc-dashboard", fragment=frag)
 
     def checks_url(self) -> str:
         return absolute_reverse("hc-checks", args=[self.code])

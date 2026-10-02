@@ -285,11 +285,6 @@ def mask_ro_key(key: str) -> str:
 
 
 @register.filter
-def underline(s: str) -> str:
-    return "=" * len(str(s))
-
-
-@register.filter
 def first5(rid: UUID) -> str:
     return str(rid)[:5]
 

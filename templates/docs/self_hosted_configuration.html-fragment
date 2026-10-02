@@ -36,7 +36,7 @@ from environment variables. Below is a list of environment variables it reads an
 <li><a href="#GITHUB_PUBLIC_LINK">GITHUB_PUBLIC_LINK</a></li>
 <li><a href="#http_proxy">http_proxy and https_proxy</a></li>
 <li><a href="#INTEGRATIONS_ALLOW_PRIVATE_IPS">INTEGRATIONS_ALLOW_PRIVATE_IPS</a></li>
-<li><a href="#MASTER_BADGE_URL">MASTER_BADGE_LABEL</a></li>
+<li><a href="#MASTER_BADGE_LABEL">MASTER_BADGE_LABEL</a></li>
 <li><a href="#MATRIX_ACCESS_TOKEN">MATRIX_ACCESS_TOKEN</a></li>
 <li><a href="#MATRIX_ACCESS_TOKEN_FILE">MATRIX_ACCESS_TOKEN_FILE</a></li>
 <li><a href="#MATRIX_HOMESERVER">MATRIX_HOMESERVER</a></li>
@@ -189,7 +189,7 @@ precedence.</p>
 <p>To set up the Discord integration:</p>
 <ul>
 <li>Register a new application at
-  <a href="https://discordapp.com/developers/applications/me">https://discordapp.com/developers/applications/me</a></li>
+  <a href="https://discord.com/developers/applications">https://discord.com/developers/applications</a></li>
 <li>Add a Redirect URI to your Discord application. The URI format is
   <code>SITE_ROOT/integrations/add_discord/</code>. For example, if <code>your SITE_ROOT</code>
   is <code>https://my-hc.example.org</code> then the Redirect URI would be
@@ -201,7 +201,7 @@ precedence.</p>
 <h2 id="DISCORD_CLIENT_SECRET"><code>DISCORD_CLIENT_SECRET</code></h2>
 <p>Default: <code>None</code></p>
 <p>The Discord Client Secret, required by the Discord integration. Look it up at
-<a href="https://discordapp.com/developers/applications/me">https://discordapp.com/developers/applications/me</a>.</p>
+<a href="https://discord.com/developers/applications">https://discord.com/developers/applications</a>.</p>
 <h2 id="DISCORD_CLIENT_SECRET_FILE"><code>DISCORD_CLIENT_SECRET_FILE</code></h2>
 <p>Default: <code>None</code></p>
 <p>If set, must contain a filesystem path pointing to a readable file. Healthchecks will
@@ -340,7 +340,7 @@ IP address, you will need to enable <code>INTEGRATIONS_ALLOW_PRIVATE_IPS</code> 
 <p>This setting <em>does not</em> have effect on the Apprise integration, as the Apprise library
 uses its own HTTP client. Apprise can make requests to private IPs regardless
 of this setting.</p>
-<h2 id="MASTER_BADGE_URL"><code>MASTER_BADGE_LABEL</code></h2>
+<h2 id="MASTER_BADGE_LABEL"><code>MASTER_BADGE_LABEL</code></h2>
 <p>Default: same as <code>SITE_NAME</code></p>
 <p>The label for the "Overall Status" status badge.</p>
 <h2 id="MATRIX_ACCESS_TOKEN"><code>MATRIX_ACCESS_TOKEN</code></h2>
@@ -590,9 +590,6 @@ required by the WebAuthn second-factor authentication feature.</p>
 standard. To enable WebAuthn support, set the <code>RP_ID</code> setting to a non-null value.
 Set its value to your site's domain without scheme and without port. For example,
 if your site runs on <code>https://my-hc.example.org</code>, set <code>RP_ID</code> to <code>my-hc.example.org</code>.</p>
-<p>Note that WebAuthn requires HTTPS, even if running on localhost. To test WebAuthn
-locally with a self-signed certificate, you can use the <code>runsslserver</code> command
-from the <code>django-sslserver</code> package.</p>
 <h2 id="SECRET_KEY"><code>SECRET_KEY</code></h2>
 <p>Default: <code>---</code></p>
 <p>A secret key used for cryptographic signing. Should be set to a unique,
@@ -655,7 +652,7 @@ TCP socket.</p>
 
 <p>Healthchecks uses <a href="https://github.com/AsamK/signal-cli">signal-cli</a> to send Signal
 notifications. Healthchecks interacts with signal-cli over UNIX or TCP socket (requires
-signal-cli 0.10.0 or later).</p>
+signal-cli 0.11.10 or later).</p>
 <p>To enable the Signal integration:</p>
 <ul>
 <li>Set up and configure signal-cli to expose JSON RPC on an UNIX or TCP socket

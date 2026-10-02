@@ -43,7 +43,7 @@ class Opsgenie(HttpTransport):
         }
 
         if flip.new_status == "down":
-            ctx = {"flip": flip, "check": check, "ping": self.last_ping(flip)}
+            ctx = {"flip": flip, "check": check}
             payload["tags"] = cast(JSONValue, check.tags_list())
             payload["message"] = self.tmpl("opsgenie_message.html", **ctx)
             payload["description"] = check.desc

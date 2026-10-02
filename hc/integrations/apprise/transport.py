@@ -21,7 +21,7 @@ class Apprise(HttpTransport):
         a = apprise.Apprise()
         check, status = flip.owner, flip.new_status
         title = self.tmpl("apprise_title.html", check=check, status=status)
-        body = self.tmpl("apprise_description.html", check=check, status=status, flip=flip)
+        body = self.tmpl("apprise_description.html", status=status, flip=flip)
 
         a.add(self.channel.value)
 

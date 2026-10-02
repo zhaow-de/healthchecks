@@ -79,7 +79,7 @@ class NotifyCallTestCase(BaseTestCase):
         self.assertEqual(len(mail.outbox), 0)
 
     @override_settings(TWILIO_FROM="+000")
-    @patch("hc.api.transports.logger.debug", autospec=True)
+    @patch("hc.integrations.call.transport.logger.debug", autospec=True)
     @patch("hc.api.transports.curl.request", autospec=True)
     def test_it_disables_channel_on_21211(self, mock_post: Mock, debug: Mock) -> None:
         # Twilio's error 21211 is "Invalid 'To' Phone Number"

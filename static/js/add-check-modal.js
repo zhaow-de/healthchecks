@@ -81,7 +81,6 @@ $(function () {
             return;
 
         currentSchedule = field.value;
-        var token = $('input[name=csrfmiddlewaretoken]').val();
         var payload = {kind: kind, schedule: field.value};
         $.getJSON(base + "/checks/validate_schedule/", payload, function(data) {
             if (field.value != currentSchedule)

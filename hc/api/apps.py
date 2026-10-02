@@ -14,7 +14,7 @@ class ApiConfig(AppConfig):
     name = "hc.api"
 
 
-@register()  # W001, W002, W005, E002, E003
+@register()  # W001, W002, W005, W006, E002, E003
 def settings_check(
     app_configs: Sequence[AppConfig] | None,
     databases: Sequence[str] | None,

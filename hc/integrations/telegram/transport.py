@@ -55,7 +55,7 @@ class Telegram(HttpTransport):
     @classmethod
     def send(cls, chat_id: int, thread_id: int | None, text: str) -> None:
         # Telegram.send is a separate method because it is also used in
-        # hc.front.views.telegram_bot to send invite links.
+        # hc.integrations.telegram.views.telegram_bot to send invite links.
         payload = {
             "chat_id": chat_id,
             "message_thread_id": thread_id,

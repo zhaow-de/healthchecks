@@ -132,7 +132,6 @@ class PingsAdmin(ModelAdmin[Ping]):
     list_select_related = ("owner",)
     list_display = ("id", "created", "owner", "scheme", "method", "ua")
     list_filter = ("created", SchemeListFilter, MethodListFilter, KindListFilter)
-    exclude = ("body",)
 
     paginator = PingsPaginator
     show_full_result_count = False

@@ -38,7 +38,7 @@ from environment variables. Below is a list of environment variables it reads an
 <li><a href="#GITHUB_PUBLIC_LINK">GITHUB_PUBLIC_LINK</a></li>
 <li><a href="#http_proxy">http_proxy and https_proxy</a></li>
 <li><a href="#INTEGRATIONS_ALLOW_PRIVATE_IPS">INTEGRATIONS_ALLOW_PRIVATE_IPS</a></li>
-<li><a href="#MASTER_BADGE_URL">MASTER_BADGE_LABEL</a></li>
+<li><a href="#MASTER_BADGE_LABEL">MASTER_BADGE_LABEL</a></li>
 <li><a href="#MATRIX_ACCESS_TOKEN">MATRIX_ACCESS_TOKEN</a></li>
 <li><a href="#MATRIX_ACCESS_TOKEN_FILE">MATRIX_ACCESS_TOKEN_FILE</a></li>
 <li><a href="#MATRIX_HOMESERVER">MATRIX_HOMESERVER</a></li>
@@ -249,7 +249,7 @@ The Discord Client ID, required by the Discord integration.
 To set up the Discord integration:
 
 * Register a new application at
-  [https://discordapp.com/developers/applications/me](https://discordapp.com/developers/applications/me)
+  [https://discord.com/developers/applications](https://discord.com/developers/applications)
 * Add a Redirect URI to your Discord application. The URI format is
   `SITE_ROOT/integrations/add_discord/`. For example, if `your SITE_ROOT`
   is `https://my-hc.example.org` then the Redirect URI would be
@@ -263,7 +263,7 @@ To set up the Discord integration:
 Default: `None`
 
 The Discord Client Secret, required by the Discord integration. Look it up at
-[https://discordapp.com/developers/applications/me](https://discordapp.com/developers/applications/me).
+[https://discord.com/developers/applications](https://discord.com/developers/applications).
 
 ## `DISCORD_CLIENT_SECRET_FILE` {: #DISCORD_CLIENT_SECRET_FILE }
 
@@ -466,7 +466,7 @@ This setting *does not* have effect on the Apprise integration, as the Apprise l
 uses its own HTTP client. Apprise can make requests to private IPs regardless
 of this setting.
 
-## `MASTER_BADGE_LABEL` {: #MASTER_BADGE_URL }
+## `MASTER_BADGE_LABEL` {: #MASTER_BADGE_LABEL }
 
 Default: same as `SITE_NAME`
 
@@ -821,10 +821,6 @@ standard. To enable WebAuthn support, set the `RP_ID` setting to a non-null valu
 Set its value to your site's domain without scheme and without port. For example,
 if your site runs on `https://my-hc.example.org`, set `RP_ID` to `my-hc.example.org`.
 
-Note that WebAuthn requires HTTPS, even if running on localhost. To test WebAuthn
-locally with a self-signed certificate, you can use the `runsslserver` command
-from the `django-sslserver` package.
-
 ## `SECRET_KEY` {: #SECRET_KEY }
 
 Default: `---`
@@ -916,7 +912,7 @@ SIGNAL_CLI_SOCKET=example.org:7583
 
 Healthchecks uses [signal-cli](https://github.com/AsamK/signal-cli) to send Signal
 notifications. Healthchecks interacts with signal-cli over UNIX or TCP socket (requires
-signal-cli 0.10.0 or later).
+signal-cli 0.11.10 or later).
 
 To enable the Signal integration:
 
