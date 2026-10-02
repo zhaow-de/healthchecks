@@ -78,7 +78,7 @@ allowed-tools: Bash(git add:*), Bash(git checkout:*), Bash(git tag:*), Bash(git 
    ```bash
    uv lock
    ```
-   `cz bump` does not touch `uv.lock`; without this step `uv sync --locked`, which CI and the Docker build run, fails on the released commit. If `uv` refuses to run because of `required-version` in `pyproject.toml`, an older `uv` is first on `PATH`: fix `PATH` and run the step again.
+   `cz bump` does not touch `uv.lock`; without this step `uv sync --locked`, which CI and the Docker build run, fails on the released commit.
 
 6. **Verify the bump**. `cz bump` silently skips a `version_files` entry whose line no longer contains the previous version string, so check every home:
 
