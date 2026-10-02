@@ -14,7 +14,7 @@ including [Ethernet](https://github.com/arduino-libraries/Ethernet) and
 #include <WiFiNINA.h>
 
 WiFiSSLClient wifi;
-HttpClient client = HttpClient(wifi, "hc-ping.com", 443);
+HttpClient client = HttpClient(wifi, "zcrypto-hc.zhaow.me", 443);
 
 void setup() {
   Serial.begin(9600);
@@ -31,7 +31,7 @@ void setup() {
   Serial.println(WiFi.localIP());
 
   // Make a HTTPS request:
-  client.get("/your-uuid-here");
+  client.get("/ping/your-uuid-here");
   Serial.print("Status code: ");
   Serial.println(client.responseStatusCode());
   Serial.print("Response: ");

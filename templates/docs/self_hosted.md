@@ -3,7 +3,7 @@
 Healthchecks is open-source, and is licensed under the BSD 3-clause license.
 
 As an alternative to using the hosted service at
-[https://healthchecks.io](https://healthchecks.io), you have the option to host a
+[https://zcrypto-hc.zhaow.me](https://zcrypto-hc.zhaow.me), you have the option to host a
 Healthchecks instance yourself.
 
 The building blocks are:

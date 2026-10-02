@@ -23,7 +23,7 @@ from the original Healthchecks project remains under its BSD 3-clause
 license. Both are in [LICENSE](LICENSE).
 
 Healthchecks is available as a hosted service
-at [https://healthchecks.io/](https://healthchecks.io/).
+at [https://zcrypto-hc.zhaow.me/](https://zcrypto-hc.zhaow.me/).
 
 A [Dockerfile](docker/)
 and [pre-built Docker images](https://github.com/zhaow-de/healthchecks/pkgs/container/healthchecks) are
@@ -125,7 +125,7 @@ assume an activated virtual environment.
 ## Configuration
 
 Healthchecks reads configuration from environment variables. See the
-[full list of configuration parameters](https://healthchecks.io/docs/self_hosted_configuration/)
+[full list of configuration parameters](https://zcrypto-hc.zhaow.me/docs/self_hosted_configuration/)
 you can set via environment variables.
 
 In addition, Healthchecks reads settings from the `hc/local_settings.py` file if it

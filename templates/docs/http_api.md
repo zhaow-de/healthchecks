@@ -109,8 +109,8 @@ rid=&lt;uuid&gt;
 **Example**
 
 ```http
-GET /5bf66975-d4c7-4bf5-bcc8-b8d8a82ea278 HTTP/1.0
-Host: hc-ping.com
+GET /ping/5bf66975-d4c7-4bf5-bcc8-b8d8a82ea278 HTTP/1.0
+Host: zcrypto-hc.zhaow.me
 ```
 
 ```http
@@ -168,8 +168,8 @@ rid=&lt;uuid&gt;
 **Example**
 
 ```http
-GET /5bf66975-d4c7-4bf5-bcc8-b8d8a82ea278/start HTTP/1.0
-Host: hc-ping.com
+GET /ping/5bf66975-d4c7-4bf5-bcc8-b8d8a82ea278/start HTTP/1.0
+Host: zcrypto-hc.zhaow.me
 ```
 
 ```http
@@ -224,8 +224,8 @@ rid=&lt;uuid&gt;
 **Example**
 
 ```http
-GET /5bf66975-d4c7-4bf5-bcc8-b8d8a82ea278/fail HTTP/1.0
-Host: hc-ping.com
+GET /ping/5bf66975-d4c7-4bf5-bcc8-b8d8a82ea278/fail HTTP/1.0
+Host: zcrypto-hc.zhaow.me
 ```
 
 ```http
@@ -279,8 +279,8 @@ rid=&lt;uuid&gt;
 **Example**
 
 ```http
-POST /5bf66975-d4c7-4bf5-bcc8-b8d8a82ea278/log HTTP/1.1
-Host: hc-ping.com
+POST /ping/5bf66975-d4c7-4bf5-bcc8-b8d8a82ea278/log HTTP/1.1
+Host: zcrypto-hc.zhaow.me
 Content-Type: text/plain
 Content-Length: 11
 
@@ -343,8 +343,8 @@ rid=&lt;uuid&gt;
 **Example**
 
 ```http
-GET /5bf66975-d4c7-4bf5-bcc8-b8d8a82ea278/1 HTTP/1.0
-Host: hc-ping.com
+GET /ping/5bf66975-d4c7-4bf5-bcc8-b8d8a82ea278/1 HTTP/1.0
+Host: zcrypto-hc.zhaow.me
 ```
 
 ```http
@@ -416,8 +416,8 @@ rid=&lt;uuid&gt;
 **Example**
 
 ```http
-GET /fqOOd6-F4MMNuCEnzTU01w/database-backup HTTP/1.0
-Host: hc-ping.com
+GET /ping/fqOOd6-F4MMNuCEnzTU01w/database-backup HTTP/1.0
+Host: zcrypto-hc.zhaow.me
 ```
 
 ```http
@@ -492,8 +492,8 @@ rid=&lt;uuid&gt;
 **Example**
 
 ```http
-GET /fqOOd6-F4MMNuCEnzTU01w/database-backup/start HTTP/1.0
-Host: hc-ping.com
+GET /ping/fqOOd6-F4MMNuCEnzTU01w/database-backup/start HTTP/1.0
+Host: zcrypto-hc.zhaow.me
 ```
 
 ```http
@@ -565,8 +565,8 @@ rid=&lt;uuid&gt;
 **Example**
 
 ```http
-GET /fqOOd6-F4MMNuCEnzTU01w/database-backup/fail HTTP/1.0
-Host: hc-ping.com
+GET /ping/fqOOd6-F4MMNuCEnzTU01w/database-backup/fail HTTP/1.0
+Host: zcrypto-hc.zhaow.me
 ```
 
 ```http
@@ -634,8 +634,8 @@ rid=&lt;uuid&gt;
 **Example**
 
 ```http
-POST /fqOOd6-F4MMNuCEnzTU01w/database-backup/log HTTP/1.1
-Host: hc-ping.com
+POST /ping/fqOOd6-F4MMNuCEnzTU01w/database-backup/log HTTP/1.1
+Host: zcrypto-hc.zhaow.me
 Content-Type: text/plain
 Content-Length: 11
 
@@ -712,8 +712,8 @@ rid=&lt;uuid&gt;
 **Example**
 
 ```http
-GET /fqOOd6-F4MMNuCEnzTU01w/database-backup/1 HTTP/1.0
-Host: hc-ping.com
+GET /ping/fqOOd6-F4MMNuCEnzTU01w/database-backup/1 HTTP/1.0
+Host: zcrypto-hc.zhaow.me
 ```
 
 ```http

@@ -53,7 +53,7 @@ class CurlTestCase(SimpleTestCase):
         self.assertEqual(obj.opts[pycurl.URL], b"http://example.org")
 
         # Default user agent
-        self.assertEqual(obj.opts[pycurl.HTTPHEADER], [b"User-Agent:healthchecks.io"])
+        self.assertEqual(obj.opts[pycurl.HTTPHEADER], [b"User-Agent:zcrypto-hc.zhaow.me"])
 
         # It should allow redirects
         self.assertEqual(obj.opts[pycurl.FOLLOWLOCATION], True)
@@ -202,7 +202,7 @@ class CurlTestCase(SimpleTestCase):
         )
 
         self.assertEqual(obj.opts[pycurl.URL], b"http://example.org?a=b")
-        self.assertEqual(obj.opts[pycurl.HTTPHEADER], [b"X-Foo:bar", b"User-Agent:healthchecks.io"])
+        self.assertEqual(obj.opts[pycurl.HTTPHEADER], [b"X-Foo:bar", b"User-Agent:zcrypto-hc.zhaow.me"])
         self.assertEqual(obj.opts[pycurl.USERPWD], "alice:pass")
         self.assertEqual(obj.opts[pycurl.TIMEOUT], 5)
         # A GET request sets no custom method and uploads no body

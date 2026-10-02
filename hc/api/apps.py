@@ -56,7 +56,7 @@ def settings_check(
         items.append(
             Warning(
                 "settings.SECURE_PROXY_SSL_HEADER is not 2-element tuple",
-                hint="See https://healthchecks.io/docs/self_hosted_configuration/#SECURE_PROXY_SSL_HEADER",
+                hint="See https://zcrypto-hc.zhaow.me/docs/self_hosted_configuration/#SECURE_PROXY_SSL_HEADER",
                 id="hc.api.W005",
             )
         )
@@ -74,7 +74,7 @@ def settings_check(
         items.append(
             Warning(
                 "Apprise can access private IPs regardless of the settings.INTEGRATIONS_ALLOW_PRIVATE_IPS value",
-                hint="See https://healthchecks.io/docs/self_hosted_configuration/#INTEGRATIONS_ALLOW_PRIVATE_IPS",
+                hint="See https://zcrypto-hc.zhaow.me/docs/self_hosted_configuration/#INTEGRATIONS_ALLOW_PRIVATE_IPS",
                 id="hc.api.W006",
             )
         )

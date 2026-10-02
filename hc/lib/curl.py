@@ -115,7 +115,7 @@ def request(
     Notes:
 
     If the caller does not specify the User-Agent header, this function
-    uses a default "healthchecks.io" value.
+    uses a default "zcrypto-hc.zhaow.me" value.
 
     If `INTEGRATIONS_ALLOW_PRIVATE_IPS` is set to `False` in Django settings,
     this function will raise CurlException if the target IP address is from
@@ -159,7 +159,7 @@ def request(
         headers["Content-Type"] = "application/json"
 
     if "User-Agent" not in headers:
-        headers["User-Agent"] = "healthchecks.io"
+        headers["User-Agent"] = "zcrypto-hc.zhaow.me"
 
     headers_list = [_makeheader(k, v) for k, v in headers.items()]
     c.setopt(pycurl.HTTPHEADER, headers_list)

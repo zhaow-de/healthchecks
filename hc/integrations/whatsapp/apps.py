@@ -34,7 +34,7 @@ def whatsapp_settings_check(
             items.append(
                 Warning(
                     f"The WhatsApp integration requires the settings.{key} to be set",
-                    hint=f"See https://healthchecks.io/docs/self_hosted_configuration/#{key}",
+                    hint=f"See https://zcrypto-hc.zhaow.me/docs/self_hosted_configuration/#{key}",
                     id="hc.integrations.whatsapp.W001",
                 )
             )
