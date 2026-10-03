@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from datetime import timedelta as td
+from unittest import skipUnless
 
-from django.test.utils import override_settings
+from django.db import connection
+from django.test.utils import CaptureQueriesContext, override_settings
 from django.utils.timezone import now
 
 from hc.api.models import TokenBucket
@@ -39,6 +41,14 @@ class TokenBucketTestCase(BaseTestCase):
 
         obj.refresh_from_db()
         self.assertAlmostEqual(obj.tokens, 0.4, places=4)
+
+    @skipUnless(connection.features.has_select_for_update, "no row locks")
+    def test_it_locks_the_row(self) -> None:
+        with CaptureQueriesContext(connection) as ctx:
+            TokenBucket.authorize_login_email("alice@example.org")
+
+        sqls = [q["sql"] for q in ctx.captured_queries]
+        self.assertTrue(any(sql.endswith(" FOR UPDATE") for sql in sqls))
 
     def test_it_normalizes_email(self) -> None:
         emails = ("alice+alias@example.org", "a.li.ce@example.org")

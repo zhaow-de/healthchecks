@@ -1045,24 +1045,28 @@ class TokenBucket(models.Model):
 
     @staticmethod
     def authorize(value: str, capacity: int, refill_time_secs: int) -> bool:
-        frozen_now = now()
-        obj, created = TokenBucket.objects.get_or_create(value=value)
+        # The row lock (PostgreSQL) or the IMMEDIATE transaction (SQLite)
+        # makes concurrent calls on one key wait for each other, so none
+        # overwrites another's deduction.
+        with transaction.atomic():
+            q = TokenBucket.objects.select_for_update()
+            obj, created = q.get_or_create(value=value)
+            # Read the clock after the lock: a call that waited must not
+            # see a negative top-up.
+            frozen_now = now()
 
-        if not created:
-            # Top up the bucket:
-            duration_secs = (frozen_now - obj.updated).total_seconds()
-            obj.tokens = min(1.0, obj.tokens + duration_secs / refill_time_secs)
+            if not created:
+                # Top up the bucket:
+                duration_secs = (frozen_now - obj.updated).total_seconds()
+                obj.tokens = min(1.0, obj.tokens + duration_secs / refill_time_secs)
 
-        obj.tokens -= 1.0 / capacity
-        if obj.tokens < 0:
-            # Not enough tokens
-            return False
+            obj.tokens -= 1.0 / capacity
+            if obj.tokens < 0:
+                # Not enough tokens
+                return False
 
-        # Race condition: two concurrent authorize calls can overwrite each
-        # other's changes. It's OK to be a little inexact here for the sake
-        # of simplicity.
-        obj.updated = frozen_now
-        obj.save()
+            obj.updated = frozen_now
+            obj.save()
 
         return True
 
