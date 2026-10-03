@@ -245,10 +245,10 @@ class HcUserAdmin(UserAdmin[User]):
 
     list_display_links = ("id", "email")
     list_filter = ("last_login", "date_joined", "is_staff", "is_active")
-    # Unticking a flag, blanking the email, which log-in goes by, or turning password
-    # log-in off would shut the one user out of the site or the admin, and
-    # createsuperuser refuses to make another user while it exists. The profile page
-    # changes the email, by a mailed link.
+    # Unticking a flag, blanking the email, which log-in goes by, or, without mail,
+    # turning password log-in off would shut the one user out, and createsuperuser
+    # refuses to make another user while it exists. The profile page changes the
+    # email, by a mailed link.
     readonly_fields = ("email", "is_active", "is_staff", "is_superuser")
     change_password_form = OneUserPasswordChangeForm
     ordering = ("-id",)
