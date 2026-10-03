@@ -5,7 +5,7 @@ version = "4.5.0"
 requires-python = "==3.14.*"
 dependencies = [
     "cronsim>=2.7",
-    "django[argon2]>=6.1.1",
+    "django>=6.1.1",
     "django-compressor>=4.6",
     "django-stubs-ext>=6.1.1",
     "fido2>=2.2.1",
