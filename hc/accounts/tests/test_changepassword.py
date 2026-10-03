@@ -29,6 +29,18 @@ class ChangePasswordTestCase(TestCase):
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password("Correct-Horse-9"))
 
+    def test_it_matches_the_email_in_any_case(self) -> None:
+        call_command("changepassword", "One@Example.org", stdout=StringIO())
+
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("Correct-Horse-9"))
+
+    def test_its_help_names_the_one_user(self) -> None:
+        text = Command().create_parser("manage.py", "changepassword").format_help()
+        text = " ".join(text.split())
+        self.assertIn("by default, the instance's one user", text)
+        self.assertNotIn("current username", text)
+
     def test_it_still_takes_a_username(self) -> None:
         call_command("changepassword", "0f8b3c1e-uuid", stdout=StringIO())
 
