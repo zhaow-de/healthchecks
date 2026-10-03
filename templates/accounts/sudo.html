@@ -4,6 +4,15 @@
 <div class="row">
     <div class="col-sm-6 offset-sm-3">
         <div class="hc-dialog">
+            {% if no_mail %}
+            <h1>Email Needed</h1>
+            <br />
+            <p>
+                Confirming it is you takes a code sent by email, and this site
+                has not set up email. To set a new password, run
+                <code>manage.py changepassword</code> from the shell.
+            </p>
+            {% else %}
             <h1>Enter a Confirmation Code</h1>
             <br />
             <p>
@@ -37,6 +46,7 @@
                 </button>
 
             </form>
+            {% endif %}
 
         </div>
     </div>
