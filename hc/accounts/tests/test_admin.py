@@ -318,6 +318,17 @@ class AccountsAdminTestCase(BaseTestCase):
         self.alice.refresh_from_db()
         self.assertTrue(self.alice.check_password("Correct-Horse-9"))
 
+    def test_password_pages_hide_post_data_on_the_sudo_page(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        urls = (
+            reverse("admin:auth_user_password_change", args=[self.alice.id]),
+            reverse("admin:password_change"),
+        )
+        for url in urls:
+            r = self.client.post(url, {"old_password": "password", "sudo_code": "123456"})
+            self.assertTemplateUsed(r, "accounts/sudo.html")
+            self.assertEqual(r.wsgi_request.sensitive_post_parameters, "__ALL__")
+
     def test_it_shows_credentials(self) -> None:
         Credential.objects.create(user=self.charlie, name="Charlies Yubikey", data=b"")
 
