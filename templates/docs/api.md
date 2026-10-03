@@ -187,10 +187,9 @@ The possible values for the `status` field are: `new`, `up`, `grace`, `down`,
 and `paused`.
 
 The `filter_subject`, `filter_body`, `subject`, and `subject_fail` fields are inert,
-kept for compatibility with the original Healthchecks API v3 only. SITE_NAME does
-not accept email pings, so these fields have no effect: `filter_subject` and
-`filter_body` return the stored values, and `subject` and `subject_fail` return
-`success_kw` and `failure_kw` when `filter_subject` is `true`, and `""` otherwise.
+kept for compatibility with the original Healthchecks API v3 only: `subject` and
+`subject_fail` return `success_kw` and `failure_kw` when `filter_subject` is `true`,
+and `""` otherwise.
 
 When using the read-only API key, SITE_NAME omits the following fields from responses:
 `uuid`, `ping_url`, `update_url`, `pause_url`, `resume_url`, `channels`.  It adds an
@@ -324,10 +323,9 @@ The possible values for the `status` field are: `new`, `up`, `grace`, `down`,
 and `paused`.
 
 The `filter_subject`, `filter_body`, `subject`, and `subject_fail` fields are inert,
-kept for compatibility with the original Healthchecks API v3 only. SITE_NAME does
-not accept email pings, so these fields have no effect: `filter_subject` and
-`filter_body` return the stored values, and `subject` and `subject_fail` return
-`success_kw` and `failure_kw` when `filter_subject` is `true`, and `""` otherwise.
+kept for compatibility with the original Healthchecks API v3 only: `subject` and
+`subject_fail` return `success_kw` and `failure_kw` when `filter_subject` is `true`,
+and `""` otherwise.
 
 ### Example Read-Only Response
 
@@ -386,8 +384,7 @@ name
 
     Name for the new check.
 
-    The check's slug is not generated from its name: set it with the `slug`
-    field.
+    The check's slug is not generated from its name.
 
 slug
 :   string, optional, default value: ""
@@ -595,26 +592,18 @@ filter_body
 subject
 :   string, optional.
 
-    Inert as an email setting, kept for compatibility with the original
-    Healthchecks API v3 only. Deprecated in the original, where it sets the
-    success keywords for inbound email messages. SITE_NAME does not accept email
-    pings, but maps the value as the original does: it sets `success_kw` to the
-    value, and sets the inert `filter_subject` to `true` if `success_kw` or
-    `failure_kw` is non-empty (`false` otherwise). `success_kw` also applies to
-    HTTP pings when `filter_http_body` is `true`. An explicit `success_kw` in the
-    same request takes precedence.
+    Deprecated, kept for compatibility with the original Healthchecks API v3
+    only. Sets `success_kw` to the value, and the inert `filter_subject` to
+    `true` if `success_kw` or `failure_kw` is non-empty (`false` otherwise). An
+    explicit `success_kw` in the same request takes precedence.
 
 subject_fail
 :   string, optional.
 
-    Inert as an email setting, kept for compatibility with the original
-    Healthchecks API v3 only. Deprecated in the original, where it sets the
-    failure keywords for inbound email messages. SITE_NAME does not accept email
-    pings, but maps the value as the original does: it sets `failure_kw` to the
-    value, and sets the inert `filter_subject` to `true` if `success_kw` or
-    `failure_kw` is non-empty (`false` otherwise). `failure_kw` also applies to
-    HTTP pings when `filter_http_body` is `true`. An explicit `failure_kw` in the
-    same request takes precedence.
+    Deprecated, kept for compatibility with the original Healthchecks API v3
+    only. Sets `failure_kw` to the value, and the inert `filter_subject` to
+    `true` if `success_kw` or `failure_kw` is non-empty (`false` otherwise). An
+    explicit `failure_kw` in the same request takes precedence.
 
 filter_http_body
 :   boolean, optional, default value: false.
@@ -629,8 +618,7 @@ filter_default_fail
     Determines the handling of HTTP pings when keyword filtering is enabled,
     but no keywords match.
 
-    Keyword filtering is enabled for HTTP pings if `filter_http_body` is set to
-    `true`. The inert `filter_subject` and `filter_body` fields do not enable it.
+    Keyword filtering is enabled for HTTP pings if `filter_http_body` is set to `true`.
 
     If `filter_default_fail=false`, and no keywords match, the ping will be ignored.
 
@@ -730,8 +718,7 @@ name
 
     Name for the check.
 
-    The check's slug is not generated from its name: set it with the `slug`
-    field.
+    The check's slug is not generated from its name.
 
 slug
 :   string, optional
@@ -920,26 +907,18 @@ filter_body
 subject
 :   string, optional.
 
-    Inert as an email setting, kept for compatibility with the original
-    Healthchecks API v3 only. Deprecated in the original, where it sets the
-    success keywords for inbound email messages. SITE_NAME does not accept email
-    pings, but maps the value as the original does: it sets `success_kw` to the
-    value, and sets the inert `filter_subject` to `true` if `success_kw` or
-    `failure_kw` is non-empty (`false` otherwise). `success_kw` also applies to
-    HTTP pings when `filter_http_body` is `true`. An explicit `success_kw` in the
-    same request takes precedence.
+    Deprecated, kept for compatibility with the original Healthchecks API v3
+    only. Sets `success_kw` to the value, and the inert `filter_subject` to
+    `true` if `success_kw` or `failure_kw` is non-empty (`false` otherwise). An
+    explicit `success_kw` in the same request takes precedence.
 
 subject_fail
 :   string, optional.
 
-    Inert as an email setting, kept for compatibility with the original
-    Healthchecks API v3 only. Deprecated in the original, where it sets the
-    failure keywords for inbound email messages. SITE_NAME does not accept email
-    pings, but maps the value as the original does: it sets `failure_kw` to the
-    value, and sets the inert `filter_subject` to `true` if `success_kw` or
-    `failure_kw` is non-empty (`false` otherwise). `failure_kw` also applies to
-    HTTP pings when `filter_http_body` is `true`. An explicit `failure_kw` in the
-    same request takes precedence.
+    Deprecated, kept for compatibility with the original Healthchecks API v3
+    only. Sets `failure_kw` to the value, and the inert `filter_subject` to
+    `true` if `success_kw` or `failure_kw` is non-empty (`false` otherwise). An
+    explicit `failure_kw` in the same request takes precedence.
 
 filter_http_body
 :   boolean, optional, default value: false.
@@ -954,8 +933,7 @@ filter_default_fail
     Determines the handling of HTTP pings when keyword filtering is enabled,
     but no keywords match.
 
-    Keyword filtering is enabled for HTTP pings if `filter_http_body` is set to
-    `true`. The inert `filter_subject` and `filter_body` fields do not enable it.
+    Keyword filtering is enabled for HTTP pings if `filter_http_body` is set to `true`.
 
     If `filter_default_fail=false`, and no keywords match, the ping will be ignored.
 
@@ -1264,8 +1242,8 @@ curl SITE_ROOT/api/v3/checks/7918b17b-a745-4db1-8575-9d2e07c97f79 \
 Returns a list of pings this check has received.
 
 This endpoint returns pings in reverse order (most recent first), and the total
-number of returned pings depends on the account's ping log limit (100 by default), up to
-at most 1000.
+number of returned pings depends on the account's ping log limit (100 by default),
+capped at 1000.
 
 ### Response Codes
 

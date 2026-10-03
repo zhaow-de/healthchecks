@@ -287,9 +287,6 @@ environment, and need to integrate with services running in your internal networ
 This setting affects all integration types that make HTTP requests, not just
 webhooks: the Slack integration is subject to it as well.
 
-This setting affects all outbound HTTP requests, including those made
-while setting up new integrations (e.g. during the OAuth2 authorization flow).
-
 This setting also affects connections to the proxy server when the `http_proxy` or
 `https_proxy` environment variables are set. If your proxy server has a private
 IP address, you will need to enable `INTEGRATIONS_ALLOW_PRIVATE_IPS` to use it.
@@ -308,10 +305,9 @@ The upper size limit in bytes for logged ping request bodies.
 The default value is 10000 (10 kilobytes). You can adjust the limit or you can remove
 it altogether by setting this value to `None`.
 
-Healthchecks stores ping bodies in the database, in the `api_ping` table, for every
-ping it keeps: each check keeps its most recent pings up to the account's ping log
-limit (100 by default), pruned every 100 pings. Keep `PING_BODY_LIMIT`, and the
-bodies your jobs send, no bigger than the output you actually need to read.
+Healthchecks stores each ping body in the database, with its ping. Keep
+`PING_BODY_LIMIT`, and the bodies your jobs send, no bigger than the output you
+actually need to read.
 
 ## `PING_ENDPOINT` {: #PING_ENDPOINT }
 

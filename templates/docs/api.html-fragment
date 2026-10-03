@@ -229,10 +229,9 @@ specified value.</p>
 <p>The possible values for the <code>status</code> field are: <code>new</code>, <code>up</code>, <code>grace</code>, <code>down</code>,
 and <code>paused</code>.</p>
 <p>The <code>filter_subject</code>, <code>filter_body</code>, <code>subject</code>, and <code>subject_fail</code> fields are inert,
-kept for compatibility with the original Healthchecks API v3 only. SITE_NAME does
-not accept email pings, so these fields have no effect: <code>filter_subject</code> and
-<code>filter_body</code> return the stored values, and <code>subject</code> and <code>subject_fail</code> return
-<code>success_kw</code> and <code>failure_kw</code> when <code>filter_subject</code> is <code>true</code>, and <code>""</code> otherwise.</p>
+kept for compatibility with the original Healthchecks API v3 only: <code>subject</code> and
+<code>subject_fail</code> return <code>success_kw</code> and <code>failure_kw</code> when <code>filter_subject</code> is <code>true</code>,
+and <code>""</code> otherwise.</p>
 <p>When using the read-only API key, SITE_NAME omits the following fields from responses:
 <code>uuid</code>, <code>ping_url</code>, <code>update_url</code>, <code>pause_url</code>, <code>resume_url</code>, <code>channels</code>.  It adds an
 extra <code>unique_key</code> field. The <code>unique_key</code> identifier is stable across API calls, and
@@ -351,10 +350,9 @@ using the read-only API key) as an identifier.</p>
 <p>The possible values for the <code>status</code> field are: <code>new</code>, <code>up</code>, <code>grace</code>, <code>down</code>,
 and <code>paused</code>.</p>
 <p>The <code>filter_subject</code>, <code>filter_body</code>, <code>subject</code>, and <code>subject_fail</code> fields are inert,
-kept for compatibility with the original Healthchecks API v3 only. SITE_NAME does
-not accept email pings, so these fields have no effect: <code>filter_subject</code> and
-<code>filter_body</code> return the stored values, and <code>subject</code> and <code>subject_fail</code> return
-<code>success_kw</code> and <code>failure_kw</code> when <code>filter_subject</code> is <code>true</code>, and <code>""</code> otherwise.</p>
+kept for compatibility with the original Healthchecks API v3 only: <code>subject</code> and
+<code>subject_fail</code> return <code>success_kw</code> and <code>failure_kw</code> when <code>filter_subject</code> is <code>true</code>,
+and <code>""</code> otherwise.</p>
 <h3>Example Read-Only Response</h3>
 <p>When using the read-only API key, SITE_NAME omits the following fields from responses:
 <code>uuid</code>, <code>ping_url</code>, <code>update_url</code>, <code>pause_url</code>, <code>resume_url</code>, <code>channels</code>.  It adds an
@@ -404,8 +402,7 @@ values if omitted.</p>
 <dd>
 <p>string, optional, default value: ""</p>
 <p>Name for the new check.</p>
-<p>The check's slug is not generated from its name: set it with the <code>slug</code>
-field.</p>
+<p>The check's slug is not generated from its name.</p>
 </dd>
 <dt>slug</dt>
 <dd>
@@ -570,26 +567,18 @@ value, but the value has no effect on pings.</p>
 <dt>subject</dt>
 <dd>
 <p>string, optional.</p>
-<p>Inert as an email setting, kept for compatibility with the original
-Healthchecks API v3 only. Deprecated in the original, where it sets the
-success keywords for inbound email messages. SITE_NAME does not accept email
-pings, but maps the value as the original does: it sets <code>success_kw</code> to the
-value, and sets the inert <code>filter_subject</code> to <code>true</code> if <code>success_kw</code> or
-<code>failure_kw</code> is non-empty (<code>false</code> otherwise). <code>success_kw</code> also applies to
-HTTP pings when <code>filter_http_body</code> is <code>true</code>. An explicit <code>success_kw</code> in the
-same request takes precedence.</p>
+<p>Deprecated, kept for compatibility with the original Healthchecks API v3
+only. Sets <code>success_kw</code> to the value, and the inert <code>filter_subject</code> to
+<code>true</code> if <code>success_kw</code> or <code>failure_kw</code> is non-empty (<code>false</code> otherwise). An
+explicit <code>success_kw</code> in the same request takes precedence.</p>
 </dd>
 <dt>subject_fail</dt>
 <dd>
 <p>string, optional.</p>
-<p>Inert as an email setting, kept for compatibility with the original
-Healthchecks API v3 only. Deprecated in the original, where it sets the
-failure keywords for inbound email messages. SITE_NAME does not accept email
-pings, but maps the value as the original does: it sets <code>failure_kw</code> to the
-value, and sets the inert <code>filter_subject</code> to <code>true</code> if <code>success_kw</code> or
-<code>failure_kw</code> is non-empty (<code>false</code> otherwise). <code>failure_kw</code> also applies to
-HTTP pings when <code>filter_http_body</code> is <code>true</code>. An explicit <code>failure_kw</code> in the
-same request takes precedence.</p>
+<p>Deprecated, kept for compatibility with the original Healthchecks API v3
+only. Sets <code>failure_kw</code> to the value, and the inert <code>filter_subject</code> to
+<code>true</code> if <code>success_kw</code> or <code>failure_kw</code> is non-empty (<code>false</code> otherwise). An
+explicit <code>failure_kw</code> in the same request takes precedence.</p>
 </dd>
 <dt>filter_http_body</dt>
 <dd>
@@ -603,8 +592,7 @@ PING_BODY_LIMIT_FORMATTED of the HTTP request body. See also the
 <p>boolean, optional, default value: false.</p>
 <p>Determines the handling of HTTP pings when keyword filtering is enabled,
 but no keywords match.</p>
-<p>Keyword filtering is enabled for HTTP pings if <code>filter_http_body</code> is set to
-<code>true</code>. The inert <code>filter_subject</code> and <code>filter_body</code> fields do not enable it.</p>
+<p>Keyword filtering is enabled for HTTP pings if <code>filter_http_body</code> is set to <code>true</code>.</p>
 <p>If <code>filter_default_fail=false</code>, and no keywords match, the ping will be ignored.</p>
 <p>If <code>filter_default_fail=true</code>, and no keywords match, the ping will be
 classified as a failure signal.</p>
@@ -687,8 +675,7 @@ parameter, SITE_NAME will leave its value unchanged.</p>
 <dd>
 <p>string, optional.</p>
 <p>Name for the check.</p>
-<p>The check's slug is not generated from its name: set it with the <code>slug</code>
-field.</p>
+<p>The check's slug is not generated from its name.</p>
 </dd>
 <dt>slug</dt>
 <dd>
@@ -838,26 +825,18 @@ value, but the value has no effect on pings.</p>
 <dt>subject</dt>
 <dd>
 <p>string, optional.</p>
-<p>Inert as an email setting, kept for compatibility with the original
-Healthchecks API v3 only. Deprecated in the original, where it sets the
-success keywords for inbound email messages. SITE_NAME does not accept email
-pings, but maps the value as the original does: it sets <code>success_kw</code> to the
-value, and sets the inert <code>filter_subject</code> to <code>true</code> if <code>success_kw</code> or
-<code>failure_kw</code> is non-empty (<code>false</code> otherwise). <code>success_kw</code> also applies to
-HTTP pings when <code>filter_http_body</code> is <code>true</code>. An explicit <code>success_kw</code> in the
-same request takes precedence.</p>
+<p>Deprecated, kept for compatibility with the original Healthchecks API v3
+only. Sets <code>success_kw</code> to the value, and the inert <code>filter_subject</code> to
+<code>true</code> if <code>success_kw</code> or <code>failure_kw</code> is non-empty (<code>false</code> otherwise). An
+explicit <code>success_kw</code> in the same request takes precedence.</p>
 </dd>
 <dt>subject_fail</dt>
 <dd>
 <p>string, optional.</p>
-<p>Inert as an email setting, kept for compatibility with the original
-Healthchecks API v3 only. Deprecated in the original, where it sets the
-failure keywords for inbound email messages. SITE_NAME does not accept email
-pings, but maps the value as the original does: it sets <code>failure_kw</code> to the
-value, and sets the inert <code>filter_subject</code> to <code>true</code> if <code>success_kw</code> or
-<code>failure_kw</code> is non-empty (<code>false</code> otherwise). <code>failure_kw</code> also applies to
-HTTP pings when <code>filter_http_body</code> is <code>true</code>. An explicit <code>failure_kw</code> in the
-same request takes precedence.</p>
+<p>Deprecated, kept for compatibility with the original Healthchecks API v3
+only. Sets <code>failure_kw</code> to the value, and the inert <code>filter_subject</code> to
+<code>true</code> if <code>success_kw</code> or <code>failure_kw</code> is non-empty (<code>false</code> otherwise). An
+explicit <code>failure_kw</code> in the same request takes precedence.</p>
 </dd>
 <dt>filter_http_body</dt>
 <dd>
@@ -871,8 +850,7 @@ PING_BODY_LIMIT_FORMATTED of the HTTP request body. See also the
 <p>boolean, optional, default value: false.</p>
 <p>Determines the handling of HTTP pings when keyword filtering is enabled,
 but no keywords match.</p>
-<p>Keyword filtering is enabled for HTTP pings if <code>filter_http_body</code> is set to
-<code>true</code>. The inert <code>filter_subject</code> and <code>filter_body</code> fields do not enable it.</p>
+<p>Keyword filtering is enabled for HTTP pings if <code>filter_http_body</code> is set to <code>true</code>.</p>
 <p>If <code>filter_default_fail=false</code>, and no keywords match, the ping will be ignored.</p>
 <p>If <code>filter_default_fail=true</code>, and no keywords match, the ping will be
 classified as a failure signal.</p>
@@ -1126,8 +1104,8 @@ check that was just deleted.</p>
 <p><code>GET SITE_ROOT/api/v3/checks/&lt;uuid&gt;/pings/</code></p>
 <p>Returns a list of pings this check has received.</p>
 <p>This endpoint returns pings in reverse order (most recent first), and the total
-number of returned pings depends on the account's ping log limit (100 by default), up to
-at most 1000.</p>
+number of returned pings depends on the account's ping log limit (100 by default),
+capped at 1000.</p>
 <h3>Response Codes</h3>
 <dl>
 <dt>200 OK</dt>

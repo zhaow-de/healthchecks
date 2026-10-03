@@ -197,8 +197,6 @@ internal addresses is a security risk.</p>
 environment, and need to integrate with services running in your internal network.</p>
 <p>This setting affects all integration types that make HTTP requests, not just
 webhooks: the Slack integration is subject to it as well.</p>
-<p>This setting affects all outbound HTTP requests, including those made
-while setting up new integrations (e.g. during the OAuth2 authorization flow).</p>
 <p>This setting also affects connections to the proxy server when the <code>http_proxy</code> or
 <code>https_proxy</code> environment variables are set. If your proxy server has a private
 IP address, you will need to enable <code>INTEGRATIONS_ALLOW_PRIVATE_IPS</code> to use it.</p>
@@ -210,10 +208,9 @@ IP address, you will need to enable <code>INTEGRATIONS_ALLOW_PRIVATE_IPS</code> 
 <p>The upper size limit in bytes for logged ping request bodies.
 The default value is 10000 (10 kilobytes). You can adjust the limit or you can remove
 it altogether by setting this value to <code>None</code>.</p>
-<p>Healthchecks stores ping bodies in the database, in the <code>api_ping</code> table, for every
-ping it keeps: each check keeps its most recent pings up to the account's ping log
-limit (100 by default), pruned every 100 pings. Keep <code>PING_BODY_LIMIT</code>, and the
-bodies your jobs send, no bigger than the output you actually need to read.</p>
+<p>Healthchecks stores each ping body in the database, with its ping. Keep
+<code>PING_BODY_LIMIT</code>, and the bodies your jobs send, no bigger than the output you
+actually need to read.</p>
 <h2 id="PING_ENDPOINT"><code>PING_ENDPOINT</code></h2>
 <p>Default: <code>SITE_ROOT</code> + <code>/ping/</code></p>
 <p>The base URL to use for constructing ping URLs for display. Healthchecks constructs ping

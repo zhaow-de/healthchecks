@@ -86,11 +86,9 @@ SITE_NAME will ignore all incoming pings until you explicitly <em>resume</em> th
 <p>If the <strong>Request body of HTTP requests</strong> option is checked, SITE_NAME will classify
 the HTTP pings as start, success, or failure signals by looking for keywords in
 the first PING_BODY_LIMIT_FORMATTED of the request body.</p>
-<p>SITE_NAME does not accept email pings. The <a href="../api/">Management API</a> still accepts
-and returns the email-only fields <code>filter_subject</code>, <code>filter_body</code>, <code>subject</code>, and
-<code>subject_fail</code>, for compatibility with the original Healthchecks API v3 only: they are
-inert and do not turn on any filtering (<code>subject</code> and <code>subject_fail</code> still set
-<code>success_kw</code> and <code>failure_kw</code>, as in the original).</p>
+<p>SITE_NAME does not accept email pings: the email-only fields the
+<a href="../api/">Management API</a> still accepts and returns are inert, kept for
+compatibility with the original Healthchecks API v3 only.</p>
 <p>You can specify multiple keywords in each of the <strong>Start Keywords</strong>,
 <strong>Success Keywords</strong>, and <strong>Failure Keywords</strong> fields by separating them with commas.
 The keyword matching is case-sensitive (for example, "error" and "ERROR" are different

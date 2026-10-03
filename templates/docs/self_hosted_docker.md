@@ -131,12 +131,6 @@ from `postgres:16` to `postgres:18`), you will also need to upgrade your postgre
 data directory. One way to do this is using the
 [pgautoupgrade](https://hub.docker.com/r/pgautoupgrade/pgautoupgrade) container.
 
-Starting with `postgres:18`, the image keeps its data in `/var/lib/postgresql/18/docker`
-and expects the data volume to be mounted at `/var/lib/postgresql`, not at
-`/var/lib/postgresql/data` as earlier versions did. The upgrade below moves your data
-into the new layout, so both the upgrade command and `docker-compose.yml` mount the
-volume at `/var/lib/postgresql`.
-
 Steps:
 
 * As the very first step, **take a full backup of your database**, for example:
