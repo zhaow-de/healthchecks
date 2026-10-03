@@ -81,9 +81,8 @@ class SendAlertsTestCase(BaseTestCase):
         self.assertEqual(check.status, "down")
         self.assertEqual(check.alert_after, None)
 
-    @patch("hc.api.management.commands.sendalerts.statsd")
     @patch("hc.api.management.commands.sendalerts.notify")
-    def test_it_processes_flip(self, mock_notify: Mock, statsd: Mock) -> None:
+    def test_it_processes_flip(self, mock_notify: Mock) -> None:
         check = Check(project=self.project, status="up")
         check.last_ping = now()
         check.alert_after = check.last_ping + td(days=1, hours=1)
@@ -106,9 +105,6 @@ class SendAlertsTestCase(BaseTestCase):
         # It should set the processed date
         flip.refresh_from_db()
         self.assertTrue(flip.processed)
-
-        # It should increase a statsd counter
-        statsd.incr.assert_called_once()
 
     @patch("hc.api.management.commands.sendalerts.notify")
     def test_it_updates_alert_after(self, mock_notify: Mock) -> None:
@@ -198,8 +194,7 @@ class SendAlertsTestCase(BaseTestCase):
         self.profile.refresh_from_db()
         self.assertEqual(self.profile.next_nag_date, original_nag_date)
 
-    @patch("hc.api.management.commands.sendalerts.statsd")
-    def test_it_does_not_clobber_check_status(self, statsd: Mock) -> None:
+    def test_it_does_not_clobber_check_status(self) -> None:
         check = Check(project=self.project, status="down")
         check.last_ping = now() - td(days=2)
         check.save()
@@ -225,8 +220,7 @@ class SendAlertsTestCase(BaseTestCase):
             # clobber flip.owner.status.
             self.assertEqual(args[0].owner.status, "down")
 
-    @patch("hc.api.management.commands.sendalerts.statsd")
-    def test_it_increases_statsd_success_counter(self, statsd: Mock) -> None:
+    def test_it_logs_a_successful_notification(self) -> None:
         check = Check(project=self.project, status="down")
         check.last_ping = now() - td(days=2)
         check.save()
@@ -241,12 +235,12 @@ class SendAlertsTestCase(BaseTestCase):
 
         with patch("hc.api.models.Channel.transport") as Webhook:
             Webhook.is_noop.return_value = False
-            notify(flip)
+            log = notify(flip)
 
-        self.assertEqual(statsd.incr.mock_calls, [call("hc.notifications.webhook.success")])
+        assert log is not None
+        self.assertIn(f"{str(channel.code)[:8]} (webhook) OK in", log)
 
-    @patch("hc.api.management.commands.sendalerts.statsd")
-    def test_it_increases_statsd_fail_counter(self, statsd: Mock) -> None:
+    def test_it_logs_a_failed_notification(self) -> None:
         check = Check(project=self.project, status="down")
         check.last_ping = now() - td(days=2)
         check.save()
@@ -261,12 +255,12 @@ class SendAlertsTestCase(BaseTestCase):
 
         with patch("hc.api.models.Channel.transport") as Webhook:
             Webhook.is_noop.return_value = False
-            # Rig Webhook.notify() to raise a TransportError.
-            # This should cause sendalerts to increase a statsd "fail" counter.
             Webhook.notify.side_effect = TransportError("Test error message")
-            notify(flip)
+            log = notify(flip)
 
-        self.assertEqual(statsd.incr.mock_calls, [call("hc.notifications.webhook.fail")])
+        assert log is not None
+        self.assertIn(f"{str(channel.code)[:8]} (webhook) Error in", log)
+        self.assertIn("Test error message", log)
 
     @patch("hc.api.management.commands.sendalerts.close_old_connections")
     @patch("hc.api.management.commands.sendalerts.connection")
@@ -326,9 +320,8 @@ class SendAlertsTestCase(BaseTestCase):
         # The worker seat should have been given back
         self.assertTrue(cmd.seats.acquire(blocking=False))
 
-    @patch("hc.api.management.commands.sendalerts.statsd")
     @patch("hc.api.management.commands.sendalerts.notify")
-    def test_it_skips_flip_claimed_by_another_process(self, mock_notify: Mock, statsd: Mock) -> None:
+    def test_it_skips_flip_claimed_by_another_process(self, mock_notify: Mock) -> None:
         check = Check.objects.create(project=self.project, status="up")
         Flip.objects.create(owner=check, created=now(), old_status="down", new_status="up")
 
@@ -342,7 +335,6 @@ class SendAlertsTestCase(BaseTestCase):
         # It should continue right away to look for the next flip
         self.assertTrue(result)
         mock_notify.assert_not_called()
-        statsd.incr.assert_not_called()
         # The other process's claim should stay intact
         self.assertEqual(Flip.objects.get().processed, claimed_at)
         # The worker seat should have been given back

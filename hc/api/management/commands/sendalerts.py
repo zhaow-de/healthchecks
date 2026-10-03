@@ -16,7 +16,6 @@ from django.db import close_old_connections, connection
 from django.utils.timezone import now
 
 from hc.api.models import Check, Flip
-from hc.lib.statsd import statsd
 
 logger = logging.getLogger("hc")
 
@@ -36,7 +35,6 @@ def notify(flip: Flip) -> str | None:
     if not channels:
         return None
 
-    send_start = now()
     logs = [f"{check.code} goes {flip.new_status}"]
     for ch in channels:
         notify_start = time.time()
@@ -45,13 +43,9 @@ def notify(flip: Flip) -> str | None:
         code8 = str(ch.code)[:8]
         if error:
             logs.append(f"  {code8} ({ch.kind}) Error in {secs:.1f}s: {error}")
-            statsd.incr(f"hc.notifications.{ch.kind}.fail")
         else:
             logs.append(f"  {code8} ({ch.kind}) OK in {secs:.1f}s")
-            statsd.incr(f"hc.notifications.{ch.kind}.success")
 
-    statsd.timing("hc.sendalerts.dwellTime", send_start - flip.created)
-    statsd.timing("hc.sendalerts.sendTime", now() - send_start)
     return "\n".join(logs)
 
 
@@ -109,7 +103,6 @@ class Command(BaseCommand):
             # Nothing got updated: another sendalerts process got there first.
             return True
 
-        statsd.incr("hc.sendalerts.processFlip")
         f = self.executor.submit(notify, flip)
         f.add_done_callback(self.on_notify_done)
         return True

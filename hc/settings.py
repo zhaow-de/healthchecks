@@ -281,10 +281,6 @@ if os.getenv("EMAIL_HOST"):
 # WebAuthn
 RP_ID = os.getenv("RP_ID")
 
-# To enable statsd metric collection, set STATSD_HOST="host:hostport"
-# (example: "localhost:8125")
-STATSD_HOST = os.getenv("STATSD_HOST")
-
 # Integrations
 
 # Prometheus
