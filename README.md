@@ -306,13 +306,12 @@ Healthchecks instance in production.
      and data migrations.
 * Processes that need to be running constantly.
   * `manage.py runserver` is intended for development only.
-     **Do not use it in production**, instead consider using
-     [uWSGI](https://uwsgi-docs.readthedocs.io/en/latest/) or
-     [gunicorn](https://gunicorn.org/).
-     An example of a minimal setup would be to install uWSGI using
-     `uv sync --no-dev --extra uwsgi` (plus any other extras you use), and to run
-     `uv run --no-sync uwsgi --http :8000 --module hc.wsgi` from the project's root
-     directory.
+     **Do not use it in production**, use
+     [uWSGI](https://uwsgi-docs.readthedocs.io/en/latest/) instead, as the Docker
+     image does with [docker/uwsgi.ini](docker/uwsgi.ini). A minimal setup installs
+     uWSGI with `uv sync --no-dev --extra uwsgi` (plus any other extras you use) and
+     runs `uv run --no-sync uwsgi --http :8000 --module hc.wsgi` from the project's
+     root directory.
   *  `manage.py sendalerts` is the process that monitors checks and sends out
      monitoring alerts. It must be always running, it must be started on reboot, and it
      must be restarted if it itself crashes. On modern linux systems, a good option is
