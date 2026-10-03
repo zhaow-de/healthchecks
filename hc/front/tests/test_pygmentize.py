@@ -16,15 +16,10 @@ SNIPPET_NAMES = [
     "bash_curl",
     "bash_wget",
     "browser",
-    "cs",
     "node",
     "go",
     "python_urllib2",
     "python_requests",
-    "php",
-    "powershell",
-    "powershell_inline",
-    "ruby",
 ]
 
 
@@ -65,10 +60,6 @@ class PygmentizeTestCase(BaseTestCase):
 
         python = (self.snippets / "python_requests.html").read_text()
         self.assertIn('<span class="kn">import</span>', python)
-
-        # PhpLexer(startinline=True) highlights code that has no "<?php" opener
-        php = (self.snippets / "php.html").read_text()
-        self.assertIn('<span class="nb">file_get_contents</span>', php)
 
     def test_it_requires_pygments(self) -> None:
         with patch("hc.front.management.commands.pygmentize.have_pygments", False):

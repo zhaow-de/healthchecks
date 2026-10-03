@@ -1,16 +1,23 @@
 package main
 
-import "fmt"
-import "net/http"
-import "time"
+import (
+    "fmt"
+    "net/http"
+    "time"
+)
 
 func main() {
     var client = &http.Client{
         Timeout: 10 * time.Second,
     }
 
-    _, err := client.Head("PING_URL")
+    resp, err := client.Head("PING_URL")
     if err != nil {
-        fmt.Printf("%s", err)
+        fmt.Println("Ping failed:", err)
+        return
+    }
+    resp.Body.Close()
+    if resp.StatusCode >= 300 {
+        fmt.Println("Ping failed:", resp.Status)
     }
 }

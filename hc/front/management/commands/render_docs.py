@@ -28,7 +28,7 @@ class Command(BaseCommand):
             "def_list",
             "attr_list",
         ]
-        extension_configs = {"codehilite": {"css_class": "highlight", "startinline": True}}
+        extension_configs = {"codehilite": {"css_class": "highlight"}}
 
         def process_directory(path: Path) -> None:
             for src_path in path.glob("*.md"):
