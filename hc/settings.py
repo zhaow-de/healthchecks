@@ -284,6 +284,9 @@ def immutable_file_test(path: Any, url: str) -> bool:
 
 
 WHITENOISE_IMMUTABLE_FILE_TEST = immutable_file_test
+# Served at the site's root, where browsers and crawlers ask for them whatever a page
+# links: favicon.ico, the Apple touch icons and robots.txt
+WHITENOISE_ROOT = BASE_DIR / "webroot"
 
 # SMTP credentials for sending email
 EMAIL_USE_VERIFICATION = envbool("EMAIL_USE_VERIFICATION", "True")
