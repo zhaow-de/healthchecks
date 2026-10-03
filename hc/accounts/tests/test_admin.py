@@ -249,6 +249,15 @@ class AccountsAdminTestCase(BaseTestCase):
         self.alice.refresh_from_db()
         self.assertTrue(self.alice.check_password("Correct-Horse-9"))
 
+    def test_it_runs_the_password_validators(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        url = reverse("admin:auth_user_password_change", args=[self.alice.id])
+        payload = {"password1": "1qaz2wsx3edc", "password2": "1qaz2wsx3edc"}
+        r = self.client.post(url, payload)
+        self.assertContains(r, "This password is too common.")
+        self.alice.refresh_from_db()
+        self.assertTrue(self.alice.check_password("password"))
+
     def test_it_shows_credentials(self) -> None:
         Credential.objects.create(user=self.charlie, name="Charlies Yubikey", data=b"")
 

@@ -76,7 +76,7 @@ To access the administration panel, log into the site as the superuser. In the
 setup steps above, `createsuperuser` can take its credentials as parameters
 instead of prompting:
 
-    $ ./manage.py createsuperuser --email user@example.com --password changeme123
+    $ ./manage.py createsuperuser --email user@example.com --password correct-horse-battery-staple
 
 Once logged in, click on the "Account" dropdown in top navigation, and select
 "Site Administration".

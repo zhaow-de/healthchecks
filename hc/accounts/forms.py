@@ -6,6 +6,7 @@ from typing import Any
 from django import forms
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password
 from django.http import HttpRequest
 from pyotp.totp import TOTP
 
@@ -86,7 +87,18 @@ class ReportSettingsForm(forms.Form):
 
 
 class SetPasswordForm(forms.Form):
-    password = forms.CharField(min_length=8)
+    error_css_class = "has-error"
+    password = forms.CharField()
+
+    def __init__(self, user: User, *args: Any, **kwargs: Any) -> None:
+        self.user = user
+        super().__init__(*args, **kwargs)
+
+    def clean_password(self) -> str:
+        password = self.cleaned_data["password"]
+        assert isinstance(password, str)
+        validate_password(password, self.user)
+        return password
 
 
 class ChangeEmailForm(forms.Form):

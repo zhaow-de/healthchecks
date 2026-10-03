@@ -20,7 +20,7 @@ class CreateSuperuserTestCase(TestCase):
     def test_it_works(self, mock_input: Mock, mock_getpass: Mock) -> None:
         cmd = Command(stdout=Mock())
         mock_input.return_value = "superuser@example.org"
-        mock_getpass.return_value = "hunter2"
+        mock_getpass.return_value = "Correct-Horse-9"
         cmd.handle(email=None, password=None)
 
         u = User.objects.get(email="superuser@example.org")
@@ -33,7 +33,7 @@ class CreateSuperuserTestCase(TestCase):
         stderr = StringIO()
         cmd = Command(stdout=Mock(), stderr=stderr)
         mock_input.side_effect = ["not-an-email", "superuser@example.org"]
-        mock_getpass.return_value = "hunter2"
+        mock_getpass.return_value = "Correct-Horse-9"
         cmd.handle(email=None, password=None)
 
         self.assertEqual(stderr.getvalue(), "Error: Enter a valid email address.\n")
@@ -43,7 +43,7 @@ class CreateSuperuserTestCase(TestCase):
 
     def test_it_accepts_arguments(self) -> None:
         cmd = Command(stdout=Mock())
-        cmd.handle(email="superuser@example.org", password="hunter2")
+        cmd.handle(email="superuser@example.org", password="Correct-Horse-9")
 
         u = User.objects.get()
         self.assertEqual(u.email, "superuser@example.org")
@@ -72,7 +72,7 @@ class CreateSuperuserTestCase(TestCase):
     def test_it_refuses_when_a_user_exists(self, mock_input: Mock, mock_getpass: Mock) -> None:
         User.objects.create(username="alice", email="alice@example.org")
         mock_input.return_value = "superuser@example.org"
-        mock_getpass.return_value = "hunter2"
+        mock_getpass.return_value = "Correct-Horse-9"
 
         stderr = StringIO()
         cmd = Command(stdout=Mock(), stderr=stderr)
@@ -88,20 +88,20 @@ class CreateSuperuserTestCase(TestCase):
 
     def test_it_parses_command_line_options(self) -> None:
         stdout = StringIO()
-        call_command("createsuperuser", "--email", "Superuser@Example.org", "--pass", "hunter2", stdout=stdout)
+        call_command("createsuperuser", "--email", "Superuser@Example.org", "--pass", "Correct-Horse-9", stdout=stdout)
 
         self.assertEqual(stdout.getvalue(), "Superuser created successfully.\n")
         u = User.objects.get(email="superuser@example.org")
         self.assertTrue(u.is_staff)
         self.assertTrue(u.is_superuser)
-        self.assertTrue(u.check_password("hunter2"))
+        self.assertTrue(u.check_password("Correct-Horse-9"))
 
     @patch(Command.__module__ + ".sys.stdin.isatty", Mock(return_value=False))
     def test_it_exits_on_invalid_email_without_tty(self) -> None:
         stderr = StringIO()
         cmd = Command(stdout=Mock(), stderr=stderr)
         with self.assertRaises(SystemExit) as cm:
-            cmd.handle(email="not-an-email", password="hunter2")
+            cmd.handle(email="not-an-email", password="Correct-Horse-9")
 
         self.assertEqual(cm.exception.code, 2)
         self.assertEqual(
@@ -129,22 +129,60 @@ class CreateSuperuserTestCase(TestCase):
     def test_it_prompts_again_when_passwords_do_not_match(self, mock_getpass: Mock) -> None:
         stderr = StringIO()
         cmd = Command(stdout=Mock(), stderr=stderr)
-        mock_getpass.side_effect = ["hunter2", "hunter3", "hunter2", "hunter2"]
+        mock_getpass.side_effect = ["Correct-Horse-9", "Correct-Horse-8", "Correct-Horse-9", "Correct-Horse-9"]
         cmd.handle(email="superuser@example.org", password=None)
 
         self.assertEqual(stderr.getvalue(), "Error: Your passwords didn't match.\n")
         self.assertEqual(mock_getpass.call_count, 4)
         u = User.objects.get(email="superuser@example.org")
-        self.assertTrue(u.check_password("hunter2"))
+        self.assertTrue(u.check_password("Correct-Horse-9"))
 
     @patch(Command.__module__ + ".sys.stdin.isatty", Mock(return_value=True))
     @patch(Command.__module__ + ".getpass")
     def test_it_prompts_again_on_blank_password(self, mock_getpass: Mock) -> None:
         stderr = StringIO()
         cmd = Command(stdout=Mock(), stderr=stderr)
-        mock_getpass.side_effect = [" ", " ", "hunter2", "hunter2"]
+        mock_getpass.side_effect = [" ", " ", "Correct-Horse-9", "Correct-Horse-9"]
         cmd.handle(email="superuser@example.org", password=None)
 
         self.assertEqual(stderr.getvalue(), "Error: Blank passwords aren't allowed.\n")
         u = User.objects.get(email="superuser@example.org")
-        self.assertTrue(u.check_password("hunter2"))
+        self.assertTrue(u.check_password("Correct-Horse-9"))
+
+    @patch(Command.__module__ + ".sys.stdin.isatty", Mock(return_value=False))
+    def test_it_exits_on_weak_password_without_tty(self) -> None:
+        stderr = StringIO()
+        cmd = Command(stdout=Mock(), stderr=stderr)
+        with self.assertRaises(SystemExit) as cm:
+            cmd.handle(email="superuser@example.org", password="12345678")
+
+        self.assertEqual(cm.exception.code, 2)
+        self.assertEqual(
+            stderr.getvalue(),
+            "Error: This password is too short. It must contain at least 12 characters. "
+            "This password is too common. This password is entirely numeric.\n"
+            "Missing or invalid required argument: --password/--pass\n",
+        )
+        self.assertFalse(User.objects.exists())
+
+    @patch(Command.__module__ + ".sys.stdin.isatty", Mock(return_value=False))
+    def test_it_compares_the_password_with_the_email(self) -> None:
+        stderr = StringIO()
+        cmd = Command(stdout=Mock(), stderr=stderr)
+        with self.assertRaises(SystemExit):
+            cmd.handle(email="superuser@example.org", password="superuser@example")
+
+        self.assertIn("The password is too similar to the email address.", stderr.getvalue())
+        self.assertFalse(User.objects.exists())
+
+    @patch(Command.__module__ + ".sys.stdin.isatty", Mock(return_value=True))
+    @patch(Command.__module__ + ".getpass")
+    def test_it_prompts_again_on_weak_password(self, mock_getpass: Mock) -> None:
+        stderr = StringIO()
+        cmd = Command(stdout=Mock(), stderr=stderr)
+        mock_getpass.side_effect = ["1qaz2wsx3edc", "1qaz2wsx3edc", "Correct-Horse-9", "Correct-Horse-9"]
+        cmd.handle(email="superuser@example.org", password=None)
+
+        self.assertEqual(stderr.getvalue(), "Error: This password is too common.\n")
+        u = User.objects.get(email="superuser@example.org")
+        self.assertTrue(u.check_password("Correct-Horse-9"))

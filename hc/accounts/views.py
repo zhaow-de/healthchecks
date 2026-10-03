@@ -342,8 +342,9 @@ def notifications(request: AuthenticatedHttpRequest) -> HttpResponse:
 @sensitive_post_parameters()
 @require_sudo_mode
 def set_password(request: AuthenticatedHttpRequest) -> HttpResponse:
+    form = forms.SetPasswordForm(request.user)
     if request.method == "POST":
-        form = forms.SetPasswordForm(request.POST)
+        form = forms.SetPasswordForm(request.user, request.POST)
         if form.is_valid():
             password = form.cleaned_data["password"]
             request.user.set_password(password)
@@ -359,7 +360,7 @@ def set_password(request: AuthenticatedHttpRequest) -> HttpResponse:
             request.session["changed_password"] = True
             return redirect("hc-profile")
 
-    return render(request, "accounts/set_password.html", {})
+    return render(request, "accounts/set_password.html", {"form": form})
 
 
 @login_required

@@ -77,7 +77,7 @@ database tables.</p>
 <p>To access the administration panel, log into the site as the superuser. In the
 setup steps above, <code>createsuperuser</code> can take its credentials as parameters
 instead of prompting:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>./manage.py<span class="w"> </span>createsuperuser<span class="w"> </span>--email<span class="w"> </span>user@example.com<span class="w"> </span>--password<span class="w"> </span>changeme123
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>./manage.py<span class="w"> </span>createsuperuser<span class="w"> </span>--email<span class="w"> </span>user@example.com<span class="w"> </span>--password<span class="w"> </span>correct-horse-battery-staple
 </code></pre></div>
 
 <p>Once logged in, click on the "Account" dropdown in top navigation, and select

@@ -37,7 +37,7 @@ termination.
 
     You can also provide credentials via parameters, bypassing the interactive prompt:
 
-        $ docker compose run web /opt/healthchecks/manage.py createsuperuser --email user@example.com --password changeme123
+        $ docker compose run web /opt/healthchecks/manage.py createsuperuser --email user@example.com --password correct-horse-battery-staple
 
 * Open [http://localhost:8000](http://localhost:8000) in your browser and log in with
   the credentials from the previous step.
