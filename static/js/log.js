@@ -120,7 +120,7 @@ hc.ready(function () {
                 var tbody = document.createElement("tbody");
                 tbody.setAttribute("class", "new");
                 tbody.innerHTML = data;
-                formatPingDates(dateFormat, tbody.querySelectorAll("tr"));
+                formatPingDates(tbody.querySelectorAll("tr"));
                 document.getElementById("log").prepend(tbody);
                 updateNumHits();
             });
