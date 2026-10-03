@@ -1,0 +1,3 @@
+<component name="DependencyValidationManager">
+  <scope name="git-managed" pattern="file[healthchecks]:*/&amp;&amp;!file[healthchecks]:.local//*&amp;&amp;!file[healthchecks]:.tmp//*&amp;&amp;!file[healthchecks]:.idea//*&amp;&amp;!file:search.db&amp;&amp;!file:uv.lock&amp;&amp;!file:hc.sqlite&amp;&amp;!file[healthchecks]:static/vendor//*" />
+</component>
