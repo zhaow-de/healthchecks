@@ -62,7 +62,7 @@ catch the exceptions or let them bubble up.
 
 Many HTTP libraries (Python's requests, Go's net/http, JavaScript's fetch) do not
 raise an error on a 404, so check the status code yourself: any status other than
-200 or 201 means the ping was not recorded.
+200 means the ping was not recorded.
 
 ## Use the Request Method the Check Accepts
 

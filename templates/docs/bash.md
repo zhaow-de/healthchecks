@@ -37,8 +37,7 @@ Here's what each curl parameter does:
 
 **-f, --fail**
 :   Makes curl treat HTTP responses with a status of 400 or above as errors, and
-    [exit with code 22](https://curl.se/docs/manpage.html#-f). A 201 (auto-provisioning
-    created the check) is not an error.
+    [exit with code 22](https://curl.se/docs/manpage.html#-f).
 
 **-s, --silent**
 :   Silent or quiet mode. Hides the progress meter, but also
@@ -115,32 +114,3 @@ keeps; this avoids the 400 that a body over the size cap gets, which loses the
 ping. Reading the body from stdin (`@-`) also avoids the shell's limit on argument
 length (128 KiB per argument on Linux), which `--data-raw "$m"` hits. `/$rc`
 reports certbot's exit status together with its output.
-
-## Auto Provisioning New Checks
-
-This example uses SITE_NAME [auto provisioning feature](../autoprovisioning/) to
-create a check "on the fly" if it does not already exist. Using this technique, you can
-write services that automatically register with SITE_NAME the first time they run.
-
-
-```bash
-#!/bin/bash
-
-PING_KEY=fixme-your-ping-key-here
-
-# Use the system's short hostname, lowercased, as the check's slug
-SLUG=$(hostname | cut -d. -f1 | tr '[:upper:]' '[:lower:]')
-
-# Construct a ping URL and append "?create=1" at the end:
-URL="PING_ENDPOINT$PING_KEY/$SLUG?create=1"
-
-# Send a ping:
-curl -fsS -m 10 --retry 5 "$URL"
-```
-
-A slug may contain only `a-z`, `0-9`, hyphens and underscores, so the example cuts
-the domain off the hostname and lowercases it: a dot gets 404, an uppercase letter
-"400 invalid url format". The ping key is created and shown on the project's
-Settings page (see [UUIDs and Slugs](../http_api/#uuids-and-slugs)).
-[Auto-Provisioning](../http_api/#auto-provisioning) gives the new check's defaults:
-a period of 1 day, a grace time of 1 hour, and every integration assigned.

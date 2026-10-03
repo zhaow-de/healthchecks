@@ -252,30 +252,14 @@ def ping_by_slug(
     if slug != slug.lower():
         return HttpResponseBadRequest("invalid url format")
 
-    created = False
     try:
         check = Check.objects.get(slug=slug, project__ping_key=ping_key)
     except Check.DoesNotExist:
-        if request.GET.get("create") != "1":
-            return HttpResponseNotFound("not found")
-
-        try:
-            project = Project.objects.get(ping_key=ping_key)
-        except Project.DoesNotExist:
-            return HttpResponseNotFound("not found")
-
-        check = Check(project=project, name=slug, slug=slug)
-        check.save()
-        check.assign_all_channels()
-        created = True
+        return HttpResponseNotFound("not found")
     except Check.MultipleObjectsReturned:
         return HttpResponse("ambiguous slug", status=409)
 
-    response = ping(request, check.code, check, action, exitstatus)
-    if response.status_code == 200 and created:
-        response.content = b"Created"
-        response.status_code = 201
-    return response
+    return ping(request, check.code, check, action, exitstatus)
 
 
 def _lookup(project: Project, spec: Spec) -> Check | None:

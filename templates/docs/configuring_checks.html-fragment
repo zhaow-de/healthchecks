@@ -18,8 +18,7 @@ next section.</li>
 <p>Click <strong>Save</strong> to create the check. The new check starts in the "New" state and is
 assigned every integration of the project. You can add a description afterwards in
 the "Name and Tags" dialog. A check created through the Management API gets only the
-integrations its <a href="../api/#field-channels"><code>channels</code></a> field names, and a check
-created by a <a href="../http_api/#auto-provisioning">slug ping with <code>create=1</code></a> gets them all.</p>
+integrations its <a href="../api/#field-channels"><code>channels</code></a> field names.</p>
 <h2>Name, Tags, Description</h2>
 <p>Describe each check using an optional name, slug, tags, and description fields.
 To edit them, click the check's name on the "Checks" page, or the "(edit…)" link

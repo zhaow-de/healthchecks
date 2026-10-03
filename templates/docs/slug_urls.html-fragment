@@ -71,7 +71,6 @@ curious individuals.</p>
 <li>You can pick descriptive, human-readable slug values. You can change an existing
   check's slug.</li>
 <li>You can monitor multiple processes using a single secret: the ping key.</li>
-<li>Slug URLs support <a href="../autoprovisioning/">the check auto-provisioning feature</a>.</li>
 </ul>
 <h2>Duplicate Slug Values</h2>
 <p>SITE_NAME does not force you to pick unique slug values. If several checks have the

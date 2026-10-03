@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from django.test import Client
 
-from hc.api.models import Channel, Check, Ping
+from hc.api.models import Check, Ping
 from hc.test import BaseTestCase
 
 
@@ -82,42 +82,15 @@ class PingBySlugTestCase(BaseTestCase):
         r = self.client.get("/ping/rrrrrrrrrrrrrrrrrrrrrr/foo")
         self.assertEqual(r.status_code, 404)
 
-    def test_it_auto_provisions_missing_check(self) -> None:
+    def test_it_handles_unknown_slug(self) -> None:
         self.check.delete()
-        channel = Channel.objects.create(project=self.project)
-
-        r = self.client.get(self.url + "?create=1")
-        self.assertEqual(r.content, b"Created")
-        self.assertEqual(r.status_code, 201)
-
-        check = Check.objects.get()
-        self.assertEqual(check.name, "foo")
-        self.assertEqual(check.slug, "foo")
-        self.assertEqual(check.ping_set.count(), 1)
-        # It should assign all channels to the new check
-        self.assertEqual(check.channel_set.get(), channel)
-
-    def test_auto_provisioning_is_off_by_default(self) -> None:
-        self.check.delete()
-        r = self.client.get(self.url)
-        self.assertEqual(r.status_code, 404)
+        for query in ("", "?create=1"):
+            r = self.client.get(self.url + query)
+            self.assertEqual(r.status_code, 404)
+            self.assertEqual(r.content, b"not found")
         self.assertFalse(Check.objects.exists())
 
     def test_it_rejects_uppercase_slug(self) -> None:
         r = self.client.get(self.url + "FOO")
         self.assertEqual(r.content, b"invalid url format")
         self.assertEqual(r.status_code, 400)
-
-    def test_auto_provisioning_has_no_check_limit(self) -> None:
-        Check.objects.bulk_create([Check(project=self.project) for _ in range(50)])
-
-        r = self.client.get(f"/ping/{self.project.ping_key}/foo3?create=1")
-        self.assertEqual(r.status_code, 201)
-        self.assertTrue(Check.objects.filter(slug="foo3").exists())
-
-    def test_auto_provisioning_handles_wrong_ping_key(self) -> None:
-        self.check.delete()
-
-        r = self.client.get("/ping/rrrrrrrrrrrrrrrrrrrrrr/foo?create=1")
-        self.assertEqual(r.status_code, 404)
-        self.assertFalse(Check.objects.exists())

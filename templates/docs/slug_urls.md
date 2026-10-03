@@ -85,7 +85,6 @@ Compared to UUID URLs:
 * You can pick descriptive, human-readable slug values. You can change an existing
   check's slug.
 * You can monitor multiple processes using a single secret: the ping key.
-* Slug URLs support [the check auto-provisioning feature](../autoprovisioning/).
 
 ## Duplicate Slug Values
 

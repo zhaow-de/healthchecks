@@ -94,8 +94,7 @@ automatically by SITE_NAME, and are guaranteed to be unique.
 The check is identified by project's **Ping key** and check's
 **slug** (user-chosen, URL-friendly identifier). A slug URL works only after you
 create the project's ping key on the project's **Settings** page; a new project has
-none. A slug URL that ends with `?create=1` creates the check when it does not exist
-yet (see [Auto-Provisioning](SITE_ROOT/docs/http_api/#auto-provisioning)).
+none.
 
 You can append `/start`, `/fail`, `/log` or `/<exitcode>` to the base ping URL to send
 "start", "failure" and "log" signals, or to report an exit code; a "log" signal records

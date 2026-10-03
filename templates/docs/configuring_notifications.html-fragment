@@ -67,8 +67,7 @@ attempt (hover over "Failed" for the error), or "Never".</p>
 web interface starts with every integration of its project enabled, and a newly added
 integration is enabled for every existing check in its project. A check created
 through the Management API gets only the integrations its
-<a href="../api/#field-channels"><code>channels</code></a> field names; a check created by a slug ping with
-<a href="../http_api/#auto-provisioning"><code>create=1</code></a> gets them all; a check
+<a href="../api/#field-channels"><code>channels</code></a> field names; a check
 <a href="../projects/#transferring-checks">transferred</a> to another project gets all of the
 target project's integrations. You can switch an integration on or off for a single
 check in two places:</p>

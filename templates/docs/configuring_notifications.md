@@ -75,8 +75,7 @@ A check alerts only through the integrations enabled for it. A check created in 
 web interface starts with every integration of its project enabled, and a newly added
 integration is enabled for every existing check in its project. A check created
 through the Management API gets only the integrations its
-[`channels`](../api/#field-channels) field names; a check created by a slug ping with
-[`create=1`](../http_api/#auto-provisioning) gets them all; a check
+[`channels`](../api/#field-channels) field names; a check
 [transferred](../projects/#transferring-checks) to another project gets all of the
 target project's integrations. You can switch an integration on or off for a single
 check in two places:

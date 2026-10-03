@@ -51,8 +51,7 @@ Feel free to adjust the curl options to suit your needs.</p>
 <dd>Run curl only if <code>/home/me/backup.sh</code> exits with an exit code 0.</dd>
 <dt><strong>-f, --fail</strong></dt>
 <dd>Makes curl exit with an error (exit code 22) when the server answers with an
-HTTP status of 400 or above. A 2xx response, such as the 201 of a slug URL with
-<code>?create=1</code>, is not an error. See <a href="../http_api/#status-codes">Status Codes</a>.</dd>
+HTTP status of 400 or above. See <a href="../http_api/#status-codes">Status Codes</a>.</dd>
 <dt><strong>-s, --silent</strong></dt>
 <dd>Silent or quiet mode. Hides the progress meter but also hides error messages.</dd>
 <dt><strong>-S, --show-error</strong></dt>

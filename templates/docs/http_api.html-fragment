@@ -41,9 +41,8 @@ project's <strong>Settings</strong> page in the web UI.</p>
 <h3 id="requests">Requests</h3>
 <p>Every endpoint accepts any HTTP method, which the endpoint sections write as <code>ANY</code>;
 GET, HEAD and POST are the usual ones, and a check can be set to accept POST only (see
-<a href="#interpreting-pings">How SITE_NAME Interprets a Ping</a>). The query parameters are
-<code>rid</code> (all endpoints, a <a href="#run-ids">run ID</a>) and <code>create=1</code> (slug URLs only,
-<a href="#auto-provisioning">auto-provisioning</a>). The request body is optional, may be any
+<a href="#interpreting-pings">How SITE_NAME Interprets a Ping</a>). The one query parameter
+is <code>rid</code>, a <a href="#run-ids">run ID</a>. The request body is optional, may be any
 content type, and is stored with the ping (see <a href="#request-body">Request Body</a>).
 No cookies, CSRF token or special headers are needed.</p>
 <h3>Responses</h3>
@@ -66,7 +65,7 @@ When the server's body limit setting is <code>None</code>, which stores every bo
 header is absent from every response, including those the examples on this page
 show (see the body limit setting in
 <a href="../self_hosted_configuration/#PING%5FBODY%5FLIMIT">Server Configuration</a>).
-<code>Access-Control-Allow-Origin: *</code> is set on 200 and 201 responses only, so a browser
+<code>Access-Control-Allow-Origin: *</code> is set on 200 responses only, so a browser
 page on another origin can read a successful response; error responses do not
 carry it.</p>
 <h3 id="status-codes">Status Codes</h3>
@@ -83,11 +82,6 @@ carry it.</p>
 <td>200</td>
 <td><code>OK</code></td>
 <td>The ping was recorded (also when it was recorded as "ignored").</td>
-</tr>
-<tr>
-<td>201</td>
-<td><code>Created</code></td>
-<td>A slug URL with <code>?create=1</code> created the check, and the ping was recorded.</td>
 </tr>
 <tr>
 <td>400</td>
@@ -107,7 +101,7 @@ carry it.</p>
 <tr>
 <td>404</td>
 <td><code>not found</code></td>
-<td>No check has this UUID; no check has this slug under this ping key and <code>create=1</code> was not given; no project has this ping key; an unknown lowercase suffix follows a UUID; or any lowercase suffix follows an uppercase or undashed UUID (in these two, the URL is read as a slug URL).</td>
+<td>No check has this UUID; no check has this slug under this ping key; no project has this ping key; an unknown lowercase suffix follows a UUID; or any lowercase suffix follows an uppercase or undashed UUID (in these two, the URL is read as a slug URL).</td>
 </tr>
 <tr>
 <td>404</td>
@@ -127,9 +121,7 @@ carry it.</p>
 </tbody>
 </table>
 <p>A 4xx response means the request itself is wrong: fix the URL, the <code>rid</code> or the
-body rather than repeating it. The one 4xx with a side effect is a slug URL with
-<code>?create=1</code> that creates the check and then fails on its <code>rid</code>, its exit status or
-its body size: the check stays, and the ping is not recorded.</p>
+body rather than repeating it.</p>
 <h3>Rate Limits</h3>
 <p>SITE_NAME applies no rate limit to pings: it records every
 request it accepts. Each ping is stored, and the check's event log keeps only the
@@ -180,12 +172,8 @@ web server in front of SITE_NAME, not by SITE_NAME itself.</p>
 <td>The <a href="#success-slug">slug URLs</a>: <code>PING_ENDPOINT&lt;ping-key&gt;/&lt;slug&gt;</code></td>
 </tr>
 <tr>
-<td>Create the check on its first ping</td>
-<td>A slug URL with <a href="#auto-provisioning"><code>?create=1</code></a></td>
-</tr>
-<tr>
 <td>Create a check, to get a UUID to ping</td>
-<td>Management API: <a href="../api/#create-check">create a check</a> with a read-write key; the response carries <code>uuid</code> and <code>ping_url</code>. Or ping a slug URL with <a href="#auto-provisioning"><code>?create=1</code></a>.</td>
+<td>Management API: <a href="../api/#create-check">create a check</a> with a read-write key; the response carries <code>uuid</code> and <code>ping_url</code>.</td>
 </tr>
 <tr>
 <td>Find a check's UUID or ping URL</td>
@@ -285,10 +273,6 @@ slug gets "400 invalid url format"; a check with an empty slug has no slug URL.<
 using a non-unique slug, SITE_NAME will return the "409 Conflict" HTTP status code
 with the body "ambiguous slug" and ignore the request. The UUID URLs of those checks
 keep working.</p>
-<p>Slug URLs optionally support <strong>auto-provisioning</strong>: if you make a Pinging API request
-to a slug with no corresponding check, SITE_NAME will create the check automatically.
-Auto-provisioning is off by default. To enable it, add a <code>create=1</code> query parameter
-to the ping URL; see <a href="#auto-provisioning">Auto-Provisioning</a>.</p>
 <h2 id="interpreting-pings">How SITE_NAME Interprets a Ping</h2>
 <p>The endpoint gives each ping its meaning, and three check settings can change it.
 SITE_NAME applies these steps in order:</p>
@@ -389,22 +373,6 @@ ping of one run, and a new one for each run:</p>
 </ul>
 <p><a href="../measuring_script_run_time/">Measuring script run time</a> shows this with an
 example.</p>
-<h2 id="auto-provisioning">Auto-Provisioning</h2>
-<p>A slug URL with the query parameter <code>create=1</code> creates the check when the project
-has no check with that slug. The value must be exactly <code>1</code>; any other value is
-ignored, and an unknown slug then gets 404. The new check:</p>
-<ul>
-<li>takes the slug as both its name and its slug;</li>
-<li>has the default period of 1 day and grace time of 1 hour;</li>
-<li>is assigned every integration in the project;</li>
-<li>receives the ping, and the response is "201 Created".</li>
-</ul>
-<p>When the check already exists, <code>create=1</code> changes nothing and the response is
-"200 OK". An unknown ping key gets 404 either way, and duplicate slugs get 409.
-The check is created before the exit status, the body size and the <code>rid</code> are
-checked, so a request that fails on any of them still leaves the new check behind.
-UUID URLs ignore <code>create</code>. See <a href="../autoprovisioning/">Auto Provisioning</a> for when to
-use it.</p>
 <h2 class="rule" id="success-uuid">Send a "success" Signal Using UUID</h2>
 <div class="highlight"><pre><span></span><code>ANY PING_ENDPOINT&lt;uuid&gt;
 </code></pre></div>
@@ -878,14 +846,6 @@ identify the check. See <a href="#uuids-and-slugs">UUIDs and Slugs</a>.</p>
 <td>The check's slug.</td>
 </tr>
 <tr>
-<td><code>create</code></td>
-<td>query</td>
-<td><code>1</code></td>
-<td>no</td>
-<td>off</td>
-<td><code>1</code> creates the check if the slug is unknown; see <a href="#auto-provisioning">Auto-Provisioning</a>.</td>
-</tr>
-<tr>
 <td><code>rid</code></td>
 <td>query</td>
 <td>UUID</td>
@@ -904,18 +864,17 @@ identify the check. See <a href="#uuids-and-slugs">UUIDs and Slugs</a>.</p>
 </tbody>
 </table>
 <h3>Example</h3>
-<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsS<span class="w"> </span>-m<span class="w"> </span><span class="m">10</span><span class="w"> </span>--retry<span class="w"> </span><span class="m">5</span><span class="w"> </span><span class="s2">"PING_ENDPOINTu0b6xgqk2xh3w5dc0rmwmq/database-backup?create=1"</span>
+<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>-fsS<span class="w"> </span>-m<span class="w"> </span><span class="m">10</span><span class="w"> </span>--retry<span class="w"> </span><span class="m">5</span><span class="w"> </span>PING_ENDPOINTu0b6xgqk2xh3w5dc0rmwmq/database-backup
 </code></pre></div>
 
-<div class="highlight"><pre><span></span><code><span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span> <span class="m">201</span> <span class="ne">Created</span>
+<div class="highlight"><pre><span></span><code><span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span> <span class="m">200</span> <span class="ne">OK</span>
 <span class="na">Content-Type</span><span class="o">:</span> <span class="l">text/html; charset=utf-8</span>
 <span class="na">Ping-Body-Limit</span><span class="o">:</span> <span class="l">PING_BODY_LIMIT</span>
 <span class="na">Access-Control-Allow-Origin</span><span class="o">:</span> <span class="l">*</span>
 
-Created
+OK
 </code></pre></div>
 
-<p>When the check already exists, the response is "200 OK" with the body <code>OK</code>.</p>
 <h3>Errors</h3>
 <table>
 <thead>
@@ -939,7 +898,7 @@ Created
 <tr>
 <td>404</td>
 <td><code>not found</code></td>
-<td>No check has this slug under this ping key and <code>create=1</code> was not given, or no project has this ping key.</td>
+<td>No check has this slug under this ping key, or no project has this ping key.</td>
 </tr>
 <tr>
 <td>409</td>
@@ -990,14 +949,6 @@ identify the check. See <a href="#uuids-and-slugs">UUIDs and Slugs</a>.</p>
 <td>yes</td>
 <td></td>
 <td>The check's slug.</td>
-</tr>
-<tr>
-<td><code>create</code></td>
-<td>query</td>
-<td><code>1</code></td>
-<td>no</td>
-<td>off</td>
-<td><code>1</code> creates the check if the slug is unknown; see <a href="#auto-provisioning">Auto-Provisioning</a>.</td>
 </tr>
 <tr>
 <td><code>rid</code></td>
@@ -1052,7 +1003,7 @@ OK
 <tr>
 <td>404</td>
 <td><code>not found</code></td>
-<td>No check has this slug under this ping key and <code>create=1</code> was not given, or no project has this ping key.</td>
+<td>No check has this slug under this ping key, or no project has this ping key.</td>
 </tr>
 <tr>
 <td>409</td>
@@ -1099,14 +1050,6 @@ identify the check. See <a href="#uuids-and-slugs">UUIDs and Slugs</a>.</p>
 <td>yes</td>
 <td></td>
 <td>The check's slug.</td>
-</tr>
-<tr>
-<td><code>create</code></td>
-<td>query</td>
-<td><code>1</code></td>
-<td>no</td>
-<td>off</td>
-<td><code>1</code> creates the check if the slug is unknown; see <a href="#auto-provisioning">Auto-Provisioning</a>.</td>
 </tr>
 <tr>
 <td><code>rid</code></td>
@@ -1162,7 +1105,7 @@ OK
 <tr>
 <td>404</td>
 <td><code>not found</code></td>
-<td>No check has this slug under this ping key and <code>create=1</code> was not given, or no project has this ping key.</td>
+<td>No check has this slug under this ping key, or no project has this ping key.</td>
 </tr>
 <tr>
 <td>409</td>
@@ -1209,14 +1152,6 @@ identify the check. See <a href="#uuids-and-slugs">UUIDs and Slugs</a>.</p>
 <td>yes</td>
 <td></td>
 <td>The check's slug.</td>
-</tr>
-<tr>
-<td><code>create</code></td>
-<td>query</td>
-<td><code>1</code></td>
-<td>no</td>
-<td>off</td>
-<td><code>1</code> creates the check if the slug is unknown; see <a href="#auto-provisioning">Auto-Provisioning</a>.</td>
 </tr>
 <tr>
 <td><code>rid</code></td>
@@ -1272,7 +1207,7 @@ OK
 <tr>
 <td>404</td>
 <td><code>not found</code></td>
-<td>No check has this slug under this ping key and <code>create=1</code> was not given, or no project has this ping key.</td>
+<td>No check has this slug under this ping key, or no project has this ping key.</td>
 </tr>
 <tr>
 <td>409</td>
@@ -1331,14 +1266,6 @@ identify the check. See <a href="#uuids-and-slugs">UUIDs and Slugs</a>.</p>
 <td>0 is success; 1 to 255 is failure.</td>
 </tr>
 <tr>
-<td><code>create</code></td>
-<td>query</td>
-<td><code>1</code></td>
-<td>no</td>
-<td>off</td>
-<td><code>1</code> creates the check if the slug is unknown; see <a href="#auto-provisioning">Auto-Provisioning</a>.</td>
-</tr>
-<tr>
 <td><code>rid</code></td>
 <td>query</td>
 <td>UUID</td>
@@ -1392,7 +1319,7 @@ OK
 <tr>
 <td>404</td>
 <td><code>not found</code></td>
-<td>No check has this slug under this ping key and <code>create=1</code> was not given, or no project has this ping key.</td>
+<td>No check has this slug under this ping key, or no project has this ping key.</td>
 </tr>
 <tr>
 <td>409</td>

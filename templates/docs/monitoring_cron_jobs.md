@@ -63,8 +63,7 @@ Feel free to adjust the curl options to suit your needs.
 
 **-f, --fail**
 :   Makes curl exit with an error (exit code 22) when the server answers with an
-    HTTP status of 400 or above. A 2xx response, such as the 201 of a slug URL with
-    `?create=1`, is not an error. See [Status Codes](../http_api/#status-codes).
+    HTTP status of 400 or above. See [Status Codes](../http_api/#status-codes).
 
 **-s, --silent**
 :   Silent or quiet mode. Hides the progress meter but also hides error messages.

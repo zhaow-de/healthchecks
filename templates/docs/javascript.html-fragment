@@ -47,7 +47,7 @@ async/await and the <code>ping</code> function above:</p>
 
 <h2>Browser</h2>
 <p>You can also send pings from a browser environment. SITE_NAME sets
-<code>Access-Control-Allow-Origin: *</code> on successful (200 and 201) responses, so a GET,
+<code>Access-Control-Allow-Origin: *</code> on successful (200) responses, so a GET,
 HEAD, or POST with a <code>text/plain</code> body (or no body) from a page on another origin
 works:</p>
 <div class="highlight"><pre><span></span><code><span class="kd">var</span><span class="w"> </span><span class="nx">xhr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">XMLHttpRequest</span><span class="p">();</span>

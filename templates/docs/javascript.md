@@ -54,7 +54,7 @@ runJob();
 ## Browser
 
 You can also send pings from a browser environment. SITE_NAME sets
-`Access-Control-Allow-Origin: *` on successful (200 and 201) responses, so a GET,
+`Access-Control-Allow-Origin: *` on successful (200) responses, so a GET,
 HEAD, or POST with a `text/plain` body (or no body) from a page on another origin
 works:
 

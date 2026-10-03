@@ -31,8 +31,7 @@ A refused connection, such as while the server restarts, is not a transient
 error; add <code>--retry-connrefused</code> to retry it too.</dd>
 <dt><strong>-f, --fail</strong></dt>
 <dd>Makes curl treat HTTP responses with a status of 400 or above as errors, and
-<a href="https://curl.se/docs/manpage.html#-f">exit with code 22</a>. A 201 (auto-provisioning
-created the check) is not an error.</dd>
+<a href="https://curl.se/docs/manpage.html#-f">exit with code 22</a>.</dd>
 <dt><strong>-s, --silent</strong></dt>
 <dd>Silent or quiet mode. Hides the progress meter, but also
 hides error messages.</dd>
@@ -96,27 +95,3 @@ keeps; this avoids the 400 that a body over the size cap gets, which loses the
 ping. Reading the body from stdin (<code>@-</code>) also avoids the shell's limit on argument
 length (128 KiB per argument on Linux), which <code>--data-raw "$m"</code> hits. <code>/$rc</code>
 reports certbot's exit status together with its output.</p>
-<h2>Auto Provisioning New Checks</h2>
-<p>This example uses SITE_NAME <a href="../autoprovisioning/">auto provisioning feature</a> to
-create a check "on the fly" if it does not already exist. Using this technique, you can
-write services that automatically register with SITE_NAME the first time they run.</p>
-<div class="highlight"><pre><span></span><code><span class="ch">#!/bin/bash</span>
-
-<span class="nv">PING_KEY</span><span class="o">=</span>fixme-your-ping-key-here
-
-<span class="c1"># Use the system's short hostname, lowercased, as the check's slug</span>
-<span class="nv">SLUG</span><span class="o">=</span><span class="k">$(</span>hostname<span class="w"> </span><span class="p">|</span><span class="w"> </span>cut<span class="w"> </span>-d.<span class="w"> </span>-f1<span class="w"> </span><span class="p">|</span><span class="w"> </span>tr<span class="w"> </span><span class="s1">'[:upper:]'</span><span class="w"> </span><span class="s1">'[:lower:]'</span><span class="k">)</span>
-
-<span class="c1"># Construct a ping URL and append &quot;?create=1&quot; at the end:</span>
-<span class="nv">URL</span><span class="o">=</span><span class="s2">"PING_ENDPOINT</span><span class="nv">$PING_KEY</span><span class="s2">/</span><span class="nv">$SLUG</span><span class="s2">?create=1"</span>
-
-<span class="c1"># Send a ping:</span>
-curl<span class="w"> </span>-fsS<span class="w"> </span>-m<span class="w"> </span><span class="m">10</span><span class="w"> </span>--retry<span class="w"> </span><span class="m">5</span><span class="w"> </span><span class="s2">"</span><span class="nv">$URL</span><span class="s2">"</span>
-</code></pre></div>
-
-<p>A slug may contain only <code>a-z</code>, <code>0-9</code>, hyphens and underscores, so the example cuts
-the domain off the hostname and lowercases it: a dot gets 404, an uppercase letter
-"400 invalid url format". The ping key is created and shown on the project's
-Settings page (see <a href="../http_api/#uuids-and-slugs">UUIDs and Slugs</a>).
-<a href="../http_api/#auto-provisioning">Auto-Provisioning</a> gives the new check's defaults:
-a period of 1 day, a grace time of 1 hour, and every integration assigned.</p>

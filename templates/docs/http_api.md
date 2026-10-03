@@ -35,9 +35,8 @@ project's **Settings** page in the web UI.
 
 Every endpoint accepts any HTTP method, which the endpoint sections write as `ANY`;
 GET, HEAD and POST are the usual ones, and a check can be set to accept POST only (see
-[How SITE_NAME Interprets a Ping](#interpreting-pings)). The query parameters are
-`rid` (all endpoints, a [run ID](#run-ids)) and `create=1` (slug URLs only,
-[auto-provisioning](#auto-provisioning)). The request body is optional, may be any
+[How SITE_NAME Interprets a Ping](#interpreting-pings)). The one query parameter
+is `rid`, a [run ID](#run-ids). The request body is optional, may be any
 content type, and is stored with the ping (see [Request Body](#request-body)).
 No cookies, CSRF token or special headers are needed.
 
@@ -64,7 +63,7 @@ When the server's body limit setting is `None`, which stores every body whole, t
 header is absent from every response, including those the examples on this page
 show (see the body limit setting in
 [Server Configuration](../self_hosted_configuration/#PING%5FBODY%5FLIMIT)).
-`Access-Control-Allow-Origin: *` is set on 200 and 201 responses only, so a browser
+`Access-Control-Allow-Origin: *` is set on 200 responses only, so a browser
 page on another origin can read a successful response; error responses do not
 carry it.
 
@@ -73,19 +72,16 @@ carry it.
 Status | Body | Meaning
 -------|------|--------
 200 | `OK` | The ping was recorded (also when it was recorded as "ignored").
-201 | `Created` | A slug URL with `?create=1` created the check, and the ping was recorded.
 400 | `invalid url format` | The slug has uppercase letters (an uppercase suffix after a UUID, such as `/Fail`, counts as a slug), or the exit status is above 255.
 400 | `invalid uuid format` | The `rid` parameter is not a UUID.
 400 | an HTML error page | The request body is larger than 2.5 MiB (2,621,440 bytes), or than the body limit when that is higher.
-404 | `not found` | No check has this UUID; no check has this slug under this ping key and `create=1` was not given; no project has this ping key; an unknown lowercase suffix follows a UUID; or any lowercase suffix follows an uppercase or undashed UUID (in these two, the URL is read as a slug URL).
+404 | `not found` | No check has this UUID; no check has this slug under this ping key; no project has this ping key; an unknown lowercase suffix follows a UUID; or any lowercase suffix follows an uppercase or undashed UUID (in these two, the URL is read as a slug URL).
 404 | an HTML error page | The URL matches no ping route: an uppercase or undashed UUID with no suffix, a trailing slash after a slug or a suffix, or an unknown suffix after a slug.
 409 | `ambiguous slug` | More than one check in the project has this slug.
 500 | an HTML error page | The check filters by keywords and the request body is not valid UTF-8.
 
 A 4xx response means the request itself is wrong: fix the URL, the `rid` or the
-body rather than repeating it. The one 4xx with a side effect is a slug URL with
-`?create=1` that creates the check and then fails on its `rid`, its exit status or
-its body size: the check stays, and the ping is not recorded.
+body rather than repeating it.
 
 ### Rate Limits
 
@@ -111,8 +107,7 @@ Record a message without changing the check's status | [Log](#log-uuid): `PING_E
 Attach a job's output to any event | POST the output as the [request body](#request-body)
 Pair each start with its finish when runs overlap | Add [`?rid=<uuid>`](#run-ids) to both pings
 Ping by a readable name instead of a UUID | The [slug URLs](#success-slug): `PING_ENDPOINT<ping-key>/<slug>`
-Create the check on its first ping | A slug URL with [`?create=1`](#auto-provisioning)
-Create a check, to get a UUID to ping | Management API: [create a check](../api/#create-check) with a read-write key; the response carries `uuid` and `ping_url`. Or ping a slug URL with [`?create=1`](#auto-provisioning).
+Create a check, to get a UUID to ping | Management API: [create a check](../api/#create-check) with a read-write key; the response carries `uuid` and `ping_url`.
 Find a check's UUID or ping URL | Management API: [list checks](../api/#list-checks) or [get a check](../api/#get-check), with a read-write key
 Read back the pings a check received, and their bodies | Management API: [list pings](../api/#list-pings) and [get a ping's body](../api/#ping-body)
 Read back how long a run took | Management API: the `duration` field of the finishing ping in [list pings](../api/#list-pings), or the check's `last_duration` from [get a check](../api/#get-check)
@@ -169,11 +164,6 @@ Check's slug is **not guaranteed to be unique**. If you make a Pinging API reque
 using a non-unique slug, SITE_NAME will return the "409 Conflict" HTTP status code
 with the body "ambiguous slug" and ignore the request. The UUID URLs of those checks
 keep working.
-
-Slug URLs optionally support **auto-provisioning**: if you make a Pinging API request
-to a slug with no corresponding check, SITE_NAME will create the check automatically.
-Auto-provisioning is off by default. To enable it, add a `create=1` query parameter
-to the ping URL; see [Auto-Provisioning](#auto-provisioning).
 
 ## How SITE_NAME Interprets a Ping {: #interpreting-pings }
 
@@ -255,24 +245,6 @@ ping of one run, and a new one for each run:
 
 [Measuring script run time](../measuring_script_run_time/) shows this with an
 example.
-
-## Auto-Provisioning {: #auto-provisioning }
-
-A slug URL with the query parameter `create=1` creates the check when the project
-has no check with that slug. The value must be exactly `1`; any other value is
-ignored, and an unknown slug then gets 404. The new check:
-
-* takes the slug as both its name and its slug;
-* has the default period of 1 day and grace time of 1 hour;
-* is assigned every integration in the project;
-* receives the ping, and the response is "201 Created".
-
-When the check already exists, `create=1` changes nothing and the response is
-"200 OK". An unknown ping key gets 404 either way, and duplicate slugs get 409.
-The check is created before the exit status, the body size and the `rid` are
-checked, so a request that fails on any of them still leaves the new check behind.
-UUID URLs ignore `create`. See [Auto Provisioning](../autoprovisioning/) for when to
-use it.
 
 ## Send a "success" Signal Using UUID {: #success-uuid .rule }
 
@@ -526,26 +498,23 @@ Name | In | Type and allowed values | Required | Default | Meaning
 -----|----|------|----------|---------|--------
 `ping-key` | path | string | yes | | The project's ping key, matched exactly.
 `slug` | path | string of `a-z`, `0-9`, `-`, `_` | yes | | The check's slug.
-`create` | query | `1` | no | off | `1` creates the check if the slug is unknown; see [Auto-Provisioning](#auto-provisioning).
 `rid` | query | UUID | no | none | The [run ID](#run-ids); ends the run that a start with the same run ID opened.
 body | body | any bytes | no | empty | Stored with the ping, up to the first PING_BODY_LIMIT bytes; see [Request Body](#request-body).
 
 ### Example
 
 ```bash
-curl -fsS -m 10 --retry 5 "PING_ENDPOINTu0b6xgqk2xh3w5dc0rmwmq/database-backup?create=1"
+curl -fsS -m 10 --retry 5 PING_ENDPOINTu0b6xgqk2xh3w5dc0rmwmq/database-backup
 ```
 
 ```http
-HTTP/1.1 201 Created
+HTTP/1.1 200 OK
 Content-Type: text/html; charset=utf-8
 Ping-Body-Limit: PING_BODY_LIMIT
 Access-Control-Allow-Origin: *
 
-Created
+OK
 ```
-
-When the check already exists, the response is "200 OK" with the body `OK`.
 
 ### Errors
 
@@ -553,7 +522,7 @@ Status | Body | When
 -------|------|-----
 400 | `invalid url format` | The slug has uppercase letters.
 400 | `invalid uuid format` | `rid` is not a UUID.
-404 | `not found` | No check has this slug under this ping key and `create=1` was not given, or no project has this ping key.
+404 | `not found` | No check has this slug under this ping key, or no project has this ping key.
 409 | `ambiguous slug` | More than one check in the project has this slug.
 
 Plus the errors every endpoint can return; see [Status codes](#status-codes).
@@ -581,7 +550,6 @@ Name | In | Type and allowed values | Required | Default | Meaning
 -----|----|------|----------|---------|--------
 `ping-key` | path | string | yes | | The project's ping key, matched exactly.
 `slug` | path | string of `a-z`, `0-9`, `-`, `_` | yes | | The check's slug.
-`create` | query | `1` | no | off | `1` creates the check if the slug is unknown; see [Auto-Provisioning](#auto-provisioning).
 `rid` | query | UUID | no | none | The [run ID](#run-ids) of the run this start opens; send the same value on the finishing ping.
 body | body | any bytes | no | empty | Stored with the ping, up to the first PING_BODY_LIMIT bytes; see [Request Body](#request-body).
 
@@ -606,7 +574,7 @@ Status | Body | When
 -------|------|-----
 400 | `invalid url format` | The slug has uppercase letters.
 400 | `invalid uuid format` | `rid` is not a UUID.
-404 | `not found` | No check has this slug under this ping key and `create=1` was not given, or no project has this ping key.
+404 | `not found` | No check has this slug under this ping key, or no project has this ping key.
 409 | `ambiguous slug` | More than one check in the project has this slug.
 
 Plus the errors every endpoint can return; see [Status codes](#status-codes).
@@ -630,7 +598,6 @@ Name | In | Type and allowed values | Required | Default | Meaning
 -----|----|------|----------|---------|--------
 `ping-key` | path | string | yes | | The project's ping key, matched exactly.
 `slug` | path | string of `a-z`, `0-9`, `-`, `_` | yes | | The check's slug.
-`create` | query | `1` | no | off | `1` creates the check if the slug is unknown; see [Auto-Provisioning](#auto-provisioning).
 `rid` | query | UUID | no | none | The [run ID](#run-ids); a failure ends the open run whatever its run ID.
 body | body | any bytes | no | empty | Stored with the ping, up to the first PING_BODY_LIMIT bytes; see [Request Body](#request-body).
 
@@ -656,7 +623,7 @@ Status | Body | When
 -------|------|-----
 400 | `invalid url format` | The slug has uppercase letters.
 400 | `invalid uuid format` | `rid` is not a UUID.
-404 | `not found` | No check has this slug under this ping key and `create=1` was not given, or no project has this ping key.
+404 | `not found` | No check has this slug under this ping key, or no project has this ping key.
 409 | `ambiguous slug` | More than one check in the project has this slug.
 
 Plus the errors every endpoint can return; see [Status codes](#status-codes).
@@ -680,7 +647,6 @@ Name | In | Type and allowed values | Required | Default | Meaning
 -----|----|------|----------|---------|--------
 `ping-key` | path | string | yes | | The project's ping key, matched exactly.
 `slug` | path | string of `a-z`, `0-9`, `-`, `_` | yes | | The check's slug.
-`create` | query | `1` | no | off | `1` creates the check if the slug is unknown; see [Auto-Provisioning](#auto-provisioning).
 `rid` | query | UUID | no | none | A [run ID](#run-ids), stored with the event; it does not open or end a run.
 body | body | any bytes | no | empty | The message to log, stored up to the first PING_BODY_LIMIT bytes; see [Request Body](#request-body).
 
@@ -706,7 +672,7 @@ Status | Body | When
 -------|------|-----
 400 | `invalid url format` | The slug has uppercase letters.
 400 | `invalid uuid format` | `rid` is not a UUID.
-404 | `not found` | No check has this slug under this ping key and `create=1` was not given, or no project has this ping key.
+404 | `not found` | No check has this slug under this ping key, or no project has this ping key.
 409 | `ambiguous slug` | More than one check in the project has this slug.
 
 Plus the errors every endpoint can return; see [Status codes](#status-codes).
@@ -733,7 +699,6 @@ Name | In | Type and allowed values | Required | Default | Meaning
 `ping-key` | path | string | yes | | The project's ping key, matched exactly.
 `slug` | path | string of `a-z`, `0-9`, `-`, `_` | yes | | The check's slug.
 `exit-status` | path | integer, 0 to 255 | yes | | 0 is success; 1 to 255 is failure.
-`create` | query | `1` | no | off | `1` creates the check if the slug is unknown; see [Auto-Provisioning](#auto-provisioning).
 `rid` | query | UUID | no | none | The [run ID](#run-ids); ends the run that a start opened, as a success or failure ping does.
 body | body | any bytes | no | empty | Stored with the ping, up to the first PING_BODY_LIMIT bytes; see [Request Body](#request-body).
 
@@ -759,7 +724,7 @@ Status | Body | When
 -------|------|-----
 400 | `invalid url format` | The slug has uppercase letters, or the exit status is above 255.
 400 | `invalid uuid format` | `rid` is not a UUID.
-404 | `not found` | No check has this slug under this ping key and `create=1` was not given, or no project has this ping key.
+404 | `not found` | No check has this slug under this ping key, or no project has this ping key.
 409 | `ambiguous slug` | More than one check in the project has this slug.
 
 Plus the errors every endpoint can return; see [Status codes](#status-codes).

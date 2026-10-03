@@ -47,7 +47,7 @@ if you use an HTTP library that raises exceptions, decide if you want to
 catch the exceptions or let them bubble up.</p>
 <p>Many HTTP libraries (Python's requests, Go's net/http, JavaScript's fetch) do not
 raise an error on a 404, so check the status code yourself: any status other than
-200 or 201 means the ping was not recorded.</p>
+200 means the ping was not recorded.</p>
 <h2>Use the Request Method the Check Accepts</h2>
 <p>If a check accepts POST requests only, GET and HEAD pings, such as a plain
 <code>curl PING_URL</code>, are recorded as ignored. See
