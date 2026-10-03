@@ -1,15 +1,15 @@
-FROM python:3.14.7-slim-trixie AS builder
+# python:3.14-alpine is left unpinned on purpose: each build takes the newest Python 3.14
+# on the newest Alpine
+FROM python:3.14-alpine AS builder
 
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+SHELL ["/bin/sh", "-o", "pipefail", "-c"]
 
-# The uv version must satisfy "required-version" in pyproject.toml
 COPY --from=ghcr.io/astral-sh/uv:0.12.19@sha256:04d046b13e60d6bcec73cbc5e1cad25d680dea90c8573340950a0ac2d1aef424 /uv /bin/uv
 
-# build-essential is required to build uwsgi and psycopg[c]
-# libpq-dev is required to build psycopg[c]
-RUN \
-    apt-get update && \
-    apt-get install -y build-essential libpq-dev
+# PyPI has no musllinux wheels for pycurl, psycopg-c and uwsgi, so they compile here:
+# gcc and musl-dev for all three, curl-dev for pycurl, libpq-dev for psycopg[c],
+# linux-headers for uwsgi
+RUN apk add --no-cache gcc musl-dev curl-dev libpq-dev linux-headers
 
 # Use the Python interpreter of the base image, never download one
 ENV UV_PYTHON_DOWNLOADS=never
@@ -22,17 +22,15 @@ RUN --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     uv sync --locked --no-dev --all-extras
 
-FROM python:3.14.7-slim-trixie
+FROM python:3.14-alpine
 
-RUN useradd --system hc
+RUN addgroup -S hc && adduser -S -D -H -G hc hc
 ENV PYTHONUNBUFFERED=1
 WORKDIR /opt/healthchecks
 
-RUN \
-    apt-get update && \
-    apt-get install -y libpq5 && \
-    rm -rf /var/apt/cache && \
-    rm -rf /var/lib/apt/lists
+# The libraries the packages compiled in the builder link against:
+# libcurl for pycurl, libpq for psycopg[c]
+RUN apk add --no-cache libcurl libpq
 
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"

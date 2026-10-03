@@ -143,20 +143,51 @@ TEMPLATES = [
     }
 ]
 
-# Extend Django logging to log unhandled exceptions
-# and all logs from hc.* loggers to the database.
+# uWSGI's line per request is off in docker/uwsgi.ini (disable-logging)
+LOG_FORMAT = os.getenv("LOG_FORMAT", "text").strip().lower()
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "filters": {
+        "require_debug_false": {"()": "django.utils.log.RequireDebugFalse"},
+    },
+    "formatters": {
+        "text": {"format": "%(asctime)s %(levelname)s %(name)s %(message)s"},
+        "json": {"()": "hc.logs.JsonFormatter"},
+    },
     "handlers": {
+        "console": {
+            "level": "INFO",
+            "class": "logging.StreamHandler",
+            "stream": "ext://sys.stdout",
+            "formatter": "json" if LOG_FORMAT == "json" else "text",
+        },
         "db": {
-            "level": "DEBUG",
+            "level": "WARNING",
             "class": "hc.logs.Handler",
         },
+        # Django's default handler for ADMINS, which configuring the "django"
+        # logger here would otherwise drop
+        "mail_admins": {
+            "level": "ERROR",
+            "filters": ["require_debug_false"],
+            "class": "django.utils.log.AdminEmailHandler",
+        },
+        "null": {"class": "logging.NullHandler"},
     },
+    "root": {"level": "WARNING", "handlers": ["console"]},
+    # The loggers with the console handler do not propagate, so the root's
+    # console handler does not write their records a second time
     "loggers": {
-        "django.request": {"level": "ERROR", "handlers": ["db"]},
-        "hc": {"level": "DEBUG", "handlers": ["db"]},
+        "django": {"level": "INFO", "handlers": ["console", "mail_admins"], "propagate": False},
+        "django.request": {
+            "level": "ERROR",
+            "handlers": ["console", "db", "mail_admins"],
+            "propagate": False,
+        },
+        # Without a handler, its 4xx and 5xx lines would reach logging.lastResort
+        "django.server": {"handlers": ["null"], "propagate": False},
+        "hc": {"level": "INFO", "handlers": ["console", "db"], "propagate": False},
     },
 }
 
@@ -200,17 +231,10 @@ USE_TZ = True
 TIME_ZONE = "UTC"
 USE_I18N = False
 
-PASSWORD_HASHERS = [
-    "django.contrib.auth.hashers.Argon2PasswordHasher",
-    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
-    "django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",
-    "django.contrib.auth.hashers.BCryptSHA256PasswordHasher",
-    "django.contrib.auth.hashers.ScryptPasswordHasher",
-]
+PASSWORD_HASHERS = ["django.contrib.auth.hashers.PBKDF2PasswordHasher"]
 
 SITE_ROOT = os.getenv("SITE_ROOT", "http://localhost:8000").removesuffix("/")
-SITE_NAME = os.getenv("SITE_NAME", "Mychecks")
-SITE_LOGO_URL = os.getenv("SITE_LOGO_URL")
+SITE_NAME = os.getenv("SITE_NAME", "Healthchecks")
 MASTER_BADGE_LABEL = os.getenv("MASTER_BADGE_LABEL", SITE_NAME)
 PING_ENDPOINT = os.getenv("PING_ENDPOINT", SITE_ROOT + "/ping/")
 PING_BODY_LIMIT = envint("PING_BODY_LIMIT", "10000")
@@ -255,6 +279,8 @@ def immutable_file_test(path: Any, url: str) -> bool:
 
 
 WHITENOISE_IMMUTABLE_FILE_TEST = immutable_file_test
+# Served at the site's root, where browsers and crawlers ask for files whatever a page links
+WHITENOISE_ROOT = BASE_DIR / "webroot"
 
 # SMTP credentials for sending email
 EMAIL_USE_VERIFICATION = envbool("EMAIL_USE_VERIFICATION", "True")
@@ -281,10 +307,6 @@ if os.getenv("EMAIL_HOST"):
 # WebAuthn
 RP_ID = os.getenv("RP_ID")
 
-# To enable statsd metric collection, set STATSD_HOST="host:hostport"
-# (example: "localhost:8125")
-STATSD_HOST = os.getenv("STATSD_HOST")
-
 # Integrations
 
 # Prometheus
@@ -310,6 +332,10 @@ if sys.argv[1:2] == ["test"] or "pytest" in sys.modules:
     PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
     # Send emails synchronously
     BLOCKING_EMAILS = True
+    # Keep log records out of the test output, assertLogs captures them anyway;
+    # other loggers' warnings still reach the output through logging.lastResort
+    LOGGING["handlers"]["console"] = {"class": "logging.NullHandler"}
+    LOGGING["root"] = {"level": "WARNING", "handlers": []}
     # Make sure MAILERS is set as hc.lib.emails.send() requires it
     MAILERS = {
         "default": {

@@ -28,6 +28,7 @@ from environment variables. Below is a list of environment variables it reads an
 <li><a href="#EMAIL_USE_VERIFICATION">EMAIL_USE_VERIFICATION</a></li>
 <li><a href="#http_proxy">http_proxy and https_proxy</a></li>
 <li><a href="#INTEGRATIONS_ALLOW_PRIVATE_IPS">INTEGRATIONS_ALLOW_PRIVATE_IPS</a></li>
+<li><a href="#LOG_FORMAT">LOG_FORMAT</a></li>
 <li><a href="#MASTER_BADGE_LABEL">MASTER_BADGE_LABEL</a></li>
 <li><a href="#PING_BODY_LIMIT">PING_BODY_LIMIT</a></li>
 <li><a href="#PING_ENDPOINT">PING_ENDPOINT</a></li>
@@ -36,7 +37,6 @@ from environment variables. Below is a list of environment variables it reads an
 <li><a href="#SECRET_KEY">SECRET_KEY</a></li>
 <li><a href="#SECRET_KEY_FILE">SECRET_KEY_FILE</a></li>
 <li><a href="#SECURE_PROXY_SSL_HEADER">SECURE_PROXY_SSL_HEADER</a></li>
-<li><a href="#SITE_LOGO_URL">SITE_LOGO_URL</a></li>
 <li><a href="#SITE_NAME">SITE_NAME</a></li>
 <li><a href="#SITE_ROOT">SITE_ROOT</a></li>
 <li><a href="#SLACK_CLIENT_ID">SLACK_CLIENT_ID</a></li>
@@ -289,6 +289,23 @@ This setting also affects connections to the proxy server when the `http_proxy` 
 `https_proxy` environment variables are set. If your proxy server has a private
 IP address, you will need to enable `INTEGRATIONS_ALLOW_PRIVATE_IPS` to use it.
 
+## `LOG_FORMAT` {: #LOG_FORMAT }
+
+Default: `text`
+
+The format of the log records Healthchecks writes to the console (in Docker, the
+container's output), including the output of the `sendalerts` and `sendreports`
+management commands.
+
+With `text`, a record starts with a line holding the time, the level, the logger
+name and the message; a multi-line message or a traceback continues on the lines
+after it. With `json`, each record is one JSON object on one line, with the keys
+`time` (ISO 8601, in UTC), `level`, `logger`, `message`, and `exception` (the
+formatted traceback) when the record carries one.
+
+Neither `manage.py runserver` nor the Docker image's uWSGI writes a line per HTTP
+request. A uWSGI you run yourself does unless it is started with `--disable-logging`.
+
 ## `MASTER_BADGE_LABEL` {: #MASTER_BADGE_LABEL }
 
 Default: same as `SITE_NAME`
@@ -410,49 +427,9 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 This environment variable maps to a standard Django setting, read more in
 [Django documentation](https://docs.djangoproject.com/en/6.1/ref/settings/#secure-proxy-ssl-header).
 
-## `SITE_LOGO_URL` {: #SITE_LOGO_URL }
-
-Default: `None`
-
-An URL pointing to the image you want to use as the site logo. If not set,
-Healthchecks will use a fallback image: `/static/img/logo.png`.
-
-You can place a custom logo in `/static/img/`, run `manage.py collectstatic`, and
-point `SITE_LOGO_URL` to it like so:
-
-```ini
-SITE_LOGO_URL=/static/img/my-custom-logo.png
-```
-
-Or you can serve the logo from another server, and point to it using an absolute URL:
-
-```ini
-SITE_LOGO_URL=https://example.org/cdn/my-custom-logo.png
-```
-
-Either way, Healthchecks will use the provided `SITE_LOGO_URL` value as-is in HTML
-pages, and you should use an URL that **the end user's browser will be able to
-access directly**. The logo image can use any image format supported by browsers
-(PNG, SVG, JPG are all fine).
-
-**Docker note.** You can build a custom Docker image with your logo "baked in". To
-do so, use a Dockerfile with the following contents, and with your logo.png placed next
-to it:
-
-```docker
-FROM ghcr.io/zhaow-de/healthchecks:vX.Y.Z
-COPY logo.png /opt/healthchecks/static-collected/img/
-```
-
-This overwrites the default placeholder logo, so, in this case, you do not need to
-specify `SITE_LOGO_URL`. Notice that the logo must be placed in `static-collected`, not
-`static`. This is because `manage.py collectstatic` has already been run in the base
-image's build time, and the web server will not recognize any new files placed in the
-`static` directory.
-
 ## `SITE_NAME` {: #SITE_NAME }
 
-Default: `Mychecks`
+Default: `Healthchecks`
 
 The display name of this Healthchecks instance. Healthchecks uses it throughout
 its web UI and documentation.

@@ -26,6 +26,7 @@ from environment variables. Below is a list of environment variables it reads an
 <li><a href="#EMAIL_USE_VERIFICATION">EMAIL_USE_VERIFICATION</a></li>
 <li><a href="#http_proxy">http_proxy and https_proxy</a></li>
 <li><a href="#INTEGRATIONS_ALLOW_PRIVATE_IPS">INTEGRATIONS_ALLOW_PRIVATE_IPS</a></li>
+<li><a href="#LOG_FORMAT">LOG_FORMAT</a></li>
 <li><a href="#MASTER_BADGE_LABEL">MASTER_BADGE_LABEL</a></li>
 <li><a href="#PING_BODY_LIMIT">PING_BODY_LIMIT</a></li>
 <li><a href="#PING_ENDPOINT">PING_ENDPOINT</a></li>
@@ -34,7 +35,6 @@ from environment variables. Below is a list of environment variables it reads an
 <li><a href="#SECRET_KEY">SECRET_KEY</a></li>
 <li><a href="#SECRET_KEY_FILE">SECRET_KEY_FILE</a></li>
 <li><a href="#SECURE_PROXY_SSL_HEADER">SECURE_PROXY_SSL_HEADER</a></li>
-<li><a href="#SITE_LOGO_URL">SITE_LOGO_URL</a></li>
 <li><a href="#SITE_NAME">SITE_NAME</a></li>
 <li><a href="#SITE_ROOT">SITE_ROOT</a></li>
 <li><a href="#SLACK_CLIENT_ID">SLACK_CLIENT_ID</a></li>
@@ -198,6 +198,18 @@ webhooks: the Slack integration is subject to it as well.</p>
 <p>This setting also affects connections to the proxy server when the <code>http_proxy</code> or
 <code>https_proxy</code> environment variables are set. If your proxy server has a private
 IP address, you will need to enable <code>INTEGRATIONS_ALLOW_PRIVATE_IPS</code> to use it.</p>
+<h2 id="LOG_FORMAT"><code>LOG_FORMAT</code></h2>
+<p>Default: <code>text</code></p>
+<p>The format of the log records Healthchecks writes to the console (in Docker, the
+container's output), including the output of the <code>sendalerts</code> and <code>sendreports</code>
+management commands.</p>
+<p>With <code>text</code>, a record starts with a line holding the time, the level, the logger
+name and the message; a multi-line message or a traceback continues on the lines
+after it. With <code>json</code>, each record is one JSON object on one line, with the keys
+<code>time</code> (ISO 8601, in UTC), <code>level</code>, <code>logger</code>, <code>message</code>, and <code>exception</code> (the
+formatted traceback) when the record carries one.</p>
+<p>Neither <code>manage.py runserver</code> nor the Docker image's uWSGI writes a line per HTTP
+request. A uWSGI you run yourself does unless it is started with <code>--disable-logging</code>.</p>
 <h2 id="MASTER_BADGE_LABEL"><code>MASTER_BADGE_LABEL</code></h2>
 <p>Default: same as <code>SITE_NAME</code></p>
 <p>The label for the "Overall Status" status badge.</p>
@@ -281,37 +293,8 @@ with two elements instead:</p>
 
 <p>This environment variable maps to a standard Django setting, read more in
 <a href="https://docs.djangoproject.com/en/6.1/ref/settings/#secure-proxy-ssl-header">Django documentation</a>.</p>
-<h2 id="SITE_LOGO_URL"><code>SITE_LOGO_URL</code></h2>
-<p>Default: <code>None</code></p>
-<p>An URL pointing to the image you want to use as the site logo. If not set,
-Healthchecks will use a fallback image: <code>/static/img/logo.png</code>.</p>
-<p>You can place a custom logo in <code>/static/img/</code>, run <code>manage.py collectstatic</code>, and
-point <code>SITE_LOGO_URL</code> to it like so:</p>
-<div class="highlight"><pre><span></span><code><span class="na">SITE_LOGO_URL</span><span class="o">=</span><span class="s">/static/img/my-custom-logo.png</span>
-</code></pre></div>
-
-<p>Or you can serve the logo from another server, and point to it using an absolute URL:</p>
-<div class="highlight"><pre><span></span><code><span class="na">SITE_LOGO_URL</span><span class="o">=</span><span class="s">https://example.org/cdn/my-custom-logo.png</span>
-</code></pre></div>
-
-<p>Either way, Healthchecks will use the provided <code>SITE_LOGO_URL</code> value as-is in HTML
-pages, and you should use an URL that <strong>the end user's browser will be able to
-access directly</strong>. The logo image can use any image format supported by browsers
-(PNG, SVG, JPG are all fine).</p>
-<p><strong>Docker note.</strong> You can build a custom Docker image with your logo "baked in". To
-do so, use a Dockerfile with the following contents, and with your logo.png placed next
-to it:</p>
-<div class="highlight"><pre><span></span><code><span class="k">FROM</span><span class="w"> </span><span class="s">ghcr.io/zhaow-de/healthchecks:vX.Y.Z</span>
-<span class="k">COPY</span><span class="w"> </span>logo.png<span class="w"> </span>/opt/healthchecks/static-collected/img/
-</code></pre></div>
-
-<p>This overwrites the default placeholder logo, so, in this case, you do not need to
-specify <code>SITE_LOGO_URL</code>. Notice that the logo must be placed in <code>static-collected</code>, not
-<code>static</code>. This is because <code>manage.py collectstatic</code> has already been run in the base
-image's build time, and the web server will not recognize any new files placed in the
-<code>static</code> directory.</p>
 <h2 id="SITE_NAME"><code>SITE_NAME</code></h2>
-<p>Default: <code>Mychecks</code></p>
+<p>Default: <code>Healthchecks</code></p>
 <p>The display name of this Healthchecks instance. Healthchecks uses it throughout
 its web UI and documentation.</p>
 <h2 id="SITE_ROOT"><code>SITE_ROOT</code></h2>

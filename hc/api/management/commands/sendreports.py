@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import signal
 import time
 from argparse import ArgumentParser
@@ -13,6 +14,8 @@ from django.db.models import Q
 from django.utils.timezone import now
 
 from hc.accounts.models import NO_NAG, Profile
+
+logger = logging.getLogger("hc")
 
 
 class Command(BaseCommand):
@@ -58,7 +61,7 @@ class Command(BaseCommand):
             return True
 
         if profile.send_report():
-            self.stdout.write(self.tmpl % profile.user.email)
+            logger.info(self.tmpl, profile.user.email)
             # Pause before next report to avoid hitting sending quota
             self.pause()
 
@@ -81,7 +84,7 @@ class Command(BaseCommand):
             return True
 
         if profile.send_report(nag=True):
-            self.stdout.write(f"Sent nag to {profile.user.email}")
+            logger.info("Sent nag to %s", profile.user.email)
             # Pause before next report to avoid hitting sending quota
             self.pause()
         else:
@@ -91,20 +94,23 @@ class Command(BaseCommand):
         return True
 
     def on_signal(self, signum: int, frame: FrameType | None) -> None:
-        desc = signal.strsignal(signum)
-        self.stdout.write(f"{desc}, finishing...\n")
+        # Log nothing here: the handler interrupts the main thread, which may be
+        # inside a query or a write to stdout, and neither the db connection
+        # nor the stream can be entered again
+        self.signum = signum
         self.shutdown = True
 
-    def handle(self, loop: bool, **options: Any) -> str:
+    def handle(self, loop: bool, **options: Any) -> None:
         db = settings.DATABASES["default"]
         if "OPTIONS" in db and "application_name" in db["OPTIONS"]:
             db["OPTIONS"]["application_name"] = "sendreports"
 
         self.shutdown = False
+        self.signum: int | None = None
         signal.signal(signal.SIGTERM, self.on_signal)
         signal.signal(signal.SIGINT, self.on_signal)
 
-        self.stdout.write("sendreports is now running")
+        logger.info("sendreports is now running")
         while not self.shutdown:
             # The db connection may have timed out,
             # make sure we have a working db connection.
@@ -128,4 +134,5 @@ class Command(BaseCommand):
                 if not self.shutdown:
                     time.sleep(1)
 
-        return "Done."
+        if self.signum is not None:
+            logger.info("%s, finishing...", signal.strsignal(self.signum))
