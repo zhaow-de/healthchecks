@@ -47,6 +47,17 @@ $<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> <
   the credentials from the previous step.</p>
 </li>
 </ul>
+<h2>Login Lockout</h2>
+<p>A browser that has completed a login gets login rate limits of its own, but a
+new browser shares them with everyone else, so a run of wrong passwords from
+anywhere can lock it out. To get back in, wait for the limits to refill, use
+the login link sent by email if email is set up, or clear every rate limit
+record, the recent ones too:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>web<span class="w"> </span>/opt/healthchecks/manage.py<span class="w"> </span>prunetokenbucket<span class="w"> </span>--all
+</code></pre></div>
+
+<p>If you have forgotten the password, set a new one with
+<code>docker compose exec web /opt/healthchecks/manage.py changepassword</code>.</p>
 <h2>uWSGI Configuration</h2>
 <p>The reference Dockerfile uses <a href="https://uwsgi-docs.readthedocs.io/en/latest/">uWSGI</a>
 as the WSGI server. You can configure uWSGI by setting <code>UWSGI_...</code> environment
