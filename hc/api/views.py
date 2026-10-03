@@ -37,7 +37,6 @@ from hc.accounts.models import Profile, Project
 from hc.api.decorators import ApiRequest, authorize, authorize_read, cors
 from hc.api.forms import FlipsFiltersForm
 from hc.api.models import Channel, Check, Flip, Notification, Ping, prepare_durations
-from hc.lib.badges import check_signature, get_badge_svg, get_badge_url
 from hc.lib.signing import unsign_bounce_id
 from hc.lib.string import is_valid_uuid_string, match_keywords
 from hc.lib.tz import all_timezones, legacy_timezones
@@ -666,124 +665,6 @@ def flips_by_unique_key(request: ApiRequest, unique_key: str) -> HttpResponse:
         if check.unique_key == unique_key:
             return flips(request, check)
     return HttpResponseNotFound()
-
-
-@cors("GET")
-@csrf_exempt
-@authorize_read
-def badges(request: ApiRequest) -> JsonResponse:
-    tags = {"*"}
-    for check in request.project.check_set.all():
-        tags.update(check.tags_list())
-
-    key = request.project.badge_key
-    badges = {}
-    for tag in tags:
-        badges[tag] = {
-            "svg": get_badge_url(key, tag),
-            "svg3": get_badge_url(key, tag, with_late=True),
-            "json": get_badge_url(key, tag, fmt="json"),
-            "json3": get_badge_url(key, tag, fmt="json", with_late=True),
-            "shields": get_badge_url(key, tag, fmt="shields"),
-            "shields3": get_badge_url(key, tag, fmt="shields", with_late=True),
-        }
-
-    return JsonResponse({"badges": badges})
-
-
-SHIELDS_COLORS = {"up": "success", "late": "important", "down": "critical"}
-
-
-def _shields_response(label: str, status: str) -> JsonResponse:
-    return JsonResponse(
-        {
-            "schemaVersion": 1,
-            "label": label,
-            "message": status,
-            "color": SHIELDS_COLORS[status],
-        }
-    )
-
-
-@never_cache
-@cors("GET")
-def badge(request: HttpRequest, badge_key: str, signature: str, tag: str, fmt: str) -> HttpResponse:
-    if fmt not in ("svg", "json", "shields"):
-        return HttpResponseNotFound()
-
-    with_late = True
-    if len(signature) == 10 and signature.endswith("-2"):
-        with_late = False
-
-    if not check_signature(badge_key, tag, signature):
-        return HttpResponseNotFound()
-
-    q = Check.objects.filter(project__badge_key=badge_key)
-    if tag == "*":
-        label = settings.MASTER_BADGE_LABEL
-    else:
-        q = q.filter(tags__contains=tag)
-        label = tag
-
-    status, total, grace, down = "up", 0, 0, 0
-    for check in q:
-        if tag != "*" and tag not in check.tags_list():
-            continue
-
-        total += 1
-        check_status = check.get_status()
-
-        if check_status == "down":
-            down += 1
-            status = "down"
-            if fmt == "svg":
-                # For SVG badges, we can leave the loop as soon as we
-                # find the first "down"
-                break
-        elif check_status == "grace":
-            grace += 1
-            if status == "up" and with_late:
-                status = "late"
-
-    if fmt == "shields":
-        return _shields_response(label, status)
-
-    if fmt == "json":
-        return JsonResponse({"status": status, "total": total, "grace": grace, "down": down})
-
-    svg = get_badge_svg(label, status)
-    return HttpResponse(svg, content_type="image/svg+xml")
-
-
-@never_cache
-@cors("GET")
-def check_badge(request: HttpRequest, states: int, badge_key: UUID, fmt: str) -> HttpResponse:
-    if fmt not in ("svg", "json", "shields"):
-        return HttpResponseNotFound()
-
-    check = get_object_or_404(Check, badge_key=badge_key)
-    check_status = check.get_status()
-    status = "up"
-    if check_status == "down":
-        status = "down"
-    elif check_status == "grace" and states == 3:
-        status = "late"
-
-    if fmt == "shields":
-        return _shields_response(check.name_then_code(), status)
-
-    if fmt == "json":
-        return JsonResponse(
-            {
-                "status": status,
-                "total": 1,
-                "grace": 1 if check_status == "grace" else 0,
-                "down": 1 if check_status == "down" else 0,
-            }
-        )
-
-    svg = get_badge_svg(check.name_then_code(), status)
-    return HttpResponse(svg, content_type="image/svg+xml")
 
 
 def metrics(request: HttpRequest) -> HttpResponse:

@@ -1,4 +1,3 @@
-![Version](https://img.shields.io/badge/version-v4.5.0-blue)
 ![License](https://img.shields.io/badge/license-MIT%20%2B%20BSD--3--Clause-blue)
 ![Python Version from PEP 621 TOML](https://img.shields.io/python/required-version-toml?tomlFilePath=https://raw.githubusercontent.com/zhaow-de/healthchecks/develop/pyproject.toml)
 ![coverage](https://img.shields.io/coverallsCoverage/github/zhaow-de/healthchecks)

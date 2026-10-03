@@ -9,7 +9,7 @@ from datetime import datetime
 from datetime import timedelta as td
 from itertools import islice
 from typing import TypedDict, cast
-from urllib.parse import urlencode, urlparse
+from urllib.parse import urlparse
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
@@ -57,10 +57,8 @@ from hc.front.templatetags.hc_extras import (
     sortchecks,
 )
 from hc.front.validators import CronValidator, OnCalendarValidator
-from hc.lib.badges import get_badge_url
 from hc.lib.string import is_valid_uuid_string
 from hc.lib.tz import all_timezones
-from hc.lib.urls import absolute_reverse
 
 VALID_SORT_VALUES = ("name", "-name", "last_ping", "-last_ping", "created")
 STATUS_TEXT_TMPL = get_template("front/log_status_text.html")
@@ -1026,54 +1024,6 @@ def status_single(request: HttpRequest, code: UUID) -> HttpResponse:
         doc["downtimes"] = DOWNTIMES_TMPL.render({"downtimes": downtimes, "tz": request.profile.tz})
 
     return JsonResponse(doc)
-
-
-@login_required
-def badges(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
-    project = _get_project_for_user(request, code)
-
-    if request.method == "POST":
-        form = forms.BadgeSettingsForm(request.POST)
-        if not form.is_valid():
-            return HttpResponseBadRequest()
-
-        fmt = form.cleaned_data["fmt"]
-        states = form.cleaned_data["states"]
-        with_late = states == "3"
-        if form.cleaned_data["target"] == "all":
-            label = settings.MASTER_BADGE_LABEL
-            url = get_badge_url(project.badge_key, "*", fmt, with_late)
-        elif form.cleaned_data["target"] == "tag":
-            label = form.cleaned_data["tag"]
-            url = get_badge_url(project.badge_key, label, fmt, with_late)
-        elif form.cleaned_data["target"] == "check":
-            check = project.check_set.get(code=form.cleaned_data["check"])
-            url = absolute_reverse("hc-badge-check", args=[states, check.badge_key, fmt])
-            label = check.name_then_code()
-
-        if fmt == "shields":
-            url = "https://img.shields.io/endpoint?" + urlencode({"url": url})
-
-        ctx = {"fmt": fmt, "label": label, "url": url}
-        return render(request, "front/badges_preview.html", ctx)
-
-    checks = list(project.check_set.order_by("name"))
-    tags = set()
-    for check in checks:
-        tags.update(check.tags_list())
-
-    sorted_tags = sorted(tags, key=lambda s: s.lower())
-
-    ctx = {
-        "project": project,
-        "page": "badges",
-        "checks": checks,
-        "tags": sorted_tags,
-        "fmt": "svg",
-        "label": settings.MASTER_BADGE_LABEL,
-        "url": get_badge_url(project.badge_key, "*"),
-    }
-    return render(request, "front/badges.html", ctx)
 
 
 @login_required

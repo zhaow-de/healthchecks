@@ -34,7 +34,6 @@ class BaseTestCase(TestCase):
 
         self.project = Project(owner=self.alice, api_key="X" * 32)
         self.project.name = "Alices Project"
-        self.project.badge_key = self.alice.username
         self.project.ping_key = "p" * 22
         self.project.save()
 
@@ -47,7 +46,6 @@ class BaseTestCase(TestCase):
         self.charlie.save()
 
         self.charlies_project = Project(owner=self.charlie)
-        self.charlies_project.badge_key = self.charlie.username
         self.charlies_project.save()
 
         self.charlies_profile = Profile(user=self.charlie)

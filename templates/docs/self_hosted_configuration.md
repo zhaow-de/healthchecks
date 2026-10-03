@@ -13,8 +13,8 @@ How the values are read:
 * A string setting set to an empty value is the empty string, not the default. For
   `ADMINS`, `ALLOWED_HOSTS`, `EMAIL_HOST`, `METRICS_KEY`, `RP_ID`,
   `SECURE_PROXY_SSL_HEADER`, `SLACK_CLIENT_ID` and `SUPPORT_EMAIL` that is the same
-  as unset; for the others, `SITE_ROOT`, `SITE_NAME`, `PING_ENDPOINT` and
-  `MASTER_BADGE_LABEL` among them, delete the line to get the default.
+  as unset; for the others, `SITE_ROOT`, `SITE_NAME` and `PING_ENDPOINT` among
+  them, delete the line to get the default.
 * A `<NAME>_FILE` variable with a non-empty value names a file whose content is used
   instead of `<NAME>`; an empty one counts as unset, and `<NAME>` is read. A
   non-empty value that does not name an existing regular file stops startup with
@@ -51,7 +51,6 @@ How the values are read:
 <li><a href="#http_proxy">http_proxy and https_proxy</a></li>
 <li><a href="#INTEGRATIONS_ALLOW_PRIVATE_IPS">INTEGRATIONS_ALLOW_PRIVATE_IPS</a></li>
 <li><a href="#LOG_FORMAT">LOG_FORMAT</a></li>
-<li><a href="#MASTER_BADGE_LABEL">MASTER_BADGE_LABEL</a></li>
 <li><a href="#METRICS_KEY">METRICS_KEY</a></li>
 <li><a href="#PING_BODY_LIMIT">PING_BODY_LIMIT</a></li>
 <li><a href="#PING_ENDPOINT">PING_ENDPOINT</a></li>
@@ -426,15 +425,6 @@ the database and shown in Site Administration › Logs › Records. They are nev
 pruned automatically; [`sendlogs`](../self_hosted/#sending-notifications) can email
 a daily count of them to [ADMINS](#ADMINS).
 
-## `MASTER_BADGE_LABEL` {: #MASTER_BADGE_LABEL }
-
-Default: same as `SITE_NAME`
-
-The label of the badge that covers all checks in a project: "All checks in the
-project" on the Badges page, tag `*` in the badge URL. A tag's badge is labelled
-with the tag, and a single check's badge with the check's name (see
-[Badges](../badges/)).
-
 ## `METRICS_KEY` {: #METRICS_KEY }
 
 Default: `None`
@@ -531,8 +521,6 @@ Set it once, before first use, and keep it. Changing it later:
   the database stores only an HMAC of each key made with `SECRET_KEY`; Prometheus
   scrapes with a read-only key stop too. Create new keys in the **API Access**
   section of each project's Settings page (see [Authentication](../api/#authentication)).
-* changes the URL of every project and tag badge, which is signed with it; a single
-  check's badge URL does not change (see [Badges](../badges/)).
 * invalidates every session, login link, device cookie, pending sudo code, email
   verification link and unsubscribe link in emails already sent.
 * resets the per-email [login rate limits](../self_hosted/#login-lockout).

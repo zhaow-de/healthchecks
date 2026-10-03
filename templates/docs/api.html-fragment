@@ -1,8 +1,8 @@
 <h1>Management API v3</h1>
 <p>With the Management API, you can programmatically manage the checks and integrations
 in a SITE_NAME project: list, create, update, pause, resume and delete checks, read
-the pings and status changes they recorded, and list the project's integrations and
-badges. It is separate from the <a href="../http_api/">Pinging API</a>, which your jobs call to
+the pings and status changes they recorded, and list the project's integrations.
+It is separate from the <a href="../http_api/">Pinging API</a>, which your jobs call to
 report success, start, failure and log events: the Management API records no pings.</p>
 <h2 id="quick-reference">Quick Reference</h2>
 <h3>Base URL</h3>
@@ -10,7 +10,7 @@ report success, start, failure and log events: the Management API records no pin
 matched exactly:</p>
 <ul>
 <li>A collection path ends with a slash: <code>checks/</code>, <code>checks/&lt;uuid&gt;/pings/</code>,
-  <code>checks/&lt;uuid&gt;/flips/</code>, <code>channels/</code>, <code>badges/</code>, <code>status/</code>, <code>metrics/</code>. Send the
+  <code>checks/&lt;uuid&gt;/flips/</code>, <code>channels/</code>, <code>status/</code>, <code>metrics/</code>. Send the
   slash. Without it, a GET gets a 301 redirect to the slashed path, and so does a POST
   while the server runs with <code>DEBUG</code> off; with <code>DEBUG</code> on, the setting's default,
   a POST, PUT or PATCH gets a 500, since Django will not redirect those.</li>
@@ -46,7 +46,7 @@ Each key is 32 characters long, and its prefix tells its kind:</p>
 <tr>
 <td>read-only</td>
 <td><code>hcr_</code></td>
-<td><a href="#list-checks">list checks</a>, <a href="#get-check">get a check</a>, <a href="#list-flips">list flips</a>, <a href="#list-badges">list badges</a>; every other endpoint that takes a key, <a href="#list-channels">list integrations</a>, <a href="#list-pings">list pings</a> and <a href="#ping-body">a ping's body</a> included, answers it with "401 wrong api key"</td>
+<td><a href="#list-checks">list checks</a>, <a href="#get-check">get a check</a>, <a href="#list-flips">list flips</a>; every other endpoint that takes a key, <a href="#list-channels">list integrations</a>, <a href="#list-pings">list pings</a> and <a href="#ping-body">a ping's body</a> included, answers it with "401 wrong api key"</td>
 </tr>
 </tbody>
 </table>
@@ -261,10 +261,6 @@ response.</p>
 <td><a href="#list-flips">List flips</a>: <code>GET SITE_ROOT/api/v3/checks/&lt;uuid&gt;/flips/</code></td>
 </tr>
 <tr>
-<td>Get status badge URLs</td>
-<td><a href="#list-badges">List badges</a> for the tags; one check's badge is its <code>badge_url</code></td>
-</tr>
-<tr>
 <td>Check that the SITE_NAME instance and its database are up</td>
 <td><a href="#status">Status</a>: <code>GET SITE_ROOT/api/v3/status/</code></td>
 </tr>
@@ -364,16 +360,6 @@ response.</p>
 <td><a href="#list-channels">List existing integrations</a></td>
 <td><code>GET SITE_ROOT/api/v3/channels/</code></td>
 <td>read-write</td>
-</tr>
-<tr>
-<td><strong>Badges</strong></td>
-<td></td>
-<td></td>
-</tr>
-<tr>
-<td><a href="#list-badges">List project's badges</a></td>
-<td><code>GET SITE_ROOT/api/v3/badges/</code></td>
-<td>read-only or read-write</td>
 </tr>
 <tr>
 <td><strong>Service status</strong></td>
@@ -521,12 +507,6 @@ field.</p>
 <td>Deprecated: <code>success_kw</code> and <code>failure_kw</code> when <code>filter_subject</code> is <code>true</code>, and <code>""</code> otherwise.</td>
 </tr>
 <tr>
-<td><code>badge_url</code></td>
-<td>string</td>
-<td>always</td>
-<td>The SVG status badge of this check alone; see <a href="#list-badges">badges</a>.</td>
-</tr>
-<tr>
 <td><code>uuid</code></td>
 <td>string</td>
 <td>read-write key</td>
@@ -644,7 +624,6 @@ more tags.</p>
 <span class="w">      </span><span class="nt">"filter_body"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
 <span class="w">      </span><span class="nt">"filter_http_body"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
 <span class="w">      </span><span class="nt">"filter_default_fail"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">"badge_url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/b/2/1b9d0386-d07e-44b0-8995-4a9a372de43c.svg"</span><span class="p">,</span>
 <span class="w">      </span><span class="nt">"uuid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"31365bce-8da9-4729-8ff3-aaa71d56b712"</span><span class="p">,</span>
 <span class="w">      </span><span class="nt">"ping_url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"PING_ENDPOINT31365bce-8da9-4729-8ff3-aaa71d56b712"</span><span class="p">,</span>
 <span class="w">      </span><span class="nt">"update_url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/api/v3/checks/31365bce-8da9-4729-8ff3-aaa71d56b712"</span><span class="p">,</span>
@@ -675,7 +654,6 @@ more tags.</p>
 <span class="w">      </span><span class="nt">"filter_body"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
 <span class="w">      </span><span class="nt">"filter_http_body"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
 <span class="w">      </span><span class="nt">"filter_default_fail"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">"badge_url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/b/2/7d3ab93d-836e-4505-bbda-fcbd5e07adf9.svg"</span><span class="p">,</span>
 <span class="w">      </span><span class="nt">"last_duration"</span><span class="p">:</span><span class="w"> </span><span class="mi">312</span><span class="p">,</span>
 <span class="w">      </span><span class="nt">"uuid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"803f680d-e89b-492b-82ef-2be7b774a92d"</span><span class="p">,</span>
 <span class="w">      </span><span class="nt">"ping_url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"PING_ENDPOINT803f680d-e89b-492b-82ef-2be7b774a92d"</span><span class="p">,</span>
@@ -720,7 +698,6 @@ can use it in the <a href="#get-check">Get a single check</a> and
 <span class="w">      </span><span class="nt">"filter_body"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
 <span class="w">      </span><span class="nt">"filter_http_body"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
 <span class="w">      </span><span class="nt">"filter_default_fail"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">"badge_url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/b/2/1b9d0386-d07e-44b0-8995-4a9a372de43c.svg"</span><span class="p">,</span>
 <span class="w">      </span><span class="nt">"unique_key"</span><span class="p">:</span><span class="w"> </span><span class="s2">"a6c7b0a8a66bed0df66abfdab3c77736861703ee"</span><span class="p">,</span>
 <span class="w">      </span><span class="nt">"timeout"</span><span class="p">:</span><span class="w"> </span><span class="mi">3600</span>
 <span class="w">    </span><span class="p">}</span>
@@ -790,7 +767,6 @@ key works with either identifier; the response has the fields of the key's kind.
 <span class="w">  </span><span class="nt">"filter_body"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"filter_http_body"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"filter_default_fail"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">"badge_url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/b/2/7d3ab93d-836e-4505-bbda-fcbd5e07adf9.svg"</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"last_duration"</span><span class="p">:</span><span class="w"> </span><span class="mi">312</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"uuid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"803f680d-e89b-492b-82ef-2be7b774a92d"</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"ping_url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"PING_ENDPOINT803f680d-e89b-492b-82ef-2be7b774a92d"</span><span class="p">,</span>
@@ -827,7 +803,6 @@ key works with either identifier; the response has the fields of the key's kind.
 <span class="w">  </span><span class="nt">"filter_body"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"filter_http_body"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"filter_default_fail"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">"badge_url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/b/2/7d3ab93d-836e-4505-bbda-fcbd5e07adf9.svg"</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"last_duration"</span><span class="p">:</span><span class="w"> </span><span class="mi">312</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"unique_key"</span><span class="p">:</span><span class="w"> </span><span class="s2">"124f983e0e3dcaeba921cfcef46efd084576e783"</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"schedule"</span><span class="p">:</span><span class="w"> </span><span class="s2">"15 5 * * *"</span><span class="p">,</span>
@@ -1213,7 +1188,6 @@ explicit <code>success_kw</code> or <code>failure_kw</code> in the same request 
 <span class="w">  </span><span class="nt">"filter_body"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"filter_http_body"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"filter_default_fail"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">"badge_url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/b/2/d43c84db-1502-4d86-a89d-181a33e25896.svg"</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"uuid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"7918b17b-a745-4db1-8575-9d2e07c97f79"</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"ping_url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"PING_ENDPOINT7918b17b-a745-4db1-8575-9d2e07c97f79"</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"update_url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/api/v3/checks/7918b17b-a745-4db1-8575-9d2e07c97f79"</span><span class="p">,</span>
@@ -1421,7 +1395,6 @@ rules, and the <a href="#field-notes">field notes</a> apply; only the defaults d
 <span class="w">  </span><span class="nt">"filter_body"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"filter_http_body"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"filter_default_fail"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">"badge_url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/b/2/d43c84db-1502-4d86-a89d-181a33e25896.svg"</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"uuid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"7918b17b-a745-4db1-8575-9d2e07c97f79"</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"ping_url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"PING_ENDPOINT7918b17b-a745-4db1-8575-9d2e07c97f79"</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"update_url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/api/v3/checks/7918b17b-a745-4db1-8575-9d2e07c97f79"</span><span class="p">,</span>
@@ -1533,7 +1506,6 @@ header is sometimes required by some network proxies and web servers.</p>
 <span class="w">  </span><span class="nt">"filter_body"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"filter_http_body"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"filter_default_fail"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">"badge_url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/b/2/d43c84db-1502-4d86-a89d-181a33e25896.svg"</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"uuid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"7918b17b-a745-4db1-8575-9d2e07c97f79"</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"ping_url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"PING_ENDPOINT7918b17b-a745-4db1-8575-9d2e07c97f79"</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"update_url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/api/v3/checks/7918b17b-a745-4db1-8575-9d2e07c97f79"</span><span class="p">,</span>
@@ -1638,7 +1610,6 @@ header is sometimes required by some network proxies and web servers.</p>
 <span class="w">  </span><span class="nt">"filter_body"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"filter_http_body"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"filter_default_fail"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">"badge_url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/b/2/d43c84db-1502-4d86-a89d-181a33e25896.svg"</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"uuid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"7918b17b-a745-4db1-8575-9d2e07c97f79"</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"ping_url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"PING_ENDPOINT7918b17b-a745-4db1-8575-9d2e07c97f79"</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"update_url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/api/v3/checks/7918b17b-a745-4db1-8575-9d2e07c97f79"</span><span class="p">,</span>
@@ -1741,7 +1712,6 @@ body is not read).</p>
 <span class="w">  </span><span class="nt">"filter_body"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"filter_http_body"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"filter_default_fail"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">"badge_url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/b/2/d43c84db-1502-4d86-a89d-181a33e25896.svg"</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"uuid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"7918b17b-a745-4db1-8575-9d2e07c97f79"</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"ping_url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"PING_ENDPOINT7918b17b-a745-4db1-8575-9d2e07c97f79"</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"update_url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/api/v3/checks/7918b17b-a745-4db1-8575-9d2e07c97f79"</span><span class="p">,</span>
@@ -2246,74 +2216,6 @@ the <code>channels</code> field of <a href="#create-check">create</a> and <a hre
 </tbody>
 </table>
 <p>Plus the errors every endpoint can return; see <a href="#status-codes">Status codes</a>.</p>
-<h2 class="rule" id="list-badges">List Project's Badges</h2>
-<div class="highlight"><pre><span></span><code>GET SITE_ROOT/api/v3/badges/
-</code></pre></div>
-
-<p>Returns a map of all tags in the project, with badge URLs for each tag. SITE_NAME
-provides badges in a few different formats:</p>
-<ul>
-<li><code>svg</code>: returns the badge as an SVG document.</li>
-<li><code>json</code>: returns a JSON document which you can use to generate a custom badge
-    yourself.</li>
-<li><code>shields</code>: returns JSON in a <a href="https://shields.io/endpoint">Shields.io compatible format</a>.</li>
-</ul>
-<p>In addition, badges have 2-state and 3-state variations:</p>
-<ul>
-<li><code>svg</code>, <code>json</code>, <code>shields</code>: reports two states: "up" and "down". It
-    considers any checks in the grace period as still "up".</li>
-<li><code>svg3</code>, <code>json3</code>, <code>shields3</code>: reports three states: "up", "late", and "down".</li>
-</ul>
-<p>The response includes a special <code>*</code> entry: this pseudo-tag reports the overall status
-of all checks in the project. The badge URLs are public and need no API key. The
-badge of a single check is the check's <code>badge_url</code>; see <a href="../badges/">Badges</a>.</p>
-<p><strong>Authentication:</strong> a read-write or a read-only key, in the <code>X-Api-Key</code> header.</p>
-<h3>Parameters</h3>
-<p>None.</p>
-<h3>Example</h3>
-<div class="highlight"><pre><span></span><code>curl<span class="w"> </span>--header<span class="w"> </span><span class="s2">"X-Api-Key: your-api-key"</span><span class="w"> </span>SITE_ROOT/api/v3/badges/
-</code></pre></div>
-
-<div class="highlight"><pre><span></span><code><span class="p">{</span>
-<span class="w">  </span><span class="nt">"badges"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">"backup"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="nt">"svg"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/LOegDs5M-2/backup.svg"</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">"svg3"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/LOegDs5M/backup.svg"</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">"json"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/LOegDs5M-2/backup.json"</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">"json3"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/LOegDs5M/backup.json"</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">"shields"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/LOegDs5M-2/backup.shields"</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">"shields3"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/LOegDs5M/backup.shields"</span>
-<span class="w">    </span><span class="p">},</span>
-<span class="w">    </span><span class="nt">"db"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="nt">"svg"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/99MuQaKm-2/db.svg"</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">"svg3"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/99MuQaKm/db.svg"</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">"json"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/99MuQaKm-2/db.json"</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">"json3"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/99MuQaKm/db.json"</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">"shields"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/99MuQaKm-2/db.shields"</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">"shields3"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/99MuQaKm/db.shields"</span>
-<span class="w">    </span><span class="p">},</span>
-<span class="w">    </span><span class="nt">"prod"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="nt">"svg"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/1TEhqie8-2/prod.svg"</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">"svg3"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/1TEhqie8/prod.svg"</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">"json"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/1TEhqie8-2/prod.json"</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">"json3"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/1TEhqie8/prod.json"</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">"shields"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/1TEhqie8-2/prod.shields"</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">"shields3"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/1TEhqie8/prod.shields"</span>
-<span class="w">    </span><span class="p">},</span>
-<span class="w">    </span><span class="nt">"*"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="nt">"svg"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/9X7kcZoe-2.svg"</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">"svg3"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/9X7kcZoe.svg"</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">"json"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/9X7kcZoe-2.json"</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">"json3"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/9X7kcZoe.json"</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">"shields"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/9X7kcZoe-2.shields"</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">"shields3"</span><span class="p">:</span><span class="w"> </span><span class="s2">"SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/9X7kcZoe.shields"</span>
-<span class="w">    </span><span class="p">}</span>
-<span class="w">  </span><span class="p">}</span>
-<span class="p">}</span>
-</code></pre></div>
-
-<h3>Errors</h3>
-<p>Only the errors every endpoint can return; see <a href="#status-codes">Status codes</a>.</p>
 <h2 class="rule" id="status">Check Database Connectivity</h2>
 <div class="highlight"><pre><span></span><code>GET SITE_ROOT/api/v3/status/
 </code></pre></div>

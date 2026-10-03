@@ -261,13 +261,12 @@ print(len(found))
 GHCALLS
 }
 
-# The homes of the version -- `.cz.toml`, `[project].version` in pyproject.toml, the README badge and uv.lock's
-# own `healthchecks` package -- as the number of distinct versions among them, minus one: 0 when the four agree.
+# The homes of the version -- `.cz.toml`, `[project].version` in pyproject.toml and uv.lock's own `healthchecks`
+# package -- as the number of distinct versions among them, minus one: 0 when the three agree.
 # A home the reader cannot find is an error, never a 0.
 c_version_homes_that_disagree() {
   uv run python - <<'VERSIONS'
 import pathlib
-import re
 import sys
 import tomllib
 
@@ -276,15 +275,14 @@ try:
         ".cz.toml": tomllib.loads(pathlib.Path(".cz.toml").read_text())["tool"]["commitizen"]["version"],
         "pyproject.toml": tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"],
     }
-    badges = re.findall(r"img\.shields\.io/badge/version-v([^-\s)]+)-", pathlib.Path("README.md").read_text())
     locked = [p.get("version") for p in tomllib.loads(pathlib.Path("uv.lock").read_text()).get("package", []) if p.get("name") == "healthchecks"]
 except (OSError, KeyError, tomllib.TOMLDecodeError) as exc:
     print(f"count-list: version-homes-that-disagree cannot read a home: {exc!r}", file=sys.stderr)
     sys.exit(2)
-if len(badges) != 1 or len(locked) != 1:
-    print(f"count-list: version-homes-that-disagree wants one README badge and one uv.lock entry, found {len(badges)} and {len(locked)}", file=sys.stderr)
+if len(locked) != 1:
+    print(f"count-list: version-homes-that-disagree wants one uv.lock entry, found {len(locked)}", file=sys.stderr)
     sys.exit(2)
-homes["README.md"], homes["uv.lock"] = badges[0], locked[0]
+homes["uv.lock"] = locked[0]
 if len(set(homes.values())) > 1:
     print("count-list: version-homes-that-disagree: " + ", ".join(f"{k} {v}" for k, v in homes.items()), file=sys.stderr)
 print(len(set(homes.values())) - 1)

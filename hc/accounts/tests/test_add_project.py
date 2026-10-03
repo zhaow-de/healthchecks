@@ -11,7 +11,6 @@ class AddProjectTestCase(BaseTestCase):
 
         p = Project.objects.get(owner=self.alice, name="My Second Project")
         self.assertRedirects(r, f"/projects/{p.code}/checks/")
-        self.assertEqual(str(p.code), p.badge_key)
 
     def test_it_rejects_get(self) -> None:
         self.client.login(username="alice@example.org", password="password")

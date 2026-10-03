@@ -23,7 +23,6 @@
 
     <link rel="stylesheet" href="{% static 'css/add_credential.css' %}" type="text/css">
     <link rel="stylesheet" href="{% static 'css/webhook_form.css' %}" type="text/css">
-    <link rel="stylesheet" href="{% static 'css/badges.css' %}" type="text/css">
     <link rel="stylesheet" href="{% static 'css/channel_checks.css' %}" type="text/css">
     <link rel="stylesheet" href="{% static 'css/channels.css' %}" type="text/css">
     <link rel="stylesheet" href="{% static 'css/details.css' %}" type="text/css">
@@ -104,10 +103,6 @@
                         </a>
                     </li>
                     {% endwith %}
-
-                    <li class="nav-item">
-                        <a class="nav-link{% if page == 'badges' %} active{% endif %}" href="{% url 'hc-badges' project.code %}">Badges</a>
-                    </li>
 
                     <li class="nav-item">
                         <a class="nav-link{% if page == 'project' %} active{% endif %}" href="{% url 'hc-project-settings' project.code %}">Settings</a>

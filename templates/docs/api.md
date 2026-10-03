@@ -2,8 +2,8 @@
 
 With the Management API, you can programmatically manage the checks and integrations
 in a SITE_NAME project: list, create, update, pause, resume and delete checks, read
-the pings and status changes they recorded, and list the project's integrations and
-badges. It is separate from the [Pinging API](../http_api/), which your jobs call to
+the pings and status changes they recorded, and list the project's integrations.
+It is separate from the [Pinging API](../http_api/), which your jobs call to
 report success, start, failure and log events: the Management API records no pings.
 
 ## Quick Reference {: #quick-reference }
@@ -14,7 +14,7 @@ Every endpoint lives under `SITE_ROOT/api/v3/`; v3 is the only version. Paths ar
 matched exactly:
 
 * A collection path ends with a slash: `checks/`, `checks/<uuid>/pings/`,
-  `checks/<uuid>/flips/`, `channels/`, `badges/`, `status/`, `metrics/`. Send the
+  `checks/<uuid>/flips/`, `channels/`, `status/`, `metrics/`. Send the
   slash. Without it, a GET gets a 301 redirect to the slashed path, and so does a POST
   while the server runs with `DEBUG` off; with `DEBUG` on, the setting's default,
   a POST, PUT or PATCH gets a 500, since Django will not redirect those.
@@ -38,7 +38,7 @@ Each key is 32 characters long, and its prefix tells its kind:
 Key | Starts with | Works with
 ----|-------------|-----------
 read-write | `hcw_` | every endpoint that takes a key
-read-only | `hcr_` | [list checks](#list-checks), [get a check](#get-check), [list flips](#list-flips), [list badges](#list-badges); every other endpoint that takes a key, [list integrations](#list-channels), [list pings](#list-pings) and [a ping's body](#ping-body) included, answers it with "401 wrong api key"
+read-only | `hcr_` | [list checks](#list-checks), [get a check](#get-check), [list flips](#list-flips); every other endpoint that takes a key, [list integrations](#list-channels), [list pings](#list-pings) and [a ping's body](#ping-body) included, answers it with "401 wrong api key"
 
 Send the key in the `X-Api-Key` request header:
 
@@ -148,7 +148,6 @@ Delete a check | [Delete](#delete-check): `DELETE SITE_ROOT/api/v3/checks/<uuid>
 Read the pings a check received | [List pings](#list-pings): `GET SITE_ROOT/api/v3/checks/<uuid>/pings/`
 Read the output a job sent with a ping | [Get a ping's body](#ping-body), at the `body_url` of the ping
 See when a check went down and came back up | [List flips](#list-flips): `GET SITE_ROOT/api/v3/checks/<uuid>/flips/`
-Get status badge URLs | [List badges](#list-badges) for the tags; one check's badge is its `badge_url`
 Check that the SITE_NAME instance and its database are up | [Status](#status): `GET SITE_ROOT/api/v3/status/`
 Send a ping (success, start, failure, exit status, log) | The [Pinging API](../http_api/), not this API
 Get the project's ping key, for slug ping URLs | Not available through the API: the project's **Settings** page
@@ -174,8 +173,6 @@ Endpoint Name                                         | Endpoint Address | Key
 [List check's status changes](#list-flips)            | `GET SITE_ROOT/api/v3/checks/<uuid>/flips/`<br>`GET SITE_ROOT/api/v3/checks/<unique_key>/flips/` | read-only or read-write
 **Integrations**                                      | |
 [List existing integrations](#list-channels)          | `GET SITE_ROOT/api/v3/channels/` | read-write
-**Badges**                                            | |
-[List project's badges](#list-badges)                 | `GET SITE_ROOT/api/v3/badges/` | read-only or read-write
 **Service status**                                    | |
 [Check database connectivity](#status)                | `GET SITE_ROOT/api/v3/status/` | none
 [Read service metrics](#metrics)                      | `GET SITE_ROOT/api/v3/metrics/` | the metrics key
@@ -208,7 +205,6 @@ Field | Type | Present | Meaning
 `filter_default_fail` | boolean | always | `true` if a filtered ping that matches no keyword counts as a failure.
 `filter_subject`, `filter_body` | boolean | always | Inert, kept for compatibility with the original Healthchecks API v3 only.
 `subject`, `subject_fail` | string | always | Deprecated: `success_kw` and `failure_kw` when `filter_subject` is `true`, and `""` otherwise.
-`badge_url` | string | always | The SVG status badge of this check alone; see [badges](#list-badges).
 `uuid` | string | read-write key | The check's UUID.
 `ping_url` | string | read-write key | The URL that pings the check.
 `update_url`, `pause_url`, `resume_url` | string | read-write key | The [update](#update-check), [pause](#pause-check) and [resume](#resume-check) URLs of the check.
@@ -270,7 +266,6 @@ curl --header "X-Api-Key: your-api-key" SITE_ROOT/api/v3/checks/
       "filter_body": false,
       "filter_http_body": false,
       "filter_default_fail": false,
-      "badge_url": "SITE_ROOT/b/2/1b9d0386-d07e-44b0-8995-4a9a372de43c.svg",
       "uuid": "31365bce-8da9-4729-8ff3-aaa71d56b712",
       "ping_url": "PING_ENDPOINT31365bce-8da9-4729-8ff3-aaa71d56b712",
       "update_url": "SITE_ROOT/api/v3/checks/31365bce-8da9-4729-8ff3-aaa71d56b712",
@@ -301,7 +296,6 @@ curl --header "X-Api-Key: your-api-key" SITE_ROOT/api/v3/checks/
       "filter_body": false,
       "filter_http_body": false,
       "filter_default_fail": false,
-      "badge_url": "SITE_ROOT/b/2/7d3ab93d-836e-4505-bbda-fcbd5e07adf9.svg",
       "last_duration": 312,
       "uuid": "803f680d-e89b-492b-82ef-2be7b774a92d",
       "ping_url": "PING_ENDPOINT803f680d-e89b-492b-82ef-2be7b774a92d",
@@ -349,7 +343,6 @@ can use it in the [Get a single check](#get-check) and
       "filter_body": false,
       "filter_http_body": false,
       "filter_default_fail": false,
-      "badge_url": "SITE_ROOT/b/2/1b9d0386-d07e-44b0-8995-4a9a372de43c.svg",
       "unique_key": "a6c7b0a8a66bed0df66abfdab3c77736861703ee",
       "timeout": 3600
     }
@@ -411,7 +404,6 @@ curl --header "X-Api-Key: your-api-key" \
   "filter_body": false,
   "filter_http_body": false,
   "filter_default_fail": false,
-  "badge_url": "SITE_ROOT/b/2/7d3ab93d-836e-4505-bbda-fcbd5e07adf9.svg",
   "last_duration": 312,
   "uuid": "803f680d-e89b-492b-82ef-2be7b774a92d",
   "ping_url": "PING_ENDPOINT803f680d-e89b-492b-82ef-2be7b774a92d",
@@ -450,7 +442,6 @@ The response to a read-only key omits `uuid`, `ping_url`, `update_url`, `pause_u
   "filter_body": false,
   "filter_http_body": false,
   "filter_default_fail": false,
-  "badge_url": "SITE_ROOT/b/2/7d3ab93d-836e-4505-bbda-fcbd5e07adf9.svg",
   "last_duration": 312,
   "unique_key": "124f983e0e3dcaeba921cfcef46efd084576e783",
   "schedule": "15 5 * * *",
@@ -700,7 +691,6 @@ The response is "201 Created" with the new check:
   "filter_body": false,
   "filter_http_body": false,
   "filter_default_fail": false,
-  "badge_url": "SITE_ROOT/b/2/d43c84db-1502-4d86-a89d-181a33e25896.svg",
   "uuid": "7918b17b-a745-4db1-8575-9d2e07c97f79",
   "ping_url": "PING_ENDPOINT7918b17b-a745-4db1-8575-9d2e07c97f79",
   "update_url": "SITE_ROOT/api/v3/checks/7918b17b-a745-4db1-8575-9d2e07c97f79",
@@ -798,7 +788,6 @@ The response is "200 OK" with the updated check:
   "filter_body": false,
   "filter_http_body": false,
   "filter_default_fail": false,
-  "badge_url": "SITE_ROOT/b/2/d43c84db-1502-4d86-a89d-181a33e25896.svg",
   "uuid": "7918b17b-a745-4db1-8575-9d2e07c97f79",
   "ping_url": "PING_ENDPOINT7918b17b-a745-4db1-8575-9d2e07c97f79",
   "update_url": "SITE_ROOT/api/v3/checks/7918b17b-a745-4db1-8575-9d2e07c97f79",
@@ -882,7 +871,6 @@ The response is "200 OK" with the check:
   "filter_body": false,
   "filter_http_body": false,
   "filter_default_fail": false,
-  "badge_url": "SITE_ROOT/b/2/d43c84db-1502-4d86-a89d-181a33e25896.svg",
   "uuid": "7918b17b-a745-4db1-8575-9d2e07c97f79",
   "ping_url": "PING_ENDPOINT7918b17b-a745-4db1-8575-9d2e07c97f79",
   "update_url": "SITE_ROOT/api/v3/checks/7918b17b-a745-4db1-8575-9d2e07c97f79",
@@ -962,7 +950,6 @@ The response is "200 OK" with the check:
   "filter_body": false,
   "filter_http_body": false,
   "filter_default_fail": false,
-  "badge_url": "SITE_ROOT/b/2/d43c84db-1502-4d86-a89d-181a33e25896.svg",
   "uuid": "7918b17b-a745-4db1-8575-9d2e07c97f79",
   "ping_url": "PING_ENDPOINT7918b17b-a745-4db1-8575-9d2e07c97f79",
   "update_url": "SITE_ROOT/api/v3/checks/7918b17b-a745-4db1-8575-9d2e07c97f79",
@@ -1033,7 +1020,6 @@ curl SITE_ROOT/api/v3/checks/7918b17b-a745-4db1-8575-9d2e07c97f79 \
   "filter_body": false,
   "filter_http_body": false,
   "filter_default_fail": false,
-  "badge_url": "SITE_ROOT/b/2/d43c84db-1502-4d86-a89d-181a33e25896.svg",
   "uuid": "7918b17b-a745-4db1-8575-9d2e07c97f79",
   "ping_url": "PING_ENDPOINT7918b17b-a745-4db1-8575-9d2e07c97f79",
   "update_url": "SITE_ROOT/api/v3/checks/7918b17b-a745-4db1-8575-9d2e07c97f79",
@@ -1340,85 +1326,6 @@ Status | Body | When
 401 | `{"error": "wrong api key"}` | The key is a read-only key.
 
 Plus the errors every endpoint can return; see [Status codes](#status-codes).
-
-## List Project's Badges {: #list-badges .rule }
-
-```text
-GET SITE_ROOT/api/v3/badges/
-```
-
-Returns a map of all tags in the project, with badge URLs for each tag. SITE_NAME
-provides badges in a few different formats:
-
-* `svg`: returns the badge as an SVG document.
-* `json`: returns a JSON document which you can use to generate a custom badge
-    yourself.
-* `shields`: returns JSON in a [Shields.io compatible format](https://shields.io/endpoint).
-
-In addition, badges have 2-state and 3-state variations:
-
-* `svg`, `json`, `shields`: reports two states: "up" and "down". It
-    considers any checks in the grace period as still "up".
-* `svg3`, `json3`, `shields3`: reports three states: "up", "late", and "down".
-
-The response includes a special `*` entry: this pseudo-tag reports the overall status
-of all checks in the project. The badge URLs are public and need no API key. The
-badge of a single check is the check's `badge_url`; see [Badges](../badges/).
-
-**Authentication:** a read-write or a read-only key, in the `X-Api-Key` header.
-
-### Parameters
-
-None.
-
-### Example
-
-```bash
-curl --header "X-Api-Key: your-api-key" SITE_ROOT/api/v3/badges/
-```
-
-```json
-{
-  "badges": {
-    "backup": {
-      "svg": "SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/LOegDs5M-2/backup.svg",
-      "svg3": "SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/LOegDs5M/backup.svg",
-      "json": "SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/LOegDs5M-2/backup.json",
-      "json3": "SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/LOegDs5M/backup.json",
-      "shields": "SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/LOegDs5M-2/backup.shields",
-      "shields3": "SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/LOegDs5M/backup.shields"
-    },
-    "db": {
-      "svg": "SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/99MuQaKm-2/db.svg",
-      "svg3": "SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/99MuQaKm/db.svg",
-      "json": "SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/99MuQaKm-2/db.json",
-      "json3": "SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/99MuQaKm/db.json",
-      "shields": "SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/99MuQaKm-2/db.shields",
-      "shields3": "SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/99MuQaKm/db.shields"
-    },
-    "prod": {
-      "svg": "SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/1TEhqie8-2/prod.svg",
-      "svg3": "SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/1TEhqie8/prod.svg",
-      "json": "SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/1TEhqie8-2/prod.json",
-      "json3": "SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/1TEhqie8/prod.json",
-      "shields": "SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/1TEhqie8-2/prod.shields",
-      "shields3": "SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/1TEhqie8/prod.shields"
-    },
-    "*": {
-      "svg": "SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/9X7kcZoe-2.svg",
-      "svg3": "SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/9X7kcZoe.svg",
-      "json": "SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/9X7kcZoe-2.json",
-      "json3": "SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/9X7kcZoe.json",
-      "shields": "SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/9X7kcZoe-2.shields",
-      "shields3": "SITE_ROOT/badge/67541b37-8b9c-4d17-b952-690eae/9X7kcZoe.shields"
-    }
-  }
-}
-```
-
-### Errors
-
-Only the errors every endpoint can return; see [Status codes](#status-codes).
 
 ## Check Database Connectivity {: #status .rule }
 

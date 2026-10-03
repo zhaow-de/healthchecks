@@ -5,7 +5,7 @@ import time
 from datetime import timedelta as td
 from secrets import token_urlsafe
 from urllib.parse import urlparse
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import pyotp
 import segno
@@ -260,7 +260,6 @@ def add_project(request: AuthenticatedHttpRequest) -> HttpResponse:
         return HttpResponseBadRequest()
 
     project = Project(owner=request.user)
-    project.code = project.badge_key = str(uuid4())
     project.name = form.cleaned_data["name"]
     project.save()
 

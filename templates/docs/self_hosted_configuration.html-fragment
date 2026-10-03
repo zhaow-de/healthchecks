@@ -11,8 +11,8 @@ from environment variables. Below is a list of environment variables it reads an
 <li>A string setting set to an empty value is the empty string, not the default. For
   <code>ADMINS</code>, <code>ALLOWED_HOSTS</code>, <code>EMAIL_HOST</code>, <code>METRICS_KEY</code>, <code>RP_ID</code>,
   <code>SECURE_PROXY_SSL_HEADER</code>, <code>SLACK_CLIENT_ID</code> and <code>SUPPORT_EMAIL</code> that is the same
-  as unset; for the others, <code>SITE_ROOT</code>, <code>SITE_NAME</code>, <code>PING_ENDPOINT</code> and
-  <code>MASTER_BADGE_LABEL</code> among them, delete the line to get the default.</li>
+  as unset; for the others, <code>SITE_ROOT</code>, <code>SITE_NAME</code> and <code>PING_ENDPOINT</code> among
+  them, delete the line to get the default.</li>
 <li>A <code>&lt;NAME&gt;_FILE</code> variable with a non-empty value names a file whose content is used
   instead of <code>&lt;NAME&gt;</code>; an empty one counts as unset, and <code>&lt;NAME&gt;</code> is read. A
   non-empty value that does not name an existing regular file stops startup with
@@ -49,7 +49,6 @@ from environment variables. Below is a list of environment variables it reads an
 <li><a href="#http_proxy">http_proxy and https_proxy</a></li>
 <li><a href="#INTEGRATIONS_ALLOW_PRIVATE_IPS">INTEGRATIONS_ALLOW_PRIVATE_IPS</a></li>
 <li><a href="#LOG_FORMAT">LOG_FORMAT</a></li>
-<li><a href="#MASTER_BADGE_LABEL">MASTER_BADGE_LABEL</a></li>
 <li><a href="#METRICS_KEY">METRICS_KEY</a></li>
 <li><a href="#PING_BODY_LIMIT">PING_BODY_LIMIT</a></li>
 <li><a href="#PING_ENDPOINT">PING_ENDPOINT</a></li>
@@ -316,12 +315,6 @@ loggers, and the server errors (5xx) Django logs for requests, are also stored i
 the database and shown in Site Administration › Logs › Records. They are never
 pruned automatically; <a href="../self_hosted/#sending-notifications"><code>sendlogs</code></a> can email
 a daily count of them to <a href="#ADMINS">ADMINS</a>.</p>
-<h2 id="MASTER_BADGE_LABEL"><code>MASTER_BADGE_LABEL</code></h2>
-<p>Default: same as <code>SITE_NAME</code></p>
-<p>The label of the badge that covers all checks in a project: "All checks in the
-project" on the Badges page, tag <code>*</code> in the badge URL. A tag's badge is labelled
-with the tag, and a single check's badge with the check's name (see
-<a href="../badges/">Badges</a>).</p>
 <h2 id="METRICS_KEY"><code>METRICS_KEY</code></h2>
 <p>Default: <code>None</code></p>
 <p>The secret that the <a href="../api/#metrics">Read Service Metrics</a> endpoint,
@@ -391,8 +384,6 @@ unpredictable value.</p>
   the database stores only an HMAC of each key made with <code>SECRET_KEY</code>; Prometheus
   scrapes with a read-only key stop too. Create new keys in the <strong>API Access</strong>
   section of each project's Settings page (see <a href="../api/#authentication">Authentication</a>).</li>
-<li>changes the URL of every project and tag badge, which is signed with it; a single
-  check's badge URL does not change (see <a href="../badges/">Badges</a>).</li>
 <li>invalidates every session, login link, device cookie, pending sudo code, email
   verification link and unsubscribe link in emails already sent.</li>
 <li>resets the per-email <a href="../self_hosted/#login-lockout">login rate limits</a>.</li>
