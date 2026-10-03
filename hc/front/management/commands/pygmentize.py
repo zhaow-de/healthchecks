@@ -19,8 +19,6 @@ def _process(name: str, lexer: Lexer) -> None:
         source = f.read()
     processed = highlight(source, lexer, HtmlFormatter())
     processed = processed.replace("PING_URL", "{{ ping_url }}")
-    processed = processed.replace("SITE_ROOT", "{{ SITE_ROOT }}")
-    processed = processed.replace("PING_ENDPOINT", "{{ PING_ENDPOINT }}")
     with open(f"templates/front/snippets/{name}.html", "w") as out:
         out.write(processed)
 
@@ -44,9 +42,6 @@ class Command(BaseCommand):
         _process("go", lexers.GoLexer())
         _process("python_urllib2", lexers.PythonLexer())
         _process("python_requests", lexers.PythonLexer())
-        _process("python_requests_fail", lexers.PythonLexer())
-        _process("python_requests_start", lexers.PythonLexer())
-        _process("python_requests_payload", lexers.PythonLexer())
         _process("php", lexers.PhpLexer(startinline=True))
         _process("powershell", lexers.shell.PowerShellLexer())
         _process("powershell_inline", lexers.shell.BashLexer())

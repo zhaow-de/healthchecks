@@ -42,12 +42,3 @@ The checks created via auto provisioning will use the default parameters:
 It is currently not possible to specify a custom period, grace time, or other
 parameters through the ping URL. If you need to change any parameters, you will need
 to do this either from the web dashboard, or through [Management API](../api/).
-
-## Auto Provisioning and Account Limits
-
-Each SITE_NAME account has a specific limit of how many checks it is allowed to
-create: 20 checks for free accounts; 100 or 1000 checks for paid accounts. To reduce
-friction and the risk of silent failures, the auto provisioning functionality
-**is allowed to temporarily exceed the account’s check limit up to two times**.
-Meaning, if your account is already maxed out, auto provisioning will still be able to
-create new checks until you hit two times the limit.

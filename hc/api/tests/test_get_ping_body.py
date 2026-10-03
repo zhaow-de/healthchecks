@@ -1,11 +1,6 @@
 from __future__ import annotations
 
-from unittest.mock import Mock, patch
-
-from django.utils.timezone import now
-
-from hc.api.models import Check, Ping, TokenBucket
-from hc.lib.s3 import GetObjectError
+from hc.api.models import Check, Ping
 from hc.test import BaseTestCase
 
 
@@ -23,7 +18,7 @@ class GetPingBodyTestCase(BaseTestCase):
         self.ping.body_raw = b"Foo\nBar\nBaz"
         self.ping.save()
 
-        self.url = f"/api/v1/checks/{self.check.code}/pings/1/body"
+        self.url = f"/api/v3/checks/{self.check.code}/pings/1/body"
 
     def test_it_works(self) -> None:
         r = self.client.get(self.url, HTTP_X_API_KEY="X" * 32)
@@ -76,24 +71,3 @@ class GetPingBodyTestCase(BaseTestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.headers["Content-Type"], "text/plain")
         self.assertEqual(r.content, b"Hello\x01\x99World")
-
-    def test_it_handles_unhealthy_s3(self) -> None:
-        self.ping.object_size = 123
-        self.ping.save()
-
-        obj = TokenBucket(value="s3_get_object_error")
-        obj.tokens = 0.0
-        obj.updated = now()
-        obj.save()
-
-        r = self.client.get(self.url, HTTP_X_API_KEY="X" * 32)
-        self.assertEqual(r.status_code, 503)
-
-    def test_it_handles_s3_error(self) -> None:
-        self.ping.object_size = 123
-        self.ping.save()
-
-        with patch("hc.api.models.get_object", Mock(side_effect=GetObjectError)):
-            r = self.client.get(self.url, HTTP_X_API_KEY="X" * 32)
-
-        self.assertEqual(r.status_code, 503)

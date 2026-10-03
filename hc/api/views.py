@@ -26,11 +26,9 @@ from django.http import (
     JsonResponse,
 )
 from django.shortcuts import get_object_or_404
-from django.utils.text import slugify
 from django.utils.timezone import now
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
 from oncalendar import OnCalendar, OnCalendarError
 from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 from pydantic_core import PydanticCustomError
@@ -267,12 +265,6 @@ def ping_by_slug(
         except Project.DoesNotExist:
             return HttpResponseNotFound("not found")
 
-        profile = project.owner_profile
-        # When using auto-provisioning, users are allowed to temporarily
-        # exceed their check limit up to 2 times.
-        if profile.num_checks_used() >= profile.check_limit * 2:
-            return HttpResponseNotFound("not found")
-
         check = Check(project=project, name=slug, slug=slug)
         check.save()
         check.assign_all_channels()
@@ -312,7 +304,7 @@ def _lookup(project: Project, spec: Spec) -> Check | None:
     return existing_checks.first()
 
 
-def _update(check: Check, spec: Spec, v: int) -> None:
+def _update(check: Check, spec: Spec) -> None:
     new_channels: Iterable[Channel] | None
     # First, validate the supplied channel codes/names
     if spec.channels is None:
@@ -346,10 +338,6 @@ def _update(check: Check, spec: Spec, v: int) -> None:
     if spec.name is not None:
         check.name = spec.name
         update_fields.add("name")
-        if v < 3:
-            # v1 and v2 generates slug automatically from name
-            check.slug = slugify(spec.name)
-            update_fields.add("slug")
 
     kind = spec.kind()
     if kind == "simple":
@@ -363,8 +351,8 @@ def _update(check: Check, spec: Spec, v: int) -> None:
         check.schedule = spec.schedule
         update_fields.update(("kind", "schedule"))
 
-    # subject and subject_fail are deprecated but still supported.
-    # Here's the special logic to map them to success_kw, failure_kw, filter_subject.
+    # subject and subject_fail are deprecated, kept for compatibility with the original
+    # Healthchecks API v3: map them to success_kw, failure_kw and filter_subject.
     if spec.subject is not None:
         check.success_kw = spec.subject
         check.filter_subject = bool(check.success_kw or check.failure_kw)
@@ -430,7 +418,7 @@ def get_checks(request: ApiRequest) -> JsonResponse:
     for check in q:
         # precise, final filtering
         if not tags or check.matches_tag_set(tags):
-            checks.append(check.to_dict(readonly=request.readonly, v=request.v))
+            checks.append(check.to_dict(readonly=request.readonly))
 
     return JsonResponse({"checks": checks})
 
@@ -445,18 +433,15 @@ def create_check(request: ApiRequest) -> HttpResponse:
     created = False
     check = _lookup(request.project, spec)
     if check is None:
-        if request.project.num_checks_available() <= 0:
-            return HttpResponseForbidden()
-
         check = Check(project=request.project)
         created = True
 
     try:
-        _update(check, spec, request.v)
+        _update(check, spec)
     except BadChannelException as e:
         return JsonResponse({"error": e.message}, status=400)
 
-    return JsonResponse(check.to_dict(v=request.v), status=201 if created else 200)
+    return JsonResponse(check.to_dict(), status=201 if created else 200)
 
 
 @csrf_exempt
@@ -483,7 +468,7 @@ def get_check(request: ApiRequest, code: UUID) -> HttpResponse:
     if check.project_id != request.project.id:
         return HttpResponseForbidden()
 
-    return JsonResponse(check.to_dict(readonly=request.readonly, v=request.v))
+    return JsonResponse(check.to_dict(readonly=request.readonly))
 
 
 @cors("GET")
@@ -492,7 +477,7 @@ def get_check(request: ApiRequest, code: UUID) -> HttpResponse:
 def get_check_by_unique_key(request: ApiRequest, unique_key: str) -> HttpResponse:
     for check in request.project.check_set.all():
         if check.unique_key == unique_key:
-            return JsonResponse(check.to_dict(readonly=request.readonly, v=request.v))
+            return JsonResponse(check.to_dict(readonly=request.readonly))
     return HttpResponseNotFound()
 
 
@@ -508,13 +493,13 @@ def update_check(request: ApiRequest, code: UUID) -> HttpResponse:
         return JsonResponse({"error": format_first_error(e)}, status=400)
 
     try:
-        _update(check, spec, request.v)
+        _update(check, spec)
     except BadChannelException as e:
         return JsonResponse({"error": e.message}, status=400)
     except Check.NotUpdated:
         return HttpResponseNotFound()
 
-    return JsonResponse(check.to_dict(v=request.v))
+    return JsonResponse(check.to_dict())
 
 
 @authorize
@@ -526,7 +511,7 @@ def delete_check(request: ApiRequest, code: UUID) -> HttpResponse:
         return HttpResponseForbidden()
 
     check.rename_and_delete()
-    return JsonResponse(check.to_dict(v=request.v))
+    return JsonResponse(check.to_dict())
 
 
 @csrf_exempt
@@ -551,7 +536,7 @@ def pause(request: ApiRequest, code: UUID) -> HttpResponse:
 
     # Return early, without creating a flip object, if the check is already paused
     if check.status == "paused":
-        return JsonResponse(check.to_dict(v=request.v))
+        return JsonResponse(check.to_dict())
 
     # Track the status change for correct downtime calculation in Check.downtimes()
     check.create_flip("paused", mark_as_processed=True)
@@ -565,7 +550,7 @@ def pause(request: ApiRequest, code: UUID) -> HttpResponse:
     # and Profile.next_nag_date needs to be cleared out:
     check.project.update_next_nag_dates()
 
-    return JsonResponse(check.to_dict(v=request.v))
+    return JsonResponse(check.to_dict())
 
 
 @cors("POST")
@@ -587,7 +572,7 @@ def resume(request: ApiRequest, code: UUID) -> HttpResponse:
     check.alert_after = None
     check.save(update_fields=("status", "last_start", "last_ping", "alert_after"))
 
-    return JsonResponse(check.to_dict(v=request.v))
+    return JsonResponse(check.to_dict())
 
 
 @cors("GET")
@@ -616,7 +601,7 @@ def pings(request: ApiRequest, code: UUID) -> HttpResponse:
 
     # Pass check's code to Ping.to_dict(), so it does not need to look it up
     # (which would result in a database query)
-    ping_dicts = [p.to_dict(owner_code=check.code, v=request.v) for p in pings]
+    ping_dicts = [p.to_dict(owner_code=check.code) for p in pings]
     return JsonResponse({"pings": ping_dicts})
 
 
@@ -634,11 +619,7 @@ def ping_body(request: ApiRequest, code: UUID, n: int) -> HttpResponse:
         raise Http404()
 
     ping = get_object_or_404(Ping, owner=check, n=n)
-    try:
-        body = ping.get_body_bytes()
-    except Ping.GetBodyError:
-        return HttpResponse(status=503)
-
+    body = ping.get_body_bytes()
     if not body:
         raise Http404()
 
@@ -803,47 +784,6 @@ def check_badge(request: HttpRequest, states: int, badge_key: UUID, fmt: str) ->
 
     svg = get_badge_svg(check.name_then_code(), status)
     return HttpResponse(svg, content_type="image/svg+xml")
-
-
-@csrf_exempt
-@require_POST
-def notification_status(request: HttpRequest, code: UUID) -> HttpResponse:
-    """Handle notification delivery status callbacks."""
-
-    try:
-        cutoff = now() - td(hours=1)
-        notification = Notification.objects.get(code=code, created__gt=cutoff)
-    except Notification.DoesNotExist:
-        # If the notification does not exist, or is more than a hour old,
-        # return HTTP 200 so the other party doesn't retry over and over again:
-        return HttpResponse()
-
-    error, mark_disabled = None, False
-
-    # Look for "error" and "mark_disabled" keys:
-    if request.POST.get("error"):
-        error = request.POST["error"][:200]
-        mark_disabled = bool(request.POST.get("mark_disabled"))
-
-    # Handle "MessageStatus" key from Twilio
-    if request.POST.get("MessageStatus") in ("failed", "undelivered"):
-        status = request.POST["MessageStatus"]
-        error = f"Delivery failed (status={status})."
-
-    # Handle "CallStatus" key from Twilio
-    if request.POST.get("CallStatus") == "failed":
-        error = "Delivery failed (status=failed)."
-
-    if error:
-        notification.error = error
-        notification.save(update_fields=["error"])
-
-        channel_q = Channel.objects.filter(id=notification.channel_id)
-        channel_q.update(last_error=error)
-        if mark_disabled:
-            channel_q.update(disabled=True)
-
-    return HttpResponse()
 
 
 def metrics(request: HttpRequest) -> HttpResponse:

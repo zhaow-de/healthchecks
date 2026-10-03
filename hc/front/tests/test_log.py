@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import json
 from datetime import timedelta as td
-from unittest.mock import Mock, patch
 
 from django.utils.timezone import now
 
-from hc.api.models import Channel, Check, Notification, Ping
+from hc.api.models import Check, Ping
 from hc.test import BaseTestCase
 
 
@@ -25,8 +23,7 @@ class LogTestCase(BaseTestCase):
         self.ping = Ping.objects.create(owner=self.check, n=1)
         self.ping.body_raw = b"hello world"
 
-        # Older MySQL versions don't store microseconds. This makes sure
-        # the ping is older than any notifications we may create later:
+        # The log starts at the oldest ping: backdate it so the pings the tests add later fall inside it:
         self.ping.created = "2000-01-01T00:00:00+00:00"
         self.ping.save()
 
@@ -40,26 +37,6 @@ class LogTestCase(BaseTestCase):
         # in the timezone switcher:
         self.assertContains(r, "Europe/Riga")
         self.assertContains(r, "Europe/Berlin")
-
-    @patch("hc.api.models.get_object")
-    def test_it_does_not_load_body_from_object_storage(self, get_object: Mock) -> None:
-        self.ping.body_raw = None
-        self.ping.object_size = 1234
-        self.ping.save()
-
-        self.client.login(username="alice@example.org", password="password")
-        r = self.client.get(self.url)
-        self.assertContains(r, "1234 byte body")
-        get_object.assert_not_called()
-
-    def test_it_displays_email(self) -> None:
-        self.ping.scheme = "email"
-        self.ping.ua = "email from server@example.org"
-        self.ping.save()
-
-        self.client.login(username="alice@example.org", password="password")
-        r = self.client.get(self.url)
-        self.assertContains(r, "email from server@example.org", status_code=200)
 
     def test_team_access_works(self) -> None:
         # Logging in as bob, not alice. Bob has team access so this
@@ -124,24 +101,3 @@ class LogTestCase(BaseTestCase):
         r = self.client.get(self.url)
         self.assertContains(r, "label-ign", status_code=200)
         self.assertNotContains(r, "ic-timer", status_code=200)
-
-    def test_it_does_not_show_too_old_notifications(self) -> None:
-        self.ping.created = now()
-        self.ping.save()
-
-        ch = Channel(kind="email", project=self.project)
-        ch.value = json.dumps({"value": "alice@example.org", "up": True, "down": True})
-        ch.save()
-
-        n = Notification(owner=self.check)
-        n.created = self.ping.created - td(hours=1)
-        n.channel = ch
-        n.check_status = "down"
-        n.save()
-
-        self.client.login(username="alice@example.org", password="password")
-        r = self.client.get(self.url)
-
-        # The notification should not show up in the log as it is
-        # older than the oldest visible ping:
-        self.assertNotContains(r, "Sent email to alice@example.org", status_code=200)

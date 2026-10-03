@@ -51,19 +51,19 @@ class PauseTestCase(BaseTestCase):
     def test_it_validates_ownership(self) -> None:
         check = Check.objects.create(project=self.bobs_project, status="up")
 
-        url = f"/api/v1/checks/{check.code}/pause"
+        url = f"/api/v3/checks/{check.code}/pause"
         r = self.client.post(url, "", content_type="application/json", HTTP_X_API_KEY="X" * 32)
 
         self.assertEqual(r.status_code, 403)
 
     def test_it_validates_uuid(self) -> None:
-        url = "/api/v1/checks/not-uuid/pause"
+        url = "/api/v3/checks/not-uuid/pause"
         r = self.client.post(url, "", content_type="application/json", HTTP_X_API_KEY="X" * 32)
 
         self.assertEqual(r.status_code, 404)
 
     def test_it_handles_missing_check(self) -> None:
-        url = "/api/v1/checks/07c2f548-9850-4b27-af5d-6c9dc157ec02/pause"
+        url = "/api/v3/checks/07c2f548-9850-4b27-af5d-6c9dc157ec02/pause"
         r = self.client.post(url, "", content_type="application/json", HTTP_X_API_KEY="X" * 32)
 
         self.assertEqual(r.status_code, 404)

@@ -8,8 +8,8 @@ You have the option to host a Healthchecks instance yourself.
 The building blocks are:
 
 * Python 3.14
-* Django 6.0
-* PostgreSQL or MySQL
+* Django 6.1
+* SQLite (the default) or PostgreSQL
 
 ## Setting Up for Development
 
@@ -66,8 +66,8 @@ assume an activated virtual environment.
 ## Accessing Administration Panel
 
 Healthchecks comes with Django's administration panel where you can perform
-administrative tasks: delete user accounts, change passwords, increase limits for
-specific users, inspect contents of database tables.
+administrative tasks: delete user accounts, change passwords, inspect contents of
+database tables.
 
 To access the administration panel, if you haven't already, create a superuser account:
 
@@ -90,14 +90,14 @@ environment variables:
 
 - Implicit TLS (*recommended*):
 
-```python
-DEFAULT_FROM_EMAIL = "valid-sender-address@example.org"
-EMAIL_HOST = "smtp.example.org"
-EMAIL_PORT = 465
-EMAIL_HOST_USER = "example-username"
-EMAIL_HOST_PASSWORD = "example-password"
-EMAIL_USE_TLS = False
-EMAIL_USE_SSL = True
+```ini
+DEFAULT_FROM_EMAIL=valid-sender-address@example.org
+EMAIL_HOST=smtp.example.org
+EMAIL_PORT=465
+EMAIL_HOST_USER=example-username
+EMAIL_HOST_PASSWORD=example-password
+EMAIL_USE_TLS=False
+EMAIL_USE_SSL=True
 ```
 
 Port 465 should be the preferred method according to [RFC8314 Section 3.3: Implicit
@@ -106,34 +106,17 @@ to use a TLS certificate and not an SSL one.
 
 - Explicit TLS:
 
-```python
-DEFAULT_FROM_EMAIL = "valid-sender-address@example.org"
-EMAIL_HOST = "smtp.example.org"
-EMAIL_PORT = 587
-EMAIL_HOST_USER = "example-username"
-EMAIL_HOST_PASSWORD = "example-password"
-EMAIL_USE_TLS = True
+```ini
+DEFAULT_FROM_EMAIL=valid-sender-address@example.org
+EMAIL_HOST=smtp.example.org
+EMAIL_PORT=587
+EMAIL_HOST_USER=example-username
+EMAIL_HOST_PASSWORD=example-password
+EMAIL_USE_TLS=True
 ```
 
 Healthchecks uses these environment variables to construct the `settings.MAILERS`
 dictionary (a standard Django setting, [docs](https://docs.djangoproject.com/en/6.1/ref/settings/#std-setting-MAILERS)).
-
-## Receiving Emails
-
-Healthchecks comes with a `smtpd` management command, which starts up an
-SMTP listener service. With the command running, you can ping your
-checks by sending email messages.
-
-Start the SMTP listener on port 2525:
-
-    $ ./manage.py smtpd --port 2525
-
-Send a test email:
-
-    $ curl --url 'smtp://127.0.0.1:2525' \
-        --mail-from 'foo@example.org' \
-        --mail-rcpt '11111111-1111-1111-1111-111111111111@my-hc.example.org' \
-        -F '='
 
 ## Sending Status Notifications
 
@@ -159,8 +142,7 @@ go to the Administration Panel, look up user's **Profile** and modify its
 "Ping log limit" field.
 
 Healthchecks provides management commands for cleaning up
-`auth_user` (user accounts) and `api_tokenbucket` (rate limiting records) tables,
-and for removing stale objects from external object storage.
+`auth_user` (user accounts) and `api_tokenbucket` (rate limiting records) tables.
 
 Remove user accounts that are older than 1 month and have never logged in:
 
@@ -174,19 +156,6 @@ Any records older than one day can be safely removed.
 
 ```sh
 $ ./manage.py prunetokenbucket
-```
-
-Remove old objects from external object storage. When an user removes
-a check, removes a project, or closes their account, Healthchecks
-does not remove the associated objects from the external object
-storage on the fly. Instead, you should run `pruneobjects` occasionally
-(for example, once a month). This command first takes an inventory
-of all checks in the database, and then iterates over top-level
-keys in the object storage bucket, and deletes any that don't also
-exist in the database.
-
-```sh
-$ ./manage.py pruneobjects
 ```
 
 When you first try these commands on your data, it is a good idea to

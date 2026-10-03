@@ -14,7 +14,6 @@ class Unit:
         self.nsecs = nsecs
 
 
-SECOND = Unit("second", 1)
 MINUTE = Unit("minute", 60)
 HOUR = Unit("hour", MINUTE.nsecs * 60)
 DAY = Unit("day", HOUR.nsecs * 24)

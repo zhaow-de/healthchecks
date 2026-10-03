@@ -285,11 +285,6 @@ def mask_ro_key(key: str) -> str:
 
 
 @register.filter
-def underline(s: str) -> str:
-    return "=" * len(str(s))
-
-
-@register.filter
 def first5(rid: UUID) -> str:
     return str(rid)[:5]
 
@@ -297,14 +292,6 @@ def first5(rid: UUID) -> str:
 @register.filter
 def add6days(dt: datetime) -> datetime:
     return dt + timedelta(days=6)
-
-
-@register.filter
-def mask_phone(phone: str) -> str:
-    if len(phone) > 7:
-        return phone[:4] + "******" + phone[-3:]
-
-    return phone
 
 
 @register.simple_tag(takes_context=True)

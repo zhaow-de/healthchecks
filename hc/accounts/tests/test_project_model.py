@@ -1,21 +1,10 @@
 from __future__ import annotations
 
-from hc.accounts.models import Project
 from hc.api.models import Channel, Check
 from hc.test import BaseTestCase
 
 
 class ProjectModelTestCase(BaseTestCase):
-    def test_num_checks_available_handles_multiple_projects(self) -> None:
-        # One check in Alice's primary project:
-        Check.objects.create(project=self.project)
-
-        # One check in Alice's secondary project:
-        p2 = Project.objects.create(owner=self.alice)
-        Check.objects.create(project=p2)
-
-        self.assertEqual(self.project.num_checks_available(), 18)
-
     def test_it_handles_zero_broken_channels(self) -> None:
         Channel.objects.create(kind="webhook", last_error="", project=self.project)
 
@@ -43,13 +32,6 @@ class ProjectModelTestCase(BaseTestCase):
         Check.objects.create(project=self.charlies_project, status="down")
 
         self.assertEqual(self.project.get_n_down(), 2)
-
-    def test_dashboard_url_requires_readonly_key(self) -> None:
-        self.assertIsNone(self.project.dashboard_url())
-
-    def test_dashboard_url_works(self) -> None:
-        self.project.api_key_readonly = "R" * 32
-        self.assertEqual(self.project.dashboard_url(), f"/tv/#{'R' * 32}=Alices%20Project")
 
     def test_get_absolute_url_works(self) -> None:
         self.assertEqual(self.project.get_absolute_url(), f"/projects/{self.project.code}/checks/")

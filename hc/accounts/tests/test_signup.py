@@ -12,7 +12,7 @@ from hc.api.models import Channel, Check, TokenBucket
 
 @override_settings(REGISTRATION_OPEN=True)
 class SignupTestCase(TestCase):
-    @override_settings(USE_PAYMENTS=False, SESSION_COOKIE_SECURE=False)
+    @override_settings(SESSION_COOKIE_SECURE=False)
     def test_it_works(self) -> None:
         form = {"identity": "alice@example.org", "tz": "Europe/Riga"}
 
@@ -29,9 +29,6 @@ class SignupTestCase(TestCase):
 
         # A profile should have been created
         profile = Profile.objects.get()
-        self.assertEqual(profile.check_limit, 10000)
-        self.assertEqual(profile.sms_limit, 10000)
-        self.assertEqual(profile.call_limit, 10000)
         self.assertEqual(profile.tz, "Europe/Riga")
 
         # And email sent
@@ -68,17 +65,6 @@ class SignupTestCase(TestCase):
         form = {"identity": "alice@example.org", "tz": "Europe/Riga"}
         r = self.client.post("/accounts/signup/", form)
         self.assertEqual(r.status_code, 403)
-
-    @override_settings(USE_PAYMENTS=True)
-    def test_it_sets_limits(self) -> None:
-        form = {"identity": "alice@example.org", "tz": ""}
-
-        self.client.post("/accounts/signup/", form)
-
-        profile = Profile.objects.get()
-        self.assertEqual(profile.check_limit, 20)
-        self.assertEqual(profile.sms_limit, 0)
-        self.assertEqual(profile.call_limit, 0)
 
     @override_settings(REGISTRATION_OPEN=False)
     def test_it_obeys_registration_open(self) -> None:
@@ -125,7 +111,6 @@ class SignupTestCase(TestCase):
 
         self.assertFalse(User.objects.exists())
 
-    @override_settings(USE_PAYMENTS=False)
     def test_it_ignores_bad_tz(self) -> None:
         form = {"identity": "alice@example.org", "tz": "Foo/Bar"}
 

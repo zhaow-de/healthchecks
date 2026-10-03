@@ -3,11 +3,10 @@ from __future__ import annotations
 import hmac
 import random
 import uuid
-from datetime import date, datetime
+from datetime import datetime
 from datetime import timedelta as td
 from secrets import token_urlsafe
 from typing import TYPE_CHECKING, Any
-from urllib.parse import quote, urlencode
 from zoneinfo import ZoneInfo
 
 from django.conf import settings
@@ -47,15 +46,8 @@ REPORT_CHOICES = (
     ("weekly", "Weekly"),
     ("monthly", "Monthly"),
 )
-# How long an account can be over limits before it is scheduled for deletion
-OVER_LIMIT_GRACE = td(days=31)
 # When scheduling for deletion, how many days in the future to schedule
 DELETION_GRACE = td(days=31)
-
-
-def month(dt: datetime) -> date:
-    """For a given datetime, return the matching first-day-of-month date."""
-    return dt.date().replace(day=1)
 
 
 class ProfileManager(models.Manager["Profile"]):
@@ -64,12 +56,6 @@ class ProfileManager(models.Manager["Profile"]):
             return user.profile
         except Profile.DoesNotExist:
             profile = Profile(user=user)
-            if not settings.USE_PAYMENTS:
-                # If not using payments, set high limits
-                profile.check_limit = 10000
-                profile.sms_limit = 10000
-                profile.call_limit = 10000
-
             profile.save()
             return profile
 
@@ -81,24 +67,13 @@ class Profile(models.Model):
     nag_period = models.DurationField(default=NO_NAG, choices=NAG_PERIODS)
     next_nag_date = models.DateTimeField(null=True, blank=True)
     ping_log_limit = models.IntegerField(default=100)
-    check_limit = models.IntegerField(default=20)
     token = models.CharField(max_length=128, blank=True)
-
-    last_sms_date = models.DateTimeField(null=True, blank=True)
-    sms_limit = models.IntegerField(default=0)
-    sms_sent = models.IntegerField(default=0)
-
-    last_call_date = models.DateTimeField(null=True, blank=True)
-    call_limit = models.IntegerField(default=0)
-    calls_sent = models.IntegerField(default=0)
 
     sort = models.CharField(max_length=20, default="created")
     # The date when "Inactive Account Notification" is sent
     deletion_notice_date = models.DateTimeField(null=True, blank=True)
     # Set manually by admin, causes an orange banner in web UI
     deletion_scheduled_date = models.DateTimeField(null=True, blank=True)
-    # If the account is over its check limit, the date when it went over the limit
-    over_limit_date = models.DateTimeField(null=True, blank=True)
     last_active_date = models.DateTimeField(null=True, blank=True)
     tz = models.CharField(max_length=36, default="UTC")
     theme = models.CharField(max_length=10, null=True, blank=True)
@@ -284,62 +259,10 @@ class Profile(models.Model):
 
         return True
 
-    def sms_sent_this_month(self) -> int:
-        # IF last_sms_date was never set, we have not sent any messages yet.
-        if not self.last_sms_date:
-            return 0
-
-        # If last sent date is not from this month, we've sent 0 this month.
-        if month(now()) > month(self.last_sms_date):
-            return 0
-
-        return self.sms_sent
-
-    def authorize_sms(self) -> bool:
-        """If monthly limit not exceeded, increase counter and return True"""
-
-        sent_this_month = self.sms_sent_this_month()
-        if sent_this_month >= self.sms_limit:
-            return False
-
-        self.sms_sent = sent_this_month + 1
-        self.last_sms_date = now()
-        self.save()
-        return True
-
-    def calls_sent_this_month(self) -> int:
-        # IF last_call_date was never set, we have not made any phone calls yet.
-        if not self.last_call_date:
-            return 0
-
-        # If last sent date is not from this month, we've made 0 calls this month.
-        if month(now()) > month(self.last_call_date):
-            return 0
-
-        return self.calls_sent
-
-    def authorize_call(self) -> bool:
-        """If monthly limit not exceeded, increase counter and return True"""
-
-        sent_this_month = self.calls_sent_this_month()
-        if sent_this_month >= self.call_limit:
-            return False
-
-        self.calls_sent = sent_this_month + 1
-        self.last_call_date = now()
-        self.save()
-        return True
-
     def num_checks_used(self) -> int:
         from hc.api.models import Check
 
         return Check.objects.filter(project__owner_id=self.user_id).count()
-
-    def num_checks_available(self) -> int:
-        return self.check_limit - self.num_checks_used()
-
-    def can_accept(self, project: Project) -> bool:
-        return project.check_set.count() <= self.num_checks_available()
 
     def update_next_nag_date(self) -> None:
         any_down = self.checks_from_all_projects().filter(status="down").exists()
@@ -375,13 +298,6 @@ class Profile(models.Model):
                 return dt
             if self.reports == "weekly" and dt.weekday() == 0:
                 return dt
-
-    def is_past_over_limit_grace(self) -> bool:
-        """Return True if this profile is over limits for 31 or more days."""
-        if not self.over_limit_date:
-            return False
-
-        return now() > self.over_limit_date + OVER_LIMIT_GRACE
 
     def schedule_for_deletion(self) -> None:
         self.deletion_scheduled_date = now() + DELETION_GRACE
@@ -454,9 +370,6 @@ class Project(models.Model):
     def owner_profile(self) -> Profile:
         return Profile.objects.for_user(self.owner)
 
-    def num_checks_available(self) -> int:
-        return self.owner_profile.num_checks_available()
-
     def invite_suggestions(self) -> QuerySet[User]:
         q = User.objects.filter(memberships__project__owner_id=self.owner_id)
         q = q.exclude(memberships__project=self)
@@ -511,13 +424,6 @@ class Project(models.Model):
     def transfer_request(self) -> Member | None:
         return self.member_set.filter(transfer_request_date__isnull=False).first()
 
-    def dashboard_url(self) -> str | None:
-        if not self.api_key_readonly:
-            return None
-
-        frag = urlencode({self.api_key_readonly: str(self)}, quote_via=quote)
-        return reverse("hc-dashboard", fragment=frag)
-
     def checks_url(self) -> str:
         return absolute_reverse("hc-checks", args=[self.code])
 
@@ -562,7 +468,6 @@ class Project(models.Model):
         # - 22 characters long, consisting of [a-z0-9]
         # - no "_" or "-" characters for aesthetic reasons
         # - no uppercase characters to avoid case-sensitivity issues
-        #   in email addresses.
         # The ping key will have ~113 bits of entropy.
         while True:
             self.ping_key = token_urlsafe(16).lower()
@@ -603,9 +508,6 @@ class Member(models.Model):
 
     class Meta:
         constraints = (models.UniqueConstraint(fields=["user", "project"], name="accounts_member_no_duplicates"),)
-
-    def can_accept(self) -> bool:
-        return self.user.profile.can_accept(self.project)
 
     @property
     def is_rw(self) -> bool:

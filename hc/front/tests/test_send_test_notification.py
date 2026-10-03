@@ -4,7 +4,6 @@ import json
 from unittest.mock import Mock, patch
 
 from django.core import mail
-from django.test.utils import override_settings
 
 from hc.api.models import Channel, Notification
 from hc.test import BaseTestCase
@@ -129,16 +128,8 @@ class SendTestNotificationTestCase(BaseTestCase):
         r = self.client.post(self.url, {}, follow=True)
         self.assertEqual(r.status_code, 404)
 
-    @override_settings(TWILIO_ACCOUNT="test", TWILIO_AUTH="dummy", TWILIO_FROM="+000")
-    @patch("hc.api.transports.curl.request", autospec=True)
-    def test_it_handles_up_only_sms_channel(self, mock_post: Mock) -> None:
-        mock_post.return_value.status_code = 200
-
-        self.profile.sms_limit = 50
-        self.profile.save()
-
-        self.channel.kind = "sms"
-        self.channel.value = json.dumps({"value": "+123", "up": True, "down": False})
+    def test_it_handles_up_only_email_channel(self) -> None:
+        self.channel.value = json.dumps({"value": "alice@example.org", "up": True, "down": False})
         self.channel.save()
 
         self.client.login(username="alice@example.org", password="password")
@@ -146,8 +137,8 @@ class SendTestNotificationTestCase(BaseTestCase):
         self.assertRedirects(r, self.channels_url)
         self.assertContains(r, "Test notification sent!")
 
-        payload = mock_post.call_args.kwargs["data"]
-        self.assertIn("is UP", payload["Body"])
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertTrue(mail.outbox[0].subject.startswith("UP |"))
 
     @patch("hc.api.transports.curl.request", autospec=True)
     def test_it_handles_webhook_with_json_variable(self, mock_post: Mock) -> None:

@@ -39,7 +39,6 @@ from hc.accounts.models import Credential, Member, Profile, Project
 from hc.api.models import Channel, Check, TokenBucket
 from hc.lib.tz import all_timezones
 from hc.lib.webauthn import CreateHelper, GetHelper
-from hc.payments.models import Subscription
 
 logger = logging.getLogger(__name__)
 
@@ -49,8 +48,6 @@ POST_LOGIN_ROUTES = (
     "hc-log",
     "hc-channels",
     "hc-add-slack",
-    "hc-add-pushover",
-    "hc-add-telegram",
     "hc-project-settings",
     "hc-uncloak",
 )
@@ -373,8 +370,6 @@ def project(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
         "project": project,
         "is_owner": is_owner,
         "is_manager": is_manager,
-        "show_api_keys": "show_api_keys" in request.GET,
-        "enable_prometheus": settings.PROMETHEUS_ENABLED is True,
     }
 
     if request.method == "POST":
@@ -505,9 +500,6 @@ def project(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
             if not tr or tr.user != request.user:
                 return HttpResponseForbidden()
 
-            if not tr.can_accept():
-                return HttpResponseBadRequest()
-
             with transaction.atomic():
                 # 1. Reuse the existing membership, and change its user
                 tr.user = project.owner
@@ -546,7 +538,6 @@ def notifications(request: AuthenticatedHttpRequest) -> HttpResponse:
         "status": "default",
         "page": "profile",
         "profile": profile,
-        "timezones": all_timezones,
     }
 
     if request.method == "POST":
@@ -683,10 +674,6 @@ def close(request: AuthenticatedHttpRequest) -> HttpResponse:
 
     if request.method == "POST":
         if request.POST.get("confirmation") == request.user.email:
-            # Cancel their subscription:
-            if sub := Subscription.objects.filter(user=user).first():
-                sub.cancel()
-
             # Deleting user also deletes its profile, checks, channels etc.
             user.delete()
 

@@ -8,7 +8,6 @@ from django.test.utils import override_settings
 from django.utils.timezone import now
 
 from hc.api.models import Channel, Check, Flip, Notification, Ping
-from hc.integrations.slack.transport import Slackalike
 from hc.lib.curl import CurlError
 from hc.test import BaseTestCase
 
@@ -200,7 +199,7 @@ class NotifySlackTestCase(BaseTestCase):
         self.channel.refresh_from_db()
         self.assertTrue(self.channel.disabled)
 
-    @patch("hc.api.transports.logger.debug", autospec=True)
+    @patch("hc.integrations.slack.transport.logger.debug", autospec=True)
     @patch("hc.api.transports.curl.request", autospec=True)
     def test_it_disables_channel_on_400_invalid_token(self, mock_post: Mock, debug: Mock) -> None:
         self._setup_data("123")
@@ -369,19 +368,3 @@ class NotifySlackTestCase(BaseTestCase):
         self.assertEqual(fields["Total Pings"], "0")
         self.assertEqual(fields["Last Ping"], "Never")
         self.assertNotIn("Last Ping Body", fields)
-
-    @override_settings(SLACK_ENABLED=False)
-    @patch("hc.api.transports.curl.request", autospec=True)
-    def test_slackalike_base_posts_without_slack_setting(self, mock_post: Mock) -> None:
-        self._setup_data("https://example.org/hook")
-        mock_post.return_value.status_code = 200
-
-        # Slackalike is the base of Slack-compatible transports: unlike Slack,
-        # it does not consult SLACK_ENABLED
-        transport = Slackalike(self.channel)
-        transport.notify(self.flip, Notification(channel=self.channel))
-
-        method, url = mock_post.call_args.args
-        self.assertEqual((method, url), ("post", "https://example.org/hook"))
-        payload = mock_post.call_args.kwargs["json"]
-        self.assertEqual(payload["attachments"][0]["fallback"], 'The check "Foobar" is DOWN.')

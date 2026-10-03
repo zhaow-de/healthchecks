@@ -56,13 +56,13 @@ class CopyCheckTestCase(BaseTestCase):
         self.assertEqual(copy.methods, "POST")
         self.assertTrue(copy.manual_resume)
 
-    def test_it_obeys_limit(self) -> None:
-        self.profile.check_limit = 0
-        self.profile.save()
+    def test_it_has_no_check_limit(self) -> None:
+        Check.objects.bulk_create([Check(project=self.project) for _ in range(25)])
 
         self.client.login(username="alice@example.org", password="password")
         r = self.client.post(self.copy_url)
-        self.assertEqual(r.status_code, 400)
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(Check.objects.count(), 27)
 
     def test_it_requires_rw_access(self) -> None:
         self.bobs_membership.role = "r"

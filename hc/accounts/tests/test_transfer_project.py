@@ -88,18 +88,8 @@ class TransferProjectTestCase(BaseTestCase):
         self.client.login(username="bob@example.org", password="password")
         r = self.client.get(self.url)
         self.assertContains(r, "would like to transfer")
-        self.assertNotContains(r, "upgrade your account first")
-
-    def test_it_shows_transfer_request_with_limit_notice(self) -> None:
-        self.bobs_membership.transfer_request_date = now()
-        self.bobs_membership.save()
-
-        self.bobs_profile.check_limit = 0
-        self.bobs_profile.save()
-
-        self.client.login(username="bob@example.org", password="password")
-        r = self.client.get(self.url)
-        self.assertContains(r, "upgrade your account first")
+        # Enabled: no attribute between its name and its class
+        self.assertRegex(r.content.decode(), r'name="accept_transfer"\s+class="btn btn-primary">Accept')
 
     def test_accept_works(self) -> None:
         self.bobs_membership.transfer_request_date = now()
@@ -134,16 +124,18 @@ class TransferProjectTestCase(BaseTestCase):
         r = self.client.post(self.url, {"accept_transfer": "1"})
         self.assertEqual(r.status_code, 403)
 
-    def test_it_checks_limits(self) -> None:
+    def test_accept_takes_any_number_of_checks(self) -> None:
+        Check.objects.bulk_create([Check(project=self.project) for _ in range(25)])
+        Check.objects.bulk_create([Check(project=self.bobs_project) for _ in range(25)])
+
         self.bobs_membership.transfer_request_date = now()
         self.bobs_membership.save()
 
-        self.bobs_profile.check_limit = 0
-        self.bobs_profile.save()
-
         self.client.login(username="bob@example.org", password="password")
         r = self.client.post(self.url, {"accept_transfer": "1"})
-        self.assertEqual(r.status_code, 400)
+        self.assertContains(r, "You are now the owner of this project!")
+        # Every check now belongs to a project Bob owns
+        self.assertEqual(self.bobs_profile.num_checks_used(), Check.objects.count())
 
     def test_reject_works(self) -> None:
         self.bobs_membership.transfer_request_date = now()

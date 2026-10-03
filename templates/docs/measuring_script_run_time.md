@@ -1,7 +1,7 @@
 # Measuring Script Run Time
 
  Append `/start` to a ping URL and use it to signal when a job starts.
- After receiving a start signal, Healthchecks.io will show the check as "Started."
+ After receiving a start signal, SITE_NAME will show the check as "Started."
  It will store the "start" events and display the job execution times. SITE_NAME
  calculates the job execution times as the time gaps between adjacent "start" and
  "success" events.

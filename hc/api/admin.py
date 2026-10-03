@@ -59,7 +59,7 @@ class ChecksAdmin(ModelAdmin[Check]):
         return format_html("""{} &rsaquo; <a href="{}">{}</a>""", obj.owner_email, url, name)
 
     def name_tags(self, obj: Check) -> str:
-        url = obj.details_url(full=False)
+        url = obj.get_absolute_url()
         name = obj.name or "unnamed"
         tmpl = """<a href="{}"">{}</a>"""
         args = [url, name]
@@ -85,7 +85,7 @@ class SchemeListFilter(admin.SimpleListFilter):
     parameter_name = "scheme"
 
     def lookups(self, request: HttpRequest, model_admin: ModelAdmin[Check]) -> Lookups:
-        return (("http", "HTTP"), ("https", "HTTPS"), ("email", "Email"))
+        return (("http", "HTTP"), ("https", "HTTPS"))
 
     def queryset(self, request: HttpRequest, queryset: QuerySet[Ping]) -> QuerySet[Ping]:
         if self.value():
@@ -130,9 +130,8 @@ class PingsPaginator(Paginator[Ping]):
 class PingsAdmin(ModelAdmin[Ping]):
     readonly_fields = ("owner", "has_body")
     list_select_related = ("owner",)
-    list_display = ("id", "created", "owner", "scheme", "method", "object_size", "ua")
+    list_display = ("id", "created", "owner", "scheme", "method", "ua")
     list_filter = ("created", SchemeListFilter, MethodListFilter, KindListFilter)
-    exclude = ("body",)
 
     paginator = PingsPaginator
     show_full_result_count = False

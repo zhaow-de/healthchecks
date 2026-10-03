@@ -2,12 +2,11 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from datetime import timedelta as td
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import time_machine
 from django.db import IntegrityError
 from django.db.models import QuerySet
-from django.test.utils import override_settings
 from django.utils.timezone import now
 
 from hc.api.models import MAX_DURATION, Channel, Check, Flip, Notification, Ping
@@ -25,6 +24,13 @@ class CheckModelTestCase(BaseTestCase):
 
         check.tags = " "
         self.assertEqual(check.tags_list(), [])
+
+    def test_filter_any_ignores_the_email_filters(self) -> None:
+        check = Check(filter_subject=True, filter_body=True)
+        self.assertFalse(check.filter_any())
+
+        check.filter_http_body = True
+        self.assertTrue(check.filter_any())
 
     def test_get_status_handles_new_check(self) -> None:
         check = Check()
@@ -123,15 +129,6 @@ class CheckModelTestCase(BaseTestCase):
 
         self.assertEqual(check.get_status(), "down")
 
-    def test_get_status_handles_started(self) -> None:
-        check = Check()
-        check.last_ping = now() - td(hours=2)
-        # Last start was 5 minutes ago, display status should be "started"
-        check.last_start = now() - td(minutes=5)
-        for status in ("new", "paused", "up", "down"):
-            check.status = status
-            self.assertEqual(check.get_status(with_started=True), "started")
-
     def test_get_status_handles_down_then_started_and_expired(self) -> None:
         check = Check(status="down")
         # Last ping was 2 days ago
@@ -139,7 +136,6 @@ class CheckModelTestCase(BaseTestCase):
         # Last start was 2 hours ago - the check is past its grace time
         check.last_start = now() - td(hours=2)
 
-        self.assertEqual(check.get_status(with_started=True), "down")
         self.assertEqual(check.get_status(), "down")
 
     def test_get_status_handles_up_then_started(self) -> None:
@@ -149,7 +145,6 @@ class CheckModelTestCase(BaseTestCase):
         # Last start was 5 minutes ago
         check.last_start = now() - td(minutes=5)
 
-        self.assertEqual(check.get_status(with_started=True), "started")
         # A started check still is considered "up":
         self.assertEqual(check.get_status(), "up")
 
@@ -160,7 +155,6 @@ class CheckModelTestCase(BaseTestCase):
         # Last start was 2 hours ago - the check is past its grace time
         check.last_start = now() - td(hours=2)
 
-        self.assertEqual(check.get_status(with_started=True), "down")
         self.assertEqual(check.get_status(), "down")
 
     def test_get_status_handles_paused_then_started_and_expired(self) -> None:
@@ -168,14 +162,12 @@ class CheckModelTestCase(BaseTestCase):
         # Last start was 2 hours ago - the check is past its grace time
         check.last_start = now() - td(hours=2)
 
-        self.assertEqual(check.get_status(with_started=True), "down")
         self.assertEqual(check.get_status(), "down")
 
     def test_get_status_handles_started_and_mia(self) -> None:
         check = Check()
         check.last_start = now() - td(hours=2)
 
-        self.assertEqual(check.get_status(with_started=True), "down")
         self.assertEqual(check.get_status(), "down")
 
     def test_next_ping_with_cron_syntax(self) -> None:
@@ -353,7 +345,6 @@ class CheckModelTestCase(BaseTestCase):
         # Nov. 2019
         self.assertTrue(nov.no_data)
 
-    @override_settings(S3_BUCKET=None)
     def test_it_prunes(self) -> None:
         check = Check.objects.create(project=self.project, n_pings=101)
         Ping.objects.create(owner=check, created=CURRENT_TIME, n=101)
@@ -380,7 +371,6 @@ class CheckModelTestCase(BaseTestCase):
         self.assertEqual(Notification.objects.count(), 0)
         self.assertEqual(Flip.objects.count(), 0)
 
-    @override_settings(S3_BUCKET=None)
     @time_machine.travel(CURRENT_TIME)
     def test_it_does_not_prune_flips_less_than_93_days_old(self) -> None:
         check = Check.objects.create(project=self.project, n_pings=101)
@@ -397,7 +387,6 @@ class CheckModelTestCase(BaseTestCase):
 
         self.assertEqual(Flip.objects.count(), 1)
 
-    @override_settings(S3_BUCKET=None)
     def test_it_does_not_prune_flips_newer_than_the_earliest_ping(self) -> None:
         check = Check.objects.create(project=self.project, n_pings=101)
         Ping.objects.create(owner=check, n=101)
@@ -413,17 +402,6 @@ class CheckModelTestCase(BaseTestCase):
         check.prune()
 
         self.assertEqual(Flip.objects.count(), 1)
-
-    @override_settings(S3_BUCKET="test-bucket")
-    @patch("hc.api.models.remove_objects")
-    def test_it_prunes_object_storage(self, remove_objects: Mock) -> None:
-        check = Check.objects.create(project=self.project, n_pings=101)
-        Ping.objects.create(owner=check, n=101)
-        Ping.objects.create(owner=check, n=1, object_size=1000)
-
-        check.prune()
-
-        remove_objects.assert_called_once_with(str(check.code), 1, wait=False)
 
     def test_get_grace_start_returns_utc(self) -> None:
         check = Check(project=self.project)
@@ -485,10 +463,9 @@ class CheckModelTestCase(BaseTestCase):
         unnamed = Check.objects.create(project=self.project)
         self.assertEqual(str(unnamed), f"{unnamed.code} ({unnamed.id})")
 
-    def test_get_absolute_url_is_relative_details_url(self) -> None:
+    def test_get_absolute_url_is_relative(self) -> None:
         check = Check.objects.create(project=self.project)
         self.assertEqual(check.get_absolute_url(), f"/checks/{check.code}/details/")
-        self.assertEqual(check.details_url(full=False), f"/checks/{check.code}/details/")
 
     def test_clamped_last_duration_returns_short_durations(self) -> None:
         check = Check(project=self.project)
@@ -507,7 +484,6 @@ class CheckModelTestCase(BaseTestCase):
         check.last_duration = None
         self.assertNotIn("last_duration", check.to_dict())
 
-    @override_settings(S3_BUCKET=None)
     def test_every_hundredth_ping_prunes_old_pings(self) -> None:
         self.profile.ping_log_limit = 10
         self.profile.save()
@@ -521,7 +497,6 @@ class CheckModelTestCase(BaseTestCase):
         # Ping #100 triggers pruning: with the limit of 10, only n > 90 is kept
         self.assertEqual(sorted(check.ping_set.values_list("n", flat=True)), [95, 100])
 
-    @override_settings(S3_BUCKET=None)
     def test_other_pings_do_not_prune(self) -> None:
         self.profile.ping_log_limit = 10
         self.profile.save()

@@ -61,6 +61,17 @@ class MyChecksTestCase(BaseTestCase):
         r = self.client.get(self.url)
         self.assertEqual(r.status_code, 404)
 
+    def test_it_shows_add_check_button_on_empty_project(self) -> None:
+        self.check.delete()
+
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(self.url)
+        # Enabled: no attribute after its modal target
+        self.assertRegex(
+            r.content.decode(),
+            r'<button\s+class="btn btn-primary"\s+data-toggle="modal"\s+data-target="#add-check-modal">\s+Add Check',
+        )
+
     def test_it_shows_green_check(self) -> None:
         self.check.last_ping = now()
         self.check.status = "up"
@@ -91,14 +102,6 @@ class MyChecksTestCase(BaseTestCase):
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.url)
         self.assertContains(r, "ic-grace")
-
-    def test_it_hides_add_check_button(self) -> None:
-        self.profile.check_limit = 1
-        self.profile.save()
-
-        self.client.login(username="alice@example.org", password="password")
-        r = self.client.get(self.url)
-        self.assertContains(r, "There are more things to monitor", status_code=200)
 
     def test_it_saves_sort_field(self) -> None:
         self.client.login(username="alice@example.org", password="password")
@@ -161,7 +164,7 @@ class MyChecksTestCase(BaseTestCase):
         self.assertNotContains(r, 'data-target="#add-check-modal"', status_code=200)
 
         # The pause button:
-        self.assertNotContains(r, "btn btn-default pause", status_code=200)
+        self.assertNotContains(r, 'class="btn pause"', status_code=200)
 
     def test_it_shows_slugs(self) -> None:
         self.project.show_slugs = True

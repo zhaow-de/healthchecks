@@ -29,7 +29,7 @@ class GetFlipsTestCase(BaseTestCase):
             new_status="up",
         )
 
-        self.url = f"/api/v1/checks/{self.a1.code}/flips/"
+        self.url = f"/api/v3/checks/{self.a1.code}/flips/"
 
     def get(self, api_key: str = "X" * 32, qs: str = "") -> TestHttpResponse:
         return self.client.get(self.url + qs, HTTP_X_API_KEY=api_key)
@@ -48,7 +48,7 @@ class GetFlipsTestCase(BaseTestCase):
         self.assertEqual(flip["up"], 1)
 
     def test_it_works_with_unique_key(self) -> None:
-        url = f"/api/v1/checks/{self.a1.unique_key}/flips/"
+        url = f"/api/v3/checks/{self.a1.unique_key}/flips/"
         r = self.client.get(url, HTTP_X_API_KEY="X" * 32)
         self.assertEqual(r.status_code, 200)
 
@@ -119,11 +119,11 @@ class GetFlipsTestCase(BaseTestCase):
     def test_it_rejects_check_from_another_project(self) -> None:
         charlies_check = Check.objects.create(project=self.charlies_project)
 
-        url = f"/api/v1/checks/{charlies_check.code}/flips/"
+        url = f"/api/v3/checks/{charlies_check.code}/flips/"
         r = self.client.get(url, HTTP_X_API_KEY="X" * 32)
         self.assertEqual(r.status_code, 403)
 
     def test_it_handles_missing_unique_key(self) -> None:
-        url = f"/api/v1/checks/{'a' * 40}/flips/"
+        url = f"/api/v3/checks/{'a' * 40}/flips/"
         r = self.client.get(url, HTTP_X_API_KEY="X" * 32)
         self.assertEqual(r.status_code, 404)

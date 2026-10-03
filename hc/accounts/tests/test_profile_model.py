@@ -317,15 +317,6 @@ class ProfileModelTestCase(BaseTestCase):
         self.profile.reports = "off"
         self.assertIsNone(self.profile.choose_next_report_date())
 
-    def test_is_past_over_limit_grace_works(self) -> None:
-        self.assertFalse(self.profile.is_past_over_limit_grace())
-
-        self.profile.over_limit_date = now() - td(days=30)
-        self.assertFalse(self.profile.is_past_over_limit_grace())
-
-        self.profile.over_limit_date = now() - td(days=32)
-        self.assertTrue(self.profile.is_past_over_limit_grace())
-
     def test_schedule_for_deletion_works(self) -> None:
         with time_machine.travel(CURRENT_TIME, tick=False):
             self.profile.schedule_for_deletion()

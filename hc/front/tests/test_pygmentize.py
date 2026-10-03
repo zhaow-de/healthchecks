@@ -21,9 +21,6 @@ SNIPPET_NAMES = [
     "go",
     "python_urllib2",
     "python_requests",
-    "python_requests_fail",
-    "python_requests_start",
-    "python_requests_payload",
     "php",
     "powershell",
     "powershell_inline",
@@ -72,15 +69,6 @@ class PygmentizeTestCase(BaseTestCase):
         # PhpLexer(startinline=True) highlights code that has no "<?php" opener
         php = (self.snippets / "php.html").read_text()
         self.assertIn('<span class="nb">file_get_contents</span>', php)
-
-    def test_it_replaces_site_root_and_ping_endpoint(self) -> None:
-        (self.snippets / "bash_curl.txt").write_text("curl SITE_ROOT/api/v3/checks/ PING_ENDPOINTabc\n")
-
-        self.run_command()
-
-        html = (self.snippets / "bash_curl.html").read_text()
-        self.assertIn("{{ SITE_ROOT }}/api/v3/checks/", html)
-        self.assertIn("{{ PING_ENDPOINT }}abc", html)
 
     def test_it_requires_pygments(self) -> None:
         with patch("hc.front.management.commands.pygmentize.have_pygments", False):

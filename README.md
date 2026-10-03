@@ -19,21 +19,24 @@ This project is a hard fork of
   this repository's changes are under MIT, and the code from the original
   project stays under its BSD 3-clause license. Both are in [LICENSE](LICENSE).
 * It stays 100% compatible with the original project's
-  [API v3](templates/docs/api.md).
+  [API v3](templates/docs/api.md). It takes no email pings, so the email-only
+  fields `filter_subject` and `filter_body` it still accepts and returns are
+  inert, as api.md describes.
 
 Healthchecks is a cron job monitoring service. It listens for HTTP requests
-and email messages ("pings") from your cron jobs and scheduled tasks ("checks").
+("pings") from your cron jobs and scheduled tasks ("checks").
 When a ping does not arrive on time, Healthchecks sends out alerts.
 
-Healthchecks comes with a web dashboard, API, 25+ integrations for
-delivering notifications, monthly email reports, WebAuthn 2FA support,
-team management features: projects, team members, read-only access.
+Healthchecks comes with a web dashboard, API, integrations for
+delivering notifications (email, webhooks, Slack, groups), a Prometheus
+metrics endpoint, monthly email reports, WebAuthn 2FA support, team
+management features: projects, team members, read-only access.
 
 The building blocks are:
 
 * Python 3.14
 * Django 6.1
-* SQLite (the default), PostgreSQL, MySQL or MariaDB
+* SQLite (the default) or PostgreSQL
 
 This fork's own instance runs at
 [https://zcrypto-hc.zhaow.me/](https://zcrypto-hc.zhaow.me/).
@@ -97,7 +100,7 @@ To set up Healthchecks development environment:
 
   The tests of the commit and review tooling under `tests/` run with
   `uv run pytest -n auto`. CI runs both on every pull request, the Django suite
-  on SQLite, PostgreSQL, MySQL and MariaDB.
+  on SQLite and PostgreSQL.
 
 * Run development server:
 
@@ -122,7 +125,11 @@ you can set via environment variables.
 
 In addition, Healthchecks reads settings from the `hc/local_settings.py` file if it
 exists. You can set or override any [standard Django setting](https://docs.djangoproject.com/en/6.1/ref/settings/)
-in this file. You can copy the provided `hc/local_settings.py.example` as
+in this file, except `EMAIL_BACKEND`, `EMAIL_HOST`, `EMAIL_PORT` and the other
+email backend settings Django 6.1 deprecates: Healthchecks always defines `MAILERS`,
+and Django refuses them alongside it, so configure SMTP in this file through `MAILERS`
+(see [EMAIL_HOST](https://zcrypto-hc.zhaow.me/docs/self_hosted_configuration/#EMAIL_HOST)).
+You can copy the provided `hc/local_settings.py.example` as
 `hc/local_settings.py` and use it as a starting point.
 
 If a setting is specified both as environment variable and in `hc/local_settings.py`,
@@ -131,8 +138,8 @@ the latter takes precedence.
 ## Accessing Administration Panel
 
 Healthchecks comes with Django's administration panel where you can perform
-administrative tasks: delete user accounts, change passwords, increase limits for
-specific users, inspect contents of database tables.
+administrative tasks: delete user accounts, change passwords, inspect contents of
+database tables.
 
 To access the administration panel,
 
@@ -148,14 +155,14 @@ links and alerts to users. Specify your SMTP credentials using the following
 environment variables:
 
 - Implicit TLS (*recommended*):
-    ```python
-    DEFAULT_FROM_EMAIL = "valid-sender-address@example.org"
-    EMAIL_HOST = "smtp.example.org"
-    EMAIL_PORT = 465
-    EMAIL_HOST_USER = "example-username"
-    EMAIL_HOST_PASSWORD = "example-password"
-    EMAIL_USE_TLS = False
-    EMAIL_USE_SSL = True
+    ```ini
+    DEFAULT_FROM_EMAIL=valid-sender-address@example.org
+    EMAIL_HOST=smtp.example.org
+    EMAIL_PORT=465
+    EMAIL_HOST_USER=example-username
+    EMAIL_HOST_PASSWORD=example-password
+    EMAIL_USE_TLS=False
+    EMAIL_USE_SSL=True
     ```
 
     Port 465 should be the preferred method according to [RFC8314 Section 3.3: Implicit
@@ -163,39 +170,17 @@ environment variables:
     to use a TLS certificate and not an SSL one.
 
 - Explicit TLS:
-    ```python
-    DEFAULT_FROM_EMAIL = "valid-sender-address@example.org"
-    EMAIL_HOST = "smtp.example.org"
-    EMAIL_PORT = 587
-    EMAIL_HOST_USER = "example-username"
-    EMAIL_HOST_PASSWORD = "example-password"
-    EMAIL_USE_TLS = True
+    ```ini
+    DEFAULT_FROM_EMAIL=valid-sender-address@example.org
+    EMAIL_HOST=smtp.example.org
+    EMAIL_PORT=587
+    EMAIL_HOST_USER=example-username
+    EMAIL_HOST_PASSWORD=example-password
+    EMAIL_USE_TLS=True
     ```
 
 Healthchecks uses these environment variables to construct the `settings.MAILERS`
 dictionary (a standard Django setting, [docs](https://docs.djangoproject.com/en/6.1/ref/settings/#std-setting-MAILERS)).
-
-## Receiving Emails
-
-Healthchecks comes with a `smtpd` management command, which starts up a
-SMTP listener service. With the command running, you can ping your
-checks by sending email messages
-to `your-uuid-here@my-monitoring-project.com` email addresses.
-
-Start the SMTP listener on port 2525:
-
-```sh
-./manage.py smtpd --port 2525
-```
-
-Send a test email:
-
-```sh
-curl --url 'smtp://127.0.0.1:2525' \
-    --mail-from 'foo@example.org' \
-    --mail-rcpt '11111111-1111-1111-1111-111111111111@my-monitoring-project.com' \
-    -F '='
-```
 
 ## Sending Alerts and Reports
 
@@ -236,8 +221,7 @@ go to the Administration Panel, look up user's **Profile** and modify its
 "Ping log limit" field.
 
 Healthchecks also provides management commands for cleaning up
-`auth_user` (user accounts) and `api_tokenbucket` (rate limiting records) tables,
-and for removing stale objects from external object storage.
+`auth_user` (user accounts) and `api_tokenbucket` (rate limiting records) tables.
 
 * Remove user accounts that are older than 1 month and have never logged in:
 
@@ -251,19 +235,6 @@ and for removing stale objects from external object storage.
 
   ```sh
   ./manage.py prunetokenbucket
-  ```
-
-* Remove old objects from external object storage. When an user removes
-  a check, removes a project, or closes their account, Healthchecks
-  does not remove the associated objects from the external object
-  storage on the fly. Instead, you should run `pruneobjects` occasionally
-  (for example, once a month). This command first takes an inventory
-  of all checks in the database, and then iterates over top-level
-  keys in the object storage bucket, and deletes any that don't also
-  exist in the database.
-
-  ```sh
-  ./manage.py pruneobjects
   ```
 
 When you first try these commands on your data, it is a good idea to
@@ -320,46 +291,6 @@ REMOTE_USER_HEADER = "HTTP_X_AUTHENTICATED_USER"
 AUTHENTICATION_BACKENDS = ["hc.accounts.backends.CustomHeaderBackend"]
 ```
 
-## External Object Storage
-
-Healthchecks can optionally store large ping bodies in S3-compatible object
-storage. To enable this feature, you will need to:
-
-* ensure you have the [MinIO Python library](https://docs.min.io/docs/python-client-quickstart-guide.html) installed.
-  `uv sync` installs it as a part of the development dependencies. If you use
-  `uv sync --no-dev`, add the `minio` extra:
-
-  ```bash
-  uv sync --no-dev --extra minio
-  ```
-
-  `uv sync` makes the environment match the command exactly, so pass every
-  extra you use each time (for example, `--extra minio --extra apprise`).
-  After a `--no-dev` install, run commands with `uv run --no-sync` or from an
-  activated virtual environment: a plain `uv run` syncs the environment first
-  and installs the development dependencies again.
-* configure the credentials for accessing object storage: `S3_ACCESS_KEY`,
-  `S3_SECRET_KEY`, `S3_ENDPOINT`, `S3_REGION` and `S3_BUCKET`.
-
-Healthchecks will use external object storage for storing any request bodies that
-exceed 100 bytes. If the size of a request body is 100 bytes or below, Healthchecks
-will still store it in the database.
-
-Healthchecks automatically removes old stored ping bodies from object
-storage while uploading new data. However, Healthchecks does not automatically
-clean up data when you delete checks, projects or entire user accounts.
-Use the `pruneobjects` management command to remove data for checks that don't
-exist any more.
-
-When external object storage is not enabled (the credentials for accessing object
-storage are not set), Healthchecks stores all ping bodies in the database.
-If you enable external object storage, Healthchecks will still be able to
-access the ping bodies already stored in the database. You don't need to migrate
-them to the object storage. On the other hand, if you later decide to disable
-external object storage, Healthchecks will not have access to the externally
-stored ping bodies any more. And there is currently no script or management command
-for migrating ping bodies from external object storage back to the database.
-
 ## Integrations
 
 ### Slack
@@ -389,142 +320,6 @@ flow, you will need to set up a Slack OAuth2 app:
 The legacy and app-based flows only affect the user experience during the initial
 setup of Slack integrations. The contents of notifications posted to Slack are the same
 regardless of the setup flow used.
-
-### Discord
-
-To enable Discord integration, you will need to:
-
-* register a new application on https://discord.com/developers/applications/me
-* add a redirect URI to your Discord application. The URI format is
-  `SITE_ROOT/integrations/add_discord/`. For example, if you are running a
-  development server on `localhost:8000` then the redirect URI would be
-  `http://localhost:8000/integrations/add_discord/`
-* Look up your Discord app's Client ID and Client Secret. Put them
-  in `DISCORD_CLIENT_ID` and `DISCORD_CLIENT_SECRET` environment
-  variables.
-
-
-### Pushover
-
-Pushover integration works by creating an application on Pushover.net which
-is then subscribed to by Healthchecks users. The registration workflow is as follows:
-
-* On Healthchecks, the user adds a "Pushover" integration to a project
-* Healthchecks redirects user's browser to a Pushover.net subscription page
-* User approves adding the Healthchecks subscription to their Pushover account
-* Pushover.net HTTP redirects back to Healthchecks with a subscription token
-* Healthchecks saves the subscription token and uses it for sending Pushover
-  notifications
-
-To enable the Pushover integration, you will need to:
-
-* Register a new application on Pushover via https://pushover.net/apps/build.
-* Within the Pushover 'application' configuration, enable subscriptions.
-  Make sure the subscription type is set to "URL". Also make sure the redirect
-  URL is configured to point back to the root of the Healthchecks instance
-  (e.g., `http://healthchecks.example.com/`).
-* Put the Pushover application API Token and the Pushover subscription URL in
-  `PUSHOVER_API_TOKEN` and `PUSHOVER_SUBSCRIPTION_URL` environment
-  variables. The Pushover subscription URL should look similar to
-  `https://pushover.net/subscribe/yourAppName-randomAlphaNumericData`.
-
-### Signal
-
-Healthchecks uses [signal-cli](https://github.com/AsamK/signal-cli) to send Signal
-notifications. Healthchecks interacts with signal-cli over UNIX or TCP socket.
-Healthchecks requires signal-cli version 0.11.2 or later.
-
-To enable the Signal integration via UNIX socket:
-
-* Set up and configure signal-cli to expose JSON RPC on an UNIX socket
-  ([instructions](https://github.com/AsamK/signal-cli/wiki/JSON-RPC-service)).
-  Example: `signal-cli -a +xxxxxx daemon --socket /tmp/signal-cli-socket`
-* Put the socket's location in the `SIGNAL_CLI_SOCKET` environment variable.
-
-To enable the Signal integration via TCP socket:
-
-* Set up and configure signal-cli to expose JSON RPC on a TCP socket.
-  Example: `signal-cli -a +xxxxxx daemon --tcp 127.0.0.1:7583`
-* Put the socket's hostname and port in the `SIGNAL_CLI_SOCKET` environment variable
-  using "hostname:port" syntax, example: `127.0.0.1:7583`.
-
-
-### Telegram
-
-* Create a Telegram bot by talking to the
-[BotFather](https://core.telegram.org/bots#6-botfather). Set the bot's name,
-description, user picture, and add a "/start" command. To avoid user confusion,
-please do not use the Healthchecks.io logo as your bot's user picture, use
-your own logo.
-* After creating the bot you will have the bot's name and token. Put them
-in `TELEGRAM_BOT_NAME` and `TELEGRAM_TOKEN` environment variables.
-* Run `settelegramwebhook` management command. This command tells Telegram
-where to forward channel messages by invoking Telegram's
-[setWebhook](https://core.telegram.org/bots/api#setwebhook) API call:
-
-    ```sh
-    ./manage.py settelegramwebhook
-    Done, Telegram's webhook set to: https://my-monitoring-project.com/integrations/telegram/bot/
-    ```
-
-For this to work, your `SITE_ROOT` must be correct and must use the "https://"
-scheme.
-
-### Apprise
-
-To enable Apprise integration, you will need to:
-
-* ensure you have apprise installed in your local environment. `uv sync` installs
-  it as a part of the development dependencies. If you use `uv sync --no-dev`,
-  add the `apprise` extra:
-
-  ```bash
-  uv sync --no-dev --extra apprise
-  ```
-
-  `uv sync` makes the environment match the command exactly, so pass every
-  extra you use each time (for example, `--extra minio --extra apprise`).
-  After a `--no-dev` install, run commands with `uv run --no-sync` or from an
-  activated virtual environment: a plain `uv run` syncs the environment first
-  and installs the development dependencies again.
-* enable the apprise functionality by setting the `APPRISE_ENABLED` environment variable.
-
-### Shell Commands
-
-The "Shell Commands" integration runs user-defined local shell commands when checks
-go up or down. This integration is disabled by default, and can be enabled by setting
-the `SHELL_ENABLED` environment variable to `True`.
-
-Note: be careful when using "Shell Commands" integration, and only enable it when
-you fully trust the users of your Healthchecks instance. The commands will be executed
-by the `manage.py sendalerts` process, and will run with the same system permissions as
-the `sendalerts` process.
-
-### Matrix
-
-To enable the Matrix integration you will need to:
-
-* Register a bot user (for posting notifications) in your preferred homeserver.
-* Use the [Login API call](https://www.matrix.org/docs/guides/client-server-api#login)
-  to retrieve bot user's access token. You can run it as shown in the documentation,
-  using curl in command shell.
-* Set the `MATRIX_` environment variables. Example:
-
-```
-MATRIX_HOMESERVER=https://matrix.org
-MATRIX_USER_ID=@mychecks:matrix.org
-MATRIX_ACCESS_TOKEN=[a long string of characters returned by the login call]
-```
-
-### PagerDuty Simple Install Flow
-
-To enable PagerDuty [Simple Install Flow](https://developer.pagerduty.com/docs/app-integration-development/events-integration/),
-
-* Register a PagerDuty app at [PagerDuty](https://pagerduty.com/) › Developer Mode › My Apps
-* In the newly created app, add the "Events Integration" functionality
-* Specify a Redirect URL: `https://your-domain.com/integrations/add_pagerduty/`
-* Copy the displayed app_id value (PXXXXX) and put it in the `PD_APP_ID` environment
-  variable
 
 ## Running in Production
 
@@ -595,11 +390,10 @@ as `ghcr.io/zhaow-de/healthchecks`: a release as `vX.Y.Z`, every build of the
 The Docker images:
 
 * Use uWSGI as the web server. uWSGI is configured to perform database migrations
-  on startup, and to run `sendalerts`, `sendreports`, and `smtpd` in the background.
+  on startup, and to run `sendalerts` and `sendreports` in the background.
   You do not need to run them separately.
-* Ship with both PostgreSQL and MySQL database drivers.
+* Ship with the PostgreSQL database driver.
 * Serve static files using the whitenoise library.
-* Have the apprise library preinstalled.
 * Do *not* handle TLS termination. In a production setup, you will want to put
   the Healthchecks container behind a reverse proxy or load balancer that handles TLS
   termination.

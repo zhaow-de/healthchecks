@@ -56,26 +56,6 @@ To adjust the number of uWSGI processes (for example, to save memory), set:
 
 Read more about configuring uWSGI in [uWSGI documentation](https://uwsgi-docs.readthedocs.io/en/latest/Configuration.html#environment-variables).
 
-## SMTP Listener Configuration via `SMTPD_PORT` {: #SMTPD_PORT }
-
-Healthchecks comes with a `smtpd` management command, which runs a SMTP listener
-service. With the command running, you can ping your checks by sending email messages
-to `your-uuid-here@hc.example.org` email addresses.
-
-The container is configured to start the SMTP listener conditionally, based
-on the value of the `SMTPD_PORT` environment value:
-
-* If `SMTPD_PORT` environment variable is not set, the SMTP listener will not run.
-* If `SMTPD_PORT` is set, the listener will run and listen on the specified port.
-  You may also need to edit `docker-compose.yml` to expose the listening port
-  (see the "ports" section under the "web" service in `docker-compose.yml`).
-
-The conditional logic lives in uWSGI configuration file,
-[uwsgi.ini](https://github.com/healthchecks/healthchecks/blob/master/docker/uwsgi.ini).
-
-See also: the [PING_EMAIL_DOMAIN](../self_hosted_configuration/#PING_EMAIL_DOMAIN)
-environment variable for customizing the domain part of the email addresses.
-
 ## Reverse Proxy, TLS Termination, and CSRF Protection {: #tls-termination }
 
 If you plan to expose your Healthchecks instance to the public internet, make sure you
@@ -147,27 +127,49 @@ docker compose exec -u root web update-ca-certificates
 ## Upgrading Database
 
 When you upgrade the database version in `docker-compose.yml` (for example,
-from `postgres:12` to `postgres:16`), you will also need to upgrade your postgres
+from `postgres:16` to `postgres:18`), you will also need to upgrade your postgres
 data directory. One way to do this is using the
 [pgautoupgrade](https://hub.docker.com/r/pgautoupgrade/pgautoupgrade) container.
 
 Steps:
 
-* As the very first step, **take a full backup of your database**.
+* As the very first step, **take a full backup of your database**, for example:
+  `docker compose exec -T db pg_dumpall -U postgres > healthchecks-backup.sql`
 * Stop the `db` and `web` containers: `docker compose stop`
-* Look up the name of the postgres data volume name using `docker volume ls`
-* Run `pgautoupgrade` like so:
+* Look up the name of the postgres data volume using `docker volume ls`
+* Run `pgautoupgrade` like so (with the old `/var/lib/postgresql/data` mount target
+  it exits without upgrading anything):
 
 ```
 docker run --rm --name pgauto -it \
-   --mount type=volume,source=<pg-volume-name-here>,target=/var/lib/postgresql/data \
+   --mount type=volume,source=<pg-volume-name-here>,target=/var/lib/postgresql \
    -e POSTGRES_PASSWORD=password \
    -e PGAUTO_ONESHOT=yes \
-   pgautoupgrade/pgautoupgrade:16-bookworm
+   pgautoupgrade/pgautoupgrade:18-trixie
 ```
 
-* Update the `docker-compose.yml` file to use the `postgres:16` image
+* Update the `docker-compose.yml` file to use the `postgres:18` image and to mount
+  the data volume at `/var/lib/postgresql` (with the old mount target, `postgres:18`
+  exits with an error that starts
+  `Error: in 18+, these Docker images are configured to store database data`):
+
+```yaml
+services:
+  db:
+    image: postgres:18
+    volumes:
+      - db-data:/var/lib/postgresql
+```
+
 * Start containers: `docker compose up`
+* If the `db` container logs a warning that a database `has a collation version mismatch`,
+  the database was created by a `postgres` image built on an older Debian release
+  (such as bookworm). `pgautoupgrade` has already reindexed every database, so record
+  the new collation version:
+
+```
+echo "SELECT format('ALTER DATABASE %I REFRESH COLLATION VERSION', datname) FROM pg_database WHERE datallowconn \gexec" | docker compose exec -T db psql -U postgres
+```
 
 ## Pre-built Images
 
@@ -181,11 +183,10 @@ The Docker images built from the Dockerfile in the `/docker/` directory:
 
 * Support the amd64 architecture only.
 * Use uWSGI as the web server. uWSGI is configured to perform database migrations
-  on startup, and to run `sendalerts`, `sendreports`, and `smtpd` in the background.
+  on startup, and to run `sendalerts` and `sendreports` in the background.
   You do not need to run them separately.
-* Ship with both PostgreSQL and MySQL database drivers.
+* Ship with the PostgreSQL database driver.
 * Serve static files using the whitenoise library.
-* Have the apprise library preinstalled.
 * Do *not* handle TLS termination. In a production setup, you will want to put
   the Healthchecks container behind a reverse proxy or load balancer that handles TLS
   termination.

@@ -88,12 +88,6 @@
                 {% else %}
                 <code>(unavailable, set slug first)</code>
                 {% endif %}
-                <p>Or by sending email to:</p>
-                {% if check.email %}
-                <code class="click-to-copy">{{ check.email }}</code>
-                {% else %}
-                <code>(unavailable, set slug first)</code>
-                {% endif %}
 
                 {% if rw and project.show_slugs and not project.ping_key %}
                 <p class="alert alert-info">
@@ -278,12 +272,10 @@
             <p>Copy, transfer, or permanently remove this check.</p>
 
             <div class="text-right">
-                {% if project.num_checks_available > 0 %}
                 <button
                     data-toggle="modal"
                     data-target="#copy-modal"
                     class="btn btn-sm btn-default">Create a Copy&hellip;</button>
-                {% endif %}
                 <button
                     id="transfer-btn"
                     data-toggle="modal"
@@ -383,7 +375,6 @@
 <script src="{% static 'js/nouislider.min.js' %}"></script>
 <script src="{% static 'js/snippet-copy.js' %}"></script>
 <script src="{% static 'js/dates.js' %}"></script>
-<script src="{% static 'js/purify.min.js' %}"></script>
 <script src="{% static 'js/initialize-timezone-selects.js' %}"></script>
 <script src="{% static 'js/update-timeout-modal.js' %}"></script>
 <script src="{% static 'js/adaptive-setinterval.js' %}"></script>

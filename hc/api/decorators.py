@@ -15,19 +15,10 @@ class ApiRequest(HttpRequest):
     json: dict[Any, Any]
     project: Project
     readonly: bool
-    v: int
 
 
 def error(msg: str, status: int = 400) -> JsonResponse:
     return JsonResponse({"error": msg}, status=status)
-
-
-def _get_api_version(request: HttpRequest) -> int:
-    if request.path_info.startswith("/api/v3/"):
-        return 3
-    if request.path_info.startswith("/api/v2/"):
-        return 2
-    return 1
 
 
 def authorize(f: ViewFunc) -> ViewFunc:
@@ -62,7 +53,6 @@ def authorize(f: ViewFunc) -> ViewFunc:
 
         request.project = project
         request.readonly = False
-        request.v = _get_api_version(request)
         return f(request, *args, **kwds)
 
     return wrapper
@@ -85,7 +75,6 @@ def authorize_read(f: ViewFunc) -> ViewFunc:
 
         request.project = project
         request.readonly = api_key.startswith("hcr_") or api_key == request.project.api_key_readonly
-        request.v = _get_api_version(request)
         return f(request, *args, **kwds)
 
     return wrapper

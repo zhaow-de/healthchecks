@@ -9,7 +9,7 @@ fails (e.g., an email message goes to spam), you still receive a notification ov
 other channel.
 * **Use different notification methods depending on urgency**. For example, if a
 low-priority housekeeping script fails, post a message in chat. If a vital service fails,
-post in chat, send an email, and send an SMS.
+post in chat, send an email, and call a webhook.
 * Route notifications to the right people.
 
 Each notification method ("integration") belongs to a project:
@@ -30,30 +30,10 @@ each check's details pages:
   <source src="IMG_URL/details_integrations.webm" type="video/webm">
 </video>
 
-## SMS, WhatsApp, and Phone Call Monthly Quotas
-
-SITE_NAME sets a quota on the maximum number of SMS, WhatsApp, and phone-call
-notifications an account can send per month. The specific limit depends on the
-account's billing plan. The quota automatically resets at the start of each month.
-The "unused" sends from one month do not carry over to the next month.
-
-When an account exceeds its monthly limit, SITE_NAME will:
-
-* Send a warning email to the account's primary email address
-* Show a warning message on the **Integrations** page
-
-
 ## Repeated Notifications
 
 If you want to receive repeated notifications for as long as a particular check is
-down, you have a few different options:
-
-* If you use an **incident management system** (PagerDuty, Splunk On-Call, Opsgenie,
-PagerTree), you can set up escalation rules there.
-* Use the **Pushover** integration with the "Emergency" priority. Pushover will
-play a loud notification sound on your phone every 5 minutes until the notification
-is acknowledged.
-* SITE_NAME can send **hourly or daily email reminders** if any check is down
+down, SITE_NAME can send **hourly or daily email reminders** if any check is down
 in any of your projects.
 Set them up in [Account Settings › Email Reports](../../accounts/profile/notifications/):
 

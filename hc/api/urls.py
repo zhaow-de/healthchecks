@@ -51,11 +51,6 @@ api_urls = [
     path("checks/<sha1:unique_key>", views.get_check_by_unique_key),
     path("checks/<uuid:code>/pause", views.pause, name="hc-api-pause"),
     path("checks/<uuid:code>/resume", views.resume, name="hc-api-resume"),
-    path(
-        "notifications/<uuid:code>/status",
-        views.notification_status,
-        name="hc-api-notification-status",
-    ),
     path("checks/<uuid:code>/pings/", views.pings, name="hc-api-pings"),
     path(
         "checks/<uuid:code>/pings/<int:n>/body",
@@ -76,8 +71,6 @@ urlpatterns = [
     path("ping/<uuid:code>/", include(uuid_urls)),
     path("ping/<slug:ping_key>/<slug:slug>", views.ping_by_slug),
     path("ping/<slug:ping_key>/<slug:slug>/", include(slug_urls)),
-    path("api/v1/", include(api_urls)),
-    path("api/v2/", include(api_urls)),
     path("api/v3/", include(api_urls)),
     path(
         "badge/<slug:badge_key>/<slug:signature>/<quoted:tag>.<slug:fmt>",

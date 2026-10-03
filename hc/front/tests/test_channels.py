@@ -48,17 +48,6 @@ class ChannelsTestCase(BaseTestCase):
         self.assertContains(r, "http://up.example.com")
         self.assertContains(r, "foobar")
 
-    def test_it_shows_pushover_details(self) -> None:
-        ch = Channel(kind="po", project=self.project)
-        ch.value = "fake-key|0"
-        ch.save()
-
-        self.client.login(username="alice@example.org", password="password")
-        r = self.client.get(self.channels_url)
-
-        self.assertEqual(r.status_code, 200)
-        self.assertContains(r, "(normal priority)")
-
     def test_it_shows_unconfirmed_email(self) -> None:
         channel = Channel(project=self.project, kind="email")
         channel.value = "alice@example.org"
@@ -89,23 +78,12 @@ class ChannelsTestCase(BaseTestCase):
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, "(up only)")
 
-    def test_it_shows_sms_number(self) -> None:
-        ch = Channel(kind="sms", project=self.project)
-        ch.value = json.dumps({"value": "+123"})
-        ch.save()
-
-        self.client.login(username="alice@example.org", password="password")
-        r = self.client.get(self.channels_url)
-
-        self.assertEqual(r.status_code, 200)
-        self.assertContains(r, "SMS to +123")
-
     def test_it_shows_channel_issues_indicator(self) -> None:
         Channel.objects.create(
-            kind="sms",
+            kind="slack",
             project=self.project,
             last_error="x",
-            value=json.dumps({"value": "+123"}),
+            value="https://example.org",
         )
 
         self.client.login(username="alice@example.org", password="password")
@@ -116,34 +94,14 @@ class ChannelsTestCase(BaseTestCase):
         self.bobs_membership.role = "r"
         self.bobs_membership.save()
 
-        Channel.objects.create(project=self.project, kind="webhook", value="{}")
+        ch = Channel.objects.create(project=self.project, kind="webhook", value="{}")
 
         self.client.login(username="bob@example.org", password="password")
         r = self.client.get(self.channels_url)
 
         self.assertNotContains(r, "Add Integration", status_code=200)
         self.assertNotContains(r, "ic-delete")
-        self.assertNotContains(r, "edit_webhook")
-
-    def test_it_shows_down_only_note_for_sms(self) -> None:
-        channel = Channel(project=self.project, kind="sms")
-        channel.value = json.dumps({"value": "+123123123", "up": False, "down": True})
-        channel.save()
-
-        self.client.login(username="alice@example.org", password="password")
-        r = self.client.get(self.channels_url)
-        self.assertEqual(r.status_code, 200)
-        self.assertContains(r, "(down only)")
-
-    def test_it_shows_up_only_note_for_sms(self) -> None:
-        channel = Channel(project=self.project, kind="sms")
-        channel.value = json.dumps({"value": "+123123123", "up": True, "down": False})
-        channel.save()
-
-        self.client.login(username="alice@example.org", password="password")
-        r = self.client.get(self.channels_url)
-        self.assertEqual(r.status_code, 200)
-        self.assertContains(r, "(up only)")
+        self.assertNotContains(r, f"/integrations/{ch.code}/edit/")
 
     def test_it_shows_disabled_note(self) -> None:
         ch = Channel(kind="slack", project=self.project)
@@ -164,13 +122,3 @@ class ChannelsTestCase(BaseTestCase):
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.channels_url)
         self.assertContains(r, "Fix&hellip;", status_code=200)
-
-    def test_it_shows_gotify_details(self) -> None:
-        ch = Channel(kind="gotify", project=self.project)
-        ch.value = json.dumps({"url": "https://example.org", "token": "abc", "priority": 5})
-        ch.save()
-
-        self.client.login(username="alice@example.org", password="password")
-        r = self.client.get(self.channels_url)
-
-        self.assertContains(r, "down: normal priority")

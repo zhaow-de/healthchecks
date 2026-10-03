@@ -46,7 +46,7 @@ def settings_check(
         items.append(
             Warning(
                 "No SMTP configuration, cannot send email",
-                hint="See https://github.com/healthchecks/healthchecks#sending-emails",
+                hint="See https://github.com/zhaow-de/healthchecks#sending-emails",
                 id="hc.api.W002",
             )
         )
@@ -70,59 +70,4 @@ def settings_check(
             )
         )
 
-    if settings.APPRISE_ENABLED and not settings.INTEGRATIONS_ALLOW_PRIVATE_IPS:
-        items.append(
-            Warning(
-                "Apprise can access private IPs regardless of the settings.INTEGRATIONS_ALLOW_PRIVATE_IPS value",
-                hint="See https://zcrypto-hc.zhaow.me/docs/self_hosted_configuration/#INTEGRATIONS_ALLOW_PRIVATE_IPS",
-                id="hc.api.W006",
-            )
-        )
-
     return items
-
-
-@register()  # E001
-def mariadb_uuid_check(
-    app_configs: Sequence[AppConfig] | None,
-    databases: Sequence[str] | None,
-    **kwargs: dict[str, Any],
-) -> list[Error]:
-    from django.db import connection
-
-    if connection.vendor != "mysql":
-        return []
-
-    with connection.cursor() as cursor:
-        cursor.execute(
-            # Put the datatype lookup in a subquery. This is to make sure we get a
-            # row back even when the "api_check" table does not exist yet.
-            """
-            SELECT VERSION(),
-              (SELECT DATA_TYPE
-               FROM INFORMATION_SCHEMA.COLUMNS
-               WHERE TABLE_SCHEMA = DATABASE()
-                 AND TABLE_NAME = 'api_check'
-                 AND COLUMN_NAME = 'code')
-            """
-        )
-        version, data_type = cursor.fetchone()
-        if "MariaDB" not in version:
-            return []
-
-        version_parts = version.split(".")
-        major, minor = int(version_parts[0]), int(version_parts[1])
-
-        # If:
-        # - we are using MariaDB 10.7+
-        # - *and* the UUID columns exist and use a varchar datatype,
-        # then we have a problem.
-        if (major, minor) >= (10, 7) and data_type == "char":
-            e = Error(
-                "Detected MariaDB >= 10.7, a manual migration to UUID datatypes required",
-                hint="See https://github.com/healthchecks/healthchecks/issues/929 for details",
-                id="hc.api.E001",
-            )
-            return [e]
-
-    return []

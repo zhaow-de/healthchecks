@@ -459,10 +459,6 @@ class SendAlertsTestCase(BaseTestCase):
         self.assertEqual(seats.call_args, call(3))
         self.assertEqual(executor.call_args, call(max_workers=3))
 
-    def test_handle_warns_about_pool_argument(self) -> None:
-        output = self.run_until_idle("--pool")
-        self.assertIn("WARNING: The --pool argument is not supported any more and will be ignored.\n", output)
-
     def test_handle_names_the_postgres_connection(self) -> None:
         databases = {"default": {"OPTIONS": {"application_name": "hc"}}}
         with patch("hc.api.management.commands.sendalerts.settings", SimpleNamespace(DATABASES=databases)):

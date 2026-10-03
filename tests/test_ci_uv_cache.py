@@ -74,7 +74,7 @@ def test_the_warmer_and_each_suite_job_compute_the_same_cache_key(job_id):
 @pytest.mark.parametrize("job_id", sorted(_cached_jobs()))
 def test_whichever_run_saves_the_key_holds_what_every_job_installs(job_id):
     """One install set for every job sharing the key, so a run that saves it holds what the others install."""
-    assert _sync(_cached_jobs()[job_id]) == _sync(_warmer()) == ["uv sync --locked --extra mysql"]
+    assert _sync(_cached_jobs()[job_id]) == _sync(_warmer()) == ["uv sync --locked"]
 
 
 def _lock_step(job: dict) -> dict:

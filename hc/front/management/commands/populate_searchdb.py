@@ -11,7 +11,7 @@ from hc.lib.html import html2text
 
 
 class Command(BaseCommand):
-    help = "Renders Markdown to HTML"
+    help = "Rebuilds the docs search index in search.db"
 
     def handle(self, **options: Any) -> None:
         con = sqlite3.connect(settings.BASE_DIR / "search.db")
@@ -24,9 +24,6 @@ class Command(BaseCommand):
 
         docs_path = settings.BASE_DIR / "templates/docs"
         for doc_path in docs_path.glob("*.html-fragment"):
-            if doc_path.stem == "apiv1" or doc_path.stem == "apiv2":
-                continue
-
             slug = doc_path.stem
             print(f"Processing {slug}")
 

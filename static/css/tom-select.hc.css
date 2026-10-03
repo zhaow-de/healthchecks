@@ -66,10 +66,6 @@
     border-top-color: var(--border-color);
 }
 
-.ts-wrapper .help {
-    opacity: 0.6;
-}
-
 .ts-wrapper.multi .ts-control > div {
     padding: 2px 6px 2px 6px;
     background: var(--ts-tag-bg);

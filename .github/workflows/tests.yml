@@ -14,17 +14,27 @@ jobs:
       contents: read
     strategy:
       matrix:
-        db: [sqlite, postgres, mysql, mariadb]
+        db: [sqlite, postgres]
         include:
           - db: postgres
-            db_user: runner
-            db_password: ""
-          - db: mysql
-            db_user: root
-            db_password: root
-          - db: mariadb
-            db_user: root
-            db_password: ""
+            db_host: localhost
+            db_user: postgres
+            db_password: postgres
+    # An empty `image` starts no service, so the sqlite leg runs without one.
+    services:
+      postgres:
+        image: ${{ matrix.db == 'postgres' && 'postgres:18' || '' }}
+        env:
+          POSTGRES_PASSWORD: ${{ matrix.db_password }}
+        ports:
+          - 5432:5432
+        # The runner holds the first step until the container is healthy. The check goes over TCP: the image's
+        # first-start server listens on the Unix socket alone, and stops before the real one starts.
+        options: >-
+          --health-cmd "pg_isready -h localhost -U postgres"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 15
 
     steps:
       # The cache rule below compares uv.lock with `origin/develop`, which a depth-1 checkout does not fetch.
@@ -44,31 +54,19 @@ jobs:
         uses: astral-sh/setup-uv@v10.2.0
         with:
           version: "0.12.19"
-          # mysqlclient has no Linux wheel, and the cached one links the client library of a runner setup-mariadb has not touched.
-          enable-cache: ${{ matrix.db != 'mariadb' }}
           cache-dependency-glob: uv.lock
           save-cache: ${{ steps.lock.outputs.changed == 'true' }}
       - name: Set up Python
         # Installs the version specified in .python-version. Keep this step:
         # without it uv would use the runner's system Python.
         run: uv python install
-      - name: Start MySQL
-        if: matrix.db == 'mysql'
-        run: sudo systemctl start mysql.service
-      - name: Start PostgreSQL
-        if: matrix.db == 'postgres'
-        run: |
-          sudo systemctl start postgresql.service
-          sudo -u postgres createuser -s runner
-      - name: Start MariaDB
-        uses: ankane/setup-mariadb@v1
-        if: matrix.db == 'mariadb'
       - name: Install Dependencies
-        run: uv sync --locked --extra mysql
+        run: uv sync --locked
       - name: Run Tests
         if: matrix.db != 'sqlite'
         env:
           DB: ${{ matrix.db }}
+          DB_HOST: ${{ matrix.db_host }}
           DB_USER: ${{ matrix.db_user }}
           DB_PASSWORD: ${{ matrix.db_password }}
           SECRET_KEY: dummy-key
@@ -125,7 +123,7 @@ jobs:
       # no local `develop`.
       - run: git branch --force develop origin/develop
       - name: Install Dependencies
-        run: uv sync --locked --extra mysql
+        run: uv sync --locked
       - name: Run Tests
         run: uv run --no-sync pytest -n auto
 

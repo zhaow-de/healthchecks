@@ -23,13 +23,13 @@ class ApiAdminTestCase(BaseTestCase):
         self.alice.is_superuser = True
         self.alice.save()
 
-    def test_it_shows_channel_list_with_pushbullet(self) -> None:
+    def test_it_shows_channel_list_with_slack(self) -> None:
         self.client.login(username="alice@example.org", password="password")
 
-        Channel.objects.create(project=self.project, kind="pushbullet", value="test-token")
+        Channel.objects.create(project=self.project, kind="slack", value="https://example.org")
 
         r = self.client.get("/admin/api/channel/")
-        self.assertContains(r, '<span class="ic">pushbullet</span>')
+        self.assertContains(r, '<span class="ic">slack</span>')
 
     def test_it_shows_checks(self) -> None:
         self.check.name = "Backup & Restore"
@@ -41,9 +41,9 @@ class ApiAdminTestCase(BaseTestCase):
 
         # The name and the tags, escaped
         self.assertContains(r, ">Backup &amp; Restore</a> <span>foo</span> <span>bar</span>")
-        self.assertContains(r, self.check.details_url(full=False))
+        self.assertContains(r, self.check.get_absolute_url())
         self.assertContains(r, ">unnamed</a>")
-        self.assertContains(r, bobs_check.details_url(full=False))
+        self.assertContains(r, bobs_check.get_absolute_url())
 
         # The owner's email and a link to the project
         project_url = self.project.get_absolute_url()
@@ -78,7 +78,7 @@ class ApiAdminTestCase(BaseTestCase):
     def test_it_filters_pings(self) -> None:
         http_get = Ping.objects.create(owner=self.check, scheme="http", method="GET")
         https_post = Ping.objects.create(owner=self.check, scheme="https", method="POST", kind="start")
-        email_fail = Ping.objects.create(owner=self.check, scheme="email", method="email", kind="fail")
+        http_fail = Ping.objects.create(owner=self.check, scheme="http", method="HEAD", kind="fail")
 
         self.client.login(username="alice@example.org", password="password")
         url = reverse("admin:api_ping_changelist")
@@ -91,13 +91,14 @@ class ApiAdminTestCase(BaseTestCase):
         # The sidebar offers each filter's choices
         r = self.client.get(url)
         self.assertContains(r, '<a href="?scheme=https">HTTPS</a>', html=True)
+        self.assertNotContains(r, "?scheme=email")
         self.assertContains(r, '<a href="?method=DELETE">DELETE</a>', html=True)
         self.assertContains(r, '<a href="?kind=fail">fail</a>', html=True)
 
-        self.assertEqual(ids({}), {http_get.id, https_post.id, email_fail.id})
-        self.assertEqual(ids({"scheme": "email"}), {email_fail.id})
+        self.assertEqual(ids({}), {http_get.id, https_post.id, http_fail.id})
+        self.assertEqual(ids({"scheme": "http"}), {http_get.id, http_fail.id})
         self.assertEqual(ids({"method": "POST"}), {https_post.id})
-        self.assertEqual(ids({"kind": "fail"}), {email_fail.id})
+        self.assertEqual(ids({"kind": "fail"}), {http_fail.id})
         self.assertEqual(ids({"scheme": "https", "kind": "start"}), {https_post.id})
 
     def test_it_shows_channel_columns(self) -> None:
@@ -107,7 +108,7 @@ class ApiAdminTestCase(BaseTestCase):
         Channel.objects.create(project=self.project, kind="slack", last_error="Received status code 500")
         Channel.objects.create(
             project=self.bobs_project,
-            kind="shell",
+            kind="group",
             last_notify=now(),
             last_notify_duration=td(seconds=2.5),
         )
@@ -166,7 +167,7 @@ class ApiAdminTestCase(BaseTestCase):
     def test_disable_action_disables_channels(self) -> None:
         c1 = Channel.objects.create(project=self.project, kind="webhook")
         c2 = Channel.objects.create(project=self.project, kind="slack")
-        c3 = Channel.objects.create(project=self.project, kind="shell")
+        c3 = Channel.objects.create(project=self.project, kind="email")
 
         self.client.login(username="alice@example.org", password="password")
         payload = {"action": "disable", "_selected_action": [c1.id, c2.id]}

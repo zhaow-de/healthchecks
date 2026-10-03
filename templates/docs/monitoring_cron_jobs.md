@@ -90,14 +90,14 @@ send alerts.
 ## Notifications
 
 SITE_NAME has integrations to deliver notifications over different channels: email,
-webhooks, SMS, chat messages, incident management systems, and more. You can and should
+webhooks, and Slack messages. You can and should
 set up multiple ways to get notified about job failures:
 
 * **Redundancy:** if one notification channel fails (e.g., an email message gets
 delivered to spam), you will still receive notifications over the other channels.
 * **Use different notification methods depending on job priority**. You can set up
 notifications from low-priority jobs to email only, but notifications from
-high-priority jobs to email, SMS, and team chat.
+high-priority jobs to email, a webhook, and team chat.
 
 Additionally, to make sure no issues "slip through the cracks", in the
 [Account Settings › Email Reports](../../accounts/profile/notifications/) page

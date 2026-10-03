@@ -26,9 +26,6 @@
         <ul class="nav nav-pills nav-stacked">
             <li class="active"><a href="{% url 'hc-profile' %}">Account</a></li>
             <li><a href="{% url 'hc-appearance' %}">Appearance</a></li>
-            {% if show_pricing %}
-            <li><a href="{% url 'hc-billing' %}">Billing</a></li>
-            {% endif %}
             <li><a href="{% url 'hc-notifications' %}">Email Reports</a></li>
         </ul>
     </div>

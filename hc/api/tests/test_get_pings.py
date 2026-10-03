@@ -52,7 +52,7 @@ class GetPingsTestCase(BaseTestCase):
         self.assertEqual(ping["scheme"], "https")
         self.assertEqual(ping["method"], "get")
         self.assertEqual(ping["ua"], "foo-agent")
-        # body_raw is null, object_size is null, body_url should be None
+        # body_raw is null
         self.assertIsNone(ping["body_url"])
 
     def test_readonly_key_is_not_allowed(self) -> None:
@@ -114,29 +114,9 @@ class GetPingsTestCase(BaseTestCase):
         ping = doc["pings"][0]
         self.assertIsNone(ping["body_url"])
 
-    def test_it_handles_zero_object_size(self) -> None:
-        self.ping.object_size = 0
-        self.ping.save()
-
-        doc = self.get().json()
-        ping = doc["pings"][0]
-        self.assertIsNone(ping["body_url"])
-
     @override_settings(SITE_ROOT="http://testserver")
     def test_it_handles_nonempty_body_raw(self) -> None:
         self.ping.body_raw = b"this is ping body"
-        self.ping.save()
-
-        doc = self.get().json()
-        ping = doc["pings"][0]
-        self.assertEqual(
-            ping["body_url"],
-            f"http://testserver/api/v3/checks/{self.a1.code}/pings/1/body",
-        )
-
-    @override_settings(SITE_ROOT="http://testserver")
-    def test_it_handles_nonempty_object_size(self) -> None:
-        self.ping.object_size = 123
         self.ping.save()
 
         doc = self.get().json()

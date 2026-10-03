@@ -70,7 +70,6 @@ class NumChecksFilter(admin.SimpleListFilter):
 
 class ProfileAnnotations(TypedDict):
     num_checks: int
-    plan: str
 
 
 @admin.register(Profile)
@@ -89,16 +88,12 @@ class ProfileAdmin(ModelAdmin[Profile]):
         "projects",
         "date_joined",
         "last_active",
-        "over_limit",
         "deletion",
-        "sms",
         "reports",
     )
     list_filter = (
-        "check_limit",
         NumChecksFilter,
         "last_active_date",
-        "over_limit_date",
         "deletion_scheduled_date",
         "reports",
     )
@@ -122,19 +117,9 @@ class ProfileAdmin(ModelAdmin[Profile]):
         "sort",
     )
 
-    _limits_fields = (
-        "check_limit",
-        "ping_log_limit",
-        "sms_limit",
-        "sms_sent",
-        "last_sms_date",
-        "call_limit",
-        "calls_sent",
-        "last_call_date",
-    )
+    _limits_fields = ("ping_log_limit",)
 
     _deletion_fields = (
-        "over_limit_date",
         "deletion_notice_date",
         "deletion_scheduled_date",
     )
@@ -161,13 +146,9 @@ class ProfileAdmin(ModelAdmin[Profile]):
         )
         qs = qs.annotate(num_checks=Subquery(subquery))
 
-        qs = qs.annotate(plan=F("user__subscription__plan_name"))
         return qs
 
     def email(self, obj: WithAnnotations[Profile, ProfileAnnotations]) -> str:
-        if obj.plan:
-            return format_html("{} <span>{}</span>", obj.user.email, obj.plan)
-
         return obj.user.email
 
     @admin.display(ordering="user__date_joined")
@@ -180,12 +161,6 @@ class ProfileAdmin(ModelAdmin[Profile]):
             return obj.last_active_date.date()
         return None
 
-    @admin.display(ordering="over_limit_date")
-    def over_limit(self, obj: Profile) -> date | None:
-        if obj.over_limit_date:
-            return obj.over_limit_date.date()
-        return None
-
     @admin.display(ordering="deletion_scheduled_date")
     def deletion(self, obj: Profile) -> date | None:
         if obj.deletion_scheduled_date:
@@ -196,13 +171,10 @@ class ProfileAdmin(ModelAdmin[Profile]):
         return render_to_string("admin/profile_list_projects.html", {"profile": obj})
 
     def checks(self, obj: WithAnnotations[Profile, ProfileAnnotations]) -> str:
-        tmpl = "{} of {}"
+        tmpl = "{}"
         if obj.num_checks > 1:
-            tmpl = "<b>{} of {}</b>"
-        return format_html(tmpl, obj.num_checks, obj.check_limit)
-
-    def sms(self, obj: Profile) -> str:
-        return f"{obj.sms_sent} of {obj.sms_limit}"
+            tmpl = "<b>{}</b>"
+        return format_html(tmpl, obj.num_checks)
 
     def login(self, r: HttpRequest, qs: QuerySet[Profile]) -> HttpResponseRedirect:
         profile = qs.get()

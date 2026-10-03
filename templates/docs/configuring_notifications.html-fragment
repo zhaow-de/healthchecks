@@ -8,7 +8,7 @@ fails (e.g., an email message goes to spam), you still receive a notification ov
 other channel.</li>
 <li><strong>Use different notification methods depending on urgency</strong>. For example, if a
 low-priority housekeeping script fails, post a message in chat. If a vital service fails,
-post in chat, send an email, and send an SMS.</li>
+post in chat, send an email, and call a webhook.</li>
 <li>Route notifications to the right people.</li>
 </ul>
 <p>Each notification method ("integration") belongs to a project:
@@ -26,29 +26,11 @@ each check's details pages:</p>
   <source src="IMG_URL/details_integrations.webm" type="video/webm">
 </video>
 
-<h2>SMS, WhatsApp, and Phone Call Monthly Quotas</h2>
-<p>SITE_NAME sets a quota on the maximum number of SMS, WhatsApp, and phone-call
-notifications an account can send per month. The specific limit depends on the
-account's billing plan. The quota automatically resets at the start of each month.
-The "unused" sends from one month do not carry over to the next month.</p>
-<p>When an account exceeds its monthly limit, SITE_NAME will:</p>
-<ul>
-<li>Send a warning email to the account's primary email address</li>
-<li>Show a warning message on the <strong>Integrations</strong> page</li>
-</ul>
 <h2>Repeated Notifications</h2>
 <p>If you want to receive repeated notifications for as long as a particular check is
-down, you have a few different options:</p>
-<ul>
-<li>If you use an <strong>incident management system</strong> (PagerDuty, Splunk On-Call, Opsgenie,
-PagerTree), you can set up escalation rules there.</li>
-<li>Use the <strong>Pushover</strong> integration with the "Emergency" priority. Pushover will
-play a loud notification sound on your phone every 5 minutes until the notification
-is acknowledged.</li>
-<li>SITE_NAME can send <strong>hourly or daily email reminders</strong> if any check is down
+down, SITE_NAME can send <strong>hourly or daily email reminders</strong> if any check is down
 in any of your projects.
-Set them up in <a href="../../accounts/profile/notifications/">Account Settings › Email Reports</a>:</li>
-</ul>
+Set them up in <a href="../../accounts/profile/notifications/">Account Settings › Email Reports</a>:</p>
 <p><img alt="Email reminder options" src="IMG_URL/email_reports.png" /></p>
 <h2>Weekly and Monthly Reports</h2>
 <p>SITE_NAME sends periodic email reports, either monthly at the start of each month

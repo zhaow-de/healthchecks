@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import time
-from email.message import EmailMessage
 from email.utils import make_msgid
 from smtplib import SMTPDataError, SMTPServerDisconnected
 from threading import Thread
@@ -69,7 +68,7 @@ def make_message(
 
 
 def send(message: Message, block: bool = False) -> None:
-    assert settings.MAILERS, "No SMTP configuration, see https://github.com/healthchecks/healthchecks#sending-emails"
+    assert settings.MAILERS, "No SMTP configuration, see https://github.com/zhaow-de/healthchecks#sending-emails"
 
     t = EmailThread(message)
     if block or hasattr(settings, "BLOCKING_EMAILS"):
@@ -90,15 +89,8 @@ def transfer_request(to: str, ctx: dict[str, Any]) -> None:
     send(make_message("transfer-request", to, ctx))
 
 
-def alert(
-    to: str,
-    ctx: dict[str, Any],
-    headers: dict[str, str],
-    attachment: EmailMessage | None = None,
-) -> None:
+def alert(to: str, ctx: dict[str, Any], headers: dict[str, str]) -> None:
     m = make_message("alert", to, ctx, headers=headers)
-    if attachment:
-        m.attach("last-ping.eml", attachment, "message/rfc822")
     send(m, block=True)
 
 
@@ -131,17 +123,5 @@ def deletion_scheduled(to: list[str], ctx: dict[str, Any]) -> None:
     send(m, block=True)
 
 
-def sms_limit(to: list[str], ctx: dict[str, Any]) -> None:
-    send(make_message("sms-limit", to, ctx))
-
-
-def call_limit(to: list[str], ctx: dict[str, Any]) -> None:
-    send(make_message("phone-call-limit", to, ctx))
-
-
 def sudo_code(to: str, ctx: dict[str, Any]) -> None:
     send(make_message("sudo-code", to, ctx))
-
-
-def signal_rate_limited(to: str, ctx: dict[str, Any]) -> None:
-    send(make_message("signal-rate-limited", to, ctx))

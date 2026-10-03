@@ -66,15 +66,6 @@ class PopulateSearchDbTestCase(BaseTestCase):
         rows = self.query("SELECT slug FROM docs WHERE docs MATCH ?", ("pinging",))
         self.assertEqual(rows, [("introduction",)])
 
-    def test_it_skips_api_v1_and_v2_docs(self) -> None:
-        self.write_doc("apiv1", "<h1>API v1</h1>\n<p>Legacy</p>")
-        self.write_doc("apiv2", "<h1>API v2</h1>\n<p>Legacy</p>")
-
-        self.run_command()
-
-        rows = self.query("SELECT slug FROM docs")
-        self.assertEqual(rows, [("introduction",)])
-
     def test_it_keeps_placeholders_in_self_hosted_docs(self) -> None:
         self.write_doc("self_hosted", "<h1>Self-hosted SITE_NAME</h1>\n<p>Run it yourself.</p>")
 

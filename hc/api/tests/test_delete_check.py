@@ -10,8 +10,7 @@ class DeleteCheckTestCase(BaseTestCase):
     def setUp(self) -> None:
         super().setUp()
         self.check = Check.objects.create(project=self.project)
-        self.url = f"/api/v2/checks/{self.check.code}"
-        self.urlv1 = f"/api/v1/checks/{self.check.code}"
+        self.url = f"/api/v3/checks/{self.check.code}"
 
     def test_it_works(self) -> None:
         r = self.client.delete(self.url, HTTP_X_API_KEY="X" * 32)
@@ -35,16 +34,7 @@ class DeleteCheckTestCase(BaseTestCase):
         r = self.client.delete(self.url)
         self.assertContains(r, "missing api key", status_code=401)
 
-    def test_v1_reports_status_started(self) -> None:
-        self.check.last_start = now()
-        self.check.save()
-
-        r = self.client.delete(self.urlv1, HTTP_X_API_KEY="X" * 32)
-        doc = r.json()
-        self.assertEqual(doc["status"], "started")
-        self.assertTrue(doc["started"])
-
-    def test_v2_reports_started_separately(self) -> None:
+    def test_it_reports_started_separately(self) -> None:
         self.check.last_start = now()
         self.check.save()
 
@@ -56,7 +46,7 @@ class DeleteCheckTestCase(BaseTestCase):
     def test_it_rejects_check_from_another_project(self) -> None:
         charlies_check = Check.objects.create(project=self.charlies_project)
 
-        url = f"/api/v2/checks/{charlies_check.code}"
+        url = f"/api/v3/checks/{charlies_check.code}"
         r = self.client.delete(url, HTTP_X_API_KEY="X" * 32)
         self.assertEqual(r.status_code, 403)
 

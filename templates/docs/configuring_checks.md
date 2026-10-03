@@ -2,8 +2,7 @@
 
 In SITE_NAME, a **Check** represents a single service you want to
 monitor. For example, when monitoring cron jobs, you would create a separate check for
-each cron job you wish to monitor. SITE_NAME pricing plans are structured primarily
-around how many checks you can have in your account. You can create checks
+each cron job you wish to monitor. You can create checks
 in the SITE_NAME web interface or via [Management API](../api/).
 
 ## Name, Tags, Description
@@ -93,8 +92,7 @@ how SITE_NAME handles incoming pings for a particular check.
 requests to use HTTP POST. Use the "Only POST" option if you run into issues of
 preview bots hitting the ping URLs when you send them in email or post them in chat.
 * **Content Filtering**. You can instruct SITE_NAME to look for specific keywords
-in the subject line or the message body of email pings, and in the HTTP request body
-of HTTP pings.
+in the HTTP request body of HTTP pings.
 * **Pinging a Paused Check**. Normally, when you ping a paused check, it leaves the
 paused state and goes into the "up" state (or the "down" state
 in case of [a failure signal](../signaling_failures/)).
@@ -108,11 +106,9 @@ If the **Request body of HTTP requests** option is checked, SITE_NAME will class
 the HTTP pings as start, success, or failure signals by looking for keywords in
 the first PING_BODY_LIMIT_FORMATTED of the request body.
 
-If either the **Subject line of email messages** or the **Message body of email
-messages** option is checked, SITE_NAME will classify email pings as start, success, or
-failure signals by looking for keywords in the subject line and/or message body.
-SITE_NAME supports HTML emails: when looking for keywords in message body, it checks
-both plain text and HTML versions of the email.
+SITE_NAME does not accept email pings: the email-only fields `filter_subject` and
+`filter_body` that the [Management API](../api/) still accepts and returns are inert,
+kept for compatibility with the original Healthchecks API v3 only.
 
 You can specify multiple keywords in each of the **Start Keywords**,
 **Success Keywords**, and **Failure Keywords** fields by separating them with commas.

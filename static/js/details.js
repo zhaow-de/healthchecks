@@ -49,11 +49,6 @@ $(function () {
         return false;
     });
 
-    $("#pause").click(function(e) {
-        $("#pause-form").submit();
-        return false;
-    });
-
     $("#ping-now").click(function(e) {
         var button = this;
         $.post(this.dataset.url, function() {

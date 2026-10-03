@@ -59,22 +59,6 @@ variables in <code>docker/.env</code>. For example, to disable HTTP request logg
 </code></pre></div>
 
 <p>Read more about configuring uWSGI in <a href="https://uwsgi-docs.readthedocs.io/en/latest/Configuration.html#environment-variables">uWSGI documentation</a>.</p>
-<h2 id="SMTPD_PORT">SMTP Listener Configuration via <code>SMTPD_PORT</code></h2>
-<p>Healthchecks comes with a <code>smtpd</code> management command, which runs a SMTP listener
-service. With the command running, you can ping your checks by sending email messages
-to <code>your-uuid-here@hc.example.org</code> email addresses.</p>
-<p>The container is configured to start the SMTP listener conditionally, based
-on the value of the <code>SMTPD_PORT</code> environment value:</p>
-<ul>
-<li>If <code>SMTPD_PORT</code> environment variable is not set, the SMTP listener will not run.</li>
-<li>If <code>SMTPD_PORT</code> is set, the listener will run and listen on the specified port.
-  You may also need to edit <code>docker-compose.yml</code> to expose the listening port
-  (see the "ports" section under the "web" service in <code>docker-compose.yml</code>).</li>
-</ul>
-<p>The conditional logic lives in uWSGI configuration file,
-<a href="https://github.com/healthchecks/healthchecks/blob/master/docker/uwsgi.ini">uwsgi.ini</a>.</p>
-<p>See also: the <a href="../self_hosted_configuration/#PING_EMAIL_DOMAIN">PING_EMAIL_DOMAIN</a>
-environment variable for customizing the domain part of the email addresses.</p>
 <h2 id="tls-termination">Reverse Proxy, TLS Termination, and CSRF Protection</h2>
 <p>If you plan to expose your Healthchecks instance to the public internet, make sure you
 put a TLS-terminating reverse proxy or a load balancer in front of it.</p>
@@ -128,27 +112,48 @@ docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">ex
 
 <h2>Upgrading Database</h2>
 <p>When you upgrade the database version in <code>docker-compose.yml</code> (for example,
-from <code>postgres:12</code> to <code>postgres:16</code>), you will also need to upgrade your postgres
+from <code>postgres:16</code> to <code>postgres:18</code>), you will also need to upgrade your postgres
 data directory. One way to do this is using the
 <a href="https://hub.docker.com/r/pgautoupgrade/pgautoupgrade">pgautoupgrade</a> container.</p>
 <p>Steps:</p>
 <ul>
-<li>As the very first step, <strong>take a full backup of your database</strong>.</li>
+<li>As the very first step, <strong>take a full backup of your database</strong>, for example:
+  <code>docker compose exec -T db pg_dumpall -U postgres &gt; healthchecks-backup.sql</code></li>
 <li>Stop the <code>db</code> and <code>web</code> containers: <code>docker compose stop</code></li>
-<li>Look up the name of the postgres data volume name using <code>docker volume ls</code></li>
-<li>Run <code>pgautoupgrade</code> like so:</li>
+<li>Look up the name of the postgres data volume using <code>docker volume ls</code></li>
+<li>Run <code>pgautoupgrade</code> like so (with the old <code>/var/lib/postgresql/data</code> mount target
+  it exits without upgrading anything):</li>
 </ul>
 <div class="highlight"><pre><span></span><code><span class="n">docker</span><span class="w"> </span><span class="n">run</span><span class="w"> </span><span class="o">--</span><span class="n">rm</span><span class="w"> </span><span class="o">--</span><span class="n">name</span><span class="w"> </span><span class="n">pgauto</span><span class="w"> </span><span class="o">-</span><span class="n">it</span><span class="w"> </span>\
-<span class="w">   </span><span class="o">--</span><span class="n">mount</span><span class="w"> </span><span class="n">type</span><span class="o">=</span><span class="n">volume</span><span class="p">,</span><span class="n">source</span><span class="o">=&lt;</span><span class="n">pg</span><span class="o">-</span><span class="n">volume</span><span class="o">-</span><span class="n">name</span><span class="o">-</span><span class="n">here</span><span class="o">&gt;</span><span class="p">,</span><span class="n">target</span><span class="o">=/</span><span class="k">var</span><span class="o">/</span><span class="n">lib</span><span class="o">/</span><span class="n">postgresql</span><span class="o">/</span><span class="n">data</span><span class="w"> </span>\
+<span class="w">   </span><span class="o">--</span><span class="n">mount</span><span class="w"> </span><span class="n">type</span><span class="o">=</span><span class="n">volume</span><span class="p">,</span><span class="n">source</span><span class="o">=&lt;</span><span class="n">pg</span><span class="o">-</span><span class="n">volume</span><span class="o">-</span><span class="n">name</span><span class="o">-</span><span class="n">here</span><span class="o">&gt;</span><span class="p">,</span><span class="n">target</span><span class="o">=/</span><span class="k">var</span><span class="o">/</span><span class="n">lib</span><span class="o">/</span><span class="n">postgresql</span><span class="w"> </span>\
 <span class="w">   </span><span class="o">-</span><span class="n">e</span><span class="w"> </span><span class="n">POSTGRES_PASSWORD</span><span class="o">=</span><span class="n">password</span><span class="w"> </span>\
 <span class="w">   </span><span class="o">-</span><span class="n">e</span><span class="w"> </span><span class="n">PGAUTO_ONESHOT</span><span class="o">=</span><span class="n">yes</span><span class="w"> </span>\
-<span class="w">   </span><span class="n">pgautoupgrade</span><span class="o">/</span><span class="n">pgautoupgrade</span><span class="p">:</span><span class="mi">16</span><span class="o">-</span><span class="n">bookworm</span>
+<span class="w">   </span><span class="n">pgautoupgrade</span><span class="o">/</span><span class="n">pgautoupgrade</span><span class="p">:</span><span class="mi">18</span><span class="o">-</span><span class="n">trixie</span>
 </code></pre></div>
 
 <ul>
-<li>Update the <code>docker-compose.yml</code> file to use the <code>postgres:16</code> image</li>
-<li>Start containers: <code>docker compose up</code></li>
+<li>Update the <code>docker-compose.yml</code> file to use the <code>postgres:18</code> image and to mount
+  the data volume at <code>/var/lib/postgresql</code> (with the old mount target, <code>postgres:18</code>
+  exits with an error that starts
+  <code>Error: in 18+, these Docker images are configured to store database data</code>):</li>
 </ul>
+<div class="highlight"><pre><span></span><code><span class="nt">services</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">db</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres:18</span>
+<span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">db-data:/var/lib/postgresql</span>
+</code></pre></div>
+
+<ul>
+<li>Start containers: <code>docker compose up</code></li>
+<li>If the <code>db</code> container logs a warning that a database <code>has a collation version mismatch</code>,
+  the database was created by a <code>postgres</code> image built on an older Debian release
+  (such as bookworm). <code>pgautoupgrade</code> has already reindexed every database, so record
+  the new collation version:</li>
+</ul>
+<div class="highlight"><pre><span></span><code>echo "SELECT format('ALTER DATABASE %I REFRESH COLLATION VERSION', datname) FROM pg_database WHERE datallowconn \gexec" | docker compose exec -T db psql -U postgres
+</code></pre></div>
+
 <h2>Pre-built Images</h2>
 <p>Pre-built Docker images are available
 <a href="https://github.com/zhaow-de/healthchecks/pkgs/container/healthchecks">on the GitHub Container Registry</a>
@@ -159,11 +164,10 @@ branches as its commit sha, and the newest build of <code>main</code> as <code>l
 <ul>
 <li>Support the amd64 architecture only.</li>
 <li>Use uWSGI as the web server. uWSGI is configured to perform database migrations
-  on startup, and to run <code>sendalerts</code>, <code>sendreports</code>, and <code>smtpd</code> in the background.
+  on startup, and to run <code>sendalerts</code> and <code>sendreports</code> in the background.
   You do not need to run them separately.</li>
-<li>Ship with both PostgreSQL and MySQL database drivers.</li>
+<li>Ship with the PostgreSQL database driver.</li>
 <li>Serve static files using the whitenoise library.</li>
-<li>Have the apprise library preinstalled.</li>
 <li>Do <em>not</em> handle TLS termination. In a production setup, you will want to put
   the Healthchecks container behind a reverse proxy or load balancer that handles TLS
   termination.</li>

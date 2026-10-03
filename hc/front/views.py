@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import email
-import logging
 import os
 import re
 import sqlite3
@@ -64,8 +62,6 @@ from hc.lib.string import is_valid_uuid_string
 from hc.lib.tz import all_timezones
 from hc.lib.urls import absolute_reverse
 
-logger = logging.getLogger(__name__)
-
 VALID_SORT_VALUES = ("name", "-name", "last_ping", "-last_ping", "created")
 STATUS_TEXT_TMPL = get_template("front/log_status_text.html")
 LAST_PING_TMPL = get_template("front/last_ping_cell.html")
@@ -113,7 +109,7 @@ def _get_check_for_user(request: HttpRequest, code: UUID, preload_owner_profile:
 
     If `preload_owner_profile` is `True`, the returned check's
     project.owner.profile will be already loaded. This helps avoid extra SQL queries
-    if the caller later looks up the project owner's check_limit or ping_log_limit.
+    if the caller later looks up the project owner's ping_log_limit.
 
     """
 
@@ -292,11 +288,9 @@ def checks(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
         "channels": channels,
         "num_down": num_down,
         "tags": tags_counts,
-        "ping_endpoint": settings.PING_ENDPOINT,
         "common_timezones": _common_timezones(checks),
         "timezones": all_timezones,
         "project": project,
-        "num_available": project.num_checks_available(),
         "sort": request.profile.sort,
         "selected_tags": selected_tags,
         "selected_statuses": selected_statuses,
@@ -520,9 +514,6 @@ def docs_cron(request: HttpRequest) -> HttpResponse:
 @login_required
 def add_check(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
     project = _get_rw_project_for_user(request, code)
-    if project.num_checks_available() <= 0:
-        return HttpResponseBadRequest()
-
     form = forms.AddCheckForm(request.POST)
     if not form.is_valid():
         return HttpResponseBadRequest()
@@ -573,17 +564,12 @@ def filtering_rules(request: AuthenticatedHttpRequest, code: UUID) -> HttpRespon
 
     form = forms.FilteringRulesForm(request.POST)
     if form.is_valid():
-        update_fields = (
-            "filter_subject",
-            "filter_body",
-            "filter_http_body",
-            "filter_default_fail",
-            "start_kw",
-            "success_kw",
-            "failure_kw",
-            "methods",
-            "manual_resume",
-        )
+        update_fields = ["filter_http_body", "methods", "manual_resume"]
+        # The dialog disables the keyword inputs while HTTP body filtering is off, so they
+        # arrive empty. Clear the stored keywords then only if the inert API v3 email flags
+        # do not keep them: an API client may have set the keywords along with those flags.
+        if form.cleaned_data["filter_http_body"] or not (check.filter_subject or check.filter_body):
+            update_fields += ["filter_default_fail", "start_kw", "success_kw", "failure_kw"]
         for field in update_fields:
             setattr(check, field, form.cleaned_data[field])
         check.save(update_fields=update_fields)
@@ -725,9 +711,8 @@ def validate_schedule(request: HttpRequest) -> HttpResponse:
 
 @login_required
 def ping_details(request: AuthenticatedHttpRequest, code: UUID, n: int | None = None) -> HttpResponse:
-    # This view makes two non-obvious SQL queries:
-    # * it calls ping.get_body(), which reads self.owner.code, triggering a query
-    # * the template calls ping.duration() which queries past "/start" events
+    # This view makes a non-obvious SQL query: the template calls ping.duration(),
+    # which queries past "/start" events
 
     check, _rw = _get_check_for_user(request, code)
     q = Ping.objects.filter(owner=check)
@@ -743,47 +728,14 @@ def ping_details(request: AuthenticatedHttpRequest, code: UUID, n: int | None = 
     except Ping.DoesNotExist:
         return render(request, "front/ping_details_not_found.html")
 
-    try:
-        body_bytes = ping.get_body_bytes()
-    except Ping.GetBodyError:
-        body_bytes = None
+    body_bytes = ping.get_body_bytes()
 
     ctx = {
         "check": check,
         "ping": ping,
         "body": body_bytes.decode(errors="replace") if body_bytes else None,
-        "plain": None,
-        "html": None,
-        "active": None,
         "tz_switches": _tz_switches(request.profile, check),
     }
-
-    if ping.scheme == "email" and body_bytes:
-        # Don't use message_from_string here, it seems to mangle
-        # UTF8 in message body.
-        parsed = email.message_from_bytes(body_bytes, policy=email.policy.SMTP)
-        ctx["subject"] = parsed.get("subject", "")
-
-        # The "active" tab is set to show the value that's successfully parsed last.
-        # Per the current implementation, this means that if both plain text and HTML
-        # content are present, the ping details dialog will initially display the HTML
-        # content, otherwise - only one content type exists, and we default to that
-        # (either plain text or HTML, at least one of them should exist in a
-        # valid email).
-        #
-        # NOTE: If both plain text and html have not been parsed successfully the
-        # "active" tab is not set at all, but currently this is not an issue since in
-        # this case the "ping details" template does not render any tabs.
-
-        plain_mime_part = parsed.get_body(("plain",))
-        if plain_mime_part:
-            ctx["plain"] = plain_mime_part.get_content()
-            ctx["active"] = "plain"
-
-        html_mime_part = parsed.get_body(("html",))
-        if html_mime_part:
-            ctx["html"] = html_mime_part.get_content()
-            ctx["active"] = "html"
 
     return render(request, "front/ping_details.html", ctx)
 
@@ -793,11 +745,7 @@ def ping_body(request: AuthenticatedHttpRequest, code: UUID, n: int) -> HttpResp
     check, _rw = _get_check_for_user(request, code)
     ping = get_object_or_404(Ping, owner=check, n=n)
 
-    try:
-        body = ping.get_body_bytes()
-    except Ping.GetBodyError:
-        return HttpResponse(status=503)
-
+    body = ping.get_body_bytes()
     if not body:
         raise Http404("not found")
 
@@ -1044,10 +992,6 @@ def transfer(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
             return HttpResponseBadRequest()
 
         target_project = _get_rw_project_for_user(request, form.cleaned_data["project"])
-        if target_project.owner_id != check.project.owner_id:
-            if target_project.num_checks_available() <= 0:
-                return HttpResponseBadRequest()
-
         check.project = target_project
         check.save(update_fields=("project",))
         check.assign_all_channels()
@@ -1063,9 +1007,6 @@ def transfer(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
 @login_required
 def copy(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
     check = _get_rw_check_for_user(request, code)
-
-    if check.project.num_checks_available() <= 0:
-        return HttpResponseBadRequest()
 
     new_name = check.name + " (copy)"
     # Make sure we don't exceed the 100 character db field limit:
@@ -1222,36 +1163,12 @@ def channels(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
         "page": "channels",
         "rw": rw,
         "project": project,
-        "profile": project.owner_profile,
         "channels": channels,
         "num_checks": project.check_set.count(),
-        "enable_apprise": settings.APPRISE_ENABLED is True,
-        "enable_call": bool(settings.TWILIO_AUTH),
-        "enable_discord": bool(settings.DISCORD_CLIENT_ID),
-        "enable_github": bool(settings.GITHUB_CLIENT_ID),
-        "enable_matrix": bool(settings.MATRIX_ACCESS_TOKEN),
-        "enable_mattermost": settings.MATTERMOST_ENABLED is True,
-        "enable_msteams": settings.MSTEAMS_ENABLED is True,
-        "enable_opsgenie": settings.OPSGENIE_ENABLED is True,
-        "enable_pagertree": settings.PAGERTREE_ENABLED is True,
-        "enable_pd": settings.PD_ENABLED is True,
         "enable_prometheus": settings.PROMETHEUS_ENABLED is True,
-        "enable_pushbullet": bool(settings.PUSHBULLET_CLIENT_ID),
-        "enable_pushover": bool(settings.PUSHOVER_API_TOKEN),
-        "enable_rocketchat": settings.ROCKETCHAT_ENABLED is True,
-        "enable_shell": settings.SHELL_ENABLED is True,
-        "enable_signal": bool(settings.SIGNAL_CLI_SOCKET),
         "enable_slack": settings.SLACK_ENABLED is True,
         "enable_slack_btn": bool(settings.SLACK_CLIENT_ID),
-        "enable_sms": bool(settings.TWILIO_AUTH),
-        "enable_spike": settings.SPIKE_ENABLED is True,
-        "enable_telegram": bool(settings.TELEGRAM_TOKEN),
-        "enable_trello": bool(settings.TRELLO_APP_KEY),
-        "enable_victorops": settings.VICTOROPS_ENABLED is True,
         "enable_webhooks": settings.WEBHOOKS_ENABLED is True,
-        "enable_whatsapp": settings.TWILIO_USE_WHATSAPP,
-        "enable_zulip": settings.ZULIP_ENABLED is True,
-        "use_payments": settings.USE_PAYMENTS,
     }
 
     return render(request, "front/channels.html", ctx)
@@ -1337,30 +1254,10 @@ def edit_channel(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
         from hc.integrations.webhook.views import webhook_form
 
         return webhook_form(request, channel)
-    elif channel.kind == "sms":
-        from hc.integrations.sms.views import sms_form
-
-        return sms_form(request, channel)
-    elif channel.kind == "signal":
-        from hc.integrations.signal.views import signal_form
-
-        return signal_form(request, channel)
-    elif channel.kind == "whatsapp":
-        from hc.integrations.whatsapp.views import whatsapp_form
-
-        return whatsapp_form(request, channel)
-    elif channel.kind == "ntfy":
-        from hc.integrations.ntfy.views import ntfy_form
-
-        return ntfy_form(request, channel)
     elif channel.kind == "group":
         from hc.integrations.group.views import group_form
 
         return group_form(request, channel)
-    elif channel.kind == "gotify":
-        from hc.integrations.gotify.views import gotify_form
-
-        return gotify_form(request, channel)
 
     return HttpResponseBadRequest()
 
@@ -1397,16 +1294,6 @@ def log_events(request: HttpRequest, code: UUID) -> HttpResponse:
         # to specify "return any events after *this* point".
         response["X-Last-Event-Timestamp"] = str(events[0].created.timestamp())
     return response
-
-
-def contact_vcf(request: HttpRequest) -> HttpResponse:
-    ctx = {
-        "email": settings.DEFAULT_FROM_EMAIL,
-        "site_name": settings.SITE_NAME,
-        "tel": settings.TWILIO_FROM,
-        "site_root": settings.SITE_ROOT,
-    }
-    return render(request, "contact.vcf", ctx, content_type="text/vcard")
 
 
 # Forks: add custom views after this line

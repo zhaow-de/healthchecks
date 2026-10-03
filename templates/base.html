@@ -53,7 +53,6 @@
     <link rel="stylesheet" href="{% static 'css/snippet-copy.css' %}" type="text/css">
     <link rel="stylesheet" href="{% static 'css/syntax.css' %}" type="text/css">
     <link rel="stylesheet" href="{% static 'css/set_password.css' %}" type="text/css">
-    <link rel="stylesheet" href="{% static 'css/signal_form.css' %}" type="text/css">
     <link rel="stylesheet" href="{% static 'css/project.css' %}" type="text/css">
     <link rel="stylesheet" href="{% static 'css/signup.css' %}" type="text/css">
     <link rel="stylesheet" href="{% static 'css/slug-suggestions.css' %}" type="text/css">
@@ -142,15 +141,6 @@
             {% endif %}
 
             <ul id="global-links" class="nav navbar-nav navbar-right">
-                {% if show_pricing %}
-                <li {% if page == 'pricing' %} class="active" {% endif %}>
-                    {% if project %}
-                    <a href="{% url 'hc-p-pricing' project.code %}">Pricing</a>
-                    {% else %}
-                    <a href="{% url 'hc-pricing' %}">Pricing</a>
-                    {% endif %}
-                </li>
-                {% endif %}
 
                 <li {% if page == 'docs' %} class="active" {% endif %}>
                     <a href="{% url 'hc-docs' %}">Docs</a>
@@ -188,7 +178,7 @@
                 {% endif %}
 
                 {% if registration_open %}
-                {% if page == "welcome" or page == "login" %}
+                {% if page == "login" %}
                 <li>
                     <a id="nav-sign-up" href="#" data-toggle="modal" data-target="#signup-modal">
                         <span>Sign Up</span>

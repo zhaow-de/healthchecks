@@ -9,7 +9,7 @@ from hc.test import BaseTestCase
 
 @override_settings(METRICS_KEY="foo")
 class MetricsTestCase(BaseTestCase):
-    url = "/api/v1/metrics/"
+    url = "/api/v3/metrics/"
 
     def test_it_returns_num_unprocessed_flips(self) -> None:
         check = Check.objects.create(project=self.project, status="down")

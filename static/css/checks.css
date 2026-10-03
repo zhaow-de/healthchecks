@@ -84,8 +84,7 @@
     padding: 0;
 }
 
-#show-usage-modal pre,
-#show-usage-modal #email {
+#show-usage-modal pre {
     margin: 0;
     padding: 15px;
 }
@@ -96,10 +95,6 @@
 
 #update-name-modal .modal-body {
     padding: 15px 40px;
-}
-
-#my-checks-bottom-actions {
-    margin-bottom: 20px;
 }
 
 /* Add Check Modal */
@@ -131,25 +126,6 @@
 #add-check-grace-unit {
     width: 100px;
     display: inline-block;
-}
-
-/* Over-limit notice */
-#my-checks-limit-notice {
-    border: 5px solid #ffdc3e;
-    border-radius: 2px;
-    padding: 15px;
-    margin-bottom: 20px;
-}
-
-#my-checks-limit-notice table {
-    margin-top: 20px;
-    width: auto;
-    font-size: small;
-}
-
-#my-checks-limit-notice tr:first-child th,
-#my-checks-limit-notice tr:first-child td {
-    border-color: transparent;
 }
 
 @media (min-width: 992px) {

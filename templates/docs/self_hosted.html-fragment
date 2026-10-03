@@ -5,8 +5,8 @@ licensed under the BSD 3-clause license, and this fork's changes under the MIT l
 <p>The building blocks are:</p>
 <ul>
 <li>Python 3.14</li>
-<li>Django 6.0</li>
-<li>PostgreSQL or MySQL</li>
+<li>Django 6.1</li>
+<li>SQLite (the default) or PostgreSQL</li>
 </ul>
 <h2>Setting Up for Development</h2>
 <p>You can set up a development environment on your local system to develop a new
@@ -70,8 +70,8 @@ run <code>./manage.py</code> directly. The <code>./manage.py</code> examples in 
 assume an activated virtual environment.</p>
 <h2>Accessing Administration Panel</h2>
 <p>Healthchecks comes with Django's administration panel where you can perform
-administrative tasks: delete user accounts, change passwords, increase limits for
-specific users, inspect contents of database tables.</p>
+administrative tasks: delete user accounts, change passwords, inspect contents of
+database tables.</p>
 <p>To access the administration panel, if you haven't already, create a superuser account:</p>
 <div class="highlight"><pre><span></span><code>$<span class="w"> </span>./manage.py<span class="w"> </span>createsuperuser
 </code></pre></div>
@@ -90,13 +90,13 @@ environment variables:</p>
 <ul>
 <li>Implicit TLS (<em>recommended</em>):</li>
 </ul>
-<div class="highlight"><pre><span></span><code><span class="n">DEFAULT_FROM_EMAIL</span> <span class="o">=</span> <span class="s2">"valid-sender-address@example.org"</span>
-<span class="n">EMAIL_HOST</span> <span class="o">=</span> <span class="s2">"smtp.example.org"</span>
-<span class="n">EMAIL_PORT</span> <span class="o">=</span> <span class="mi">465</span>
-<span class="n">EMAIL_HOST_USER</span> <span class="o">=</span> <span class="s2">"example-username"</span>
-<span class="n">EMAIL_HOST_PASSWORD</span> <span class="o">=</span> <span class="s2">"example-password"</span>
-<span class="n">EMAIL_USE_TLS</span> <span class="o">=</span> <span class="kc">False</span>
-<span class="n">EMAIL_USE_SSL</span> <span class="o">=</span> <span class="kc">True</span>
+<div class="highlight"><pre><span></span><code><span class="na">DEFAULT_FROM_EMAIL</span><span class="o">=</span><span class="s">valid-sender-address@example.org</span>
+<span class="na">EMAIL_HOST</span><span class="o">=</span><span class="s">smtp.example.org</span>
+<span class="na">EMAIL_PORT</span><span class="o">=</span><span class="s">465</span>
+<span class="na">EMAIL_HOST_USER</span><span class="o">=</span><span class="s">example-username</span>
+<span class="na">EMAIL_HOST_PASSWORD</span><span class="o">=</span><span class="s">example-password</span>
+<span class="na">EMAIL_USE_TLS</span><span class="o">=</span><span class="s">False</span>
+<span class="na">EMAIL_USE_SSL</span><span class="o">=</span><span class="s">True</span>
 </code></pre></div>
 
 <p>Port 465 should be the preferred method according to <a href="https://tools.ietf.org/html/rfc8314#section-3.3">RFC8314 Section 3.3: Implicit
@@ -105,31 +105,16 @@ to use a TLS certificate and not an SSL one.</p>
 <ul>
 <li>Explicit TLS:</li>
 </ul>
-<div class="highlight"><pre><span></span><code><span class="n">DEFAULT_FROM_EMAIL</span> <span class="o">=</span> <span class="s2">"valid-sender-address@example.org"</span>
-<span class="n">EMAIL_HOST</span> <span class="o">=</span> <span class="s2">"smtp.example.org"</span>
-<span class="n">EMAIL_PORT</span> <span class="o">=</span> <span class="mi">587</span>
-<span class="n">EMAIL_HOST_USER</span> <span class="o">=</span> <span class="s2">"example-username"</span>
-<span class="n">EMAIL_HOST_PASSWORD</span> <span class="o">=</span> <span class="s2">"example-password"</span>
-<span class="n">EMAIL_USE_TLS</span> <span class="o">=</span> <span class="kc">True</span>
+<div class="highlight"><pre><span></span><code><span class="na">DEFAULT_FROM_EMAIL</span><span class="o">=</span><span class="s">valid-sender-address@example.org</span>
+<span class="na">EMAIL_HOST</span><span class="o">=</span><span class="s">smtp.example.org</span>
+<span class="na">EMAIL_PORT</span><span class="o">=</span><span class="s">587</span>
+<span class="na">EMAIL_HOST_USER</span><span class="o">=</span><span class="s">example-username</span>
+<span class="na">EMAIL_HOST_PASSWORD</span><span class="o">=</span><span class="s">example-password</span>
+<span class="na">EMAIL_USE_TLS</span><span class="o">=</span><span class="s">True</span>
 </code></pre></div>
 
 <p>Healthchecks uses these environment variables to construct the <code>settings.MAILERS</code>
 dictionary (a standard Django setting, <a href="https://docs.djangoproject.com/en/6.1/ref/settings/#std-setting-MAILERS">docs</a>).</p>
-<h2>Receiving Emails</h2>
-<p>Healthchecks comes with a <code>smtpd</code> management command, which starts up an
-SMTP listener service. With the command running, you can ping your
-checks by sending email messages.</p>
-<p>Start the SMTP listener on port 2525:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>./manage.py<span class="w"> </span>smtpd<span class="w"> </span>--port<span class="w"> </span><span class="m">2525</span>
-</code></pre></div>
-
-<p>Send a test email:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>curl<span class="w"> </span>--url<span class="w"> </span><span class="s1">'smtp://127.0.0.1:2525'</span><span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--mail-from<span class="w"> </span><span class="s1">'foo@example.org'</span><span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--mail-rcpt<span class="w"> </span><span class="s1">'11111111-1111-1111-1111-111111111111@my-hc.example.org'</span><span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>-F<span class="w"> </span><span class="s1">'='</span>
-</code></pre></div>
-
 <h2>Sending Status Notifications</h2>
 <p>The <code>sendalerts</code> management command continuously polls the database for any checks
 changing state, and sends out notifications as needed.
@@ -148,8 +133,7 @@ pings for every check. You can set the limit higher to keep a longer history:
 go to the Administration Panel, look up user's <strong>Profile</strong> and modify its
 "Ping log limit" field.</p>
 <p>Healthchecks provides management commands for cleaning up
-<code>auth_user</code> (user accounts) and <code>api_tokenbucket</code> (rate limiting records) tables,
-and for removing stale objects from external object storage.</p>
+<code>auth_user</code> (user accounts) and <code>api_tokenbucket</code> (rate limiting records) tables.</p>
 <p>Remove user accounts that are older than 1 month and have never logged in:</p>
 <div class="highlight"><pre><span></span><code>$<span class="w"> </span>./manage.py<span class="w"> </span>pruneusers
 </code></pre></div>
@@ -158,17 +142,6 @@ and for removing stale objects from external object storage.</p>
 model is used for rate-limiting login attempts and similar operations.
 Any records older than one day can be safely removed.</p>
 <div class="highlight"><pre><span></span><code>$<span class="w"> </span>./manage.py<span class="w"> </span>prunetokenbucket
-</code></pre></div>
-
-<p>Remove old objects from external object storage. When an user removes
-a check, removes a project, or closes their account, Healthchecks
-does not remove the associated objects from the external object
-storage on the fly. Instead, you should run <code>pruneobjects</code> occasionally
-(for example, once a month). This command first takes an inventory
-of all checks in the database, and then iterates over top-level
-keys in the object storage bucket, and deletes any that don't also
-exist in the database.</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>./manage.py<span class="w"> </span>pruneobjects
 </code></pre></div>
 
 <p>When you first try these commands on your data, it is a good idea to

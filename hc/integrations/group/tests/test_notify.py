@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 
 from django.core import mail
-from django.test.utils import override_settings
 from django.utils.timezone import now
 
 from hc.api.models import Channel, Check, Flip, Notification
@@ -81,7 +80,6 @@ class NotifyGroupTestCase(BaseTestCase):
         self.assertEqual(n.channel, self.channel)
         self.assertEqual(n.error, "")
 
-    @override_settings(SHELL_ENABLED=True)
     def test_it_reports_failure_count(self) -> None:
         self.channel_email.email_verified = False
         self.channel_email.save()
