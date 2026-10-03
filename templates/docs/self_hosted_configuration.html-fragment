@@ -311,7 +311,7 @@ specify <code>SITE_LOGO_URL</code>. Notice that the logo must be placed in <code
 image's build time, and the web server will not recognize any new files placed in the
 <code>static</code> directory.</p>
 <h2 id="SITE_NAME"><code>SITE_NAME</code></h2>
-<p>Default: <code>Mychecks</code></p>
+<p>Default: <code>Healthchecks</code></p>
 <p>The display name of this Healthchecks instance. Healthchecks uses it throughout
 its web UI and documentation.</p>
 <h2 id="SITE_ROOT"><code>SITE_ROOT</code></h2>

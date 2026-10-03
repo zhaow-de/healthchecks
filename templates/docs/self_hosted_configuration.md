@@ -452,7 +452,7 @@ image's build time, and the web server will not recognize any new files placed i
 
 ## `SITE_NAME` {: #SITE_NAME }
 
-Default: `Mychecks`
+Default: `Healthchecks`
 
 The display name of this Healthchecks instance. Healthchecks uses it throughout
 its web UI and documentation.
