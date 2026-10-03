@@ -283,6 +283,10 @@ class CredentialAdmin(ModelAdmin[Credential]):
     list_filter = ("created",)
     readonly_fields = ("user",)
 
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        # A security key is registered on the profile page, behind sudo mode
+        return False
+
     def has_delete_permission(self, request: HttpRequest, obj: Credential | None = None) -> bool:
         # A security key is removed on the profile page, behind sudo mode
         return False

@@ -336,6 +336,18 @@ class AccountsAdminTestCase(BaseTestCase):
         self.assertContains(r, '<td class="field-name">Charlies Yubikey</td>', html=True)
         self.assertContains(r, '<td class="field-email">charlie@example.org</td>', html=True)
 
+    def test_it_does_not_add_credentials(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(reverse("admin:accounts_credential_changelist"))
+        self.assertNotContains(r, reverse("admin:accounts_credential_add"), status_code=200)
+
+        r = self.client.get(reverse("admin:accounts_credential_add"))
+        self.assertEqual(r.status_code, 403)
+
+        r = self.client.post(reverse("admin:accounts_credential_add"), {"name": "Eve's Key", "code": "x"})
+        self.assertEqual(r.status_code, 403)
+        self.assertFalse(Credential.objects.exists())
+
     def test_it_does_not_delete_credentials(self) -> None:
         c = Credential.objects.create(user=self.alice, name="Alices Yubikey", data=b"")
 
