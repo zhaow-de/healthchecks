@@ -15,8 +15,8 @@
     {% endblock %}
     {% block head %}{% endblock %}
     {% compress css %}
-    <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}" type="text/css">
-    <link rel="stylesheet" href="{% static 'css/tom-select.bootstrap5.css' %}" type="text/css">
+    <link rel="stylesheet" href="{% static 'vendor/bootstrap/bootstrap.min.css' %}" type="text/css">
+    <link rel="stylesheet" href="{% static 'vendor/tom-select/tom-select.bootstrap5.css' %}" type="text/css">
 
     <link rel="stylesheet" href="{% static 'css/variables.css' %}" type="text/css">
     <link rel="stylesheet" href="{% static 'css/base.css' %}" type="text/css">
@@ -36,7 +36,7 @@
     <link rel="stylesheet" href="{% static 'css/checks.css' %}" type="text/css">
     <link rel="stylesheet" href="{% static 'css/update_timeout_modal.css' %}" type="text/css">
     <link rel="stylesheet" href="{% static 'css/checks_table.css' %}" type="text/css">
-    <link rel="stylesheet" href="{% static 'css/nouislider.min.css' %}" type="text/css">
+    <link rel="stylesheet" href="{% static 'vendor/nouislider/nouislider.min.css' %}" type="text/css">
     <link rel="stylesheet" href="{% static 'css/nouislider.hc.css' %}" type="text/css">
     <link rel="stylesheet" href="{% static 'css/ping_details.css' %}" type="text/css">
     <link rel="stylesheet" href="{% static 'css/profile.css' %}" type="text/css">
@@ -186,7 +186,7 @@
 
     {% block base_scripts %}
     {% compress js %}
-    <script src="{% static 'js/bootstrap.bundle.min.js' %}"></script>
+    <script src="{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}"></script>
     <script src="{% static 'js/hc.js' %}"></script>
     {% endcompress %}
     {% endblock %}
