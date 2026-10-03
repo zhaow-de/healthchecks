@@ -1,6 +1,6 @@
-window.addEventListener("DOMContentLoaded", function (e) {
+window.addEventListener("DOMContentLoaded", function () {
     // Event handler for input's oninput event
-    var validateAndSubmit = function (e) {
+    const validateAndSubmit = function () {
         if (this.validity.valid) {
             // Use requestSubmit() instead of submit() because submit()
             // does not generate the onsubmit event.
@@ -9,7 +9,7 @@ window.addEventListener("DOMContentLoaded", function (e) {
     };
 
     // Event handler for form's onsubmit event
-    var checkDoubleSubmit = function (e) {
+    const checkDoubleSubmit = function (e) {
         if (this.dataset.submitted) {
             e.preventDefault();
         }

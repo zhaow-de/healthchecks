@@ -1,14 +1,14 @@
 hc.ready(function () {
-    var base = hc.base();
-    var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    var input = document.getElementById("schedule");
+    const base = hc.base();
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const input = document.getElementById("schedule");
 
-    var currentPreviewHash = "";
+    let currentPreviewHash = "";
     function updateCronPreview() {
-        var schedule = input.value;
+        const schedule = input.value;
 
         // Don't try preview with empty values, or if values have not changed
-        if (!schedule || schedule == currentPreviewHash)
+        if (!schedule || schedule === currentPreviewHash)
             return;
 
         // OK, we're good
@@ -20,7 +20,7 @@ hc.ready(function () {
         hc.post(base + "/checks/cron_preview/", {schedule: schedule, tz: tz}).then(function(r) {
             return r.text();
         }).then(function(data) {
-            if (schedule != currentPreviewHash) {
+            if (schedule !== currentPreviewHash) {
                 return;  // ignore stale results
             }
 

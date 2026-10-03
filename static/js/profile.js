@@ -1,5 +1,5 @@
 hc.ready(function() {
-    var tzTom = new TomSelect("select[name=tz]", {
+    const tzTom = new TomSelect("select[name=tz]", {
         diacritics: false,
         maxOptions: null,
         placeholder: "Type to search",
@@ -7,12 +7,12 @@ hc.ready(function() {
         refreshThrottle: 0,
     });
 
-    var browserTz = null;
+    let browserTz = null;
     try {
         browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    } catch(err) {};
+    } catch(err) {}
 
-    if (browserTz && document.getElementById("tz").value != browserTz) {
+    if (browserTz && document.getElementById("tz").value !== browserTz) {
         hc.$("#browser-tz-hint b").textContent = browserTz;
         hc.show("#browser-tz-hint");
     }

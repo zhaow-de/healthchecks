@@ -1,11 +1,11 @@
 hc.ready(function() {
-    var base = hc.base();
-    var input = document.getElementById("docs-search");
-    var results = document.getElementById("search-results");
-    var nav = document.getElementById("docs-nav");
+    const base = hc.base();
+    const input = document.getElementById("docs-search");
+    const results = document.getElementById("search-results");
+    const nav = document.getElementById("docs-nav");
 
     hc.on(input, "keyup focus", function() {
-        var q = this.value;
+        const q = this.value;
         if (q.length < 3) {
             results.classList.remove("on");
             nav.classList.remove("off");
@@ -13,7 +13,7 @@ hc.ready(function() {
         }
 
         hc.getText(base + "/docs/search/", {q: q}).then(function(data) {
-            if (q != input.value) {
+            if (q !== input.value) {
                 return;  // ignore stale results
             }
 

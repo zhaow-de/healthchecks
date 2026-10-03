@@ -1,12 +1,12 @@
 hc.ready(function () {
-    var base = hc.base();
-    var modal = document.getElementById("add-check-modal");
-    var period = document.getElementById("add-check-period");
-    var periodUnit = document.getElementById("add-check-period-unit");
-    var cronField = document.getElementById("add-check-schedule");
-    var onCalendarField = document.getElementById("add-check-schedule-oncalendar");
-    var grace = document.getElementById("add-check-grace");
-    var graceUnit = document.getElementById("add-check-grace-unit");
+    const base = hc.base();
+    const modal = document.getElementById("add-check-modal");
+    const period = document.getElementById("add-check-period");
+    const periodUnit = document.getElementById("add-check-period-unit");
+    const cronField = document.getElementById("add-check-schedule");
+    const onCalendarField = document.getElementById("add-check-schedule-oncalendar");
+    const grace = document.getElementById("add-check-grace");
+    const graceUnit = document.getElementById("add-check-grace-unit");
 
     function divToOption(el) {
         return {value: el.textContent};
@@ -22,7 +22,7 @@ hc.ready(function () {
         labelField: "value",
         options: hc.$$("#my-checks-tags div").map(divToOption),
         refreshThrottle: 0,
-        render: {no_results:(data, escape) => ""},
+        render: {no_results: () => ""},
         searchField: ["value"],
     });
 
@@ -31,13 +31,13 @@ hc.ready(function () {
     }
 
     function updateScheduleExtras() {
-        var kind = selectedKind();
+        const kind = selectedKind();
         modal.classList.remove("simple", "cron", "oncalendar");
         modal.classList.add(kind);
         // Include cron schedule in POST data only if kind = "cron"
-        cronField.disabled = kind != "cron";
+        cronField.disabled = kind !== "cron";
         // Include OnCalendar schedule in POST data only if kind = "oncalendar"
-        onCalendarField.disabled = kind != "oncalendar";
+        onCalendarField.disabled = kind !== "oncalendar";
     }
 
     // Show and hide fields when user clicks simple/cron/oncalendar radio buttons
@@ -50,13 +50,13 @@ hc.ready(function () {
         document.getElementById("add-check-name").focus();
 
         // Pre-select the currently active tags
-        var selectedTags = hc.$$("#my-checks-tags .checked").map((el) => el.textContent);
+        const selectedTags = hc.$$("#my-checks-tags .checked").map((el) => el.textContent);
         document.getElementById("add-check-tags").tomselect.setValue(selectedTags);
     });
 
     // Update the hidden field when user changes period inputs
     hc.on("#add-check-modal .period-input", "keyup change", function() {
-        var secs = Math.round(period.value * periodUnit.value);
+        const secs = Math.round(period.value * periodUnit.value);
         period.setCustomValidity(secs <= 31536000 ? "" : "Must not exceed 365 days");
 
         if (secs >= 60) {
@@ -66,7 +66,7 @@ hc.ready(function () {
 
     // Update the hidden field when user changes grace inputs
     hc.on("#add-check-modal .grace-input", "keyup change", function() {
-        var secs = Math.round(grace.value * graceUnit.value);
+        const secs = Math.round(grace.value * graceUnit.value);
         grace.setCustomValidity(secs <= 31536000 ? "" : "Must not exceed 365 days");
 
         if (secs >= 60) {
@@ -74,21 +74,21 @@ hc.ready(function () {
         }
     });
 
-    var currentSchedule = "";
+    let currentSchedule = "";
     function validateSchedule() {
-        var kind = selectedKind();
-        if (kind == "simple") return;
+        const kind = selectedKind();
+        if (kind === "simple") return;
 
-        var field = kind == "cron" ? cronField : onCalendarField;
+        const field = kind === "cron" ? cronField : onCalendarField;
 
         // Return early if the schedule has not changed
-        if (field.value == currentSchedule)
+        if (field.value === currentSchedule)
             return;
 
         currentSchedule = field.value;
-        var payload = {kind: kind, schedule: field.value};
+        const payload = {kind: kind, schedule: field.value};
         hc.getJSON(base + "/checks/validate_schedule/", payload).then(function(data) {
-            if (field.value != currentSchedule)
+            if (field.value !== currentSchedule)
                 return;  // ignore stale results
 
             field.setCustomValidity(data.result ? "" : "Please enter a valid expression");

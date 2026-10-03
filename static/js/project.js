@@ -7,7 +7,7 @@ hc.ready(function () {
 
     hc.on("a[data-revoke-key]", "click", function () {
         hc.$("#revoke-key-type").value = this.dataset.revokeKey;
-        var name = this.dataset.name;
+        const name = this.dataset.name;
         hc.$$("#revoke-key-modal .name").forEach(function (el) {
             el.textContent = name;
         });
@@ -23,7 +23,7 @@ hc.ready(function () {
 
     hc.tooltip("code[data-plaintext]", {"title": "Click to reveal"});
     hc.on("code[data-plaintext]", "click", function () {
-        var tip = bootstrap.Tooltip.getInstance(this);
+        const tip = bootstrap.Tooltip.getInstance(this);
         if (tip) {
             tip.dispose();
         }

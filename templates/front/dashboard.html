@@ -195,7 +195,7 @@
 
     <script>
         function fetch(key, callback) {
-            var httpRequest = new XMLHttpRequest();
+            const httpRequest = new XMLHttpRequest();
             httpRequest.onreadystatechange = function() {
                 if (httpRequest.readyState === 4) {
                     if (httpRequest.status === 200) {
@@ -224,35 +224,33 @@
             }
 
             v = Math.floor(v / 24); // v is now days
-            return v + " day" + (v == 1 ? "" : "s");
-         };
+            return v + " day" + (v === 1 ? "" : "s");
+        }
 
         function timeSince(date) {
-            var v = Math.floor((new Date() - date) / 1000);
+            const v = Math.floor((new Date() - date) / 1000);
             return duration(v);
-         };
+        }
 
-        var template = document.querySelector(".check-template");
+        const template = document.querySelector(".check-template");
         function updatePanel(node) {
             fetch(node.dataset.readonlyKey, function(doc) {
-                var tag = "TAG_" + node.dataset.readonlyKey.substr(0, 6);
+                const tag = "TAG_" + node.dataset.readonlyKey.slice(0, 6);
 
                 // Sort returned checks by name:
-                var sorted = doc.checks.sort(function(a, b) {
+                const sorted = doc.checks.sort(function(a, b) {
                     return a.name.localeCompare(b.name)
                 });
 
-                var fragment = document.createDocumentFragment();
+                const fragment = document.createDocumentFragment();
                 sorted.forEach(function(item) {
-                    var div = template.cloneNode(true);
+                    const div = template.cloneNode(true);
                     div.setAttribute("class", tag + " status-" + item.status + (item.started ? " status-started" : ""));
                     div.querySelector(".name").textContent = item.name || "unnamed";
                     if (item.last_ping) {
-                        var s = timeSince(Date.parse(item.last_ping)) + " ago";
-                        div.querySelector(".lp").textContent = s;
+                        div.querySelector(".lp").textContent = timeSince(Date.parse(item.last_ping)) + " ago";
                     }
                     if (item.last_duration) {
-                        var svg = '<svg width="13" height="13" viewBox="0 0 768 768"><use href="#timer" /></svg> ';
                         div.querySelector(".ld span").textContent = duration(item.last_duration);
                     } else {
                         div.querySelector(".ld").textContent = "";
@@ -270,21 +268,21 @@
         }
 
         if (window.location.hash) {
-            var panel;
+            let panel;
 
-            var pairs = window.location.hash.substr(1).split("&");
+            const pairs = window.location.hash.slice(1).split("&");
             for (const pair of pairs) {
                 if (!pair) {
                     continue;
                 }
 
-                if (pair.indexOf("theme=") != -1) {
+                if (pair.indexOf("theme=") !== -1) {
                     document.body.setAttribute("class", pair.replace("=", "-"));
                     continue;
                 }
 
-                var parts = pair.split("=");
-                var h1 = document.createElement("H1");
+                const parts = pair.split("=");
+                const h1 = document.createElement("H1");
                 h1.dataset.readonlyKey = parts[0];
                 if (parts[1]) {
                     h1.innerText = decodeURIComponent(parts[1]);

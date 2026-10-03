@@ -60,7 +60,7 @@ class DateFormatter {
 
     // "Jan 15" or "Jan 15, 2025"
     formatDate(dt, requireYear) {
-        if (requireYear || this.yearFmt.format(dt) != this.currentYear) {
+        if (requireYear || this.yearFmt.format(dt) !== this.currentYear) {
             return this.dateYearFmt.format(dt);
         }
 
