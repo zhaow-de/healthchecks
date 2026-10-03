@@ -310,7 +310,7 @@ class DetailsTestCase(BaseTestCase):
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.url)
         self.assertContains(r, "(unavailable, set slug first)", status_code=200)
-        self.assertNotContains(r, "Copy URL")
+        self.assertNotContains(r, "click-to-copy")
         self.assertNotContains(r, "ping-now")
         self.assertNotContains(r, "The ping key is currently not set")
 

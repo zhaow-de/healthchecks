@@ -82,21 +82,17 @@ class HttpTransport(Transport):
         method: str,
         url: str,
         *,
-        params: curl.Params,
         data: curl.Data,
         json: Any,
         headers: curl.Headers,
-        auth: curl.Auth,
     ) -> None:
         try:
             r = curl.request(
                 method,
                 url,
-                params=params,
                 data=data,
                 json=json,
                 headers=headers,
-                auth=auth,
                 timeout=30,
             )
             if r.status_code not in (200, 201, 202, 204):
@@ -111,11 +107,9 @@ class HttpTransport(Transport):
         url: str,
         *,
         retry: bool,
-        params: curl.Params = None,
         data: curl.Data = None,
         json: Any = None,
         headers: curl.Headers = None,
-        auth: curl.Auth = None,
     ) -> None:
         tries_left = 3 if retry else 1
         while True:
@@ -123,11 +117,9 @@ class HttpTransport(Transport):
                 return cls._request(
                     method,
                     url,
-                    params=params,
                     data=data,
                     json=json,
                     headers=headers,
-                    auth=auth,
                 )
             except TransportError as e:
                 tries_left = 0 if e.permanent else tries_left - 1
@@ -138,24 +130,5 @@ class HttpTransport(Transport):
 
     # Convenience wrapper around self.request for making "POST" requests
     @classmethod
-    def post(
-        cls,
-        url: str,
-        retry: bool = True,
-        *,
-        params: curl.Params = None,
-        data: curl.Data = None,
-        json: Any = None,
-        headers: curl.Headers = None,
-        auth: curl.Auth = None,
-    ) -> None:
-        cls.request(
-            "post",
-            url,
-            retry=retry,
-            params=params,
-            data=data,
-            json=json,
-            headers=headers,
-            auth=auth,
-        )
+    def post(cls, url: str, retry: bool = True, *, json: Any = None) -> None:
+        cls.request("post", url, retry=retry, json=json)

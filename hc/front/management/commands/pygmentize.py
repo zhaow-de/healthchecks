@@ -19,8 +19,6 @@ def _process(name: str, lexer: Lexer) -> None:
         source = f.read()
     processed = highlight(source, lexer, HtmlFormatter())
     processed = processed.replace("PING_URL", "{{ ping_url }}")
-    processed = processed.replace("SITE_ROOT", "{{ SITE_ROOT }}")
-    processed = processed.replace("PING_ENDPOINT", "{{ PING_ENDPOINT }}")
     with open(f"templates/front/snippets/{name}.html", "w") as out:
         out.write(processed)
 

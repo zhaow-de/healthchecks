@@ -59,7 +59,7 @@ class ChecksAdmin(ModelAdmin[Check]):
         return format_html("""{} &rsaquo; <a href="{}">{}</a>""", obj.owner_email, url, name)
 
     def name_tags(self, obj: Check) -> str:
-        url = obj.details_url(full=False)
+        url = obj.get_absolute_url()
         name = obj.name or "unnamed"
         tmpl = """<a href="{}"">{}</a>"""
         args = [url, name]

@@ -90,7 +90,7 @@ send alerts.
 ## Notifications
 
 SITE_NAME has integrations to deliver notifications over different channels: email,
-webhooks, Slack messages, and more. You can and should
+webhooks, and Slack messages. You can and should
 set up multiple ways to get notified about job failures:
 
 * **Redundancy:** if one notification channel fails (e.g., an email message gets

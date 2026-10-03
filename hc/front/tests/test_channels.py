@@ -94,14 +94,14 @@ class ChannelsTestCase(BaseTestCase):
         self.bobs_membership.role = "r"
         self.bobs_membership.save()
 
-        Channel.objects.create(project=self.project, kind="webhook", value="{}")
+        ch = Channel.objects.create(project=self.project, kind="webhook", value="{}")
 
         self.client.login(username="bob@example.org", password="password")
         r = self.client.get(self.channels_url)
 
         self.assertNotContains(r, "Add Integration", status_code=200)
         self.assertNotContains(r, "ic-delete")
-        self.assertNotContains(r, "edit_webhook")
+        self.assertNotContains(r, f"/integrations/{ch.code}/edit/")
 
     def test_it_shows_disabled_note(self) -> None:
         ch = Channel(kind="slack", project=self.project)

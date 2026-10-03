@@ -67,7 +67,7 @@ any alerts yet. If there is no ping by 14:30, it will declare the job failed and
 send alerts.</p>
 <h2>Notifications</h2>
 <p>SITE_NAME has integrations to deliver notifications over different channels: email,
-webhooks, Slack messages, and more. You can and should
+webhooks, and Slack messages. You can and should
 set up multiple ways to get notified about job failures:</p>
 <ul>
 <li><strong>Redundancy:</strong> if one notification channel fails (e.g., an email message gets

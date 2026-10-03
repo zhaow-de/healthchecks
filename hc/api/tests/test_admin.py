@@ -41,9 +41,9 @@ class ApiAdminTestCase(BaseTestCase):
 
         # The name and the tags, escaped
         self.assertContains(r, ">Backup &amp; Restore</a> <span>foo</span> <span>bar</span>")
-        self.assertContains(r, self.check.details_url(full=False))
+        self.assertContains(r, self.check.get_absolute_url())
         self.assertContains(r, ">unnamed</a>")
-        self.assertContains(r, bobs_check.details_url(full=False))
+        self.assertContains(r, bobs_check.get_absolute_url())
 
         # The owner's email and a link to the project
         project_url = self.project.get_absolute_url()

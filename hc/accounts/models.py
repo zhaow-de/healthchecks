@@ -468,7 +468,6 @@ class Project(models.Model):
         # - 22 characters long, consisting of [a-z0-9]
         # - no "_" or "-" characters for aesthetic reasons
         # - no uppercase characters to avoid case-sensitivity issues
-        #   in email addresses.
         # The ping key will have ~113 bits of entropy.
         while True:
             self.ping_key = token_urlsafe(16).lower()

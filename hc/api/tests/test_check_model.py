@@ -463,10 +463,9 @@ class CheckModelTestCase(BaseTestCase):
         unnamed = Check.objects.create(project=self.project)
         self.assertEqual(str(unnamed), f"{unnamed.code} ({unnamed.id})")
 
-    def test_get_absolute_url_is_relative_details_url(self) -> None:
+    def test_get_absolute_url_is_relative(self) -> None:
         check = Check.objects.create(project=self.project)
         self.assertEqual(check.get_absolute_url(), f"/checks/{check.code}/details/")
-        self.assertEqual(check.details_url(full=False), f"/checks/{check.code}/details/")
 
     def test_clamped_last_duration_returns_short_durations(self) -> None:
         check = Check(project=self.project)

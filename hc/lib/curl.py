@@ -20,8 +20,6 @@ CurlSockAddr = tuple[int, int, int, tuple[str, int]]
 Data = dict[str, Any] | str | bytes | None
 Headers = dict[str, str] | None
 Timeout = int | None
-Params = dict[str, str] | None
-Auth = tuple[str, str] | None
 
 
 class CurlError(Exception):
@@ -56,11 +54,9 @@ def request(
     method: str,
     url: str,
     *,
-    params: Params = None,
     data: Data = None,
     json: Any = None,
     headers: Headers = None,
-    auth: Auth = None,
     timeout: Timeout = None,
 ) -> Response:
     """Make a HTTP request using pycurl, return a Response object.
@@ -97,20 +93,10 @@ def request(
     >>> request("post", "http://example.org", json={"foo": [1, 2, 3]})
 
     `timeout` specifies the time limit in seconds for completing the
-    entire request. If timeout is exceeded, this function will raise CurlException.
+    entire request. If timeout is exceeded, this function will raise CurlError.
     Example:
 
     >>> request("get", "http://example.org", timeout=5)
-
-    `params` is a dictionary of query string parameters. If specified, the parameters
-    will urlencoded and appended to the target URL. Example:
-
-    >>> request("get", "http://example.org", params={"foo": bar})
-
-    The resulting URL in this case would be http://example.org?foo=bar
-
-    `auth` is a (username, password) tuple for Basic authentication. Example:
-    >>> request("get", "http://example.org", auth=("jsmith", "hunter2"))
 
     Notes:
 
@@ -118,7 +104,7 @@ def request(
     uses a default "zcrypto-hc.zhaow.me" value.
 
     If `INTEGRATIONS_ALLOW_PRIVATE_IPS` is set to `False` in Django settings,
-    this function will raise CurlException if the target IP address is from
+    this function will raise CurlError if the target IP address is from
     a private IP range (127.0.0.1, 192.168.x.x, fe80::, ...).
 
     This function follows up to three HTTP 302 redirects.
@@ -144,12 +130,7 @@ def request(
     if timeout is not None:
         c.setopt(pycurl.TIMEOUT, timeout)
 
-    if params is not None:
-        url += "?" + urlencode(params)
     c.setopt(pycurl.URL, url.encode())
-
-    if auth is not None:
-        c.setopt(pycurl.USERPWD, "%s:%s" % auth)
 
     if headers is None:
         headers = {}
@@ -211,19 +192,15 @@ def post(
     url: str,
     data: Data = None,
     *,
-    params: Params = None,
     json: Any = None,
     headers: Headers = None,
-    auth: Auth = None,
     timeout: Timeout = None,
 ) -> Response:
     return request(
         "post",
         url,
-        params=params,
         data=data,
         json=json,
         headers=headers,
-        auth=auth,
         timeout=timeout,
     )

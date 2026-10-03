@@ -211,13 +211,8 @@ class Check(models.Model):
 
         return settings.PING_ENDPOINT + str(self.code)
 
-    def details_url(self, full: bool = True) -> str:
-        if not full:
-            return reverse("hc-details", args=[self.code])
-        return absolute_reverse("hc-details", args=[self.code])
-
     def get_absolute_url(self) -> str:
-        return self.details_url(full=False)
+        return reverse("hc-details", args=[self.code])
 
     def cloaked_url(self) -> str:
         return absolute_reverse("hc-uncloak", args=[self.unique_key])
