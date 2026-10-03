@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from datetime import datetime
 from datetime import timedelta as td
 from unittest import skipUnless
+from unittest.mock import patch
 
 from django.db import connection
 from django.test.utils import CaptureQueriesContext, override_settings
@@ -50,6 +52,30 @@ class TokenBucketTestCase(BaseTestCase):
         sqls = [q["sql"] for q in ctx.captured_queries]
         self.assertTrue(any(sql.endswith(" FOR UPDATE") for sql in sqls))
 
+    def test_it_reads_and_writes_in_one_atomic_block(self) -> None:
+        # TestCase wraps each test in a transaction, so the block shows as a savepoint.
+        # Without it select_for_update raises TransactionManagementError on PostgreSQL.
+        TokenBucket.objects.create(value="em-" + ALICE_HASH)
+        with CaptureQueriesContext(connection) as ctx:
+            TokenBucket.authorize_login_email("alice@example.org")
+
+        verbs = [q["sql"].split()[0] for q in ctx.captured_queries]
+        self.assertEqual(verbs, ["SAVEPOINT", "SELECT", "UPDATE", "RELEASE"])
+
+    def test_it_reads_the_clock_after_the_bucket(self) -> None:
+        TokenBucket.objects.create(value="em-" + ALICE_HASH)
+        reads: list[int] = []
+
+        def clock() -> datetime:
+            reads.append(len(ctx.captured_queries))
+            return now()
+
+        with CaptureQueriesContext(connection) as ctx, patch("hc.api.models.now", clock):
+            TokenBucket.authorize_login_email("alice@example.org")
+
+        # Once, after SAVEPOINT and SELECT
+        self.assertEqual(reads, [2])
+
     def test_it_normalizes_email(self) -> None:
         emails = ("alice+alias@example.org", "a.li.ce@example.org")
 
@@ -75,6 +101,15 @@ class TokenBucketTestCase(BaseTestCase):
         # The refused attempt created no per-email row
         self.assertFalse(TokenBucket.objects.filter(value=f"pw-{ALICE_HASH}").exists())
         self.assertEqual(TokenBucket.objects.count(), 101)
+
+    def test_untrusted_cap_refills_over_a_day(self) -> None:
+        # 100 attempts per 24 hours: one attempt's worth refills in 864 seconds
+        obj = TokenBucket.objects.create(value="pw-untrusted", tokens=0, updated=now() - td(seconds=800))
+        self.assertFalse(TokenBucket.authorize_login_password("alice@example.org"))
+
+        obj.updated = now() - td(seconds=900)
+        obj.save()
+        self.assertTrue(TokenBucket.authorize_login_password("alice@example.org"))
 
     def test_trusted_device_skips_the_untrusted_cap(self) -> None:
         TokenBucket.objects.create(value="pw-untrusted", tokens=0)
