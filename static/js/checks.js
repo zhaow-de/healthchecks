@@ -330,8 +330,12 @@ hc.ready(function () {
 
             hc.$$("#my-checks-tags > div.btn").forEach(function (btn) {
                 var tag = btn.innerText;
-                btn.setAttribute("data-tooltip", data.tags[tag][1]);
-                var status = data.tags[tag][0];
+                // A tag that no check carries any more has no entry: leave its button as it is
+                var tagData = data.tags[tag];
+                if (!tagData) return;
+
+                btn.setAttribute("data-tooltip", tagData[1]);
+                var status = tagData[0];
                 if (lastStatus[tag] != status) {
                     btn.classList.remove("up", "grace", "down");
                     btn.classList.add(status);

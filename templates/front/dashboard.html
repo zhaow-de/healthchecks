@@ -203,7 +203,7 @@
                     }
                 }
             };
-            httpRequest.open("GET", "/api/v3/checks/");
+            httpRequest.open("GET", "{% url 'hc-api-checks' %}");
             httpRequest.setRequestHeader("X-Api-Key", key);
             httpRequest.send();
         }
@@ -273,7 +273,11 @@
             var panel;
 
             var pairs = window.location.hash.substr(1).split("&");
-            for (var i=0, pair; pair=pairs[i]; i++) {
+            for (const pair of pairs) {
+                if (!pair) {
+                    continue;
+                }
+
                 if (pair.indexOf("theme=") != -1) {
                     document.body.setAttribute("class", pair.replace("=", "-"));
                     continue;
