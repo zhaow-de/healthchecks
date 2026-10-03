@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import time
 from datetime import timedelta as td
+from secrets import token_urlsafe
 from urllib.parse import urlparse
 from uuid import UUID, uuid4
 
@@ -13,6 +14,7 @@ from django.contrib.auth import authenticate, update_session_auth_hash
 from django.contrib.auth import login as auth_login
 from django.contrib.auth import logout as auth_logout
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 from django.db.models.functions import Lower
@@ -138,9 +140,16 @@ def login(request: HttpRequest) -> HttpResponse:
                 if not _allow_redirect(redirect_url):
                     redirect_url = None
 
-                if magic_form.user:
+                # Every email gets the same redirect. Without MAILERS the form
+                # is hidden, but a crafted POST still arrives and sends nothing.
+                if settings.MAILERS and magic_form.user:
                     profile = Profile.objects.for_user(magic_form.user)
                     profile.send_instant_login_link(redirect_url=redirect_url)
+                elif settings.MAILERS:
+                    # Hash a throwaway token as prepare_token() hashes the
+                    # owner's, so the response time does not tell which email
+                    # exists.
+                    make_password(token_urlsafe(24))
 
                 response = redirect("hc-login-link-sent")
                 _set_autologin_cookie(response)

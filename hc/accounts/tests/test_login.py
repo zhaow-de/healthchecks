@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from unittest.mock import patch
 from urllib.parse import quote_plus
 
 from django.conf import settings
+from django.contrib.auth.hashers import get_hasher
 from django.contrib.auth.models import User
 from django.core import mail, signing
+from django.http import HttpResponse
 from django.test.utils import override_settings
 
 from hc.accounts import device
@@ -28,6 +31,13 @@ class LoginTestCase(BaseTestCase):
         # Client.logout() also drops the cookies
         self.client.logout()
         return value
+
+    def post_counting_hashes(self, form: dict[str, str]) -> tuple[HttpResponse, int]:
+        """POST the login form and count the password hasher's runs."""
+        hasher = get_hasher()
+        with patch.object(hasher, "encode", wraps=hasher.encode) as encode:
+            r = self.client.post("/accounts/login/", form)
+        return r, encode.call_count
 
     def drain_password_bucket(self) -> None:
         for _ in range(20):
@@ -96,6 +106,22 @@ class LoginTestCase(BaseTestCase):
         self.assertEqual(r.cookies["auto-login"].value, "1")
 
         # There should be no sent emails.
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_link_request_hashes_once_for_any_email(self) -> None:
+        for email in ("alice@example.org", "surprise@example.org"):
+            r, hashes = self.post_counting_hashes({"identity": email})
+            self.assertRedirects(r, "/accounts/login_link_sent/")
+            self.assertEqual(hashes, 1, email)
+
+    @override_settings(MAILERS={})
+    def test_link_request_without_smtp_answers_any_email_alike(self) -> None:
+        for email in ("alice@example.org", "surprise@example.org"):
+            r, hashes = self.post_counting_hashes({"identity": email})
+            self.assertRedirects(r, "/accounts/login_link_sent/")
+            self.assertEqual(r.cookies["auto-login"].value, "1")
+            self.assertEqual(hashes, 0, email)
+
         self.assertEqual(len(mail.outbox), 0)
 
     @override_settings(SECRET_KEY="test-secret")
@@ -200,6 +226,12 @@ class LoginTestCase(BaseTestCase):
 
         r = self.client.post("/accounts/login/", form)
         self.assertContains(r, "Incorrect email or password")
+
+    def test_wrong_password_hashes_once_for_any_email(self) -> None:
+        for email in ("alice@example.org", "surprise@example.org"):
+            r, hashes = self.post_counting_hashes({**self.bad, "email": email})
+            self.assertContains(r, "Incorrect email or password")
+            self.assertEqual(hashes, 1, email)
 
     def test_it_offers_no_sign_up(self) -> None:
         r = self.client.get("/accounts/login/")

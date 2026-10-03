@@ -52,6 +52,9 @@ class EmailBackend(BasicBackend):
         try:
             user = User.objects.get(email=username)
         except User.DoesNotExist:
+            # Run the hasher once, as a wrong password for the owner's email
+            # does, so the response time does not tell which email exists.
+            User().set_password(password)
             return None
 
         if not user.check_password(password):
