@@ -104,6 +104,23 @@ class FilteringRulesTestCase(BaseTestCase):
         self.assertEqual(self.check.failure_kw, "ERROR")
         self.assertTrue(self.check.filter_default_fail)
 
+    def test_it_keeps_keywords_that_the_inert_filter_body_flag_holds(self) -> None:
+        self.check.filter_body = True
+        self.check.success_kw = "SUCCESS"
+        self.check.failure_kw = "ERROR"
+        self.check.filter_default_fail = True
+        self.check.save()
+
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.post(self.url, data={"methods": ""})
+        self.assertRedirects(r, self.redirect_url)
+
+        self.check.refresh_from_db()
+        self.assertTrue(self.check.filter_body)
+        self.assertEqual(self.check.success_kw, "SUCCESS")
+        self.assertEqual(self.check.failure_kw, "ERROR")
+        self.assertTrue(self.check.filter_default_fail)
+
     def test_it_replaces_keywords_when_filtering_http_bodies(self) -> None:
         self.check.filter_subject = True
         self.check.success_kw = "OLD"
