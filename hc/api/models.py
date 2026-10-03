@@ -1104,6 +1104,11 @@ class TokenBucket(models.Model):
     @staticmethod
     def authorize_login_password(email: str, device: str = "") -> bool:
         """Charge a password attempt; `device` is a trusted device's nonce."""
+        # 100 password attempts per day from all untrusted browsers
+        # together, charged first so a refused attempt adds no row:
+        if not device and not TokenBucket.authorize("pw-untrusted", 100, 3600 * 24):
+            return False
+
         salted_encoded = (email + settings.SECRET_KEY).encode()
         value = "pw-" + hashlib.sha1(salted_encoded).hexdigest()
         if device:

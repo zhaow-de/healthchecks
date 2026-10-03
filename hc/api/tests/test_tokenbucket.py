@@ -66,3 +66,19 @@ class TokenBucketTestCase(BaseTestCase):
         values = sorted(TokenBucket.objects.values_list("value", flat=True))
         self.assertEqual(values, [f"em-{ALICE_HASH}-{nonce}", f"pw-{ALICE_HASH}-{nonce}"])
         self.assertTrue(all(len(v) <= 80 for v in values))
+
+    def test_it_caps_untrusted_password_attempts(self) -> None:
+        for i in range(100):
+            self.assertTrue(TokenBucket.authorize_login_password(f"user{i}@example.org"))
+
+        self.assertFalse(TokenBucket.authorize_login_password("alice@example.org"))
+        # The refused attempt created no per-email row
+        self.assertFalse(TokenBucket.objects.filter(value=f"pw-{ALICE_HASH}").exists())
+        self.assertEqual(TokenBucket.objects.count(), 101)
+
+    def test_trusted_device_skips_the_untrusted_cap(self) -> None:
+        TokenBucket.objects.create(value="pw-untrusted", tokens=0)
+
+        self.assertTrue(TokenBucket.authorize_login_password("alice@example.org", "a" * 32))
+        obj = TokenBucket.objects.get(value="pw-untrusted")
+        self.assertEqual(obj.tokens, 0)

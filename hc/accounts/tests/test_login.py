@@ -383,3 +383,14 @@ class LoginTestCase(BaseTestCase):
         r = self.client.post("/accounts/login/", form)
         self.assertRedirects(r, "/accounts/login_link_sent/")
         self.assertEqual(len(mail.outbox), 1)
+
+    def test_drained_untrusted_cap_refuses_untrusted_browsers(self) -> None:
+        cookie = self.device_cookie()
+        TokenBucket.objects.filter(value="pw-untrusted").update(tokens=0)
+
+        r = self.client.post("/accounts/login/", self.good)
+        self.assertContains(r, "Too many attempts")
+
+        self.client.cookies[device.COOKIE_NAME] = cookie
+        r = self.client.post("/accounts/login/", self.good)
+        self.assertRedirects(r, self.checks_url)
