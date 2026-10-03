@@ -66,7 +66,7 @@ class MyChecksTestCase(BaseTestCase):
 
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.url)
-        # An enabled button: no attribute between its class and its modal target
+        # Enabled: no attribute after its modal target
         self.assertRegex(
             r.content.decode(),
             r'<button\s+class="btn btn-primary"\s+data-toggle="modal"\s+data-target="#add-check-modal">\s+Add Check',

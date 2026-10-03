@@ -88,7 +88,7 @@ class TransferProjectTestCase(BaseTestCase):
         self.client.login(username="bob@example.org", password="password")
         r = self.client.get(self.url)
         self.assertContains(r, "would like to transfer")
-        # The Accept button is enabled whatever the number of checks
+        # Enabled: no attribute between its name and its class
         self.assertRegex(r.content.decode(), r'name="accept_transfer"\s+class="btn btn-primary">Accept')
 
     def test_accept_works(self) -> None:

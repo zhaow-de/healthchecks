@@ -20,8 +20,7 @@ jobs:
             db_host: localhost
             db_user: postgres
             db_password: postgres
-    # The postgres leg's server is the image docker/docker-compose.yml runs, not the runner's own PostgreSQL; an empty
-    # `image` starts no service, so the sqlite leg runs without one.
+    # An empty `image` starts no service, so the sqlite leg runs without one.
     services:
       postgres:
         image: ${{ matrix.db == 'postgres' && 'postgres:18' || '' }}

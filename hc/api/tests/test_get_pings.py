@@ -52,7 +52,7 @@ class GetPingsTestCase(BaseTestCase):
         self.assertEqual(ping["scheme"], "https")
         self.assertEqual(ping["method"], "get")
         self.assertEqual(ping["ua"], "foo-agent")
-        # body_raw is null, body_url should be None
+        # body_raw is null
         self.assertIsNone(ping["body_url"])
 
     def test_readonly_key_is_not_allowed(self) -> None:

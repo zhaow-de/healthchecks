@@ -60,8 +60,6 @@ class Spec(BaseModel):
     channels: str | None = None
     desc: str | None = None
     failure_kw: str | None = Field(None, max_length=200)
-    # Inert, accepted for compatibility with the original Healthchecks API v3: this
-    # instance takes no email pings, so filter_subject and filter_body change nothing.
     filter_subject: bool | None = None
     filter_body: bool | None = None
     filter_http_body: bool | None = None
@@ -73,8 +71,6 @@ class Spec(BaseModel):
     schedule: str | None = Field(None, max_length=100)
     slug: str | None = Field(None, max_length=100, pattern="^[a-z0-9-_]*$")
     start_kw: str | None = Field(None, max_length=200)
-    # Email-only, kept for compatibility with the original Healthchecks API v3,
-    # mapped onto success_kw, failure_kw and the inert filter_subject below.
     subject: str | None = Field(None, max_length=200)
     subject_fail: str | None = Field(None, max_length=200)
     success_kw: str | None = Field(None, max_length=200)
@@ -355,9 +351,8 @@ def _update(check: Check, spec: Spec) -> None:
         check.schedule = spec.schedule
         update_fields.update(("kind", "schedule"))
 
-    # subject and subject_fail are deprecated, kept for compatibility with the
-    # original Healthchecks API v3: map them to success_kw, failure_kw and
-    # filter_subject, which is inert because this instance takes no email pings.
+    # subject and subject_fail are deprecated, kept for compatibility with the original
+    # Healthchecks API v3: map them to success_kw, failure_kw and filter_subject.
     if spec.subject is not None:
         check.success_kw = spec.subject
         check.filter_subject = bool(check.success_kw or check.failure_kw)

@@ -183,8 +183,6 @@ DATABASES: Mapping[str, Any] = {
     }
 }
 
-# You can switch database engine to postgres using environment
-# variable 'DB'.
 if os.getenv("DB") == "postgres":
     DATABASES = {
         "default": {

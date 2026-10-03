@@ -134,7 +134,7 @@ class PingDetailsTestCase(BaseTestCase):
         self.assertContains(r, "(exit status 0)", status_code=200)
 
     def test_it_shows_mime_body_verbatim(self) -> None:
-        # A legacy email-scheme row: its body must not be parsed as MIME any more
+        # An email-scheme row: its body is shown raw, not parsed as MIME
         Ping.objects.create(owner=self.check, n=1, scheme="email", body_raw=MIME_BODY)
 
         self.client.login(username="alice@example.org", password="password")
