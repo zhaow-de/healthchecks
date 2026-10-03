@@ -142,7 +142,6 @@ class AccountsAdminTestCase(BaseTestCase):
         self.assertEqual(self.profile.totp, "0" * 32)
 
     def test_it_does_not_delete_profiles(self) -> None:
-        # A deleted profile comes back from Profile.objects.for_user without TOTP
         self.profile.totp = "0" * 32
         self.profile.totp_created = now()
         self.profile.save()

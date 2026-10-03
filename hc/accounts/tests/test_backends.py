@@ -63,7 +63,6 @@ class EmailBackendTestCase(BaseTestCase):
         with patch.object(hasher, "encode", wraps=hasher.encode) as encode:
             self.assertIsNone(EmailBackend().authenticate(self.request, "eve@example.org", "password"))
 
-        # The hasher runs once, as for a wrong password of a known email
         encode.assert_called_once()
         self.assertEqual(encode.call_args.args[0], "password")
 

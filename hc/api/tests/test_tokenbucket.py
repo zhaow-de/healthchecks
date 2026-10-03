@@ -98,7 +98,6 @@ class TokenBucketTestCase(BaseTestCase):
             self.assertTrue(TokenBucket.authorize_login_password(f"user{i}@example.org"))
 
         self.assertFalse(TokenBucket.authorize_login_password("alice@example.org"))
-        # The refused attempt created no per-email row
         self.assertFalse(TokenBucket.objects.filter(value=f"pw-{ALICE_HASH}").exists())
         self.assertEqual(TokenBucket.objects.count(), 101)
 

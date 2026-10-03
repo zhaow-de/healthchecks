@@ -1,13 +1,8 @@
-"""The device cookie: a browser that completed a login gets its own login buckets.
+"""The device cookie: a browser that completed a login gets its own login
+buckets, so the shared ones an attacker can drain do not lock it out.
 
 Adapted from django-device-cookies 0.5.0 (https://github.com/knyghty/django-device-cookies),
 Copyright (c) 2024 Tom Carrick, under the MIT License; the notice is in LICENSE.
-
-A login that went through every step it requires sets a signed cookie holding
-the user's id and a random nonce. The login form takes the nonce into its
-TokenBucket keys when the cookie verifies and was issued to the user whose
-email was submitted, so the shared per-email buckets an attacker can drain do
-not apply to that browser.
 """
 
 from __future__ import annotations
@@ -49,8 +44,6 @@ def nonce(request: HttpRequest, user: User | None) -> str:
 
 
 def issue(request: HttpRequest, response: HttpResponse, user: User) -> None:
-    # A browser that already holds a valid cookie for this user keeps its
-    # nonce, and so its buckets.
     n = nonce(request, user) or secrets.token_hex(NONCE_LENGTH // 2)
     response.set_cookie(
         COOKIE_NAME,
