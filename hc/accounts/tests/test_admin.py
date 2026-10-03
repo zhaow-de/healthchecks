@@ -293,6 +293,31 @@ class AccountsAdminTestCase(BaseTestCase):
         self.alice.refresh_from_db()
         self.assertTrue(self.alice.check_password("password"))
 
+    def test_own_password_page_requires_sudo_mode(self) -> None:
+        url = reverse("admin:password_change")
+        r = self.client.get(url)
+        self.assertRedirects(r, f"/admin/login/?next={url}", fetch_redirect_response=False)
+
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(url)
+        self.assertTemplateUsed(r, "accounts/sudo.html")
+
+        payload = {
+            "old_password": "password",
+            "new_password1": "Correct-Horse-9",
+            "new_password2": "Correct-Horse-9",
+        }
+        r = self.client.post(url, payload)
+        self.assertTemplateUsed(r, "accounts/sudo.html")
+        self.alice.refresh_from_db()
+        self.assertTrue(self.alice.check_password("password"))
+
+        self.set_sudo_flag()
+        r = self.client.post(url, payload)
+        self.assertRedirects(r, reverse("admin:password_change_done"))
+        self.alice.refresh_from_db()
+        self.assertTrue(self.alice.check_password("Correct-Horse-9"))
+
     def test_it_shows_credentials(self) -> None:
         Credential.objects.create(user=self.charlie, name="Charlies Yubikey", data=b"")
 
