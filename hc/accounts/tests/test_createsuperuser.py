@@ -50,7 +50,6 @@ class CreateSuperuserTestCase(TestCase):
         self.assertTrue(u.is_superuser)
         self.assertTrue(Profile.objects.filter(user=u).exists())
 
-        # The user gets a project with a first check and an email channel
         project = Project.objects.get()
         self.assertEqual(project.owner, u)
         self.assertEqual(project.badge_key, u.username)

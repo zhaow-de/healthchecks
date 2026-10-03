@@ -27,7 +27,7 @@ class BaseTestCase(TestCase):
 
         self.csrf_client = Client(enforce_csrf_checks=True)
 
-        # Alice is the instance's one user and owns self.project
+        # Alice owns self.project
         self.alice = User(username="alice", email="alice@example.org")
         self.alice.set_password("password")
         self.alice.save()

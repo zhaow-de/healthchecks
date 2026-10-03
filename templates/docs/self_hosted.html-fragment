@@ -74,9 +74,9 @@ assume an activated virtual environment.</p>
 <p>Healthchecks comes with Django's administration panel where you can perform
 administrative tasks: change the user's password, inspect contents of
 database tables.</p>
-<p>To access the administration panel, log into the site as the superuser.
-<code>createsuperuser</code> in the setup steps above prompts for its credentials; you can
-also provide them via parameters, bypassing the interactive prompt:</p>
+<p>To access the administration panel, log into the site as the superuser. In the
+setup steps above, <code>createsuperuser</code> can take its credentials as parameters
+instead of prompting:</p>
 <div class="highlight"><pre><span></span><code>$<span class="w"> </span>./manage.py<span class="w"> </span>createsuperuser<span class="w"> </span>--email<span class="w"> </span>user@example.com<span class="w"> </span>--password<span class="w"> </span>changeme123
 </code></pre></div>
 

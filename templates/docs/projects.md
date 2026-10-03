@@ -17,8 +17,6 @@ button.
 
 ![The transfer dialog](IMG_URL/transfer_check.png)
 
-The transfer dialog lists your other projects.
-
 ## Monthly / Weekly / Daily Email Reports
 
 SITE_NAME can optionally send periodic email reports with a summary of checks

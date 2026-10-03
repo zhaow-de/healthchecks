@@ -14,7 +14,6 @@ class ProjectTestCase(BaseTestCase):
         r = self.client.get(self.url)
         self.assertEqual(r.status_code, 200)
 
-        # The owner gets every control on the page
         self.assertContains(r, "Change Project Name")
         self.assertContains(r, 'data-bs-target="#set-project-name-modal"')
         self.assertContains(r, 'id="set-project-name-modal"')

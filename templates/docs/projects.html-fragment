@@ -10,7 +10,6 @@ integration always belongs to a particular project.</p>
 a check, go to its details page, and look for the "Transfer to Another Project&hellip;"
 button.</p>
 <p><img alt="The transfer dialog" src="IMG_URL/transfer_check.png" /></p>
-<p>The transfer dialog lists your other projects.</p>
 <h2>Monthly / Weekly / Daily Email Reports</h2>
 <p>SITE_NAME can optionally send periodic email reports with a summary of checks
 from all your projects. For each check, the reports show the check's current status
