@@ -284,9 +284,10 @@ Healthchecks instance in production.
     set to `False`.
   * [ALLOWED_HOSTS](https://docs.djangoproject.com/en/6.1/ref/settings/#allowed-hosts).
     Make sure it contains the correct domain name you want to use.
-  * Server Errors. When DEBUG=False, Django will not show detailed error pages, and
-    will not print exception tracebacks to standard output. To receive exception
-    tracebacks in email, review and edit the
+  * Server Errors. When DEBUG=False, Django will not show detailed error pages;
+    exception tracebacks go to the log on the console (see
+    [LOG_FORMAT](https://zcrypto-hc.zhaow.me/docs/self_hosted_configuration/#LOG_FORMAT)).
+    To receive exception tracebacks in email, review and edit the
     [ADMINS](https://docs.djangoproject.com/en/6.1/ref/settings/#admins) and
     [SERVER_EMAIL](https://docs.djangoproject.com/en/6.1/ref/settings/#server-email)
     settings. Consider setting up exception logging with [Sentry](https://sentry.io/for/django/).
@@ -310,8 +311,8 @@ Healthchecks instance in production.
      [uWSGI](https://uwsgi-docs.readthedocs.io/en/latest/) instead, as the Docker
      image does with [docker/uwsgi.ini](docker/uwsgi.ini). A minimal setup installs
      uWSGI with `uv sync --no-dev --extra uwsgi` (plus any other extras you use) and
-     runs `uv run --no-sync uwsgi --http :8000 --module hc.wsgi` from the project's
-     root directory.
+     runs `uv run --no-sync uwsgi --http :8000 --module hc.wsgi --disable-logging`
+     from the project's root directory.
   *  `manage.py sendalerts` is the process that monitors checks and sends out
      monitoring alerts. It must be always running, it must be started on reboot, and it
      must be restarted if it itself crashes. On modern linux systems, a good option is

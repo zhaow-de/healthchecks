@@ -57,6 +57,7 @@ class Command(BaseCommand):
         self.executor = ThreadPoolExecutor(max_workers=10)
         self.seats = BoundedSemaphore(10)
         self.shutdown = False
+        self.signum: int | None = None
 
     def add_arguments(self, parser: ArgumentParser) -> None:
         parser.add_argument(
@@ -71,7 +72,7 @@ class Command(BaseCommand):
 
         try:
             if logs := future.result():
-                self.stdout.write(logs)
+                logger.info(logs)
         except Exception as exc:
             logger.error("Exception in notify", exc_info=exc)
             raise
@@ -164,11 +165,13 @@ class Command(BaseCommand):
         return True
 
     def on_signal(self, signum: int, frame: FrameType | None) -> None:
-        desc = signal.strsignal(signum)
-        self.stdout.write(f"{desc}, finishing...\n")
+        # Log nothing here: the handler interrupts the main thread, which may be
+        # inside a query or a write to stdout, and neither the db connection
+        # nor the stream can be entered again
+        self.signum = signum
         self.shutdown = True
 
-    def handle(self, num_workers: int, **options: Any) -> str:
+    def handle(self, num_workers: int, **options: Any) -> None:
         db = settings.DATABASES["default"]
         if "OPTIONS" in db and "application_name" in db["OPTIONS"]:
             db["OPTIONS"]["application_name"] = "sendalerts"
@@ -179,7 +182,7 @@ class Command(BaseCommand):
         signal.signal(signal.SIGTERM, self.on_signal)
         signal.signal(signal.SIGINT, self.on_signal)
 
-        self.stdout.write("sendalerts is now running\n")
+        logger.info("sendalerts is now running")
         while not self.shutdown:
             # Create flips for any checks going down
             while self.handle_going_down() and not self.shutdown:
@@ -194,5 +197,6 @@ class Command(BaseCommand):
             if not self.shutdown:
                 time.sleep(2)
 
+        if self.signum is not None:
+            logger.info("%s, finishing...", signal.strsignal(self.signum))
         self.executor.shutdown(wait=True)
-        return "Done."

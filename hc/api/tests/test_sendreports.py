@@ -210,12 +210,19 @@ class SendReportsTestCase(BaseTestCase):
 
         cmd = Command()
         out = StringIO()
-        call_command(cmd, stdout=out)
+        with self.assertLogs("hc", level="INFO") as logs:
+            call_command(cmd, stdout=out)
 
         self.assertEqual(
-            out.getvalue(),
-            "sendreports is now running\nSent monthly report to alice@example.org\nSent nag to alice@example.org\nDone.\n",
+            logs.output,
+            [
+                "INFO:hc:sendreports is now running",
+                "INFO:hc:Sent monthly report to alice@example.org",
+                "INFO:hc:Sent nag to alice@example.org",
+            ],
         )
+        # Everything should go to the log, nothing straight to stdout
+        self.assertEqual(out.getvalue(), "")
         self.assertEqual([m.subject for m in mail.outbox], ["Monthly Report", "Reminder: 1 check still down"])
 
         # Outside of a transaction it should drop timed-out db connections
@@ -235,7 +242,10 @@ class SendReportsTestCase(BaseTestCase):
             if secs == 1:
                 cmd.on_signal(signal.SIGTERM, None)
 
-        with patch("hc.api.management.commands.sendreports.time.sleep", side_effect=sleep) as mock_sleep:
+        with (
+            patch("hc.api.management.commands.sendreports.time.sleep", side_effect=sleep) as mock_sleep,
+            self.assertLogs("hc", level="INFO") as logs,
+        ):
             call_command(cmd, "--loop", stdout=out)
 
         # Two 3-second pauses after sending, then the wait loop should stop
@@ -244,7 +254,16 @@ class SendReportsTestCase(BaseTestCase):
         self.assertEqual(len(mail.outbox), 2)
 
         desc = signal.strsignal(signal.SIGTERM)
-        self.assertTrue(out.getvalue().endswith(f"{desc}, finishing...\nDone.\n"))
+        self.assertEqual(logs.output[-1], f"INFO:hc:{desc}, finishing...")
+        self.assertEqual(out.getvalue(), "")
+
+    def test_on_signal_only_sets_the_shutdown_flag(self) -> None:
+        cmd = Command()
+        with self.assertNoLogs("hc"):
+            cmd.on_signal(signal.SIGTERM, None)
+
+        self.assertTrue(cmd.shutdown)
+        self.assertEqual(cmd.signum, signal.SIGTERM)
 
     @patch("hc.api.management.commands.sendreports.signal.signal")
     def test_handle_names_the_postgres_connection(self, set_handler: Mock) -> None:

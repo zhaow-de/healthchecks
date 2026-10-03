@@ -94,13 +94,18 @@ class SendAlertsTestCase(BaseTestCase):
         flip.save()
 
         mock_notify.return_value = "all is well"
-        result = Command(stdout=Mock()).process_one_flip()
+        cmd = Command(stdout=Mock())
+        with self.assertLogs("hc", level="INFO") as logs:
+            result = cmd.process_one_flip()
+            # The worker logs the notification after process_one_flip returns
+            cmd.executor.shutdown(wait=True)
 
         # If it finds work, it should return True
         self.assertTrue(result)
 
-        # It should call `notify`
+        # It should call `notify` and log what it returns
         mock_notify.assert_called_once()
+        self.assertEqual(logs.output, ["INFO:hc:all is well"])
 
         # It should set the processed date
         flip.refresh_from_db()
@@ -373,10 +378,11 @@ class SendAlertsTestCase(BaseTestCase):
         self.assertEqual(check.status, "down")
         self.assertEqual(check.alert_after, check.last_ping + td(days=1, hours=1))
 
-    def run_until_idle(self, *args: str, asleep: Event | None = None) -> str:
+    def run_until_idle(self, *args: str, asleep: Event | None = None) -> list[str]:
         """Run the sendalerts command, deliver SIGTERM when it first goes to sleep.
 
-        Set `asleep` once the signal is delivered, and return the command's output.
+        Set `asleep` once the signal is delivered, and return the command's log
+        records as "LEVEL:logger:message" lines.
         """
         cmd = Command()
         out = StringIO()
@@ -389,6 +395,7 @@ class SendAlertsTestCase(BaseTestCase):
         with (
             patch("hc.api.management.commands.sendalerts.signal.signal") as set_handler,
             patch("hc.api.management.commands.sendalerts.time.sleep", side_effect=sleep) as mock_sleep,
+            self.assertLogs("hc", level="INFO") as logs,
         ):
             call_command(cmd, *args, stdout=out)
 
@@ -397,7 +404,9 @@ class SendAlertsTestCase(BaseTestCase):
             set_handler.mock_calls,
             [call(signal.SIGTERM, cmd.on_signal), call(signal.SIGINT, cmd.on_signal)],
         )
-        return out.getvalue()
+        # Everything should go to the log, nothing straight to stdout
+        self.assertEqual(out.getvalue(), "")
+        return logs.output
 
     @patch("hc.api.management.commands.sendalerts.notify")
     def test_handle_processes_checks_going_down(self, mock_notify: Mock) -> None:
@@ -429,10 +438,9 @@ class SendAlertsTestCase(BaseTestCase):
         self.assertEqual(check.status, "down")
 
         desc = signal.strsignal(signal.SIGTERM)
-        self.assertEqual(
-            output,
-            f"sendalerts is now running\n{desc}, finishing...\ncheck goes down\nDone.\n",
-        )
+        self.assertEqual(output[0], "INFO:hc:sendalerts is now running")
+        # The worker may log before or after the main loop logs that it is finishing
+        self.assertCountEqual(output[1:], [f"INFO:hc:{desc}, finishing...", "INFO:hc:check goes down"])
 
     def test_handle_sizes_the_worker_pool(self) -> None:
         with (
@@ -451,4 +459,13 @@ class SendAlertsTestCase(BaseTestCase):
             output = self.run_until_idle()
 
         self.assertEqual(databases["default"]["OPTIONS"]["application_name"], "sendalerts")
-        self.assertNotIn("WARNING", output)
+        desc = signal.strsignal(signal.SIGTERM)
+        self.assertEqual(output, ["INFO:hc:sendalerts is now running", f"INFO:hc:{desc}, finishing..."])
+
+    def test_on_signal_only_sets_the_shutdown_flag(self) -> None:
+        cmd = Command()
+        with self.assertNoLogs("hc"):
+            cmd.on_signal(signal.SIGTERM, None)
+
+        self.assertTrue(cmd.shutdown)
+        self.assertEqual(cmd.signum, signal.SIGTERM)

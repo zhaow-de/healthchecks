@@ -46,11 +46,8 @@ termination.
 
 The reference Dockerfile uses [uWSGI](https://uwsgi-docs.readthedocs.io/en/latest/)
 as the WSGI server. You can configure uWSGI by setting `UWSGI_...` environment
-variables in `docker/.env`. For example, to disable HTTP request logging, set:
-
-    UWSGI_DISABLE_LOGGING=1
-
-To adjust the number of uWSGI processes (for example, to save memory), set:
+variables in `docker/.env`. For example, to adjust the number of uWSGI processes
+(to save memory, say), set:
 
     UWSGI_PROCESSES=2
 

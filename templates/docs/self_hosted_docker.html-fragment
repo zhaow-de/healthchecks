@@ -50,11 +50,8 @@ $<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> <
 <h2>uWSGI Configuration</h2>
 <p>The reference Dockerfile uses <a href="https://uwsgi-docs.readthedocs.io/en/latest/">uWSGI</a>
 as the WSGI server. You can configure uWSGI by setting <code>UWSGI_...</code> environment
-variables in <code>docker/.env</code>. For example, to disable HTTP request logging, set:</p>
-<div class="highlight"><pre><span></span><code>UWSGI_DISABLE_LOGGING=1
-</code></pre></div>
-
-<p>To adjust the number of uWSGI processes (for example, to save memory), set:</p>
+variables in <code>docker/.env</code>. For example, to adjust the number of uWSGI processes
+(to save memory, say), set:</p>
 <div class="highlight"><pre><span></span><code>UWSGI_PROCESSES=2
 </code></pre></div>
 

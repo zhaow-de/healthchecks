@@ -26,6 +26,7 @@ from environment variables. Below is a list of environment variables it reads an
 <li><a href="#EMAIL_USE_VERIFICATION">EMAIL_USE_VERIFICATION</a></li>
 <li><a href="#http_proxy">http_proxy and https_proxy</a></li>
 <li><a href="#INTEGRATIONS_ALLOW_PRIVATE_IPS">INTEGRATIONS_ALLOW_PRIVATE_IPS</a></li>
+<li><a href="#LOG_FORMAT">LOG_FORMAT</a></li>
 <li><a href="#MASTER_BADGE_LABEL">MASTER_BADGE_LABEL</a></li>
 <li><a href="#PING_BODY_LIMIT">PING_BODY_LIMIT</a></li>
 <li><a href="#PING_ENDPOINT">PING_ENDPOINT</a></li>
@@ -198,6 +199,19 @@ webhooks: the Slack integration is subject to it as well.</p>
 <p>This setting also affects connections to the proxy server when the <code>http_proxy</code> or
 <code>https_proxy</code> environment variables are set. If your proxy server has a private
 IP address, you will need to enable <code>INTEGRATIONS_ALLOW_PRIVATE_IPS</code> to use it.</p>
+<h2 id="LOG_FORMAT"><code>LOG_FORMAT</code></h2>
+<p>Default: <code>text</code></p>
+<p>The format of the log records Healthchecks writes to the console (in Docker, the
+container's output), including the output of the <code>sendalerts</code> and <code>sendreports</code>
+management commands. Under uWSGI, as in the reference Docker image, the web workers write
+their records to stderr and the <code>sendalerts</code> and <code>sendreports</code> processes to stdout.</p>
+<p>With <code>text</code>, a record starts with a line holding the time, the level, the logger
+name and the message; a multi-line message or a traceback continues on the lines
+after it. With <code>json</code>, each record is one JSON object on one line, with the keys
+<code>time</code> (ISO 8601, in UTC), <code>level</code>, <code>logger</code>, <code>message</code>, and <code>exception</code> (the
+formatted traceback) when the record carries one.</p>
+<p>Neither <code>manage.py runserver</code> nor the Docker image's uWSGI writes a line per HTTP
+request. A uWSGI you run yourself does unless it is started with <code>--disable-logging</code>.</p>
 <h2 id="MASTER_BADGE_LABEL"><code>MASTER_BADGE_LABEL</code></h2>
 <p>Default: same as <code>SITE_NAME</code></p>
 <p>The label for the "Overall Status" status badge.</p>

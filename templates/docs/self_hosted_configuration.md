@@ -28,6 +28,7 @@ from environment variables. Below is a list of environment variables it reads an
 <li><a href="#EMAIL_USE_VERIFICATION">EMAIL_USE_VERIFICATION</a></li>
 <li><a href="#http_proxy">http_proxy and https_proxy</a></li>
 <li><a href="#INTEGRATIONS_ALLOW_PRIVATE_IPS">INTEGRATIONS_ALLOW_PRIVATE_IPS</a></li>
+<li><a href="#LOG_FORMAT">LOG_FORMAT</a></li>
 <li><a href="#MASTER_BADGE_LABEL">MASTER_BADGE_LABEL</a></li>
 <li><a href="#PING_BODY_LIMIT">PING_BODY_LIMIT</a></li>
 <li><a href="#PING_ENDPOINT">PING_ENDPOINT</a></li>
@@ -288,6 +289,24 @@ webhooks: the Slack integration is subject to it as well.
 This setting also affects connections to the proxy server when the `http_proxy` or
 `https_proxy` environment variables are set. If your proxy server has a private
 IP address, you will need to enable `INTEGRATIONS_ALLOW_PRIVATE_IPS` to use it.
+
+## `LOG_FORMAT` {: #LOG_FORMAT }
+
+Default: `text`
+
+The format of the log records Healthchecks writes to the console (in Docker, the
+container's output), including the output of the `sendalerts` and `sendreports`
+management commands. Under uWSGI, as in the reference Docker image, the web workers write
+their records to stderr and the `sendalerts` and `sendreports` processes to stdout.
+
+With `text`, a record starts with a line holding the time, the level, the logger
+name and the message; a multi-line message or a traceback continues on the lines
+after it. With `json`, each record is one JSON object on one line, with the keys
+`time` (ISO 8601, in UTC), `level`, `logger`, `message`, and `exception` (the
+formatted traceback) when the record carries one.
+
+Neither `manage.py runserver` nor the Docker image's uWSGI writes a line per HTTP
+request. A uWSGI you run yourself does unless it is started with `--disable-logging`.
 
 ## `MASTER_BADGE_LABEL` {: #MASTER_BADGE_LABEL }
 
