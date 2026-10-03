@@ -4,7 +4,7 @@
 {% block content %}
 
 <div class="row">
-<form class="col-sm-6 col-sm-offset-3" method="post">
+<form class="col-sm-6 offset-sm-3" method="post">
     <h1>Two-factor Authentication</h1>
     {% csrf_token %}
 
@@ -12,7 +12,7 @@
         Please enter the six-digit code from your authenticator app.
     </p>
 
-    <div class="form-group {{ form.code.css_classes }}">
+    <div class="mb-3 {{ form.code.css_classes }}">
         <input
             id="code"
             type="text"
@@ -21,18 +21,18 @@
             title="6-digit code"
             placeholder="6-digit code"
             data-auto-submit="1"
-            class="form-control input-lg"
+            class="form-control form-control-lg"
             required
             autofocus
             autocomplete="off" />
         {% if form.code.errors %}
-        <div class="help-block">
+        <div class="form-text">
             {{ form.code.errors|join:"" }}
         </div>
         {% endif %}
     </div>
 
-    <div class="form-group text-right">
+    <div class="mb-3 text-end">
         <input
             class="btn btn-primary"
             type="submit"
@@ -42,8 +42,6 @@
 </form>
 </div>
 {% endblock %}
-
-{% block base_scripts %}{% endblock %}
 
 {% block scripts %}
 {% compress js %}

@@ -6,7 +6,7 @@
 <div class="row">
 <form
     id="login-tfa-form"
-    class="col-sm-6 col-sm-offset-3"
+    class="col-sm-6 offset-sm-3"
     method="post"
     encrypt="multipart/form-data">
     <h1>Two-factor Authentication</h1>
@@ -18,7 +18,7 @@
             id="use-key-btn"
             type="button"
             class="btn btn-primary">Use security key</button>
-        <a href="{{ totp_url }}" class="btn btn-default">
+        <a href="{{ totp_url }}" class="btn btn-outline-secondary">
             Use authenticator app
         </a>
     </div>
@@ -27,7 +27,7 @@
     {% csrf_token %}
     <input id="response" type="hidden" name="response">
 
-    <div id="waiting" {% if totp_url %}class="hide"{% endif %}>
+    <div id="waiting" {% if totp_url %}class="d-none"{% endif %}>
         <h2>Waiting for security key</h2>
         <p>
             Follow your browser's steps to authenticate with your security key.
@@ -36,20 +36,20 @@
         <div class="spinner started"></div>
     </div>
 
-    <div id="error" class="alert alert-danger hide">
+    <div id="error" class="alert alert-danger d-none">
         <p>
             <strong>Something went wrong.</strong>
         </p>
         <p id="error-text"></p>
 
-        <div class="text-right">
+        <div class="text-end">
             <button id="retry" type="button" class="btn btn-danger">
                 Try Again
             </button>
         </div>
     </div>
 
-    <div id="success" class="hide">
+    <div id="success" class="d-none">
         <div class="alert alert-success">
             <strong>Success!</strong>
             Credential acquired.

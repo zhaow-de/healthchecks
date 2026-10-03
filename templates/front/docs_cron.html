@@ -30,11 +30,11 @@
 <br />
 
 <div id="cron-examples">
-    <div class="panel panel-default">
-        <div class="panel-heading">
-            <h3 class="panel-title">Basics</h3>
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title h5 mb-0">Basics</h3>
         </div>
-        <div class="panel-body">
+        <div class="card-body">
             <p>A cron expression has five fields, separated by spaces.
             Asterisk is a wild card character and means "any value."
             </p>
@@ -91,11 +91,11 @@
         </div>
     </div>
 
-    <div class="panel panel-default">
-        <div class="panel-heading">
-            <h3 class="panel-title">Numeric values</h3>
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title h5 mb-0">Numeric values</h3>
         </div>
-        <div class="panel-body">
+        <div class="card-body">
             <p>Use numeric values instead of asterisks to match specific
                minutes, hours, days, and months.
             </p>
@@ -152,11 +152,11 @@
         </div>
     </div>
 
-    <div class="panel panel-default">
-        <div class="panel-heading">
-            <h3 class="panel-title">Commas</h3>
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title h5 mb-0">Commas</h3>
         </div>
-        <div class="panel-body">
+        <div class="card-body">
             <p>Use <code>{v1},{v2},...,{vn}</code> to list multiple values.</p>
 
             <div class="desc">"Run at 9 AM, 12 PM, and 6 PM every day"</div>
@@ -211,11 +211,11 @@
         </div>
     </div>
 
-    <div class="panel panel-default">
-        <div class="panel-heading">
-            <h3 class="panel-title">Ranges of values</h3>
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title h5 mb-0">Ranges of values</h3>
         </div>
-        <div class="panel-body">
+        <div class="card-body">
             <p>Use <code>{start}-{end}</code> to define a range of matching values.</p>
 
             <div class="desc">"Run every minute on workdays"</div>
@@ -270,11 +270,11 @@
         </div>
     </div>
 
-    <div class="panel panel-default">
-        <div class="panel-heading">
-            <h3 class="panel-title">Ranges with a step</h3>
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title h5 mb-0">Ranges with a step</h3>
         </div>
-        <div class="panel-body">
+        <div class="card-body">
             <p>Use <code>{start}-{end}/{step}</code> or <code>*/{step}</code>
                to define a range with a step.</p>
 
@@ -330,11 +330,11 @@
         </div>
     </div>
 
-    <div class="panel panel-default">
-        <div class="panel-heading">
-            <h3 class="panel-title">Combine numeric values and ranges in lists</h3>
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title h5 mb-0">Combine numeric values and ranges in lists</h3>
         </div>
-        <div class="panel-body">
+        <div class="card-body">
             <p>In the comma-separated lists, you can combine not only
             numeric values but also ranges.</p>
 
@@ -390,11 +390,11 @@
         </div>
     </div>
 
-    <div class="panel panel-default">
-        <div class="panel-heading">
-            <h3 class="panel-title">Abbreviated day and month names</h3>
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title h5 mb-0">Abbreviated day and month names</h3>
         </div>
-        <div class="panel-body">
+        <div class="card-body">
             <p><code>JAN-DEC</code> can be used in the month field
                 and
                 <code>MON-SUN</code> in the weekday field.
@@ -452,11 +452,11 @@
         </div>
     </div>
 
-    <div class="panel panel-default">
-        <div class="panel-heading">
-            <h3 class="panel-title">Timezones</h3>
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title h5 mb-0">Timezones</h3>
         </div>
-        <div class="panel-body">
+        <div class="card-body">
             <p>
                 The cron daemon uses the server's <strong>local time</strong>.
                 If your server's timezone is other than UTC, make sure
@@ -477,7 +477,7 @@
 
     <input
         id="schedule"
-        class="form-control input-lg"
+        class="form-control form-control-lg"
         type="text"
         name=""
         value="0 9,12,18 * * *"
@@ -493,72 +493,72 @@
         <tr>
             <td>Every minute</td>
             <td>* * * * *</td>
-            <td><button class="btn btn-default btn-sm">Test</button></td>
+            <td><button class="btn btn-outline-secondary btn-sm">Test</button></td>
         </tr>
         <tr>
             <td>Every 5 minutes</td>
             <td>*/5 * * * *</td>
-            <td><button class="btn btn-default btn-sm">Test</button></td>
+            <td><button class="btn btn-outline-secondary btn-sm">Test</button></td>
         </tr>
         <tr>
             <td>Every 15 minutes</td>
             <td>*/15 * * * *</td>
-            <td><button class="btn btn-default btn-sm">Test</button></td>
+            <td><button class="btn btn-outline-secondary btn-sm">Test</button></td>
         </tr>
         <tr>
             <td>Every 30 minutes</td>
             <td>*/30 * * * *</td>
-            <td><button class="btn btn-default btn-sm">Test</button></td>
+            <td><button class="btn btn-outline-secondary btn-sm">Test</button></td>
         </tr>
         <tr>
             <td>Every hour</td>
             <td>0 * * * *</td>
-            <td><button class="btn btn-default btn-sm">Test</button></td>
+            <td><button class="btn btn-outline-secondary btn-sm">Test</button></td>
         </tr>
         <tr>
             <td>At 30 minutes past every hour</td>
             <td>30 * * * *</td>
-            <td><button class="btn btn-default btn-sm">Test</button></td>
+            <td><button class="btn btn-outline-secondary btn-sm">Test</button></td>
         </tr>
         <tr>
             <td>Every 2 hours</td>
             <td>0 */2 * * *</td>
-            <td><button class="btn btn-default btn-sm">Test</button></td>
+            <td><button class="btn btn-outline-secondary btn-sm">Test</button></td>
         </tr>
         <tr>
             <td>Every 3 hours</td>
             <td>0 */3 * * *</td>
-            <td><button class="btn btn-default btn-sm">Test</button></td>
+            <td><button class="btn btn-outline-secondary btn-sm">Test</button></td>
         </tr>
         <tr>
             <td>Every 6 hours</td>
             <td>0 */6 * * *</td>
-            <td><button class="btn btn-default btn-sm">Test</button></td>
+            <td><button class="btn btn-outline-secondary btn-sm">Test</button></td>
         </tr>
         <tr>
             <td>At 3 AM every day</td>
             <td>0 3 * * *</td>
-            <td><button class="btn btn-default btn-sm">Test</button></td>
+            <td><button class="btn btn-outline-secondary btn-sm">Test</button></td>
         </tr>
         <tr>
             <td>At 3 AM every Monday</td>
             <td>0 3 * * MON</td>
-            <td><button class="btn btn-default btn-sm">Test</button></td>
+            <td><button class="btn btn-outline-secondary btn-sm">Test</button></td>
         </tr>
         <tr>
             <td>At 8 AM, only on workdays</td>
             <td>0 8 * * 1-5</td>
-            <td><button class="btn btn-default btn-sm">Test</button></td>
+            <td><button class="btn btn-outline-secondary btn-sm">Test</button></td>
         </tr>
         <tr>
             <td>At the midnight of the first day of every month</td>
             <td>0 0 1 * *</td>
-            <td><button class="btn btn-default btn-sm">Test</button></td>
+            <td><button class="btn btn-outline-secondary btn-sm">Test</button></td>
         </tr>
         <tr>
             <td>At the start of every third month</td>
             <td>0 0 1 */3 *</td>
-            <td><button class="btn btn-default btn-sm">Test</button></td>
+            <td><button class="btn btn-outline-secondary btn-sm">Test</button></td>
         </tr>
 
     </table>

@@ -7,18 +7,16 @@
 <div class="row">
     <div class="col-sm-12">
         <ol class="breadcrumb">
-            <li><a href="{% url 'hc-checks' check.project.code %}">{{ check.project }}</a></li>
-            <li>
+            <li class="breadcrumb-item"><a href="{% url 'hc-checks' check.project.code %}">{{ check.project }}</a></li>
+            <li class="breadcrumb-item">
                 <a href="{% url 'hc-details' check.code %}">{{ check.name_then_code }}</a>
             </li>
-            <li class="active">Events</li>
+            <li class="breadcrumb-item active">Events</li>
 
-            <li id="tz-switcher-container" class="pull-right hidden-xs">
-                <div id="tz-switcher" class="btn-group" data-toggle="buttons">
+            <li id="tz-switcher-container" class="ms-auto">
+                <div id="tz-switcher" class="btn-group">
                     {% for tz in tz_switches %}
-                    <label class="btn btn-default btn-xs {% if forloop.last %}active{% endif %}" data-tz="{{ tz }}">
-                        <input type="radio" name="tz-switcher-value"> {{ tz }}
-                    </label>
+                    <button type="button" class="btn btn-outline-secondary btn-sm {% if forloop.last %}active{% endif %}" data-tz="{{ tz }}">{{ tz }}</button>
                     {% endfor %}
                 </div>
             </li>
@@ -53,6 +51,7 @@
         <input
             id="end"
             type="range"
+            class="form-range"
             name="end"
             min="{{ min|timestamp }}"
             max="{{ max|timestamp }}"
@@ -65,39 +64,39 @@
         </p>
 
         <br>
-        <label>Event types</label>
-        <div class="checkbox">
-            <label><input type="checkbox" name="success" autocomplete="off" checked> Success</label>
-        </div>
-        <div class="checkbox">
-            <label><input type="checkbox" name="fail" autocomplete="off" checked> Failure</label>
-        </div>
-        <div class="checkbox">
-            <label><input type="checkbox" name="start" autocomplete="off" checked> Started</label>
-        </div>
-        <div class="checkbox">
-            <label><input type="checkbox" name="log" autocomplete="off" checked> Log</label>
-        </div>
-        <div class="checkbox">
-            <label><input type="checkbox" name="ign" autocomplete="off" checked> Ignored ping</label>
-        </div>
+        <label class="form-label">Event types</label>
+        <label class="form-check">
+            <input class="form-check-input" type="checkbox" name="success" autocomplete="off" checked> Success
+        </label>
+        <label class="form-check">
+            <input class="form-check-input" type="checkbox" name="fail" autocomplete="off" checked> Failure
+        </label>
+        <label class="form-check">
+            <input class="form-check-input" type="checkbox" name="start" autocomplete="off" checked> Started
+        </label>
+        <label class="form-check">
+            <input class="form-check-input" type="checkbox" name="log" autocomplete="off" checked> Log
+        </label>
+        <label class="form-check">
+            <input class="form-check-input" type="checkbox" name="ign" autocomplete="off" checked> Ignored ping
+        </label>
         <hr>
-        <div class="checkbox">
-            <label><input type="checkbox" name="flip" autocomplete="off" checked> Status change</label>
-        </div>
-        <div class="checkbox">
-            <label><input type="checkbox" name="notification" autocomplete="off"> Downtime alert</label>
-        </div>
+        <label class="form-check">
+            <input class="form-check-input" type="checkbox" name="flip" autocomplete="off" checked> Status change
+        </label>
+        <label class="form-check">
+            <input class="form-check-input" type="checkbox" name="notification" autocomplete="off"> Downtime alert
+        </label>
         </form>
     </div>
 </div>
 
-<div id="ping-details-modal" class="modal">
-    <div class="modal-dialog">
+<div id="ping-details-modal" class="modal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div id="ping-details-body">Loading</div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-default" data-dismiss="modal">Got It!</button>
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Got It!</button>
             </div>
         </div>
     </div>

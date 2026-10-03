@@ -15,10 +15,6 @@
     text-align: center;
 }
 
-#checks-table th {
-    border-top: 0;
-}
-
 #checks-table th .ic-asc,
 #checks-table th .ic-desc {
     position: relative;
@@ -35,7 +31,6 @@
 
 #checks-table td {
     vertical-align: middle;
-    border-top: 1px solid var(--border-muted);
 }
 
 #checks-table .my-checks-name,
@@ -54,10 +49,10 @@
     cursor: pointer;
 }
 
-#checks-table > tbody > tr > th.th-name,
-#checks-table > tbody > tr > th.th-integrations,
-#checks-table > tbody > tr > th.th-period,
-#checks-table > tbody > tr > th.th-last-ping {
+#checks-table th.th-name,
+#checks-table th.th-integrations,
+#checks-table th.th-period,
+#checks-table th.th-last-ping {
     padding-left: 15px;
 }
 

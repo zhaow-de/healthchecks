@@ -21,6 +21,8 @@ class ProjectsMenuTestCase(BaseTestCase):
 
         self.assertContains(r, "Alices Project")
         self.assertContains(r, "status ic-up")
+        self.assertContains(r, '<li class="project-item">')
+        self.assertContains(r, 'class="dropdown-item"')
 
     def test_it_requires_logged_in_user(self) -> None:
         r = self.client.get(self.url)

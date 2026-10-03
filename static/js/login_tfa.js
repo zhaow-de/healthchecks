@@ -1,31 +1,31 @@
-$(function() {
+hc.ready(function() {
     var form = document.getElementById("login-tfa-form");
 
     function authenticate() {
-        $("#pick-method").addClass("hide");
-        $("#waiting").removeClass("hide");
-        $("#error").addClass("hide");
+        hc.hide("#pick-method");
+        hc.show("#waiting");
+        hc.hide("#error");
 
-        var options = JSON.parse($("#options").text());
+        var options = JSON.parse(document.getElementById("options").textContent);
         webauthnJSON.get(options).then(function(response) {
-            $("#response").val(JSON.stringify(response));
+            document.getElementById("response").value = JSON.stringify(response);
             // Show the success message and save button
-            $("#waiting").addClass("hide");
-            $("#success").removeClass("hide");
+            hc.hide("#waiting");
+            hc.show("#success");
             form.submit()
         }).catch(function(err) {
             // Show the error message
-            $("#waiting").addClass("hide");
-            $("#error-text").text(err);
-            $("#error").removeClass("hide");
+            hc.hide("#waiting");
+            document.getElementById("error-text").textContent = err;
+            hc.show("#error");
         });
     }
 
-    $("#use-key-btn").click(authenticate);
-    $("#retry").click(authenticate);
+    hc.on("#use-key-btn", "click", authenticate);
+    hc.on("#retry", "click", authenticate);
 
     // If we're not showing the TOTP option then start authentication on page load
-    if ($("#pick-method").length == 0) {
+    if (!hc.$("#pick-method")) {
         authenticate();
     }
 });

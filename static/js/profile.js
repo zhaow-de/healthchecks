@@ -1,4 +1,4 @@
-$(function() {
+hc.ready(function() {
     var tzTom = new TomSelect("select[name=tz]", {
         diacritics: false,
         maxOptions: null,
@@ -7,23 +7,23 @@ $(function() {
         refreshThrottle: 0,
     });
 
-    $(".leave-project").click(function() {
-        $("#leave-project-name").text(this.dataset.name);
-        $("#leave-project-code").val(this.dataset.code);
-        $('#leave-project-modal').modal("show");
+    hc.on(".leave-project", "click", function() {
+        hc.$("#leave-project-name").textContent = this.dataset.name;
+        hc.$("#leave-project-code").value = this.dataset.code;
+        hc.showModal("#leave-project-modal");
         return false;
     });
 
     var browserTz = null;
     try {
-        var browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     } catch(err) {};
 
-    if (browserTz && $("#tz").val() != browserTz) {
-        $("#browser-tz-hint b").text(browserTz);
-        $("#browser-tz-hint").removeClass("hide");
+    if (browserTz && document.getElementById("tz").value != browserTz) {
+        hc.$("#browser-tz-hint b").textContent = browserTz;
+        hc.show("#browser-tz-hint");
     }
-    $("#browser-tz-hint a").click(function() {
+    hc.on("#browser-tz-hint a", "click", function() {
         tzTom.setValue(browserTz, true);
         return false;
     });

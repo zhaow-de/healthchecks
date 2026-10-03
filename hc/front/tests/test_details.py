@@ -101,6 +101,8 @@ class DetailsTestCase(BaseTestCase):
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.url)
         self.assertContains(r, "Create a Copy&hellip;")
+        self.assertContains(r, 'data-bs-target="#clear-events-modal"')
+        self.assertContains(r, 'data-bs-target="#remove-check-modal"')
 
     def test_it_shows_cron_expression(self) -> None:
         self.check.kind = "cron"
@@ -129,7 +131,8 @@ class DetailsTestCase(BaseTestCase):
         self.assertNotContains(r, "Change Schedule")
         self.assertNotContains(r, "Create a Copy&hellip;")
         self.assertNotContains(r, "transfer-btn")
-        self.assertNotContains(r, "btn-remove")
+        self.assertNotContains(r, 'data-bs-target="#clear-events-modal"')
+        self.assertNotContains(r, 'data-bs-target="#remove-check-modal"')
 
     def test_it_hides_resume_action_from_readonly_users(self) -> None:
         self.bobs_membership.role = "r"

@@ -1,72 +1,77 @@
-$(function () {
-    var base = document.getElementById("base-url").getAttribute("href").slice(0, -1);
+hc.ready(function () {
+    var base = hc.base();
     var favicon = document.querySelector('link[rel="icon"]');
 
-    $(".rw .my-checks-name").click(function () {
-        var code = $(this).closest("tr.checks-row").attr("id");
-        var url = base + "/checks/" + code + "/name/";
+    // Check codes are UUIDs and may start with a digit, which is not a valid
+    // "#id" CSS selector, so rows are looked up with getElementById.
+    function rowEl(code, selector) {
+        var row = document.getElementById(code);
+        return row && row.querySelector(selector);
+    }
 
-        $("#update-name-form").attr("action", url);
-        $("#update-name-input").val(this.dataset.name);
-        $("#update-slug-input").val(this.dataset.slug);
+    function rowCode(el) {
+        return el.closest("tr.checks-row").id;
+    }
+
+    hc.on(".rw .my-checks-name", "click", function () {
+        var url = base + "/checks/" + rowCode(this) + "/name/";
+
+        hc.$("#update-name-form").setAttribute("action", url);
+        hc.$("#update-name-input").value = this.dataset.name;
+        hc.$("#update-slug-input").value = this.dataset.slug;
 
         var tagsTs = document.getElementById("update-tags-input").tomselect;
         tagsTs.setValue(this.dataset.tags.split(" "));
 
-        $("#update-desc-input").val(this.dataset.desc);
-        $("#update-name-modal").modal("show");
-        $("#update-name-input").focus();
+        hc.$("#update-desc-input").value = this.dataset.desc;
+        hc.showModal("#update-name-modal");
+        hc.$("#update-name-input").focus();
 
         return false;
     });
 
-    $(".integrations").tooltip({
-        container: "body",
-        selector: "span",
+    function channelEl(span) {
+        var idx = Array.from(span.parentElement.children).indexOf(span);
+        return document.getElementById("ch-" + idx);
+    }
+
+    hc.tooltips("#checks-table", ".integrations span", {
         title: function () {
-            var idx = $(this).index();
-            return $("#ch-" + idx).data("title");
+            return channelEl(this).dataset.title;
         },
     });
 
-    $(".rw .integrations").on("click", "span", function () {
-        var isOff = $(this).toggleClass("off").hasClass("off");
-        var token = $("input[name=csrfmiddlewaretoken]").val();
-
-        var idx = $(this).index();
-        var checkCode = $(this).closest("tr.checks-row").attr("id");
-        var channelCode = $("#ch-" + idx).data("code");
+    hc.on(".rw .integrations", "click", "span", function () {
+        var isOff = this.classList.toggle("off");
+        var checkCode = rowCode(this);
+        var channelCode = channelEl(this).dataset.code;
 
         var url =
             base + "/checks/" + checkCode + "/channels/" + channelCode + "/enabled";
 
-        $.ajax({
-            url: url,
-            type: "post",
-            headers: { "X-CSRFToken": token },
-            data: { state: isOff ? "off" : "on" },
-        });
+        hc.post(url, { state: isOff ? "off" : "on" });
 
         return false;
     });
 
-    $(".last-ping").on("click", function () {
+    hc.on(".last-ping", "click", function () {
         if (this.innerText == "Never") {
             return false;
         }
-        var code = $(this).closest("tr.checks-row").attr("id");
+        var code = rowCode(this);
         var lastPingUrl = base + "/checks/" + code + "/last_ping/";
         loadPingDetails(lastPingUrl);
 
         var logUrl = base + "/checks/" + code + "/log/";
-        $("#ping-details-log").attr("href", logUrl);
+        hc.$("#ping-details-log").setAttribute("href", logUrl);
 
         return false;
     });
 
-    var profileTz = $("#checks-table").data("profile-tz");
+    var table = document.getElementById("checks-table");
+    var profileTz = table ? table.dataset.profileTz : undefined;
     var dateFormatter = new DateFormatter(profileTz);
-    $(".last-ping").tooltip({
+    hc.tooltip(".last-ping", {
         delay: 200,
         title: function () {
             if (this.querySelector(".label-confirmation")) {
@@ -80,7 +85,7 @@ $(function () {
         },
     });
 
-    $("#my-checks-tags .btn").tooltip({
+    hc.tooltip("#my-checks-tags .btn", {
         title: function () {
             return this.getAttribute("data-tooltip");
         },
@@ -104,26 +109,31 @@ $(function () {
         return false;
     }
 
+    function activeStatusButtons() {
+        return hc.$$(".filter-btn").filter(hc.isVisible);
+    }
+
     function applyFilters() {
         var url = new URL(window.location.href);
         url.search = "";
 
         // Checked tags
         var checked = [];
-        $("#my-checks-tags .checked").each(function (index, el) {
+        hc.$$("#my-checks-tags .checked").forEach(function (el) {
             checked.push(el.textContent);
             url.searchParams.append("tag", el.textContent);
         });
 
         // Search string
-        var search = $("#search").val().toLowerCase();
+        var searchInput = document.getElementById("search");
+        var search = searchInput ? searchInput.value.toLowerCase() : "";
         if (search) {
             url.searchParams.append("search", search);
         }
 
         // Status filters
         var statuses = [];
-        $(".filter-btn:visible").each(function (index, el) {
+        activeStatusButtons().forEach(function (el) {
             statuses.push(el.dataset.value);
             url.searchParams.append("status", el.dataset.value);
         });
@@ -139,19 +149,20 @@ $(function () {
             a.setAttribute("href", url.toString());
         });
 
+        var rows = hc.$$("#checks-table tr.checks-row");
+        var numVisible = 0;
         if (checked.length == 0 && !search && statuses.length == 0) {
             // No checked tags, no search string, no status filters: show all
-            $("#checks-table tr.checks-row").show();
-            var numVisible = $("#checks-table tr.checks-row").length;
+            hc.show(rows);
+            numVisible = rows.length;
         } else {
-            var numVisible = 0;
-            function applySingle(index, element) {
+            function applySingle(element) {
                 var nameData = element.querySelector(".my-checks-name").dataset;
                 if (search) {
                     var parts = [nameData.name, nameData.slug, element.id];
                     var haystack = parts.join("\n").toLowerCase();
                     if (haystack.indexOf(search) == -1) {
-                        $(element).hide();
+                        hc.hide(element);
                         return;
                     }
                 }
@@ -160,7 +171,7 @@ $(function () {
                     var tags = nameData.tags.split(" ");
                     for (var i = 0, checkedTag; (checkedTag = checked[i]); i++) {
                         if (tags.indexOf(checkedTag) == -1) {
-                            $(element).hide();
+                            hc.hide(element);
                             return;
                         }
                     }
@@ -168,31 +179,31 @@ $(function () {
 
                 if (statuses.length) {
                     if (!statusMatch(element, statuses)) {
-                        $(element).hide();
+                        hc.hide(element);
                         return;
                     }
                 }
 
-                $(element).show();
+                hc.show(element);
                 numVisible += 1;
             }
 
             // For each row, see if it needs to be shown or hidden
-            $("#checks-table tr.checks-row").each(applySingle);
+            rows.forEach(applySingle);
         }
 
-        $("#checks-table").toggle(numVisible > 0);
-        $("#no-checks").toggle(numVisible == 0);
+        hc.toggle("#checks-table", numVisible > 0);
+        hc.toggle("#no-checks", numVisible == 0);
     }
 
     // User clicks on tags: apply filters
-    $("#my-checks-tags div").click(function () {
-        $(this).toggleClass("checked");
+    hc.on("#my-checks-tags div", "click", function () {
+        this.classList.toggle("checked");
         applyFilters();
     });
 
     // User changes the search string: apply filters
-    $("#search").keyup(applyFilters);
+    hc.on("#search", "keyup", applyFilters);
 
     function switchUrlFormat(format) {
         var url = new URL(window.location.href);
@@ -202,14 +213,16 @@ $(function () {
         return false;
     }
 
-    $("#to-uuid").click((e) => switchUrlFormat("uuid"));
-    $("#to-slug").click((e) => switchUrlFormat("slug"));
+    hc.on("#to-uuid", "click", (e) => switchUrlFormat("uuid"));
+    hc.on("#to-slug", "click", (e) => switchUrlFormat("slug"));
 
-    $(".pause").tooltip({
-        title: function() {
-            var code = $(this).closest("tr.checks-row").attr("id");
-            var alreadyPaused = $("#" + code + " span.status").hasClass("ic-paused");
-            if (alreadyPaused) {
+    function isPaused(code) {
+        return rowEl(code, "span.status").classList.contains("ic-paused");
+    }
+
+    hc.tooltip(".pause", {
+        title: function () {
+            if (isPaused(rowCode(this))) {
                 return "This check is already paused.";
             }
 
@@ -219,45 +232,44 @@ $(function () {
         html: true,
     });
 
-    $(".pause").click(function () {
-        var btn = $(this);
-        var code = btn.closest("tr.checks-row").attr("id");
+    hc.on(".pause", "click", function () {
+        var btn = this;
+        var tip = hc.tooltip(btn);
+        var code = rowCode(btn);
 
-        // A click on an already paused check
-        var alreadyPaused = $("#" + code + " span.status").hasClass("ic-paused");
-        if (alreadyPaused) {
-            btn.tooltip("show");
+        // A click on an already paused check. Bootstrap 5 hides a manual tooltip that
+        // is shown again while open, so show it only when it is not open yet.
+        if (isPaused(code)) {
+            if (!btn.hasAttribute("aria-describedby")) tip.show();
             return false;
         }
 
         // First click: show a confirmation tooltip
-        if (!btn.hasClass("confirm")) {
-            btn.addClass("confirm").tooltip("show");
+        if (!btn.classList.contains("confirm")) {
+            btn.classList.add("confirm");
+            tip.show();
             return false;
         }
 
         // Second click: update UI and pause the check
-        btn.removeClass("confirm").tooltip("hide");
-        $("#" + code + " span.status").attr("class", "status ic-paused");
+        btn.classList.remove("confirm");
+        tip.hide();
+        rowEl(code, "span.status").className = "status ic-paused";
 
-        var url = base + "/checks/" + code + "/pause/";
-        var token = $("input[name=csrfmiddlewaretoken]").val();
-        $.ajax({
-            url: url,
-            type: "post",
-            headers: { "X-CSRFToken": token },
-        });
+        hc.post(base + "/checks/" + code + "/pause/");
 
         return false;
     });
 
-    $(".pause").mouseleave(function () {
-        $(this).removeClass("confirm").tooltip("hide");
+    hc.on(".pause", "mouseleave", function () {
+        this.classList.remove("confirm");
+        hc.tooltip(this).hide();
     });
 
-    $('[data-toggle="tooltip"]').tooltip({
+    // Status icons and sort links. The status icon's class changes as the page
+    // refreshes, so the title is computed on every show.
+    hc.tooltip("#checks-table span.status, #checks-table a[data-sort-value]", {
         html: true,
-        container: "body",
         title: function () {
             var cssClasses = this.getAttribute("class");
             if (cssClasses.indexOf("ic-new") > -1)
@@ -278,62 +290,61 @@ $(function () {
     var lastStatus = {};
     var lastStarted = {};
     var lastPing = {};
-    var statusUrl = $("#checks-table").data("status-url");
+    var statusUrl = table ? table.dataset.statusUrl : null;
     function refreshStatus() {
-        $.ajax({
-            url: statusUrl,
-            dataType: "json",
-            timeout: 2000,
-            success: function (data) {
-                var statusChanged = false;
-                for (var i = 0, el; (el = data.details[i]); i++) {
-                    if (lastStatus[el.code] != el.status) {
-                        lastStatus[el.code] = el.status;
-                        $("#" + el.code + " span.status").attr(
-                            "class",
-                            "status ic-" + el.status,
-                        );
-                        statusChanged = true;
+        hc.getJSON(statusUrl, null, { timeout: 2000 }).then(function (data) {
+            var statusChanged = false;
+            for (var i = 0, el; (el = data.details[i]); i++) {
+                if (lastStatus[el.code] != el.status) {
+                    lastStatus[el.code] = el.status;
+                    var statusSpan = rowEl(el.code, "span.status");
+                    if (statusSpan) {
+                        statusSpan.className = "status ic-" + el.status;
                     }
-
-                    if (lastStarted[el.code] != el.started) {
-                        lastStarted[el.code] = el.started;
-                        $("#" + el.code + " .spinner").toggleClass(
-                            "started",
-                            el.started,
-                        );
-                        statusChanged = true;
-                    }
-
-                    if (lastPing[el.code] != el.last_ping) {
-                        lastPing[el.code] = el.last_ping;
-                        $("#" + el.code + " .last-ping").html(el.last_ping);
-                    }
+                    statusChanged = true;
                 }
 
-                // If there were status updates and we have active status filters
-                // then we need to reapply filters now:
-                if (statusChanged && $(".filter-btn:visible").length) {
-                    applyFilters();
-                }
-
-                $("#my-checks-tags > div.btn").each(function (a) {
-                    tag = this.innerText;
-                    this.setAttribute("data-tooltip", data.tags[tag][1]);
-                    var status = data.tags[tag][0];
-                    if (lastStatus[tag] != status) {
-                        $(this).removeClass("up grace down").addClass(status);
-                        lastStatus[tag] = status;
+                if (lastStarted[el.code] != el.started) {
+                    lastStarted[el.code] = el.started;
+                    var spinner = rowEl(el.code, ".spinner");
+                    if (spinner) {
+                        spinner.classList.toggle("started", el.started);
                     }
-                });
-
-                if (document.title != data.title) {
-                    document.title = data.title;
-                    var downPostfix = data.title.includes("down") ? "_down" : "";
-                    favicon.href = `${base}/static/img/favicon${downPostfix}.svg`;
+                    statusChanged = true;
                 }
-            },
-        });
+
+                if (lastPing[el.code] != el.last_ping) {
+                    lastPing[el.code] = el.last_ping;
+                    var lastPingCell = rowEl(el.code, ".last-ping");
+                    if (lastPingCell) {
+                        lastPingCell.innerHTML = el.last_ping;
+                    }
+                }
+            }
+
+            // If there were status updates and we have active status filters
+            // then we need to reapply filters now:
+            if (statusChanged && activeStatusButtons().length) {
+                applyFilters();
+            }
+
+            hc.$$("#my-checks-tags > div.btn").forEach(function (btn) {
+                var tag = btn.innerText;
+                btn.setAttribute("data-tooltip", data.tags[tag][1]);
+                var status = data.tags[tag][0];
+                if (lastStatus[tag] != status) {
+                    btn.classList.remove("up", "grace", "down");
+                    btn.classList.add(status);
+                    lastStatus[tag] = status;
+                }
+            });
+
+            if (document.title != data.title) {
+                document.title = data.title;
+                var downPostfix = data.title.includes("down") ? "_down" : "";
+                favicon.href = `${base}/static/img/favicon${downPostfix}.svg`;
+            }
+        }).catch(function () {});
     }
 
     // Schedule regular status updates:
@@ -342,8 +353,8 @@ $(function () {
     }
 
     // Configure TomSelect for entering tags
-    function divToOption() {
-        return { value: this.textContent };
+    function divToOption(el) {
+        return { value: el.textContent };
     }
 
     new TomSelect("#update-tags-input", {
@@ -354,33 +365,31 @@ $(function () {
         hideSelected: true,
         highlight: false,
         labelField: "value",
-        options: $("#my-checks-tags div").map(divToOption).get(),
+        options: hc.$$("#my-checks-tags div").map(divToOption),
         refreshThrottle: 0,
-        render: {no_results: (data, escape) => ""},
+        render: { no_results: (data, escape) => "" },
         searchField: ["value"],
     });
 
-    $(".my-checks-url").tooltip({ container: "body", title: "Click to copy" });
-    $(".my-checks-url").click(function (e) {
+    hc.tooltip(".my-checks-url", { title: "Click to copy" });
+    hc.on(".my-checks-url", "click", function (e) {
         if (window.getSelection().toString()) {
             // do nothing, selection not empty
             return;
         }
 
         navigator.clipboard.writeText(this.textContent);
-        $(".tooltip-inner").text("Copied!");
+        hc.flashTooltip(this, "Copied!", "Click to copy");
     });
 
-    $("#check-filters button[title]").tooltip();
-
-    $("#filters li a").click(function () {
+    hc.on("#filters a[data-value]", "click", function () {
         var v = this.dataset.value;
-        $("#check-filters button[data-value=" + v + "]").toggle();
+        hc.toggle('#check-filters button[data-value="' + v + '"]');
         applyFilters();
     });
 
-    $(".filter-btn").click(function () {
-        $(this).hide();
+    hc.on(".filter-btn", "click", function () {
+        hc.hide(this);
         applyFilters();
     });
 });

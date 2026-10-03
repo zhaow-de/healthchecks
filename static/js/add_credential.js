@@ -1,14 +1,14 @@
-$(function() {
+hc.ready(function() {
     var form = document.getElementById("add-credential-form");
 
     function requestCredentials() {
         // Hide error & success messages, show the "waiting" message
-        $("#name-next").addClass("hide");
-        $("#waiting").removeClass("hide");
-        $("#error").addClass("hide");
-        $("#success").addClass("hide");
+        hc.hide("#name-next");
+        hc.show("#waiting");
+        hc.hide("#error");
+        hc.hide("#success");
 
-        var options = JSON.parse($("#options").text());
+        var options = JSON.parse(document.getElementById("options").textContent);
         // Override pubKeyCredParams prepared by python-fido2,
         // to only list ES256 (-7) and RS256 (-257), **and omit Ed25519 (-8)**.
         // This is to work around a bug in Firefox < 119. Affected
@@ -23,31 +23,31 @@ $(function() {
         ]
 
         webauthnJSON.create(options).then(function(response) {
-            $("#response").val(JSON.stringify(response));
+            document.getElementById("response").value = JSON.stringify(response);
             // Show the success message and save button
-            $("#waiting").addClass("hide");
-            $("#success").removeClass("hide");
+            hc.hide("#waiting");
+            hc.show("#success");
         }).catch(function(err) {
             // Show the error message
-            $("#waiting").addClass("hide");
-            $("#error-text").text(err);
-            $("#error").removeClass("hide");
+            hc.hide("#waiting");
+            document.getElementById("error-text").textContent = err;
+            hc.show("#error");
         });
     }
 
-    $("#name").on('keypress',function(e) {
-        if (e.which == 13) {
+    hc.on("#name", "keypress", function(e) {
+        if (e.key == "Enter") {
             e.preventDefault();
             requestCredentials();
         }
     });
 
-    $("#name-next").click(requestCredentials);
-    $("#retry").click(requestCredentials);
+    hc.on("#name-next", "click", requestCredentials);
+    hc.on("#retry", "click", requestCredentials);
 
     // Disable the submit button to prevent double submission
-    $("#add-credential-form").submit(function() {
-        $("#add-credential-submit").prop("disabled", true);
+    form.addEventListener("submit", function() {
+        document.getElementById("add-credential-submit").disabled = true;
     });
 
 });

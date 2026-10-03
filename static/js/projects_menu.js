@@ -1,24 +1,18 @@
-$(function() {
-    var base = document.getElementById("base-url").getAttribute("href").slice(0, -1);
-
+hc.ready(function() {
     var timeout = null;
-    function refreshMenu()     {
+    function refreshMenu() {
         if (timeout) return;
 
         timeout = setTimeout(function() {
             timeout = null
         }, 3000);
 
-        $.ajax({
-            url: base + "/projects/menu/",
-            timeout: 2000,
-            success: function(data) {
-                $("#project-menu li.project-item").remove();
-                $("#projects-divider").after(data);
-            }
-        });
+        hc.getText(hc.base() + "/projects/menu/", null, {timeout: 2000}).then(function(data) {
+            hc.$$("#project-menu li.project-item").forEach(function(el) { el.remove(); });
+            hc.$("#projects-divider").insertAdjacentHTML("afterend", data);
+        }).catch(function() {});
     }
 
-    $("#project-menu").on("mouseenter", refreshMenu);
-    $("#project-menu > .dropdown").on("show.bs.dropdown", refreshMenu);
+    hc.on("#project-menu", "mouseenter", refreshMenu);
+    hc.on("#project-menu > .dropdown", "show.bs.dropdown", refreshMenu);
 });

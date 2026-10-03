@@ -6,7 +6,6 @@
     padding-top: 10px;
     padding-bottom: 10px;
     vertical-align: middle;
-    border-top: 1px solid var(--border-muted);
 }
 
 .channels-table .icon-cell {
@@ -26,14 +25,6 @@
 .channels-table .unnamed {
     font-style: italic;
     color: #999;
-}
-
-.channels-table .channel-row:hover > td {
-    background: var(--table-bg-hover);
-}
-
-table.channels-table > tbody > tr > th {
-    border-top: 0;
 }
 
 .edit-name,
@@ -61,14 +52,6 @@ table.channels-table > tbody > tr > th {
     cursor: pointer;
 }
 
-.edit-checks {
-    color: var(--text-color);
-}
-
-.edit-checks:hover {
-    text-decoration: none;
-}
-
 .channel-row .actions {
     text-align: right;
     padding-right: 16px;
@@ -90,56 +73,14 @@ table.channels-table > tbody > tr > th {
     margin-top: 2em;
 }
 
-.add-integration {
-    list-style: none;
-    padding: 0;
-}
-
-.add-integration li {
-    position: relative;
-    padding: 8px 0;
-    border-radius: 4px;
-}
-
-.add-integration li:hover {
-    background: var(--table-bg-hover);
-}
-
 .add-integration .icon {
-    position: absolute;
-    left: 16px;
-    top: 50%;
-    margin-top: -20px;
     width: 40px;
     height: 40px;
 }
 
-.add-integration h2 {
-    font-size: 18px;
-    margin-left: 72px;
-}
-
-.add-integration p {
-    margin-left: 72px;
-}
-
-.add-integration a.btn {
-    position: absolute;
-    right: 16px;
-    top: 50%;
-    margin-top: -17px;
-    width: 139px;
-    height: 40px;
-    padding: 0;
-    line-height: 40px;
-}
-
-.add-integration h2 {
-    margin-top: 0;
-}
-
 .ai-step {
-    margin: 2em 0;
+    margin-top: 2em;
+    margin-bottom: 2em;
     counter-increment: ai-step;
 }
 
@@ -179,8 +120,4 @@ table.channels-table > tbody > tr > th {
 
 .page-channels .ic-delete {
     font-size: 16px;
-}
-
-.channel-modal .modal-body {
-    padding: 15px 40px;
 }

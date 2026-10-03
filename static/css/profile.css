@@ -1,27 +1,15 @@
-.panel-success .panel-footer {
+.card.border-success > .card-footer {
     background: var(--panel-success-bg);
     color: var(--alert-success-color);
     font-size: small;
     text-align: center;
-    border-top: 0;
-    padding: 6px 15px;
 }
 
-.panel-info .panel-footer {
+.card.border-info > .card-footer {
     background: var(--state-info-bg);
     color: var(--state-info-color);
     font-size: small;
     text-align: center;
-    border-top: 0;
-    padding: 8px 15px;
-}
-
-#my-projects th {
-    border-top: 0;
-}
-
-#my-projects td {
-    vertical-align: middle;
 }
 
 #my-projects .name {
@@ -29,10 +17,6 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-#my-keys th {
-    border-top: 0;
 }
 
 #my-keys .missing {
@@ -56,8 +40,4 @@ code.totp-secret {
 
 #tz-settings .ts-wrapper {
     max-width: 300px;
-}
-
-#tz-settings ul {
-    padding-left: 15px;
 }

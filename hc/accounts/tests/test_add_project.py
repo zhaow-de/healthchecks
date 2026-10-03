@@ -23,3 +23,13 @@ class AddProjectTestCase(BaseTestCase):
         r = self.client.post("/projects/add/", {"name": ""})
         self.assertEqual(r.status_code, 400)
         self.assertEqual(Project.objects.filter(owner=self.alice).count(), 1)
+
+    def test_navbar_opens_the_modal(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(f"/projects/{self.project.code}/checks/")
+        self.assertContains(r, 'data-bs-toggle="modal" data-bs-target="#add-project-modal"')
+        # base_project.html has its own script block, apart from base.html's
+        self.assertNotContains(r, "jquery")
+        self.assertContains(r, 'id="add-project-modal"')
+        self.assertContains(r, 'id="projects-divider"')
+        self.assertContains(r, "js/projects_menu.js")

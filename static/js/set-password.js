@@ -1,4 +1,4 @@
-$(function () {
+hc.ready(function () {
     var pw = document.getElementById("password");
     var meter = document.getElementById("meter");
     pw.addEventListener("input", function() {
