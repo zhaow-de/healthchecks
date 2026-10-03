@@ -43,9 +43,9 @@ class ChannelsTestCase(BaseTestCase):
         r = self.client.get(self.channels_url)
 
         self.assertEqual(r.status_code, 200)
-        # These are inside a modal:
         self.assertContains(r, f'data-bs-target="#name-{ch.code}"')
         self.assertContains(r, f'id="name-{ch.code}"')
+        # These are inside a modal:
         self.assertContains(r, "http://down.example.com")
         self.assertContains(r, "http://up.example.com")
         self.assertContains(r, "foobar")

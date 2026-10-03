@@ -95,7 +95,6 @@
     }
 
     // fetch() that resolves to the Response for a 2xx status and rejects otherwise.
-    // opts: method, data (the POST body or the GET query), timeout (ms), signal, headers.
     // A same-origin request carries X-Requested-With (the pause view answers it
     // differently), and a same-origin POST carries X-CSRFToken. A cross-origin request
     // carries neither, so it stays a simple request with no CORS preflight.
