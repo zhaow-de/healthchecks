@@ -93,7 +93,7 @@
     font-style: italic;
     font-size: 18px;
     color: var(--text-color);
-    padding: 16px 8px 0px 8px;
+    padding: 16px 8px 0 8px;
 }
 
 #cron-preview {

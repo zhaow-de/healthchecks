@@ -245,7 +245,7 @@
                 <form method="post">
                     {% csrf_token %}
                     <h2>Preferred Time Zone</h2>
-                    <select id="tz" name="tz" class="form-select" value="{{ profile.tz }}">
+                    <select id="tz" name="tz" class="form-select">
                         <option{% if profile.tz == "UTC" %} selected{% endif %}>UTC</option>
                         {% for tz in timezones %}
                         {% if tz != "UTC" %}
