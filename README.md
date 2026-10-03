@@ -236,6 +236,21 @@ test it on a copy of your database, not on the live database right away.
 In a production setup, you should also have regular, automated database
 backups set up.
 
+### Getting Back In After a Login Lockout
+
+A browser that has completed a login gets login rate limits of its own, but a
+new browser shares them with everyone else, so a run of wrong passwords from
+anywhere can lock it out. To get back in, wait for the limits to refill, use
+the login link sent by email if email is set up, or clear every rate limit
+record, the recent ones too:
+
+```sh
+./manage.py prunetokenbucket --all
+```
+
+With Docker, run `docker compose exec web /opt/healthchecks/manage.py prunetokenbucket --all`.
+If you have forgotten the password, set a new one with `./manage.py changepassword`.
+
 ## Two-factor Authentication
 
 Healthchecks optionally supports two-factor authentication using the WebAuthn

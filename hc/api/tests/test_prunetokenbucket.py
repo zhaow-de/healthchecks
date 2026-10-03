@@ -31,3 +31,13 @@ class PruneTokenBucketTestCase(BaseTestCase):
         call_command("prunetokenbucket", stdout=out)
 
         self.assertEqual(out.getvalue(), "Done! Pruned 0 token bucket entries\n")
+
+    def test_it_removes_every_entry_with_all(self) -> None:
+        TokenBucket.objects.create(value="old", updated=CURRENT_TIME - td(days=30))
+        TokenBucket.objects.create(value="pw-recent", updated=CURRENT_TIME)
+
+        out = StringIO()
+        call_command("prunetokenbucket", "--all", stdout=out)
+
+        self.assertEqual(out.getvalue(), "Done! Pruned 2 token bucket entries\n")
+        self.assertFalse(TokenBucket.objects.exists())

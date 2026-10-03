@@ -51,6 +51,9 @@ termination.
   docker compose run web /opt/healthchecks/manage.py <command>
   ```
 
+  After a login lockout, `prunetokenbucket --all` clears every rate limit
+  record and lets you log in again; `changepassword` sets a new password.
+
 ## uWSGI Configuration
 
 The reference Dockerfile uses [uWSGI](https://uwsgi-docs.readthedocs.io/en/latest/)
