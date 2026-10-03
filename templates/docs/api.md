@@ -186,10 +186,10 @@ curl --header "X-Api-Key: your-api-key" SITE_ROOT/api/v3/checks/
 The possible values for the `status` field are: `new`, `up`, `grace`, `down`,
 and `paused`.
 
-The `filter_subject`, `filter_body`, `subject`, and `subject_fail` fields are inert,
-kept for compatibility with the original Healthchecks API v3 only: `subject` and
-`subject_fail` return `success_kw` and `failure_kw` when `filter_subject` is `true`,
-and `""` otherwise.
+The `filter_subject` and `filter_body` fields are inert, kept for compatibility with
+the original Healthchecks API v3 only. The deprecated `subject` and `subject_fail`
+fields return `success_kw` and `failure_kw` when `filter_subject` is `true`, and `""`
+otherwise.
 
 When using the read-only API key, SITE_NAME omits the following fields from responses:
 `uuid`, `ping_url`, `update_url`, `pause_url`, `resume_url`, `channels`.  It adds an
@@ -322,10 +322,10 @@ curl --header "X-Api-Key: your-api-key" SITE_ROOT/api/v3/checks/<uuid>
 The possible values for the `status` field are: `new`, `up`, `grace`, `down`,
 and `paused`.
 
-The `filter_subject`, `filter_body`, `subject`, and `subject_fail` fields are inert,
-kept for compatibility with the original Healthchecks API v3 only: `subject` and
-`subject_fail` return `success_kw` and `failure_kw` when `filter_subject` is `true`,
-and `""` otherwise.
+The `filter_subject` and `filter_body` fields are inert, kept for compatibility with
+the original Healthchecks API v3 only. The deprecated `subject` and `subject_fail`
+fields return `success_kw` and `failure_kw` when `filter_subject` is `true`, and `""`
+otherwise.
 
 ### Example Read-Only Response
 

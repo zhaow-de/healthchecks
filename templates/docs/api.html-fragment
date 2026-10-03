@@ -228,10 +228,10 @@ specified value.</p>
 
 <p>The possible values for the <code>status</code> field are: <code>new</code>, <code>up</code>, <code>grace</code>, <code>down</code>,
 and <code>paused</code>.</p>
-<p>The <code>filter_subject</code>, <code>filter_body</code>, <code>subject</code>, and <code>subject_fail</code> fields are inert,
-kept for compatibility with the original Healthchecks API v3 only: <code>subject</code> and
-<code>subject_fail</code> return <code>success_kw</code> and <code>failure_kw</code> when <code>filter_subject</code> is <code>true</code>,
-and <code>""</code> otherwise.</p>
+<p>The <code>filter_subject</code> and <code>filter_body</code> fields are inert, kept for compatibility with
+the original Healthchecks API v3 only. The deprecated <code>subject</code> and <code>subject_fail</code>
+fields return <code>success_kw</code> and <code>failure_kw</code> when <code>filter_subject</code> is <code>true</code>, and <code>""</code>
+otherwise.</p>
 <p>When using the read-only API key, SITE_NAME omits the following fields from responses:
 <code>uuid</code>, <code>ping_url</code>, <code>update_url</code>, <code>pause_url</code>, <code>resume_url</code>, <code>channels</code>.  It adds an
 extra <code>unique_key</code> field. The <code>unique_key</code> identifier is stable across API calls, and
@@ -349,10 +349,10 @@ using the read-only API key) as an identifier.</p>
 
 <p>The possible values for the <code>status</code> field are: <code>new</code>, <code>up</code>, <code>grace</code>, <code>down</code>,
 and <code>paused</code>.</p>
-<p>The <code>filter_subject</code>, <code>filter_body</code>, <code>subject</code>, and <code>subject_fail</code> fields are inert,
-kept for compatibility with the original Healthchecks API v3 only: <code>subject</code> and
-<code>subject_fail</code> return <code>success_kw</code> and <code>failure_kw</code> when <code>filter_subject</code> is <code>true</code>,
-and <code>""</code> otherwise.</p>
+<p>The <code>filter_subject</code> and <code>filter_body</code> fields are inert, kept for compatibility with
+the original Healthchecks API v3 only. The deprecated <code>subject</code> and <code>subject_fail</code>
+fields return <code>success_kw</code> and <code>failure_kw</code> when <code>filter_subject</code> is <code>true</code>, and <code>""</code>
+otherwise.</p>
 <h3>Example Read-Only Response</h3>
 <p>When using the read-only API key, SITE_NAME omits the following fields from responses:
 <code>uuid</code>, <code>ping_url</code>, <code>update_url</code>, <code>pause_url</code>, <code>resume_url</code>, <code>channels</code>.  It adds an

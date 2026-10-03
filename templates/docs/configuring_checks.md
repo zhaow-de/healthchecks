@@ -106,9 +106,9 @@ If the **Request body of HTTP requests** option is checked, SITE_NAME will class
 the HTTP pings as start, success, or failure signals by looking for keywords in
 the first PING_BODY_LIMIT_FORMATTED of the request body.
 
-SITE_NAME does not accept email pings: the email-only fields the
-[Management API](../api/) still accepts and returns are inert, kept for
-compatibility with the original Healthchecks API v3 only.
+SITE_NAME does not accept email pings: the email-only fields `filter_subject` and
+`filter_body` that the [Management API](../api/) still accepts and returns are inert,
+kept for compatibility with the original Healthchecks API v3 only.
 
 You can specify multiple keywords in each of the **Start Keywords**,
 **Success Keywords**, and **Failure Keywords** fields by separating them with commas.

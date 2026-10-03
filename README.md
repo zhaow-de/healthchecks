@@ -20,7 +20,8 @@ This project is a hard fork of
   project stays under its BSD 3-clause license. Both are in [LICENSE](LICENSE).
 * It stays 100% compatible with the original project's
   [API v3](templates/docs/api.md). It takes no email pings, so the email-only
-  fields it still accepts and returns are inert, as api.md describes.
+  fields `filter_subject` and `filter_body` it still accepts and returns are
+  inert, as api.md describes.
 
 Healthchecks is a cron job monitoring service. It listens for HTTP requests
 ("pings") from your cron jobs and scheduled tasks ("checks").
