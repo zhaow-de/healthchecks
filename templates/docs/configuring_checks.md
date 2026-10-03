@@ -8,8 +8,9 @@ in the SITE_NAME web interface or via [Management API](../api/).
 ## Name, Tags, Description
 
 Describe each check using an optional name, slug, tags, and description fields.
-
-![Editing name, tags and description](IMG_URL/edit_name.png)
+To edit them, click the check's name on the "Checks" page, or the "edit…" link next
+to the name on the check's details page. Both open the "Name and Tags" dialog with
+these four fields:
 
 * **Name**: names are optional, but setting them is a good idea.
 Good naming becomes especially important as you add more checks to the
@@ -18,7 +19,8 @@ and notifications.
 * **Slug**: URL-friendly identifier used in [slug-based ping URLs](../http_api/#success-slug)
 (an alternative to the default UUID-based ping URLs). The slug should only contain the
 following characters: `a-z`, `0-9`, hyphens, and underscores. If you don't plan to use
-slug-based ping URLs, you can leave the slug field empty.
+slug-based ping URLs, you can leave the slug field empty. The "Use Suggested" button
+beside the field fills in a slug derived from the name.
 * **Tags**: a space-separated list of optional labels. Use tags to organize and group
 checks within a project. You can tag checks by the environment
 (`prod`, `staging`, `dev`, etc.), by role (`www`, `db`, `worker`, etc.), or by using
@@ -33,9 +35,14 @@ SITE_NAME supports three types of schedules: **Simple**, **Cron**, and **OnCalen
 Use Simple schedules for monitoring processes that you expect to run at relatively
 regular intervals: once an hour, once a day, once a week, etc.
 
-![Editing the period and grace time](IMG_URL/edit_simple_schedule.png)
+To change a check's schedule, click its entry in the "Period" column of the "Checks"
+page, or the "Change Schedule…" button on the check's details page. The "Simple", "Cron"
+and "OnCalendar" buttons at the bottom left of the dialog switch between the three
+schedule types.
 
 For the simple schedules, you can configure two parameters, Period and Grace Time.
+Set each with a number and a unit (minutes, hours, or days), or drag its slider,
+which spans 1 minute to 365 days.
 
 * **Period** is the expected time between pings.
 * **Grace Time** is the additional time to wait before sending an alert when a check
@@ -58,8 +65,6 @@ See [Cron syntax cheatsheet](../cron/) for cron expression syntax examples.
 See [crontab(5) man page](https://www.man7.org/linux/man-pages/man5/crontab.5.html)
 for complete cron syntax reference.
 
-![Editing cron schedule](IMG_URL/edit_cron_schedule.png)
-
 You will need to specify Cron Expression, Server's Time Zone, and Grace Time.
 
 * **Cron Expression** is the cron expression you specified in the crontab.
@@ -68,6 +73,9 @@ the system's local time. If the machine does not use the UTC timezone, specify i
 timezone here.
 * **Grace Time**, same as for simple schedules, is how long to wait before sending an
 alert for a late check.
+
+As you type, the dialog describes the cron expression in words and lists the next
+six dates when SITE_NAME expects a ping.
 
 ## OnCalendar Schedules
 
@@ -79,12 +87,15 @@ whenever any schedule matches.
 See [systemd.time(7) man page](https://www.man7.org/linux/man-pages/man7/systemd.time.7.html#CALENDAR_EVENTS)
 for complete OnCalendar syntax reference.
 
-![Editing cron schedule](IMG_URL/edit_oncalendar_schedule.png)
+With "OnCalendar" selected, the schedule dialog has the same three fields as with
+"Cron": **OnCalendar Expression(s)**, **Server's Time Zone**, and **Grace Time**.
+Beside them, it lists the next dates when SITE_NAME expects a ping.
 
 ## Filtering Rules {: #filtering-rules }
 
 In the "Filtering Rules" dialog, you can control several advanced aspects of
-how SITE_NAME handles incoming pings for a particular check.
+how SITE_NAME handles incoming pings for a particular check. Open it with the
+"Filtering Rules…" button in the "How To Ping" section of the check's details page.
 
 ![Setting filtering rules](IMG_URL/filtering_rules.png)
 

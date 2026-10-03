@@ -24,12 +24,17 @@ Let's take a look at an example cron job:
 8 6 * * * /home/me/backup.sh
 ```
 
-To monitor it, first create a new Check in your SITE_NAME account:
+To monitor it, first create a new Check in your SITE_NAME account: on the "Checks"
+page, click "Add Check". In the dialog that opens, give the check a name (for example,
+"backup-db"), select "Cron" under "Schedule", enter the job's schedule (`8 6 * * *`)
+in "Cron Expression", pick the server's time zone in "Time Zone" (it starts as UTC),
+set "Grace Time" (it starts at 1 hour), and click "Save". The dialog also has
+"Slug" and "Tags" fields; [Configuring Checks](../configuring_checks/) describes
+every field.
 
-![The "Add Check" dialog](IMG_URL/add_check.png)
-
-After creating the check, copy the generated **ping URL** , and update the job's
-definition:
+After creating the check, copy the generated **ping URL** (click it in the
+"Ping URL" column of the "Checks" page, or in the "How To Ping" section of the check's
+details page, to copy it), and update the job's definition:
 
 ```bash
 # run backup.sh, then send a success signal to SITE_NAME
@@ -102,9 +107,10 @@ high-priority jobs to email, a webhook, and team chat.
 Additionally, to make sure no issues "slip through the cracks", in the
 [Account Settings › Email Reports](../../accounts/profile/notifications/) page
 you can configure SITE_NAME to send repeated email notifications every hour or every
-day as long as any of the jobs is down:
-
-![Email reminder options](IMG_URL/email_reports.png)
+day as long as any of the jobs is down: under "Ongoing reminders if any checks are
+down", pick "Remind me daily" or "Remind me hourly", and click "Save Changes". See
+[Configuring Notifications](../configuring_notifications/) for these reminders and
+the periodic email reports.
 
 ## Advanced Techniques
 

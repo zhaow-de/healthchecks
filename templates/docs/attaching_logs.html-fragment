@@ -71,8 +71,14 @@ consider using a dedicated log aggregation service for capturing the logs.</li>
 </ul>
 <h2>Where to See Captured Logs</h2>
 <p>In the check's details page, Events section, click on individual events to see
-full event details, including the captured log information.</p>
-<p><img alt="The Events section" src="IMG_URL/events.png" /></p>
-<p>In the dialog that opens, use the "Download Original" link to download the request
-body data, exactly as it was submitted to SITE_NAME:</p>
-<p><img alt="The Ping Details dialog" src="IMG_URL/ping_details.png" /></p>
+full event details, including the captured log information. The Events section lists
+the 30 most recent events, and its "Show More…" link opens the check's full log,
+where events open the same way. A ping that carried a body shows the start of it in
+its row, after the source address.</p>
+<p>Clicking a ping opens the "Ping #N" dialog: the time received, the source (protocol,
+method and IP address), the duration and run ID when the ping has them, the user
+agent, and, under "Request Body", the body decoded as text. Use the
+"Download Original" link below the body to download the request body data, exactly
+as it was submitted to SITE_NAME, as a file named <code>&lt;check-uuid&gt;-&lt;N&gt;.txt</code>.</p>
+<p>To read the body from a script, use the Management API's
+<a href="../api/#ping-body">get a ping's body</a> call.</p>

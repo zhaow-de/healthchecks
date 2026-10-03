@@ -5,7 +5,11 @@ dashboards, or public status pages. Each SITE_NAME badge reports the combined st
 all checks in the project, the status of checks tagged with a specific tag, or the
 status of a single specific check.
 
-![The "Badges" page](IMG_URL/badges.png)
+To get a badge, open the project's "Badges" page from the top navigation. Its Badge
+Generator has three choices: what the badge reports on (all checks in the project,
+the checks tagged with one tag, or one specific check), the badge format, and the
+badge states. The Preview beside it shows the resulting badge with its URL, and for
+the SVG and Shields.io formats also ready-to-paste HTML and Markdown code.
 
 The badges have public but hard-to-guess URLs. Badges do not expose information
 other than the badge label and the aggregate status of their corresponding checks.

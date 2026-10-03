@@ -53,12 +53,18 @@ you will see the duration displayed in the list of checks. If the two events are
 more than 72 hours apart, they are assumed to be unrelated, and the duration is
 not displayed.
 
-![List of checks with durations](IMG_URL/checks_durations.png)
+In the list of checks, the duration appears in the "Last Ping" column, below the
+time of the last ping and after a stopwatch icon (for example, "7 min 22 sec"), and
+when any check in the list shows one, the column heading gains a "Last Duration" line.
+It is the duration of the run that the last success or failure ended: a later success
+or failure that ends no run removes it.
 
 You can also see the durations of the previous runs when viewing an individual
-check:
-
-![Log of received pings with durations](IMG_URL/details_durations.png)
+check: in the "Events" section of its details page, a success or failure that has
+a matching earlier "start" event shows the time since it, after a stopwatch icon, at
+the right end of its row ([Run IDs](../http_api/#run-ids) in the Pinging API
+reference says how the start is matched). The [list pings](../api/#list-pings) call
+of the Management API returns the same value as each ping's `duration` field.
 
 ## Specifying Run IDs
 
@@ -96,7 +102,10 @@ curl -fsS -m 10 --retry 5 PING_URL?rid=$RID
 ```
 
 If the client specifies run IDs, SITE_NAME will display them in the "Events"
-section in a shortened form:
+section in a shortened form, the first five characters in a grey label before the
+source address (the "Ping #N" dialog of an event shows the whole run ID). Here two
+runs overlap: run `3f2c8…` starts as event #1, run `b81d0…` starts as event #2 and
+finishes as event #3, and run `3f2c8…` finishes as event #4:
 
 ![Log of received pings with run IDs and durations](IMG_URL/run_ids.png)
 

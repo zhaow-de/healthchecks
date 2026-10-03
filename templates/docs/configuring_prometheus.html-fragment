@@ -5,7 +5,14 @@
 <p>Create a read-only API key in <strong>Project Settings › API Access</strong>.</p>
 <p>Make sure to use a <strong>read-only</strong> API key. Prometheus does not need
 read-write API access.</p>
-<p><img alt="Project's API Keys" src="IMG_URL/prometheus_api_keys.png" /></p>
+<p>In the "API Access" section of the project's Settings page, click "Create" in the
+"API key (read-only)" row. The new key starts with <code>hcr_</code> and is 32 characters long.
+SITE_NAME shows it once, in the "API Key Created!" dialog: copy it there, as the
+Settings page afterwards shows only its first characters. A project has at most one
+read-only key; to replace it, click "Revoke" in the same row, then "Create" again.</p>
+<p>The metrics endpoint answers a key that is not 32 characters long with
+"400 Bad Request", and a read-write key (<code>hcw_</code>) or an unknown key with
+"403 Forbidden".</p>
 <h2>Update the prometheus.yml</h2>
 <p>Add the following scrape configuration to Prometheus:</p>
 <div class="highlight"><pre><span></span><code><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">job_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;healthchecks&quot;</span>
@@ -18,6 +25,10 @@ read-write API access.</p>
 
 <p>The "{your-project-uuid}" is the UUID you see in your browser's address bar
 when viewing a list of checks for a particular project.</p>
+<p>This instance's address is SITE_ROOT. When an address has a path after
+its host name, start <code>metrics_path</code> with that path: for an address of
+<code>https://example.org/hc</code>, the path is
+<code>/hc/projects/{your-project-uuid}/metrics/{your-readonly-api-key}</code>.</p>
 <p>Reload Prometheus, and your changes should be live, coming in under the <code>hc_</code> prefix.</p>
 <h2>Available Metrics</h2>
 <p>The Prometheus metrics endpoint exports the following metrics:</p>
@@ -96,3 +107,5 @@ requires "Bearer" authentication. Use the following settings with Grafana Cloud:
 <li>Authentication type: Bearer</li>
 <li>Bearer token: the read-only API key</li>
 </ul>
+<p>This endpoint answers a request without an <code>Authorization: Bearer &lt;key&gt;</code> header
+with "401 Unauthorized", and checks the key as the endpoint above does.</p>

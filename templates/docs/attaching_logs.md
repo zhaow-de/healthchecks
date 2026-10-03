@@ -92,11 +92,16 @@ consider using a dedicated log aggregation service for capturing the logs.
 ## Where to See Captured Logs
 
 In the check's details page, Events section, click on individual events to see
-full event details, including the captured log information.
+full event details, including the captured log information. The Events section lists
+the 30 most recent events, and its "Show More…" link opens the check's full log,
+where events open the same way. A ping that carried a body shows the start of it in
+its row, after the source address.
 
-![The Events section](IMG_URL/events.png)
+Clicking a ping opens the "Ping #N" dialog: the time received, the source (protocol,
+method and IP address), the duration and run ID when the ping has them, the user
+agent, and, under "Request Body", the body decoded as text. Use the
+"Download Original" link below the body to download the request body data, exactly
+as it was submitted to SITE_NAME, as a file named `<check-uuid>-<N>.txt`.
 
-In the dialog that opens, use the "Download Original" link to download the request
-body data, exactly as it was submitted to SITE_NAME:
-
-![The Ping Details dialog](IMG_URL/ping_details.png)
+To read the body from a script, use the Management API's
+[get a ping's body](../api/#ping-body) call.

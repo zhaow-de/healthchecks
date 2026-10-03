@@ -113,9 +113,13 @@ WantedBy=timers.target
 
 The calendar event expressions are different from cron expressions. SITE_NAME supports
 them natively–you can specify a check's schedule using
-the same expression you use in the `.timer` file:
-
-![Editing OnCalendar schedule](IMG_URL/edit_oncalendar_schedule.png)
+the same expression you use in the `.timer` file. Open the check's schedule dialog
+(click the check's entry in the "Period" column of the "Checks" page, or
+"Change Schedule…" on its details page), click "OnCalendar", paste the expression
+(`Mon-Fri *-*-* 0/4:00` above) into "OnCalendar Expression(s)", pick the server's
+time zone in "Server's Time Zone", and set "Grace Time"; the dialog lists the next
+dates when SITE_NAME expects a ping.
+[Configuring Checks](../configuring_checks/) describes the dialog.
 
 Read more about [calendar event expressions](https://www.freedesktop.org/software/systemd/man/latest/systemd.time.html#Calendar%20Events)
 in Systemd docs.

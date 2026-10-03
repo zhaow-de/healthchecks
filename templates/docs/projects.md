@@ -4,7 +4,10 @@ Use Projects to organize checks in your SITE_NAME account. Your account initiall
 has a single default project. You can create additional projects and transfer
 your checks between them as your usage grows.
 
-![An overview of projects](IMG_URL/projects.png)
+The project menu at the top left of every project page (it shows the current
+project's name) switches between projects. Its "All Projects" item opens a page
+that lists every project with its overall status and its numbers of checks and
+integrations, and its "New Project…" item creates a project.
 
 Checks and integrations are project-scoped: each check and each configured
 integration always belongs to a particular project.
@@ -14,8 +17,9 @@ integration always belongs to a particular project.
 You can transfer a check between projects, **and keep its ping address**. To transfer
 a check, go to its details page, and look for the "Transfer to Another Project&hellip;"
 button.
-
-![The transfer dialog](IMG_URL/transfer_check.png)
+In the dialog, pick the **Target Project** and click **Transfer**. The check's
+integrations get reset: it loses its current notification channels and is assigned
+all notification channels of the target project.
 
 ## Monthly / Weekly / Daily Email Reports
 

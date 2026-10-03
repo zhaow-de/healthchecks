@@ -19,10 +19,16 @@ It can detect various failure modes:</p>
 <span class="m">8</span><span class="w"> </span><span class="m">6</span><span class="w"> </span>*<span class="w"> </span>*<span class="w"> </span>*<span class="w"> </span>/home/me/backup.sh
 </code></pre></div>
 
-<p>To monitor it, first create a new Check in your SITE_NAME account:</p>
-<p><img alt="The &quot;Add Check&quot; dialog" src="IMG_URL/add_check.png" /></p>
-<p>After creating the check, copy the generated <strong>ping URL</strong> , and update the job's
-definition:</p>
+<p>To monitor it, first create a new Check in your SITE_NAME account: on the "Checks"
+page, click "Add Check". In the dialog that opens, give the check a name (for example,
+"backup-db"), select "Cron" under "Schedule", enter the job's schedule (<code>8 6 * * *</code>)
+in "Cron Expression", pick the server's time zone in "Time Zone" (it starts as UTC),
+set "Grace Time" (it starts at 1 hour), and click "Save". The dialog also has
+"Slug" and "Tags" fields; <a href="../configuring_checks/">Configuring Checks</a> describes
+every field.</p>
+<p>After creating the check, copy the generated <strong>ping URL</strong> (click it in the
+"Ping URL" column of the "Checks" page, or in the "How To Ping" section of the check's
+details page, to copy it), and update the job's definition:</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># run backup.sh, then send a success signal to SITE_NAME</span>
 <span class="m">8</span><span class="w"> </span><span class="m">6</span><span class="w"> </span>*<span class="w"> </span>*<span class="w"> </span>*<span class="w"> </span>/home/me/backup.sh<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>curl<span class="w"> </span>-fsS<span class="w"> </span>-m<span class="w"> </span><span class="m">10</span><span class="w"> </span>--retry<span class="w"> </span><span class="m">5</span><span class="w"> </span>-o<span class="w"> </span>/dev/null<span class="w"> </span>PING_URL
 </code></pre></div>
@@ -79,8 +85,10 @@ high-priority jobs to email, a webhook, and team chat.</li>
 <p>Additionally, to make sure no issues "slip through the cracks", in the
 <a href="../../accounts/profile/notifications/">Account Settings › Email Reports</a> page
 you can configure SITE_NAME to send repeated email notifications every hour or every
-day as long as any of the jobs is down:</p>
-<p><img alt="Email reminder options" src="IMG_URL/email_reports.png" /></p>
+day as long as any of the jobs is down: under "Ongoing reminders if any checks are
+down", pick "Remind me daily" or "Remind me hourly", and click "Save Changes". See
+<a href="../configuring_notifications/">Configuring Notifications</a> for these reminders and
+the periodic email reports.</p>
 <h2>Advanced Techniques</h2>
 <ul>
 <li>If your cron job hits an error, you can <a href="../signaling_failures/">actively signal it to SITE_NAME</a>.</li>
