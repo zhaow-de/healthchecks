@@ -3,12 +3,7 @@
     overflow-y: scroll;
 }
 
-.channel-checks-table > tbody > tr:first-child > td {
-    border-top: 0;
-}
-
-.channel-checks-table > tbody > tr:hover > td {
-    background: var(--table-bg-hover);
+.channel-checks-table tr {
     cursor: pointer;
 }
 

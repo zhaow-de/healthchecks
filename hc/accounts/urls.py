@@ -21,7 +21,6 @@ urlpatterns = [
         name="hc-check-token",
     ),
     path("accounts/profile/", views.profile, name="hc-profile"),
-    path("accounts/profile/appearance/", views.appearance, name="hc-appearance"),
     path("accounts/profile/notifications/", views.notifications, name="hc-notifications"),
     path("accounts/close/", views.close, name="hc-close"),
     path(

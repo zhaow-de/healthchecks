@@ -1,43 +1,43 @@
 {% load hc_extras %}
-<div id="show-usage-modal" class="modal">
-    <div class="modal-dialog">
+<div id="show-usage-modal" class="modal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
-            <div class="modal-header">
-                <button type="button" class="close" data-dismiss="modal">&times;</button>
-                <h4 id="usage-examples-title">
+            <div class="modal-header flex-wrap">
+                <h4 id="usage-examples-title" class="modal-title">
                     {% if check.name %}"{{ check.name }}"{% endif %}
                     Usage Examples
                 </h4>
-                <ul class="nav nav-pills" role="tablist">
-                    <li class="active">
-                        <a href="#crontab" data-toggle="tab">Crontab</a>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <ul class="nav nav-pills w-100" role="tablist">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#crontab" data-bs-toggle="pill">Crontab</a>
                     </li>
-                    <li>
-                        <a href="#bash" data-toggle="tab">Bash</a>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#bash" data-bs-toggle="pill">Bash</a>
                     </li>
-                    <li>
-                        <a href="#python" data-toggle="tab">Python</a>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#python" data-bs-toggle="pill">Python</a>
                     </li>
-                    <li>
-                        <a href="#ruby" data-toggle="tab">Ruby</a>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#ruby" data-bs-toggle="pill">Ruby</a>
                     </li>
-                    <li class="hidden-xs">
-                        <a href="#node" data-toggle="tab">Node.js</a>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#node" data-bs-toggle="pill">Node.js</a>
                     </li>
-                    <li class="hidden-xs">
-                        <a href="#go" data-toggle="tab">Go</a>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#go" data-bs-toggle="pill">Go</a>
                     </li>
-                    <li class="hidden-xs">
-                        <a href="#php" data-toggle="tab">PHP</a>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#php" data-bs-toggle="pill">PHP</a>
                     </li>
-                    <li class="hidden-xs">
-                        <a href="#cs" data-toggle="tab">C#</a>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#cs" data-bs-toggle="pill">C#</a>
                     </li>
-                    <li class="hidden-xs">
-                        <a href="#browser" data-toggle="tab">Browser</a>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#browser" data-bs-toggle="pill">Browser</a>
                     </li>
-                    <li class="hidden-xs">
-                        <a href="#powershell" data-toggle="tab">PowerShell</a>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#powershell" data-bs-toggle="pill">PowerShell</a>
                     </li>
                 </ul>
             </div>
@@ -93,7 +93,7 @@
 
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-default" data-dismiss="modal">Got It!</button>
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Got It!</button>
             </div>
         </div>
     </div>

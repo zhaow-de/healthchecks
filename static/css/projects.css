@@ -1,32 +1,20 @@
-#project-selector a {
-    color: var(--text-color);
-}
-
-#project-selector a:hover,
-#project-selector a:focus {
-    text-decoration: none;
-}
-
 #project-selector a:hover .project,
 #project-selector .project.selected {
-    border-color: var(--link-color);
+    border-color: var(--bs-primary);
 }
 
 #project-selector a:focus .project {
-    border-color: var(--link-color);
-    outline: solid var(--link-color);
+    border-color: var(--bs-primary);
+    outline: solid var(--bs-primary);
 }
 
 #project-selector .project {
-    border-color: var(--border-color);
     padding: 24px 24px 24px 64px;
-    position: relative;
     min-height: 120px;
 }
 
 #project-selector .project h4 {
     font-weight: bold;
-    margin-top: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -38,13 +26,12 @@
     text-align: center;
     font-size: 18px;
     font-weight: bold;
-    color: #999;
+    color: var(--bs-secondary-color);
     line-height: 120px;
 }
 
 #project-selector #add-project:hover .project {
-    border-color: var(--link-color);
-    color: var(--text-color);
+    color: var(--bs-body-color);
 }
 
 .indicators {

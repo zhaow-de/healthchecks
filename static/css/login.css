@@ -55,24 +55,6 @@
     padding: 8px 0;
 }
 
-#xs-login-sep {
-    text-align: center;
-    margin: 40px;
-    font-style: italic;
-    color: #666;
-    font-size: 12px;
-    height: 1px;
-    background: #ddd;
-}
-
-#xs-login-sep div {
-    position: relative;
-    margin: 0 auto;
-    width: 30px;
-    top: -9px;
-    background: var(--body-bg);
-}
-
 #login-password {
     margin-bottom: 0;
 }

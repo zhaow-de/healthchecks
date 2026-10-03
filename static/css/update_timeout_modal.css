@@ -17,7 +17,6 @@
 }
 
 .interval-controls label {
-    font-weight: normal;
     padding-right: 16px;
     width: 120px;
     text-align: right;
@@ -28,7 +27,7 @@
     text-align: center;
 }
 
-.interval-controls select.form-control {
+.interval-controls select {
     width: auto;
     padding-left: 8px;
     margin-left: 8px;
@@ -83,11 +82,6 @@
     width: 90px;
 }
 
-#update-cron-form label,
-#update-oncalendar-form label {
-    font-weight: normal;
-}
-
 .schedule-hint {
     margin-left: 8px;
     font-size: small;
@@ -113,7 +107,6 @@
 }
 
 #cron-preview th {
-    border-top: 0;
     font-weight: normal;
     font-size: small;
 }
@@ -172,23 +165,18 @@
 #oncalendar-preview th {
     padding-top: 0;
     font-weight: normal;
-    border-top: 0;
 }
 
 #oncalendar-preview tr.in-utc td,
 #oncalendar-preview tr.from-now td {
-    border-top: 0;
     padding-top: 0;
+}
+
+/* One border under each date's group of rows */
+#oncalendar-preview tr:not(.from-now) td {
+    border-bottom: 0;
 }
 
 #oncalendar-preview tr.from-now td {
     font-size: small;
-}
-
-.select-group {
-    display: flex;
-}
-
-.select-group select {
-    border-left: 0;
 }

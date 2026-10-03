@@ -1,10 +1,11 @@
-$(function () {
-    var base = document.getElementById("base-url").getAttribute("href").slice(0, -1);
+hc.ready(function () {
+    var base = hc.base();
     var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    var input = document.getElementById("schedule");
 
     var currentPreviewHash = "";
     function updateCronPreview() {
-        var schedule = $("#schedule").val();
+        var schedule = input.value;
 
         // Don't try preview with empty values, or if values have not changed
         if (!schedule || schedule == currentPreviewHash)
@@ -12,30 +13,26 @@ $(function () {
 
         // OK, we're good
         currentPreviewHash = schedule;
-        $("#cron-preview-title").text("Updating...");
+        hc.$$("#cron-preview-title").forEach(function(el) {
+            el.textContent = "Updating...";
+        });
 
-        var token = $('input[name=csrfmiddlewaretoken]').val();
-        $.ajax({
-            url: base + "/checks/cron_preview/",
-            type: "post",
-            headers: {"X-CSRFToken": token},
-            data: {schedule: schedule, tz: tz},
-            success: function(data) {
-                if (schedule != currentPreviewHash) {
-                    return;  // ignore stale results
-                }
-
-                $("#cron-preview" ).html(data);
+        hc.post(base + "/checks/cron_preview/", {schedule: schedule, tz: tz}).then(function(r) {
+            return r.text();
+        }).then(function(data) {
+            if (schedule != currentPreviewHash) {
+                return;  // ignore stale results
             }
+
+            document.getElementById("cron-preview").innerHTML = data;
         });
     }
 
-    $("#common-cron-expressions button").click(function() {
-        var schedule = $(this).closest("tr").find("td:nth-child(2n)").text();
-        $("#schedule").val(schedule);
+    hc.on("#common-cron-expressions button", "click", function() {
+        input.value = this.closest("tr").querySelector("td:nth-child(2)").textContent;
         updateCronPreview();
     });
 
-    $("#schedule").on("keyup", updateCronPreview);
+    hc.on(input, "keyup", updateCronPreview);
     updateCronPreview();
 });

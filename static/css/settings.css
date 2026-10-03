@@ -4,6 +4,8 @@
 
 .settings-block {
     padding: 24px;
+    /* contain the float-end buttons */
+    display: flow-root;
 }
 
 .settings-block h2 {
@@ -16,13 +18,8 @@
 }
 
 #suggestions-row td {
-    border-top: 0;
     font-size: 85%;
     padding-top: 20px;
-}
-
-#team-table th {
-    border-top: 0;
 }
 
 #team-table .email {
@@ -31,8 +28,7 @@
 
 }
 
-.page-project .panel-footer {
-    max-width: 100%;
+.page-project .card-footer {
     word-wrap: break-word;
 }
 

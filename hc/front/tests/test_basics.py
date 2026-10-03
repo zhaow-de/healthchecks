@@ -32,3 +32,10 @@ class BasicsTestCase(TestCase):
         r = self.client.get("/accounts/login/")
 
         self.assertNotContains(r, "Sign Up")
+
+    def test_it_loads_bootstrap_5_without_jquery(self) -> None:
+        r = self.client.get("/docs/")
+        self.assertContains(r, "vendor/bootstrap/bootstrap.bundle.min.js")
+        self.assertContains(r, "js/hc.js")
+        self.assertContains(r, "vendor/bootstrap/bootstrap.min.css")
+        self.assertNotContains(r, "jquery")

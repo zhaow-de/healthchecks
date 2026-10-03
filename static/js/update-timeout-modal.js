@@ -1,5 +1,5 @@
-$(function () {
-    var base = document.getElementById("base-url").getAttribute("href").slice(0, -1);
+hc.ready(function () {
+    var base = hc.base();
     var period = document.getElementById("period-value");
     var periodUnit = document.getElementById("period-unit");
     var grace = document.getElementById("grace-value");
@@ -10,54 +10,52 @@ $(function () {
     var graceOncalendarUnit = document.getElementById("update-timeout-grace-oncalendar-unit");
 
 
-    $(".rw .timeout-grace").click(function() {
-        var code = $(this).closest("tr.checks-row").attr("id");
-        if (!code) {
-            code = this.dataset.code;
-        }
+    hc.on(".rw .timeout-grace", "click", function() {
+        var row = this.closest("tr.checks-row");
+        var code = row ? row.id : this.dataset.code;
 
         var url = base + "/checks/" + code + "/timeout/";
 
-        $("#update-timeout-form").attr("action", url);
-        $("#update-cron-form").attr("action", url);
-        $("#update-oncalendar-form").attr("action", url);
+        hc.$$("#update-timeout-form, #update-cron-form, #update-oncalendar-form").forEach(function(form) {
+            form.setAttribute("action", url);
+        });
 
         // Simple, period
         var parsed = secsToUnits(this.dataset.timeout);
         period.value = parsed.value;
         periodUnit.value = parsed.unit;
         periodSlider.noUiSlider.set(this.dataset.timeout);
-        $("#update-timeout-timeout").val(this.dataset.timeout);
+        hc.$("#update-timeout-timeout").value = this.dataset.timeout;
 
         // Simple, grace
         var parsed = secsToUnits(this.dataset.grace);
         grace.value = parsed.value;
         graceUnit.value = parsed.unit;
         graceSlider.noUiSlider.set(this.dataset.grace);
-        $("#update-timeout-grace").val(this.dataset.grace);
+        hc.$("#update-timeout-grace").value = this.dataset.grace;
 
         // Cron
         cronPreviewHash = "";
-        $("#cron-preview").html("<p>Updating...</p>");
-        $("#schedule").val(this.dataset.kind == "cron" ? this.dataset.schedule: "* * * * *");
-        $("#tz")[0].tomselect.setValue(this.dataset.tz, true);
+        hc.$("#cron-preview").innerHTML = "<p>Updating...</p>";
+        hc.$("#schedule").value = this.dataset.kind == "cron" ? this.dataset.schedule: "* * * * *";
+        document.getElementById("tz").tomselect.setValue(this.dataset.tz, true);
         graceCron.value = parsed.value;
         graceCronUnit.value = parsed.unit;
-        $("#update-cron-grace").val(this.dataset.grace);
+        hc.$("#update-cron-grace").value = this.dataset.grace;
         updateCronPreview();
 
         // OnCalendar
         onCalendarPreviewHash = "";
-        $("#oncalendar-preview").html("<p>Updating...</p>");
-        $("#schedule-oncalendar").val(this.dataset.kind == "oncalendar" ? this.dataset.schedule: "*-*-* *:*:*");
-        $("#tz-oncalendar")[0].tomselect.setValue(this.dataset.tz, true);
-        graceOncalendar.value = parsed.value
-        graceOncalendarUnit.value = parsed.unit
-        $("#update-oncalendar-grace").val(this.dataset.grace);
+        hc.$("#oncalendar-preview").innerHTML = "<p>Updating...</p>";
+        hc.$("#schedule-oncalendar").value = this.dataset.kind == "oncalendar" ? this.dataset.schedule: "*-*-* *:*:*";
+        document.getElementById("tz-oncalendar").tomselect.setValue(this.dataset.tz, true);
+        graceOncalendar.value = parsed.value;
+        graceOncalendarUnit.value = parsed.unit;
+        hc.$("#update-oncalendar-grace").value = this.dataset.grace;
         updateOnCalendarPreview();
 
         showPanel(this.dataset.kind);
-        $('#update-timeout-modal').modal({"show":true, "backdrop":"static"});
+        hc.showModal("#update-timeout-modal");
         return false;
     });
 
@@ -108,7 +106,7 @@ $(function () {
 
     function setPeriod(secs) {
         // Set the hidden form field
-        $("#update-timeout-timeout").val(secs);
+        hc.$("#update-timeout-timeout").value = secs;
         // Set the visible value+units form fields
         var parsed = secsToUnits(secs);
         period.value = parsed.value;
@@ -121,21 +119,21 @@ $(function () {
     });
 
     // Update slider, inputs and the hidden field when user clicks slider labels
-    $("#period-slider .noUi-value").on("click", function() {
+    hc.on("#period-slider .noUi-value", "click", function() {
         periodSlider.noUiSlider.set(this.dataset.value);
         setPeriod(this.dataset.value);
-    })
+    });
 
     // Update the slider and the hidden field when user changes period inputs
-    $("#update-timeout-modal .period-input").on("keyup change", function() {
+    hc.on("#update-timeout-modal .period-input", "keyup change", function() {
         var secs = Math.round(period.value * periodUnit.value);
         period.setCustomValidity(secs <= 31536000 ? "" : "Must not exceed 365 days");
 
         if (secs >= 60) {
             periodSlider.noUiSlider.set(secs);
-            $("#update-timeout-timeout").val(secs);
+            hc.$("#update-timeout-timeout").value = secs;
         }
-    })
+    });
 
     var graceSlider = document.getElementById("grace-slider");
     noUiSlider.create(graceSlider, {
@@ -162,7 +160,7 @@ $(function () {
 
     function setGrace(secs) {
         // Set the hidden form field
-        $("#update-timeout-grace").val(secs);
+        hc.$("#update-timeout-grace").value = secs;
         // Set the visible value+units form fields
         var parsed = secsToUnits(secs);
         grace.value = parsed.value;
@@ -175,32 +173,32 @@ $(function () {
     });
 
     // Update slider, inputs and the hidden field when user clicks slider labels
-    $("#grace-slider .noUi-value").on("click", function() {
+    hc.on("#grace-slider .noUi-value", "click", function() {
         graceSlider.noUiSlider.set(this.dataset.value);
         setGrace(this.dataset.value);
-    })
+    });
 
     // Update the slider and the hidden field when user changes grace inputs
-    $("#update-timeout-modal .grace-input").on("keyup change", function() {
+    hc.on("#update-timeout-modal .grace-input", "keyup change", function() {
         var secs = Math.round(grace.value * graceUnit.value);
         grace.setCustomValidity(secs <= 31536000 ? "" : "Must not exceed 365 days");
 
         if (secs >= 60) {
             graceSlider.noUiSlider.set(secs);
-            $("#update-timeout-grace").val(secs);
+            hc.$("#update-timeout-grace").value = secs;
         }
     });
 
     function showPanel(kind) {
-        $("#update-timeout-form").toggle(kind == "simple");
-        $("#update-cron-form").toggle(kind == "cron");
-        $("#update-oncalendar-form").toggle(kind == "oncalendar");
+        hc.toggle("#update-timeout-form", kind == "simple");
+        hc.toggle("#update-cron-form", kind == "cron");
+        hc.toggle("#update-oncalendar-form", kind == "oncalendar");
     }
 
     var cronPreviewHash = "";
     function updateCronPreview() {
-        var schedule = $("#schedule").val();
-        var tz = $("#tz").val();
+        var schedule = hc.$("#schedule").value;
+        var tz = hc.$("#tz").value;
         var hash = schedule + tz;
 
         // Don't try preview with empty values, or if values have not changed
@@ -209,30 +207,25 @@ $(function () {
 
         // OK, we're good
         cronPreviewHash = hash;
-        $("#cron-preview-title").text("Updating...");
+        var title = hc.$("#cron-preview-title");
+        if (title) title.textContent = "Updating...";
 
-        var token = $('input[name=csrfmiddlewaretoken]').val();
-        $.ajax({
-            url: base + "/checks/cron_preview/",
-            type: "post",
-            headers: {"X-CSRFToken": token},
-            data: {schedule: schedule, tz: tz},
-            success: function(data) {
-                if (hash != cronPreviewHash) {
-                    return;  // ignore stale results
-                }
-
-                $("#cron-preview" ).html(data);
-                var haveError = $("#invalid-arguments").length > 0;
-                $("#update-cron-submit").prop("disabled", haveError);
+        var data = {schedule: schedule, tz: tz};
+        hc.post(base + "/checks/cron_preview/", data).then((r) => r.text()).then(function(html) {
+            if (hash != cronPreviewHash) {
+                return;  // ignore stale results
             }
+
+            hc.$("#cron-preview").innerHTML = html;
+            var haveError = hc.$("#invalid-arguments") !== null;
+            hc.$("#update-cron-submit").disabled = haveError;
         });
     }
 
     var onCalendarPreviewHash = "";
     function updateOnCalendarPreview() {
-        var schedule = $("#schedule-oncalendar").val();
-        var tz = $("#tz-oncalendar").val();
+        var schedule = hc.$("#schedule-oncalendar").value;
+        var tz = hc.$("#tz-oncalendar").value;
         var hash = schedule + tz;
 
         // Don't try preview with empty values, or if values have not changed
@@ -241,52 +234,47 @@ $(function () {
 
         // OK, we're good
         onCalendarPreviewHash = hash;
-        $("#oncalendar-preview-title").text("Updating...");
+        var title = hc.$("#oncalendar-preview-title");
+        if (title) title.textContent = "Updating...";
 
-        var token = $('input[name=csrfmiddlewaretoken]').val();
-        $.ajax({
-            url: base + "/checks/oncalendar_preview/",
-            type: "post",
-            headers: {"X-CSRFToken": token},
-            data: {schedule: schedule, tz: tz},
-            success: function(data) {
-                if (hash != onCalendarPreviewHash) {
-                    return;  // ignore stale results
-                }
-
-                $("#oncalendar-preview" ).html(data);
-                var haveError = $("#invalid-oncalendar-arguments").length > 0;
-                $("#update-oncalendar-submit").prop("disabled", haveError);
+        var data = {schedule: schedule, tz: tz};
+        hc.post(base + "/checks/oncalendar_preview/", data).then((r) => r.text()).then(function(html) {
+            if (hash != onCalendarPreviewHash) {
+                return;  // ignore stale results
             }
+
+            hc.$("#oncalendar-preview").innerHTML = html;
+            var haveError = hc.$("#invalid-oncalendar-arguments") !== null;
+            hc.$("#update-oncalendar-submit").disabled = haveError;
         });
     }
 
-    $("#update-timeout-modal .update-timeout-grace-cron-input").on("keyup change", function() {
+    hc.on("#update-timeout-modal .update-timeout-grace-cron-input", "keyup change", function() {
         var secs = Math.round(graceCron.value * graceCronUnit.value);
         graceCron.setCustomValidity(secs <= 31536000 ? "" : "Must not exceed 365 days");
 
         if (secs >= 60) {
-            $("#update-cron-grace").val(secs);
+            hc.$("#update-cron-grace").value = secs;
         }
     });
 
-    $("#update-timeout-modal .update-timeout-grace-oncalendar-input").on("keyup change", function() {
+    hc.on("#update-timeout-modal .update-timeout-grace-oncalendar-input", "keyup change", function() {
         var secs = Math.round(graceOncalendar.value * graceOncalendarUnit.value);
         graceOncalendar.setCustomValidity(secs <= 31536000 ? "" : "Must not exceed 365 days");
 
         if (secs >= 60) {
-            $("#update-oncalendar-grace").val(secs);
+            hc.$("#update-oncalendar-grace").value = secs;
         }
     });
 
     // Wire up events for Timeout/Cron forms
-    $(".kind-simple").click(() => showPanel("simple"));
-    $(".kind-cron").click(() => showPanel("cron"));
-    $(".kind-oncalendar").click(() => showPanel("oncalendar"));
+    hc.on("#update-timeout-modal .kind-simple", "click", () => showPanel("simple"));
+    hc.on("#update-timeout-modal .kind-cron", "click", () => showPanel("cron"));
+    hc.on("#update-timeout-modal .kind-oncalendar", "click", () => showPanel("oncalendar"));
 
-    $("#schedule").on("keyup", updateCronPreview);
-    $("#schedule-oncalendar").on("keyup", updateOnCalendarPreview);
-    $("#tz").on("change", updateCronPreview);
-    $("#tz-oncalendar").on("change", updateOnCalendarPreview);
+    hc.on("#schedule", "keyup", updateCronPreview);
+    hc.on("#schedule-oncalendar", "keyup", updateOnCalendarPreview);
+    hc.on("#tz", "change", updateCronPreview);
+    hc.on("#tz-oncalendar", "change", updateOnCalendarPreview);
 
 });

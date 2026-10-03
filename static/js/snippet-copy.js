@@ -1,19 +1,19 @@
-$(function() {
-    var markup = '<button class="btn btn-default hidden-sm">' +
+hc.ready(function() {
+    var markup = '<button type="button" class="btn btn-outline-secondary btn-sm">' +
                  '<span class="ic-clippy"></span>' +
                  '</button>';
 
-    $(".highlight").append(markup);
+    hc.$$(".highlight").forEach(function(el) {
+        el.insertAdjacentHTML("beforeend", markup);
+        var button = el.lastElementChild;
+        var tip = hc.tooltip(button, {title: "Copied", trigger: "manual"});
 
-    $(".highlight button")
-        .tooltip({title: "Copied", trigger: "manual"})
-        .on("mouseleave", function(e) {
-            $(e.target).tooltip("hide");
-        })
-        .click(function() {
-            var text = this.parentNode.innerText;
-            navigator.clipboard.writeText(text);
-            $(this).tooltip("show");
-        })
-
+        button.addEventListener("mouseleave", function() {
+            tip.hide();
+        });
+        button.addEventListener("click", function() {
+            navigator.clipboard.writeText(el.innerText);
+            tip.show();
+        });
+    });
 });

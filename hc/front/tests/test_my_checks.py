@@ -30,6 +30,8 @@ class MyChecksTestCase(BaseTestCase):
             self.assertContains(r, str(self.check.code))
             # The pause button:
             self.assertContains(r, "btn pause")
+            # The Add Check button:
+            self.assertContains(r, 'data-bs-target="#add-check-modal"')
             if email == "alice@example.org":
                 self.assertContains(r, 'data-profile-tz="Europe/Riga"')
 
@@ -69,7 +71,7 @@ class MyChecksTestCase(BaseTestCase):
         # Enabled: no attribute after its modal target
         self.assertRegex(
             r.content.decode(),
-            r'<button\s+class="btn btn-primary"\s+data-toggle="modal"\s+data-target="#add-check-modal">\s+Add Check',
+            r'<button\s+class="btn btn-primary"\s+data-bs-toggle="modal"\s+data-bs-target="#add-check-modal">\s+Add Check',
         )
 
     def test_it_shows_green_check(self) -> None:
@@ -131,7 +133,7 @@ class MyChecksTestCase(BaseTestCase):
 
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.url)
-        self.assertContains(r, """<div data-tooltip="1 of 1 down" class="btn btn-xs down ">foo</div>""")
+        self.assertContains(r, """<div data-tooltip="1 of 1 down" class="btn btn-sm down ">foo</div>""")
 
     def test_it_shows_grace_badge(self) -> None:
         self.check.last_ping = now() - td(days=1, minutes=10)
@@ -141,7 +143,7 @@ class MyChecksTestCase(BaseTestCase):
 
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.url)
-        self.assertContains(r, """<div data-tooltip="1 up" class="btn btn-xs grace ">foo</div>""")
+        self.assertContains(r, """<div data-tooltip="1 up" class="btn btn-sm grace ">foo</div>""")
 
     def test_it_shows_grace_started_badge(self) -> None:
         self.check.last_start = now()
@@ -152,7 +154,7 @@ class MyChecksTestCase(BaseTestCase):
 
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.url)
-        self.assertContains(r, """<div data-tooltip="1 up" class="btn btn-xs grace ">foo</div>""")
+        self.assertContains(r, """<div data-tooltip="1 up" class="btn btn-sm grace ">foo</div>""")
 
     def test_it_hides_actions_from_readonly_users(self) -> None:
         self.bobs_membership.role = "r"
@@ -161,7 +163,7 @@ class MyChecksTestCase(BaseTestCase):
         self.client.login(username="bob@example.org", password="password")
         r = self.client.get(self.url)
 
-        self.assertNotContains(r, 'data-target="#add-check-modal"', status_code=200)
+        self.assertNotContains(r, 'data-bs-target="#add-check-modal"', status_code=200)
 
         # The pause button:
         self.assertNotContains(r, 'class="btn pause"', status_code=200)

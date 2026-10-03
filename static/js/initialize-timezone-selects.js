@@ -1,4 +1,4 @@
-$(function() {
+hc.ready(function() {
     var common = document.getElementById("common-timezones").textContent.split(",");
     var all = document.getElementById("all-timezones").textContent.split(",");
 

@@ -43,6 +43,8 @@ class ChannelsTestCase(BaseTestCase):
         r = self.client.get(self.channels_url)
 
         self.assertEqual(r.status_code, 200)
+        self.assertContains(r, f'data-bs-target="#name-{ch.code}"')
+        self.assertContains(r, f'id="name-{ch.code}"')
         # These are inside a modal:
         self.assertContains(r, "http://down.example.com")
         self.assertContains(r, "http://up.example.com")
@@ -102,6 +104,8 @@ class ChannelsTestCase(BaseTestCase):
         self.assertNotContains(r, "Add Integration", status_code=200)
         self.assertNotContains(r, "ic-delete")
         self.assertNotContains(r, f"/integrations/{ch.code}/edit/")
+        self.assertNotContains(r, f'id="name-{ch.code}"')
+        self.assertNotContains(r, f'data-bs-target="#name-{ch.code}"')
 
     def test_it_shows_disabled_note(self) -> None:
         ch = Channel(kind="slack", project=self.project)
@@ -111,7 +115,7 @@ class ChannelsTestCase(BaseTestCase):
 
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.channels_url)
-        self.assertContains(r, "label-danger", status_code=200)
+        self.assertContains(r, '<span class="badge text-bg-danger">Disabled</span>', status_code=200)
 
     def test_it_shows_fix_button_for_disabled_email(self) -> None:
         ch = Channel(kind="email", project=self.project)

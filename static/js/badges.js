@@ -1,23 +1,16 @@
-$(function() {
+hc.ready(function() {
     function updatePreview() {
-        var params = $("#badge-settings-form").serialize();
-        var token = $('input[name=csrfmiddlewaretoken]').val();
-        $.ajax({
-            url: window.location.href,
-            type: "post",
-            headers: {"X-CSRFToken": token},
-            data: params,
-            success: function(data) {
-                document.getElementById("preview").innerHTML = data;
-                $(".fetch-json").each(function(idx, el) {
-                    $.getJSON(el.dataset.url, function(data) {
-                        el.innerText = JSON.stringify(data);
-                    });
+        hc.post(window.location.href, hc.serialize("#badge-settings-form")).then(function(r) {
+            return r.text();
+        }).then(function(data) {
+            document.getElementById("preview").innerHTML = data;
+            hc.$$(".fetch-json").forEach(function(el) {
+                hc.getJSON(el.dataset.url).then(function(data) {
+                    el.innerText = JSON.stringify(data);
                 });
-            }
+            });
         });
     }
 
-    $("input[type=radio]").change(updatePreview);
-    $("select").change(updatePreview);
+    hc.on("#badge-settings-form", "change", updatePreview);
 });

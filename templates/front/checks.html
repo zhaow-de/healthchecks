@@ -16,48 +16,46 @@
 <div id="check-filters">
     <div id="my-checks-tags">
     {% for tag, status, tooltip in tags %}
-        <div data-tooltip="{{ tooltip }}" class="btn btn-xs {{ status }} {% if tag in selected_tags %}checked{% endif%}">{{ tag }}</div>
+        <div data-tooltip="{{ tooltip }}" class="btn btn-sm {{ status }} {% if tag in selected_tags %}checked{% endif%}">{{ tag }}</div>
     {% endfor %}
     </div>
-    <div id="search-group" class="input-group hidden-xs">
+    <div id="search-group" class="input-group">
         <input
             id="search"
             type="text"
             class="form-control"
             value="{{ search }}">
-        <div id="filters" class="input-group-btn">
-            <button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown">
-                <span class="caret"></span>
-            </button>
-            <ul class="dropdown-menu dropdown-menu-right">
-                <li class="header">Filter by status</li>
+        <div id="filters" class="dropdown">
+            <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown"></button>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li><h6 class="dropdown-header">Filter by status</h6></li>
                 <li>
-                    <a href="javascript:;" data-value="new">
+                    <a class="dropdown-item" href="javascript:;" data-value="new">
                         <span class="status ic-new"></span> New
                     </a>
                 </li>
                 <li>
-                    <a href="javascript:;" data-value="paused">
+                    <a class="dropdown-item" href="javascript:;" data-value="paused">
                         <span class="status ic-paused"></span> Paused
                     </a>
                 </li>
                 <li>
-                    <a href="javascript:;" data-value="started">
+                    <a class="dropdown-item" href="javascript:;" data-value="started">
                         <span class="status ic-dots"></span> Started
                     </a>
                 </li>
                 <li>
-                    <a href="javascript:;" data-value="up">
+                    <a class="dropdown-item" href="javascript:;" data-value="up">
                         <span class="status ic-up"></span> Up
                     </a>
                 </li>
                 <li>
-                    <a href="javascript:;" data-value="grace">
+                    <a class="dropdown-item" href="javascript:;" data-value="grace">
                         <span class="status ic-grace"></span> Late
                     </a>
                 </li>
                 <li>
-                    <a href="javascript:;" data-value="down">
+                    <a class="dropdown-item" href="javascript:;" data-value="down">
                         <span class="status ic-down"></span> Down
                     </a>
                 </li>
@@ -65,35 +63,35 @@
         </div>
     </div>
     <button
-        class="filter-btn btn btn-default hidden-xs"
+        class="filter-btn btn btn-outline-secondary"
         {% if 'new' not in selected_statuses %}style="display: none"{% endif %}
         data-value="new">New ×</button>
     <button
-        class="filter-btn btn btn-default hidden-xs"
+        class="filter-btn btn btn-outline-secondary"
         {% if 'paused' not in selected_statuses %}style="display: none"{% endif %}
         data-value="paused">Paused ×</button>
     <button
-        class="filter-btn btn btn-default hidden-xs"
+        class="filter-btn btn btn-outline-secondary"
         {% if 'started' not in selected_statuses %}style="display: none"{% endif %}
         data-value="started">Started ×</button>
     <button
-        class="filter-btn btn btn-default hidden-xs"
+        class="filter-btn btn btn-outline-secondary"
         {% if 'up' not in selected_statuses %}style="display: none"{% endif %}
         data-value="up">Up ×</button>
     <button
-        class="filter-btn btn btn-default hidden-xs"
+        class="filter-btn btn btn-outline-secondary"
         {% if 'grace' not in selected_statuses %}style="display: none"{% endif %}
         data-value="grace">Late ×</button>
     <button
-        class="filter-btn btn btn-default hidden-xs"
+        class="filter-btn btn btn-outline-secondary"
         {% if 'down' not in selected_statuses %}style="display: none"{% endif %}
         data-value="down">Down ×</button>
 
     {% if rw %}
     <button
         class="btn btn-primary"
-        data-toggle="modal"
-        data-target="#add-check-modal">
+        data-bs-toggle="modal"
+        data-bs-target="#add-check-modal">
             Add Check
         </button>
     {% endif %}
@@ -117,8 +115,8 @@
             <br><br>
             <button
                 class="btn btn-primary"
-                data-toggle="modal"
-                data-target="#add-check-modal">
+                data-bs-toggle="modal"
+                data-bs-target="#add-check-modal">
                     Add Check
             </button>
             {% endif %}
@@ -134,21 +132,21 @@
 {% include "front/update_timeout_modal.html" %}
 {% include "front/add_check_modal.html" %}
 
-<div id="ping-details-modal" class="modal">
-    <div class="modal-dialog">
+<div id="ping-details-modal" class="modal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div id="ping-details-body">Loading</div>
             <div class="modal-footer">
                 <a
                     id="ping-details-log"
                     href="#"
-                    class="btn btn-default">
+                    class="btn btn-outline-secondary">
                     Show Earlier Events
                 </a>
                 <button
                     type="button"
-                    class="btn btn-default"
-                    data-dismiss="modal">
+                    class="btn btn-outline-secondary"
+                    data-bs-dismiss="modal">
                     Got It!
                 </button>
             </div>
@@ -162,8 +160,8 @@
 <script id="common-timezones" type="data">{{ common_timezones|join:"," }}</script>
 <script id="all-timezones" type="data">{{ timezones|join:"," }}</script>
 {% compress js %}
-<script src="{% static 'js/tom-select.popular.min.js' %}"></script>
-<script src="{% static 'js/nouislider.min.js' %}"></script>
+<script src="{% static 'vendor/tom-select/tom-select.popular.min.js' %}"></script>
+<script src="{% static 'vendor/nouislider/nouislider.min.js' %}"></script>
 <script src="{% static 'js/initialize-timezone-selects.js' %}"></script>
 <script src="{% static 'js/update-timeout-modal.js' %}"></script>
 <script src="{% static 'js/adaptive-setinterval.js' %}"></script>

@@ -1,18 +1,21 @@
 function loadPingDetails(url) {
-    $("#ping-details-body").html("<div class='loading'><div class='spinner'><div></div><div></div><div></div></div></div>");
-    $('#ping-details-modal').modal("show");
-    $("#ping-details-body .spinner").addClass("started");
+    var body = document.getElementById("ping-details-body");
+    body.innerHTML = "<div class='loading'><div class='spinner'><div></div><div></div><div></div></div></div>";
+    hc.showModal("#ping-details-modal");
+    hc.$("#ping-details-body .spinner").classList.add("started");
 
-    $.get(url, function(data) {
-            $("#ping-details-body").html(data);
+    hc.getText(url).then(function(data) {
+        body.innerHTML = data;
 
-            var dateFormatter = new DateFormatter("UTC");
-            var createdUnix = $("#ping-details-body .times").data("dt");
-            var created = new Date(createdUnix * 1000);
-            $("#ping-details-body .times span").each(function(i, el) {
-                dateFormatter.setTimezone(el.dataset.tz);
-                el.innerText = dateFormatter.formatDateTime(created);
-            });
-        }
-    );
+        // ping_details_not_found.html has no .times
+        var times = hc.$("#ping-details-body .times");
+        if (!times) return;
+
+        var dateFormatter = new DateFormatter("UTC");
+        var created = new Date(times.dataset.dt * 1000);
+        hc.$$("#ping-details-body .times span").forEach(function(el) {
+            dateFormatter.setTimezone(el.dataset.tz);
+            el.innerText = dateFormatter.formatDateTime(created);
+        });
+    });
 }

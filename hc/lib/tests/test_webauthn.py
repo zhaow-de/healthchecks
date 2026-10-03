@@ -5,8 +5,10 @@ from hashlib import sha256
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from django.test import SimpleTestCase
 from fido2.cose import ES256
+from fido2.utils import websafe_encode
 from fido2.webauthn import (
     AttestationObject,
     AttestedCredentialData,
@@ -79,6 +81,31 @@ class WebAuthnTestCase(SimpleTestCase):
     def test_create_helper_returns_credential_data(self) -> None:
         credential = AttestedCredentialData(self._register())
 
+        self.assertEqual(credential.credential_id, CREDENTIAL_ID)
+        expected_key = ES256.from_cryptography_key(self.authenticator.key.public_key())
+        self.assertEqual(credential.public_key, expected_key)
+
+    def test_create_helper_ignores_the_level3_fields_of_to_json(self) -> None:
+        # The browser posts credential.toJSON(), whose response also carries the public key
+        # and authenticator data; the stored credential must come from the attestationObject alone.
+        helper = CreateHelper(RP_ID, [])
+        options, state = helper.prepare("alice@example.org")
+        doc = json.loads(self.authenticator.register(options["publicKey"]["challenge"]))
+
+        other_key = ec.generate_private_key(ec.SECP256R1()).public_key()
+        spki = other_key.public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo)
+        other_credential = AttestedCredentialData.create(b"\x00" * 16, b"\x02" * 16, ES256.from_cryptography_key(other_key))
+        other_auth_data = AuthenticatorData.create(sha256(RP_ID.encode()).digest(), 0x41, 0, other_credential)
+        doc["response"]["publicKey"] = websafe_encode(spki)
+        doc["response"]["publicKeyAlgorithm"] = -7
+        doc["response"]["authenticatorData"] = websafe_encode(bytes(other_auth_data))
+        doc["response"]["transports"] = ["usb"]
+        doc["authenticatorAttachment"] = "cross-platform"
+        doc["clientExtensionResults"] = {}
+
+        blob = helper.verify(state, json.dumps(doc))
+        assert blob is not None
+        credential = AttestedCredentialData(blob)
         self.assertEqual(credential.credential_id, CREDENTIAL_ID)
         expected_key = ES256.from_cryptography_key(self.authenticator.key.public_key())
         self.assertEqual(credential.public_key, expected_key)
