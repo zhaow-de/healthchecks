@@ -12,6 +12,5 @@ hc.ready(function() {
         });
     }
 
-    // The radios and selects are all inside the form, and change bubbles.
     hc.on("#badge-settings-form", "change", updatePreview);
 });

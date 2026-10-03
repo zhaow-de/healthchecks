@@ -48,8 +48,6 @@ hc.ready(function () {
         return false;
     });
 
-    // The ping URL may be on another origin: hc.post sends no custom headers
-    // there, so the request stays simple and needs no CORS preflight.
     hc.on("#ping-now", "click", function() {
         var button = this;
         hc.post(this.dataset.url).then(function() {

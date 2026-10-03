@@ -28,7 +28,6 @@ hc.ready(function() {
 
         navigator.credentials.get({publicKey: publicKey}).then(function(credential) {
             document.getElementById("response").value = JSON.stringify(credential.toJSON());
-            // Show the success message and submit the form
             hc.hide("#waiting");
             hc.show("#success");
             form.submit();

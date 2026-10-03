@@ -1,7 +1,6 @@
-// The small helper the page scripts use where they used jQuery.
-// base.html and base_project.html load it right after bootstrap.bundle.min.js, so
-// `bootstrap` and `hc` are globals in every page script. Everything here is null-safe:
-// a selector that matches nothing is a no-op, as it was with jQuery.
+// Helpers for the page scripts. base.html and base_project.html load it right after
+// bootstrap.bundle.min.js, so `bootstrap` and `hc` are globals in every page script.
+// A `target` that matches nothing is a no-op.
 (function() {
     "use strict";
 
@@ -27,8 +26,8 @@
     // on(target, "click", ".child", handler) delegates to children matching the selector,
     // including ones added later. The handler gets (event, element), with `this` set to
     // the bound or the matched element. A handler that returns false prevents the default
-    // and stops propagation, as in jQuery. Use mouseover/focusin rather than
-    // mouseenter/focus for delegation: those do not bubble.
+    // and stops propagation. Use mouseover/focusin rather than mouseenter/focus for
+    // delegation: those do not bubble.
     function on(target, types, selector, handler) {
         if (typeof selector == "function") {
             handler = selector;
@@ -69,8 +68,7 @@
         return m ? decodeURIComponent(m[1]) : "";
     }
 
-    // A form's successful controls, as jQuery's .serialize(): disabled and unchecked
-    // fields are left out.
+    // A form's successful controls: disabled and unchecked fields are left out.
     function serialize(form) {
         if (typeof form == "string") form = document.querySelector(form);
         return new URLSearchParams(new FormData(form));
@@ -96,12 +94,11 @@
         return new URL(url, window.location.href).origin == window.location.origin;
     }
 
-    // fetch() that resolves to the Response for a 2xx status and rejects otherwise, like
-    // jQuery's success/error split. opts: method, data (the POST body or the GET query),
-    // timeout (ms), signal (an AbortSignal, e.g. to cancel a superseded request), headers.
-    // A same-origin request carries X-Requested-With, as jQuery's did (the pause view
-    // answers it differently), and a same-origin POST carries X-CSRFToken. A cross-origin
-    // request carries neither, so it stays a simple request with no CORS preflight.
+    // fetch() that resolves to the Response for a 2xx status and rejects otherwise.
+    // opts: method, data (the POST body or the GET query), timeout (ms), signal, headers.
+    // A same-origin request carries X-Requested-With (the pause view answers it
+    // differently), and a same-origin POST carries X-CSRFToken. A cross-origin request
+    // carries neither, so it stays a simple request with no CORS preflight.
     function request(url, opts) {
         opts = opts || {};
         var method = (opts.method || "GET").toUpperCase();
@@ -174,7 +171,6 @@
         return el.hidden || el.classList.contains("d-none") || el.style.display == "none";
     }
 
-    // toggle(target, true) shows, toggle(target, false) hides, toggle(target) flips each.
     function toggle(target, visible) {
         all(target).forEach(function(el) {
             var v = visible === undefined ? isHidden(el) : visible;
@@ -182,7 +178,6 @@
         });
     }
 
-    // jQuery's :visible
     function isVisible(el) {
         return !!(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length));
     }

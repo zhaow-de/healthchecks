@@ -86,9 +86,8 @@ class WebAuthnTestCase(SimpleTestCase):
         self.assertEqual(credential.public_key, expected_key)
 
     def test_create_helper_ignores_the_level3_fields_of_to_json(self) -> None:
-        # The browser posts credential.toJSON(), whose response also carries the
-        # public key and authenticator data in the clear. The stored credential
-        # must come from the attestationObject alone, never from those fields.
+        # The browser posts credential.toJSON(), whose response also carries the public key
+        # and authenticator data; the stored credential must come from the attestationObject alone.
         helper = CreateHelper(RP_ID, [])
         options, state = helper.prepare("alice@example.org")
         doc = json.loads(self.authenticator.register(options["publicKey"]["challenge"]))

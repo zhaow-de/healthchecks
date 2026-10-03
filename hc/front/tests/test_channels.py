@@ -43,7 +43,7 @@ class ChannelsTestCase(BaseTestCase):
         r = self.client.get(self.channels_url)
 
         self.assertEqual(r.status_code, 200)
-        # These are inside a modal, which the channel's name opens:
+        # These are inside a modal:
         self.assertContains(r, f'data-bs-target="#name-{ch.code}"')
         self.assertContains(r, f'id="name-{ch.code}"')
         self.assertContains(r, "http://down.example.com")
@@ -104,7 +104,6 @@ class ChannelsTestCase(BaseTestCase):
         self.assertNotContains(r, "Add Integration", status_code=200)
         self.assertNotContains(r, "ic-delete")
         self.assertNotContains(r, f"/integrations/{ch.code}/edit/")
-        # The name modals are not rendered, so nothing may toggle them
         self.assertNotContains(r, f'id="name-{ch.code}"')
         self.assertNotContains(r, f'data-bs-target="#name-{ch.code}"')
 
