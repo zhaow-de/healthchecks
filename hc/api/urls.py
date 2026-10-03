@@ -6,7 +6,7 @@ from hc.api import views
 
 
 class SHA1Converter:
-    regex = "[A-z0-9]{40}"
+    regex = "[a-f0-9]{40}"
 
     def to_python(self, value: str) -> str:
         return value

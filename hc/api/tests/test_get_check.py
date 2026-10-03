@@ -153,6 +153,16 @@ class GetCheckTestCase(BaseTestCase):
         r = self.get("a" * 40)
         self.assertEqual(r.status_code, 404)
 
+    def test_unique_key_route_takes_lowercase_hex_only(self) -> None:
+        # Without an API key, a request that reaches the view gets authorize's 401;
+        # a key the sha1 converter rejects matches no route and gets 404
+        r = self.client.get(f"/api/v3/checks/{'a' * 40}")
+        self.assertEqual(r.status_code, 401)
+
+        for key in ("a" * 39 + "A", "a" * 39 + "_"):
+            r = self.client.get(f"/api/v3/checks/{key}")
+            self.assertEqual(r.status_code, 404)
+
     def test_unique_key_lookup_is_scoped_to_project(self) -> None:
         charlies_check = Check.objects.create(project=self.charlies_project)
 

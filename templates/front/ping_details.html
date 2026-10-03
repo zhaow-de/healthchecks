@@ -22,15 +22,15 @@
             <p>
                 <strong>Time Received</strong>
                 <code>{{ ping.created.isoformat }}</code>
-                <div class="times" data-dt="{{ ping.created|timestamp }}">
-                    {% for tz in tz_switches %}
-                    <div>
-                        {{ tz }}<br>
-                        <span data-tz="{{ tz }}"></span>
-                    </div>
-                    {% endfor %}
-                </div>
             </p>
+            <div class="times mb-3" data-dt="{{ ping.created|timestamp }}">
+                {% for tz in tz_switches %}
+                <div>
+                    {{ tz }}<br>
+                    <span data-tz="{{ tz }}"></span>
+                </div>
+                {% endfor %}
+            </div>
         </div>
 
         <div class="col-sm-6">

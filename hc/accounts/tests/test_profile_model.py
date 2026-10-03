@@ -26,7 +26,7 @@ EMPTY_TABLE = """
 
 NAG_TEXT = """Hello,
 
-This is a hourly reminder sent by Mychecks.
+This is an hourly reminder sent by Mychecks.
 One check is currently DOWN:
 
 
@@ -243,10 +243,20 @@ class ProfileModelTestCase(BaseTestCase):
 
         self.assertEqual(message.subject, "Reminder: 1 check still down")
         self.assertEqual(message.body, NAG_TEXT)
+        self.assertEmailContainsHtml("This is\nan hourly\nreminder")
         self.assertEmailContains("Foo")
 
         # Check UUIDs should not appear anywhere in the email
         self.assertEmailNotContains(str(self.check.code))
+
+    def test_send_report_sends_daily_nag(self) -> None:
+        self.profile.nag_period = td(days=1)
+        self.profile.save()
+
+        sent = self.profile.send_report(nag=True)
+        self.assertTrue(sent)
+        self.assertEmailContainsText("This is a daily reminder")
+        self.assertEmailContainsHtml("This is\na daily\nreminder")
 
     def test_send_nag_noops_if_none_down(self) -> None:
         self.check.last_ping = None

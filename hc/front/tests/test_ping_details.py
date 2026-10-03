@@ -44,6 +44,15 @@ class PingDetailsTestCase(BaseTestCase):
         self.assertContains(r, "Europe/Riga")
         self.assertContains(r, "Europe/Berlin")
 
+    def test_it_keeps_divs_out_of_paragraphs(self) -> None:
+        Ping.objects.create(owner=self.check, n=1, body_raw=b"this is body")
+
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(self.url)
+        # A browser closes an open <p> at a <div>, and turns the </p> that
+        # follows into an extra empty paragraph
+        self.assertNotRegex(r.content.decode(), r"(?s)<p\b[^>]*>(?:(?!</p>).)*<div")
+
     def test_it_displays_duration(self) -> None:
         expected_duration = td(minutes=5)
         end_time = now()
