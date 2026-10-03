@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from unittest.mock import patch
 from urllib.parse import quote_plus
 
@@ -381,6 +382,23 @@ class LoginTestCase(BaseTestCase):
         self.client.cookies[device.COOKIE_NAME] = f"{payload}:{timestamp}:{signature}"
         r = self.client.post("/accounts/login/", self.good)
         self.assertContains(r, "Too many attempts")
+
+    def test_device_cookie_expires_after_a_year(self) -> None:
+        self.drain_password_bucket()
+
+        payload = {"u": self.alice.id, "n": "a" * 32}
+        for days, trusted in ((364, True), (366, False)):
+            issued = time.time() - days * 86400
+            with patch("django.core.signing.time.time", return_value=issued):
+                cookie = signing.dumps(payload, salt=device.SALT)
+
+            self.client.cookies[device.COOKIE_NAME] = cookie
+            r = self.client.post("/accounts/login/", self.good)
+            if trusted:
+                self.assertRedirects(r, self.checks_url)
+                self.client.logout()
+            else:
+                self.assertContains(r, "Too many attempts")
 
     def test_device_cookie_of_another_user_is_untrusted(self) -> None:
         self.drain_password_bucket()
