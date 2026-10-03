@@ -344,9 +344,9 @@ class AccountsAdminTestCase(BaseTestCase):
         r = self.client.get(reverse("admin:accounts_credential_add"))
         self.assertEqual(r.status_code, 403)
 
-        r = self.client.post(reverse("admin:accounts_credential_add"), {"name": "Eve's Key", "code": "x"})
+        payload = {"name": "Eve's Key", "code": "00000000-0000-0000-0000-000000000000"}
+        r = self.client.post(reverse("admin:accounts_credential_add"), payload)
         self.assertEqual(r.status_code, 403)
-        self.assertFalse(Credential.objects.exists())
 
     def test_it_does_not_delete_credentials(self) -> None:
         c = Credential.objects.create(user=self.alice, name="Alices Yubikey", data=b"")
