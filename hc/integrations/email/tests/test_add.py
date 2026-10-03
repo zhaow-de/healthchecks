@@ -47,16 +47,6 @@ class AddEmailTestCase(BaseTestCase):
         # Make sure it calls assign_all_checks
         self.assertEqual(c.checks.count(), 1)
 
-    def test_team_access_works(self) -> None:
-        form = {"value": "bob@example.org", "down": "true", "up": "true"}
-
-        self.client.login(username="bob@example.org", password="password")
-        self.client.post(self.url, form)
-
-        ch = Channel.objects.get()
-        # Added by bob, but should belong to alice (bob has team access)
-        self.assertEqual(ch.project, self.project)
-
     def test_it_rejects_bad_email(self) -> None:
         form = {"value": "not an email address", "down": "true", "up": "true"}
 
@@ -120,10 +110,7 @@ class AddEmailTestCase(BaseTestCase):
         r = self.client.post(self.url, form)
         self.assertContains(r, "Please select at least one.")
 
-    def test_it_requires_rw_access(self) -> None:
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
-
-        self.client.login(username="bob@example.org", password="password")
+    def test_it_checks_ownership(self) -> None:
+        self.client.login(username="charlie@example.org", password="password")
         r = self.client.get(self.url)
-        self.assertEqual(r.status_code, 403)
+        self.assertEqual(r.status_code, 404)

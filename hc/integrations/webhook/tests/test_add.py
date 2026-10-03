@@ -53,24 +53,6 @@ class AddWebhookTestCase(BaseTestCase):
         self.assertEqual(c.down_webhook_spec.url, "http://foo.com")
         self.assertEqual(c.up_webhook_spec.url, "https://bar.com")
 
-    def test_it_adds_webhook_using_team_access(self) -> None:
-        form = {
-            "method_down": "GET",
-            "url_down": "http://foo.com",
-            "method_up": "GET",
-            "url_up": "https://bar.com",
-        }
-
-        # Logging in as bob, not alice. Bob has team access so this
-        # should work.
-        self.client.login(username="bob@example.org", password="password")
-        self.client.post(self.url, form)
-
-        c = Channel.objects.get()
-        self.assertEqual(c.project, self.project)
-        self.assertEqual(c.down_webhook_spec.url, "http://foo.com")
-        self.assertEqual(c.up_webhook_spec.url, "https://bar.com")
-
     def test_it_accepts_good_urls(self) -> None:
         urls = [
             "http://foo",
@@ -281,13 +263,10 @@ class AddWebhookTestCase(BaseTestCase):
 
         self.assertEqual(Channel.objects.count(), 0)
 
-    def test_it_requires_rw_access(self) -> None:
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
-
-        self.client.login(username="bob@example.org", password="password")
+    def test_it_checks_ownership(self) -> None:
+        self.client.login(username="charlie@example.org", password="password")
         r = self.client.get(self.url)
-        self.assertEqual(r.status_code, 403)
+        self.assertEqual(r.status_code, 404)
 
     @override_settings(WEBHOOKS_ENABLED=False)
     def test_it_handles_disabled_integration(self) -> None:

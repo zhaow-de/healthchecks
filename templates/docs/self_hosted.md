@@ -36,10 +36,13 @@ and the dependencies.
     This creates a virtual environment in `.venv` and installs the exact package
     versions listed in `uv.lock`. If you do not have Python 3.14, uv downloads it.
 
-* Create database tables and a superuser account:
+* Create database tables and the superuser account:
 
         $ uv run ./manage.py migrate
         $ uv run ./manage.py createsuperuser
+
+    The superuser is the instance's only user: there is no sign-up, and
+    `createsuperuser` refuses to run once a user exists.
 
     With the default configuration, Healthchecks stores data in a SQLite file
     `hc.sqlite` in the project directory (`~/webapps/healthchecks/`).
@@ -66,21 +69,17 @@ assume an activated virtual environment.
 ## Accessing Administration Panel
 
 Healthchecks comes with Django's administration panel where you can perform
-administrative tasks: delete user accounts, change passwords, inspect contents of
+administrative tasks: change the user's password, inspect contents of
 database tables.
 
-To access the administration panel, if you haven't already, create a superuser account:
-
-    $ ./manage.py createsuperuser
-
-This will trigger an interactive prompt.
-
-You can also provide credentials via parameters, bypassing the interactive prompt:
+To access the administration panel, log into the site as the superuser.
+`createsuperuser` in the setup steps above prompts for its credentials; you can
+also provide them via parameters, bypassing the interactive prompt:
 
     $ ./manage.py createsuperuser --email user@example.com --password changeme123
 
-Then, log into the site using the superuser credentials. Once logged in,
-click on the "Account" dropdown in top navigation, and select "Site Administration".
+Once logged in, click on the "Account" dropdown in top navigation, and select
+"Site Administration".
 
 ## Sending Emails
 
@@ -141,26 +140,18 @@ pings for every check. You can set the limit higher to keep a longer history:
 go to the Administration Panel, look up user's **Profile** and modify its
 "Ping log limit" field.
 
-Healthchecks provides management commands for cleaning up
-`auth_user` (user accounts) and `api_tokenbucket` (rate limiting records) tables.
-
-Remove user accounts that are older than 1 month and have never logged in:
-
-```sh
-$ ./manage.py pruneusers
-```
-
-Remove old records from the `api_tokenbucket` table. The TokenBucket
-model is used for rate-limiting login attempts and similar operations.
-Any records older than one day can be safely removed.
+Healthchecks provides a management command for cleaning up the `api_tokenbucket`
+(rate limiting records) table. The TokenBucket model is used for rate-limiting
+login attempts and similar operations. Any records older than one day can be
+safely removed.
 
 ```sh
 $ ./manage.py prunetokenbucket
 ```
 
-When you first try these commands on your data, it is a good idea to
-test them on a copy of your database, not on the live database right away.
-In a production setup, you will want to run these commands regularly, as well as
+When you first try this command on your data, it is a good idea to
+test it on a copy of your database, not on the live database right away.
+In a production setup, you will want to run this command regularly, as well as
 have regular, automatic database backups set up.
 
 ## Next Steps

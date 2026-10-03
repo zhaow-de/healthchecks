@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load compress hc_extras static %}
+{% load hc_extras %}
 
 {% block title %}Log In - {{ site_name }}{% endblock %}
 
@@ -106,10 +106,6 @@
     </div>
 </div>
 
-{% if registration_open %}
-{% include "front/signup_modal.html" %}
-{% endif %}
-
 <div id="lost-password-modal" class="modal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -144,10 +140,4 @@
     </div>
 </div>
 
-{% endblock %}
-
-{% block scripts %}
-{% compress js %}
-<script src="{% static 'js/signup.js' %}"></script>
-{% endcompress %}
 {% endblock %}

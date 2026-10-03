@@ -56,10 +56,7 @@ class SendReportsTestCase(BaseTestCase):
         self.profile.next_nag_date = CURRENT_TIME - td(seconds=10)
         self.profile.save()
 
-        # Disable bob's and charlie's monthly reports so they don't interfere
-        self.bobs_profile.reports = "off"
-        self.bobs_profile.save()
-
+        # Disable charlie's monthly report so it doesn't interfere
         self.charlies_profile.reports = "off"
         self.charlies_profile.save()
 

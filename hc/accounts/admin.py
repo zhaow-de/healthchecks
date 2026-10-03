@@ -6,12 +6,10 @@ from typing import ClassVar, TypedDict
 
 from django.contrib import admin
 from django.contrib.admin import ModelAdmin
-from django.contrib.auth import login as auth_login
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.models import User
 from django.db.models import Count, F, Func, OuterRef, QuerySet, Subquery
-from django.http import HttpRequest, HttpResponseRedirect
-from django.shortcuts import redirect
+from django.http import HttpRequest
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils.html import format_html
@@ -88,22 +86,17 @@ class ProfileAdmin(ModelAdmin[Profile]):
         "projects",
         "date_joined",
         "last_active",
-        "deletion",
         "reports",
     )
     list_filter = (
         NumChecksFilter,
         "last_active_date",
-        "deletion_scheduled_date",
         "reports",
     )
     actions = (
-        "login",
         "send_report",
         "send_nag",
         "remove_totp",
-        "schedule_for_deletion",
-        "unschedule_for_deletion",
     )
 
     _profile_fields = (
@@ -118,15 +111,9 @@ class ProfileAdmin(ModelAdmin[Profile]):
 
     _limits_fields = ("ping_log_limit",)
 
-    _deletion_fields = (
-        "deletion_notice_date",
-        "deletion_scheduled_date",
-    )
-
     fieldsets = (
         ("User Profile", {"fields": _profile_fields}),
         ("Limits", {"fields": _limits_fields}),
-        ("Deletion", {"fields": _deletion_fields}),
     )
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Profile]:
@@ -160,12 +147,6 @@ class ProfileAdmin(ModelAdmin[Profile]):
             return obj.last_active_date.date()
         return None
 
-    @admin.display(ordering="deletion_scheduled_date")
-    def deletion(self, obj: Profile) -> date | None:
-        if obj.deletion_scheduled_date:
-            return obj.deletion_scheduled_date.date()
-        return None
-
     def projects(self, obj: Profile) -> str:
         return render_to_string("admin/profile_list_projects.html", {"profile": obj})
 
@@ -174,11 +155,6 @@ class ProfileAdmin(ModelAdmin[Profile]):
         if obj.num_checks > 1:
             tmpl = "<b>{}</b>"
         return format_html(tmpl, obj.num_checks)
-
-    def login(self, r: HttpRequest, qs: QuerySet[Profile]) -> HttpResponseRedirect:
-        profile = qs.get()
-        auth_login(r, profile.user, "hc.accounts.backends.EmailBackend")
-        return redirect("hc-index")
 
     def send_report(self, request: HttpRequest, qs: QuerySet[Profile]) -> None:
         for profile in qs:
@@ -201,20 +177,10 @@ class ProfileAdmin(ModelAdmin[Profile]):
 
         self.message_user(request, f"Removed TOTP for {len(qs)} profile(s)")
 
-    def schedule_for_deletion(self, r: HttpRequest, qs: QuerySet[Profile]) -> None:
-        for profile in qs:
-            profile.schedule_for_deletion()
-        self.message_user(r, f"{len(qs)} user(s) scheduled for deletion")
-
-    def unschedule_for_deletion(self, r: HttpRequest, qs: QuerySet[Profile]) -> None:
-        num_unscheduled = qs.update(deletion_scheduled_date=None)
-        self.message_user(r, f"{num_unscheduled} user(s) unscheduled for deletion")
-
 
 class ProjectAnnotations(TypedDict):
     num_checks: int
     num_channels: int
-    num_members: int
 
 
 @admin.register(Project)
@@ -224,14 +190,10 @@ class ProjectAdmin(ModelAdmin[Project]):
     list_display = ("id", "name_", "users", "usage", "switch")
     search_fields = ("id", "name", "owner__email", "code")
 
-    class Media:
-        css: ClassVar = {"all": ("css/admin/projects.css",)}
-
     def get_queryset(self, request: HttpRequest) -> QuerySet[Project]:
         qs = super().get_queryset(request)
         qs = qs.annotate(num_channels=Count("channel", distinct=True))
         qs = qs.annotate(num_checks=Count("check", distinct=True))
-        qs = qs.annotate(num_members=Count("member", distinct=True))
         return qs
 
     def name_(self, obj: Project) -> str:
@@ -240,11 +202,8 @@ class ProjectAdmin(ModelAdmin[Project]):
 
         return f"Default Project for {obj.owner.email}"
 
-    def users(self, obj: WithAnnotations[Project, ProjectAnnotations]) -> str:
-        if obj.num_members == 0:
-            return obj.owner.email
-        else:
-            return render_to_string("admin/project_list_team.html", {"project": obj})
+    def users(self, obj: Project) -> str:
+        return obj.owner.email
 
     def usage(self, obj: WithAnnotations[Project, ProjectAnnotations]) -> str:
         return _format_usage(obj.num_checks, obj.num_channels)
@@ -277,8 +236,11 @@ class HcUserAdmin(UserAdmin[User]):
 
     list_display_links = ("id", "email")
     list_filter = ("last_login", "date_joined", "is_staff", "is_active")
-    actions = ("activate", "deactivate")
     ordering = ("-id",)
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        # The instance has one user, created by the createsuperuser command
+        return False
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[User]:
         qs = super().get_queryset(request)
@@ -293,21 +255,6 @@ class HcUserAdmin(UserAdmin[User]):
 
     def usage(self, user: WithAnnotations[User, UserAnnotations]) -> str:
         return _format_usage(user.num_checks, user.num_channels)
-
-    def activate(self, request: HttpRequest, qs: QuerySet[User]) -> None:
-        for user in qs:
-            user.is_active = True
-            user.save()
-
-        self.message_user(request, f"{len(qs)} user(s) activated")
-
-    def deactivate(self, request: HttpRequest, qs: QuerySet[User]) -> None:
-        for user in qs:
-            user.is_active = False
-            user.set_unusable_password()
-            user.save()
-
-        self.message_user(request, f"{len(qs)} user(s) deactivated")
 
 
 @admin.register(Credential)

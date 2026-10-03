@@ -15,47 +15,14 @@ class ProfileTestCase(BaseTestCase):
         self.assertContains(r, "Change Password")
         self.assertContains(r, "Set Up Authenticator App")
 
-    def test_leaving_works(self) -> None:
-        self.client.login(username="bob@example.org", password="password")
-
-        form = {"code": str(self.project.code), "leave_project": "1"}
-        r = self.client.post("/accounts/profile/", form)
-        self.assertContains(r, "Left project <strong>Alices Project</strong>")
-        self.assertNotContains(r, "Member")
-
-        self.bobs_profile.refresh_from_db()
-        self.assertFalse(self.bob.memberships.exists())
-
-    def test_leaving_checks_membership(self) -> None:
-        self.client.login(username="charlie@example.org", password="password")
-
-        form = {"code": str(self.project.code), "leave_project": "1"}
-        r = self.client.post("/accounts/profile/", form)
-        self.assertEqual(r.status_code, 400)
-
-    def test_leaving_handles_invalid_uuid(self) -> None:
-        self.client.login(username="bob@example.org", password="password")
-
-        form = {"code": "surprise", "leave_project": "1"}
-        r = self.client.post("/accounts/profile/", form)
-        self.assertEqual(r.status_code, 400)
-
-    def test_it_shows_project_membership(self) -> None:
-        self.client.login(username="bob@example.org", password="password")
+    def test_it_shows_own_projects(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
 
         r = self.client.get("/accounts/profile/")
         self.assertContains(r, "Alices Project")
-        self.assertContains(r, "Member")
-
-    def test_it_shows_readonly_project_membership(self) -> None:
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
-
-        self.client.login(username="bob@example.org", password="password")
-
-        r = self.client.get("/accounts/profile/")
-        self.assertContains(r, "Alices Project")
-        self.assertContains(r, "Read-only")
+        self.assertContains(r, f"/projects/{self.project.code}/checks/")
+        self.assertContains(r, f"/projects/{self.project.code}/settings/")
+        self.assertNotContains(r, str(self.charlies_project.code))
 
     def test_it_handles_no_projects(self) -> None:
         self.project.delete()

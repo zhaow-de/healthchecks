@@ -22,18 +22,28 @@ class MyChecksTestCase(BaseTestCase):
         self.profile.tz = "Europe/Riga"
         self.profile.save()
 
-        for email in ("alice@example.org", "bob@example.org"):
-            self.client.login(username=email, password="password")
-            r = self.client.get(self.url)
-            self.assertContains(r, "favicon.svg", status_code=200)
-            self.assertContains(r, "Alice Was Here")
-            self.assertContains(r, str(self.check.code))
-            # The pause button:
-            self.assertContains(r, "btn pause")
-            # The Add Check button:
-            self.assertContains(r, 'data-bs-target="#add-check-modal"')
-            if email == "alice@example.org":
-                self.assertContains(r, 'data-profile-tz="Europe/Riga"')
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(self.url)
+        self.assertContains(r, "favicon.svg", status_code=200)
+        self.assertContains(r, "Alice Was Here")
+        self.assertContains(r, str(self.check.code))
+        self.assertContains(r, 'data-profile-tz="Europe/Riga"')
+        # The pause button:
+        self.assertContains(r, "btn pause")
+        # The Add Check button:
+        self.assertContains(r, 'data-bs-target="#add-check-modal"')
+        # The ping URL style switcher:
+        self.assertContains(r, 'id="url-style-switcher"')
+        # The cells that checks.js and update-timeout-modal.js make editable:
+        self.assertContains(r, 'class="my-checks-name ')
+        self.assertContains(r, 'class="integrations ic"')
+        self.assertContains(r, 'class="timeout-grace"')
+        # The schedule dialog's Save buttons are enabled
+        html = r.content.decode()
+        self.assertRegex(html, r'id="update-cron-submit"')
+        self.assertNotRegex(html, r'id="update-cron-submit"[^>]*disabled')
+        self.assertRegex(html, r'id="update-oncalendar-submit"')
+        self.assertNotRegex(html, r'id="update-oncalendar-submit"[^>]*disabled')
 
         # last_active_date should have been set
         self.profile.refresh_from_db()
@@ -156,18 +166,6 @@ class MyChecksTestCase(BaseTestCase):
         r = self.client.get(self.url)
         self.assertContains(r, """<div data-tooltip="1 up" class="btn btn-sm grace ">foo</div>""")
 
-    def test_it_hides_actions_from_readonly_users(self) -> None:
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
-
-        self.client.login(username="bob@example.org", password="password")
-        r = self.client.get(self.url)
-
-        self.assertNotContains(r, 'data-bs-target="#add-check-modal"', status_code=200)
-
-        # The pause button:
-        self.assertNotContains(r, 'class="btn pause"', status_code=200)
-
     def test_it_shows_slugs(self) -> None:
         self.project.show_slugs = True
         self.project.save()
@@ -208,15 +206,13 @@ class MyChecksTestCase(BaseTestCase):
         self.assertContains(r, 'data-timeout="123"')
         self.assertContains(r, 'data-grace="456"')
 
-    def test_superuser_can_view_any_project(self) -> None:
+    def test_it_denies_a_superuser_outsider(self) -> None:
         self.charlie.is_superuser = True
         self.charlie.save()
 
         self.client.login(username="charlie@example.org", password="password")
         r = self.client.get(self.url)
-        self.assertContains(r, "Alice Was Here", status_code=200)
-        # Superusers get read-write access, so the pause button is shown
-        self.assertContains(r, "btn pause")
+        self.assertEqual(r.status_code, 404)
 
     def test_it_filters_by_status(self) -> None:
         self.check.last_ping = now()

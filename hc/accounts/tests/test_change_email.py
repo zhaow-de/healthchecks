@@ -80,9 +80,9 @@ class ChangeEmailTestCase(BaseTestCase):
         self.client.login(username="alice@example.org", password="password")
         self.set_sudo_flag()
 
-        payload = {"email": "bob@example.org"}
+        payload = {"email": "charlie@example.org"}
         r = self.client.post("/accounts/change_email/", payload)
-        self.assertContains(r, "bob@example.org is already registered")
+        self.assertContains(r, "charlie@example.org is already registered")
 
         self.alice.refresh_from_db()
         self.assertEqual(self.alice.email, "alice@example.org")

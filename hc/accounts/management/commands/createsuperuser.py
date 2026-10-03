@@ -4,27 +4,53 @@ import sys
 from argparse import ArgumentParser
 from getpass import getpass
 from typing import Any
+from uuid import uuid4
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand
 
 from hc.accounts.forms import LowercaseEmailField
-from hc.accounts.views import _make_user
+from hc.accounts.models import Profile, Project
+from hc.api.models import Channel, Check
+
+
+def _make_user(email: str) -> User:
+    username = str(uuid4())[:30]
+    user = User(username=username, email=email)
+    user.set_unusable_password()
+    user.save()
+
+    project = Project(owner=user)
+    project.badge_key = user.username
+    project.save()
+
+    check = Check(project=project)
+    check.name = "My First Check"
+    check.slug = "my-first-check"
+    check.save()
+
+    channel = Channel(project=project)
+    channel.kind = "email"
+    channel.value = email
+    channel.email_verified = True
+    channel.save()
+
+    channel.checks.add(check)
+
+    # Ensure a profile gets created
+    Profile.objects.for_user(user)
+    return user
 
 
 class Command(BaseCommand):
-    help = """Create a super-user account."""
+    help = """Create the instance's one user, a superuser."""
 
     def validate_email(self, raw_email: str) -> str | None:
         try:
             email = LowercaseEmailField().clean(raw_email)
         except ValidationError as e:
             self.stderr.write("Error: " + " ".join(e.messages))
-            return None
-
-        if User.objects.filter(email=email).exists():
-            self.stderr.write(f"Error: email {email} is already taken")
             return None
 
         return email
@@ -50,6 +76,10 @@ class Command(BaseCommand):
         )
 
     def handle(self, **options: Any) -> str:
+        if User.objects.exists():
+            self.stderr.write("Error: a user already exists, and this instance has only one")
+            sys.exit(2)
+
         email = options["email"]
         password = options["password"]
 

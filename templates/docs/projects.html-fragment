@@ -1,0 +1,20 @@
+<h1>Projects</h1>
+<p>Use Projects to organize checks in your SITE_NAME account. Your account initially
+has a single default project. You can create additional projects and transfer
+your checks between them as your usage grows.</p>
+<p><img alt="An overview of projects" src="IMG_URL/projects.png" /></p>
+<p>Checks and integrations are project-scoped: each check and each configured
+integration always belongs to a particular project.</p>
+<h2 id="transferring-checks">Transferring Checks Between Projects</h2>
+<p>You can transfer a check between projects, <strong>and keep its ping address</strong>. To transfer
+a check, go to its details page, and look for the "Transfer to Another Project&hellip;"
+button.</p>
+<p><img alt="The transfer dialog" src="IMG_URL/transfer_check.png" /></p>
+<p>The transfer dialog lists your other projects.</p>
+<h2>Monthly / Weekly / Daily Email Reports</h2>
+<p>SITE_NAME can optionally send periodic email reports with a summary of checks
+from all your projects. For each check, the reports show the check's current status
+and its downtime statistics.</p>
+<p>You can configure the frequency of the reports (monthly, on the 1st of every month,
+or weekly, on Mondays, or daily) or turn them off altogether in
+<a href="../../accounts/profile/notifications/">Account Settings › Email Reports</a>.</p>

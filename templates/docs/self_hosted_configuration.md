@@ -32,8 +32,6 @@ from environment variables. Below is a list of environment variables it reads an
 <li><a href="#PING_BODY_LIMIT">PING_BODY_LIMIT</a></li>
 <li><a href="#PING_ENDPOINT">PING_ENDPOINT</a></li>
 <li><a href="#PROMETHEUS_ENABLED">PROMETHEUS_ENABLED</a></li>
-<li><a href="#REGISTRATION_OPEN">REGISTRATION_OPEN</a></li>
-<li><a href="#REMOTE_USER_HEADER">REMOTE_USER_HEADER</a></li>
 <li><a href="#RP_ID">RP_ID</a></li>
 <li><a href="#SECRET_KEY">SECRET_KEY</a></li>
 <li><a href="#SECRET_KEY_FILE">SECRET_KEY_FILE</a></li>
@@ -343,61 +341,6 @@ https://ping.my-hc.example.org/1fj9XWM6Ns8vLGTmnPGk9g/dummy-slug
 Default: `True`
 
 A boolean that turns on/off the Prometheus integration. Enabled by default.
-
-## `REGISTRATION_OPEN` {: #REGISTRATION_OPEN }
-
-Default: `True`
-
-A boolean that controls whether site visitors can create new accounts.
-Set it to `False` if you are setting up a private Healthchecks instance, but
-it needs to be publicly accessible (so, for example, your cloud services
-can send pings to it).
-
-If you close new user registration, you can still selectively invite users
-to your team account.
-
-## `REMOTE_USER_HEADER` {: #REMOTE_USER_HEADER }
-
-Default: `None`
-
-Specifies the request header to use for external authentication. If you use
-a reverse proxy that handles user authentication, and the reverse proxy can pass
-the authenticated user's email address in an HTTP request header, you can use this
-setting to integrate Healthchecks with it.
-
-When `REMOTE_USER_HEADER` is set, Healthchecks will:
-
- - in views that require authentication, look up the request header
-   specified in `REMOTE_USER_HEADER`
- - assume the header contains the user's email address
- - automatically log in the user with a matching email address
- - automatically create a user account if it does not exist
- - disable the default authentication methods (login link to email, password)
-
-The header name in `REMOTE_USER_HEADER` must be specified in upper-case,
-with any dashes replaced with underscores, and prefixed with `HTTP_`. For
-example, if your authentication proxy sets a `X-Authenticated-User` request
-header, you should set `REMOTE_USER_HEADER=HTTP_X_AUTHENTICATED_USER`.
-
-**Important:** When this option is enabled, **Healthchecks will trust the header's
-value implicitly**, so it is **very important** to ensure that attackers cannot
-set the value themselves (and thus impersonate any user). How to do this varies by
-your chosen proxy, but generally involves configuring it to strip out headers that
-normalize to the same name as the chosen identity header.
-
-**On using `local_settings.py`:**
-When Healthchecks reads settings from environment variables and encounters
-the `REMOTE_USER_HEADER` environment variable, it sets *two* settings,
-`REMOTE_USER_HEADER` and `AUTHENTICATION_BACKENDS`. This logic has already run by the
-time Healthchecks reads `local_settings.py`. Therefore, if you configure Healthchecks
-using the `local_settings.py` file instead of environment variables, and specify
-`REMOTE_USER_HEADER` there, you will also need a line which sets the other setting,
-`AUTHENTICATION_BACKENDS`:
-
-```
-REMOTE_USER_HEADER = "HTTP_X_AUTHENTICATED_USER"
-AUTHENTICATION_BACKENDS = ["hc.accounts.backends.CustomHeaderBackend"]
-```
 
 ## `RP_ID` {: #RP_ID }
 

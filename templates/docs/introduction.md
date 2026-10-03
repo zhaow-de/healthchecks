@@ -144,8 +144,6 @@ Your account starts with a single default project, but you can create
 additional projects as needed. You can transfer existing checks between projects
 while preserving their configuration and ping URLs.
 
-Each project has a configurable name, a separate set of API keys, and a separate
-project team. The project's team is the set of people you have granted read-only or
-read-write access to the project.
+Each project has a configurable name and a separate set of API keys.
 
-For more information on projects, see [Projects and teams](projects_teams/).
+For more information on projects, see [Projects](projects/).

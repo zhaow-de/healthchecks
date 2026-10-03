@@ -87,14 +87,12 @@
         {% if 'down' not in selected_statuses %}style="display: none"{% endif %}
         data-value="down">Down ×</button>
 
-    {% if rw %}
     <button
         class="btn btn-primary"
         data-bs-toggle="modal"
         data-bs-target="#add-check-modal">
             Add Check
         </button>
-    {% endif %}
 </div>
 
 
@@ -111,7 +109,6 @@
     <div class="col-sm-12">
         <div class="alert alert-info">
             The project <strong>{{ project }}</strong> does not have any checks yet.
-            {% if rw %}
             <br><br>
             <button
                 class="btn btn-primary"
@@ -119,7 +116,6 @@
                 data-bs-target="#add-check-modal">
                     Add Check
             </button>
-            {% endif %}
         </div>
     </div>
 </div>

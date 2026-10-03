@@ -61,7 +61,7 @@ hc.ready(function () {
         }, 300);
     });
 
-    hc.on(".details-integrations.rw tr", "click", function() {
+    hc.on(".details-integrations tr", "click", function() {
         var isOn = this.classList.toggle("on");
         this.querySelector(".badge").textContent = isOn ? "ON" : "OFF";
         hc.post(this.dataset.url, {"state": isOn ? "on" : "off"}).catch(function() {});

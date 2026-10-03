@@ -64,13 +64,11 @@ class CopyCheckTestCase(BaseTestCase):
         self.assertEqual(r.status_code, 302)
         self.assertEqual(Check.objects.count(), 27)
 
-    def test_it_requires_rw_access(self) -> None:
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
-
-        self.client.login(username="bob@example.org", password="password")
+    def test_it_checks_ownership(self) -> None:
+        self.client.login(username="charlie@example.org", password="password")
         r = self.client.post(self.copy_url)
-        self.assertEqual(r.status_code, 403)
+        self.assertEqual(r.status_code, 404)
+        self.assertEqual(Check.objects.count(), 1)
 
     def test_it_handles_long_check_name(self) -> None:
         self.check.name = "A" * 100

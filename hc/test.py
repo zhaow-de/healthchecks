@@ -8,7 +8,7 @@ from django.core.mail import EmailMultiAlternatives
 from django.core.signing import TimestampSigner
 from django.test import Client, TestCase
 
-from hc.accounts.models import Member, Profile, Project
+from hc.accounts.models import Profile, Project
 
 if TYPE_CHECKING:
     # _MonkeyPatchedWSGIResponse is defined in django-stubs,
@@ -27,7 +27,7 @@ class BaseTestCase(TestCase):
 
         self.csrf_client = Client(enforce_csrf_checks=True)
 
-        # Alice is a normal user for tests. Alice has team access enabled.
+        # Alice is the instance's one user and owns self.project
         self.alice = User(username="alice", email="alice@example.org")
         self.alice.set_password("password")
         self.alice.save()
@@ -41,21 +41,7 @@ class BaseTestCase(TestCase):
         self.profile = Profile(user=self.alice)
         self.profile.save()
 
-        # Bob is on Alice's team and should have access to her stuff
-        self.bob = User(username="bob", email="bob@example.org")
-        self.bob.set_password("password")
-        self.bob.save()
-
-        self.bobs_project = Project(owner=self.bob)
-        self.bobs_project.badge_key = self.bob.username
-        self.bobs_project.save()
-
-        self.bobs_profile = Profile(user=self.bob)
-        self.bobs_profile.save()
-
-        self.bobs_membership = Member.objects.create(user=self.bob, project=self.project, role=Member.Role.REGULAR)
-
-        # Charlie should have no access to Alice's stuff
+        # Charlie is an outsider and should have no access to Alice's stuff
         self.charlie = User(username="charlie", email="charlie@example.org")
         self.charlie.set_password("password")
         self.charlie.save()

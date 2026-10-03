@@ -58,11 +58,6 @@ def site_name() -> str:
 
 
 @register.simple_tag
-def support_email() -> str | None:
-    return settings.SUPPORT_EMAIL
-
-
-@register.simple_tag
 def absolute_site_logo_url() -> str:
     """Return absolute URL to site's logo.
 

@@ -5,51 +5,17 @@
 
 
 {% block content %}
-{% with project.transfer_request as transfer_request %}
 <div class="row">
     <div class="col-sm-9 col-md-7 col-lg-6">
-        {% for message in messages %}
-            <p class="alert alert-{{ message.tags }}">{{ message }}</p>
-        {% endfor %}
-
-        {% if transfer_request and transfer_request.user == request.user %}
-        <div id="transfer-request" class="card mb-4">
-            <div class="card-body settings-block">
-                <h2>Ownership Transfer Request</h2>
-                <p>
-                    <strong>{{ project.owner.email }}</strong> would like to transfer
-                    the ownership of this project to you.
-                </p>
-
-                <div class="text-end">
-                    <form method="post">
-                        {% csrf_token %}
-                        <button
-                            type="submit"
-                            name="reject_transfer"
-                            class="btn btn-outline-secondary">Reject</button>
-                        <button
-                            type="submit"
-                            name="accept_transfer"
-                            class="btn btn-primary">Accept</button>
-                    </form>
-                </div>
-
-            </div>
-        </div>
-        {% endif %}
-
         <div class="card mb-4 border-{{ project_name_status|default:'default' }}">
             <div class="card-body settings-block">
                 <h2>Project Name</h2>
                 {{ project }}
-                {% if rw %}
                 <a
                     href="#"
                     class="btn btn-outline-secondary float-end"
                     data-bs-toggle="modal"
                     data-bs-target="#set-project-name-modal">Change Project Name</a>
-                {% endif %}
             </div>
 
            {% if project_name_updated %}
@@ -59,7 +25,6 @@
             {% endif %}
         </div>
 
-        {% if rw %}
         <div class="card mb-4 border-{{ api_status|default:'default' }}">
             <div class="card-body settings-block">
                 <h2>API Access</h2>
@@ -146,164 +111,26 @@
             </div>
             {% endif %}
         </div>
-        {% endif %}
 
-        {% with invite_suggestions=project.invite_suggestions %}
-        <div class="card mb-4 border-{{ team_status|default:'default' }}">
-            <div class="card-body settings-block">
-                <h2>Team Access</h2>
-                {% if memberships or invite_suggestions %}
-                    <table id="team-table" class="table">
-                        <tr>
-                            <th>Email</th>
-                            <th>Role</th>
-                            <th></th>
-                        </tr>
-                        <tr>
-                            <td class="email">{{ project.owner.email }}</td>
-                            <td>Owner</td>
-                            <td></td>
-                        </tr>
-                        {% for m in memberships %}
-                        <tr>
-                            <td class="email">{{ m.user.email }}</td>
-                            <td>{{ m.get_role_display }}</td>
-                            <td class="text-end">
-                                {% if is_manager and m.user != request.user %}
-                                <a
-                                    href="#"
-                                    data-email="{{ m.user.email }}"
-                                    class="member-remove">Remove</a>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-
-                        {% if is_manager and invite_suggestions %}
-                        <tr id="suggestions-row">
-                            <td colspan="3">
-                                Add Users from Other Projects
-                            </td>
-                        </tr>
-
-                        {% for user in invite_suggestions %}
-                        <tr class="invite-suggestion">
-                            <td>{{ user.email }} </td>
-                            <td></td>
-                            <td class="text-end">
-                                <a
-                                    href="#"
-                                    data-email="{{ user.email }}"
-                                    class="add-to-team">Add to Team</a>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                        {% endif %}
-                    </table>
-                {% else %}
-                    <p>
-                        <strong>Invite team members to your project.</strong>
-                        Share access to your checks and configured integrations
-                        without having to share login details.
-                    </p>
-                {% endif %}
-
-                <br />
-
-                {% if is_manager %}
-                <a
-                    href="#"
-                    class="btn btn-primary float-end"
-                    data-bs-toggle="modal"
-                    data-bs-target="#invite-team-member-modal">Invite a Team Member</a>
-                {% endif %}
-            </div>
-            {% endwith %}
-
-           {% if team_member_invited %}
-            <div class="card-footer">
-                {{ team_member_invited }} invited to team
-            </div>
-            {% endif %}
-
-           {% if team_member_duplicate %}
-            <div class="card-footer">
-                {{ team_member_duplicate }} is already a member
-            </div>
-            {% endif %}
-
-           {% if team_member_removed %}
-            <div class="card-footer">
-                {{ team_member_removed }} removed from team
-            </div>
-            {% endif %}
-        </div>
-
-        {% if is_owner %}
-        <div class="card mb-4 border-{{ transfer_status|default:'default' }}">
-            <div class="card-body settings-block">
-                <h2>Transfer Ownership</h2>
-
-                {% if transfer_request %}
-                <form method="post">
-                    {% csrf_token %}
-                    <button
-                        type="submit"
-                        name="cancel_transfer"
-                        class="btn btn-outline-secondary float-end">Cancel Transfer</button>
-                </form>
-
-                Transfer initiated, awaiting confirmation from
-                <strong>{{ transfer_request.user.email }}</strong>.
-
-                {% else %}
-                <a href="#"
-                   class="btn btn-outline-secondary float-end"
-                   data-bs-toggle="modal"
-                   data-bs-target="#transfer-modal">Transfer Project&hellip;</a>
-                Transfer this project to a team member.
-                {% endif %}
-            </div>
-
-           {% if transfer_initiated %}
-            <div class="card-footer">
-                Transfer initiated!
-            </div>
-            {% endif %}
-
-           {% if transfer_cancelled %}
-            <div class="card-footer">
-                Transfer cancelled!
-            </div>
-            {% endif %}
-        </div>
-        {% endif %}
-
-        {% if is_owner %}
         <div class="card mb-4">
             <div class="card-body settings-block">
-                    {% csrf_token %}
-                    <h2>Remove Project</h2>
-                    <a href="#"
-                       class="btn btn-outline-danger float-end"
-                       data-bs-toggle="modal"
-                       data-bs-target="#remove-project-modal">Remove Project</a>
-                    This will permanently remove project {{ project }}.
+                <h2>Remove Project</h2>
+                <a href="#"
+                   class="btn btn-outline-danger float-end"
+                   data-bs-toggle="modal"
+                   data-bs-target="#remove-project-modal">Remove Project</a>
+                This will permanently remove project {{ project }}.
             </div>
         </div>
-        {% endif %}
 
     </div>
 </div>
 
-{% if rw %}
 <form id="create-key-form" method="post">
     {% csrf_token %}
     <input id="create-key-type" type="hidden" name="create_key">
 </form>
-{% endif %}
 
-{% if rw %}
 <div id="revoke-key-modal" class="modal" tabindex="-1">
     <div class="modal-dialog">
         <form id="revoke-key-form" method="post">
@@ -335,124 +162,7 @@
         </form>
     </div>
 </div>
-{% endif %}
 
-{% if is_manager %}
-<div id="remove-team-member-modal" class="modal" tabindex="-1">
-    <div class="modal-dialog">
-        <form id="remove-team-member-form" method="post">
-            {% csrf_token %}
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h4 class="modal-title">Remove Team Member</h4>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p>You are about to remove <strong id="rtm-email"></strong> from the project.</p>
-                    <p>Are you sure?</p>
-                    <input
-                        type="hidden"
-                        name="email"
-                        id="remove-team-member-email" />
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button
-                        type="submit"
-                        name="remove_team_member"
-                        class="btn btn-danger">Remove Member from Project</button>
-                </div>
-            </div>
-        </form>
-    </div>
-</div>
-{% endif %}
-
-{% if is_manager %}
-<div id="invite-team-member-modal" class="modal" tabindex="-1">
-    <div class="modal-dialog">
-        <form method="post">
-            {% csrf_token %}
-            <input type="hidden" name="invite_team_member" value="1" />
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h4 class="modal-title">Invite a Team Member</h4>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="row mb-3">
-                        <label for="itm-email" class="col-sm-3 col-form-label">Email</label>
-                        <div class="col-sm-8">
-                            <input
-                                type="email"
-                                class="form-control"
-                                id="itm-email"
-                                name="email"
-                                maxlength="254"
-                                placeholder="friend@example.org">
-                        </div>
-                    </div>
-
-                    <div class="row mb-3">
-                        <label class="col-sm-3 col-form-label">Access Level</label>
-
-                        <div class="col-sm-8">
-                        <label class="form-check">
-                            <input
-                                class="form-check-input"
-                                type="radio"
-                                name="role"
-                                value="w"
-                                checked>
-                            Team Member
-                            <span class="form-text d-block">
-                                Can create and manage checks and integrations.
-                            </span>
-                        </label>
-                        <label class="form-check">
-                            <input
-                                class="form-check-input"
-                                type="radio"
-                                name="role"
-                                value="m">
-                            Manager
-                            <span class="form-text d-block">
-                                Same as Team Member, plus can invite and remove
-                                other members.
-                            </span>
-                        </label>
-                        <label class="form-check">
-                            <input
-                                class="form-check-input"
-                                type="radio"
-                                name="role"
-                                value="r">
-                            Read-only
-                            <span class="form-text d-block">
-                                Can view checks and integrations, but cannot
-                                modify anything. Cannot access project's API keys.
-                            </span>
-                        </label>
-                        </div>
-                    </div>
-
-
-
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button
-                        type="submit"
-                        name="invite_team_member"
-                        class="btn btn-primary">Send Invite</button>
-                </div>
-            </div>
-        </form>
-    </div>
-</div>
-{% endif %}
-
-{% if rw %}
 <div id="set-project-name-modal" class="modal" tabindex="-1">
     <div class="modal-dialog">
         <form method="post">
@@ -487,9 +197,7 @@
         </form>
     </div>
 </div>
-{% endif %}
 
-{% if is_owner %}
 <div id="remove-project-modal" class="modal" tabindex="-1">
     <div class="modal-dialog">
         <form method="post" action="{% url 'hc-remove-project' project.code %}">
@@ -515,60 +223,6 @@
         </form>
     </div>
 </div>
-{% endif %}
-
-{% if is_owner and not transfer_request %}
-<div id="transfer-modal" class="modal" tabindex="-1">
-    <div class="modal-dialog">
-    <form method="post">
-        {% csrf_token %}
-        <input type="hidden" name="transfer_project" value="1" />
-        <div class="modal-content">
-            <div class="modal-header">
-                <h4 class="modal-title">Transfer Ownership</h4>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-
-                {% if memberships %}
-                <div class="row mb-3">
-                    <label for="new-owner" class="col-sm-4 col-form-label">
-                        Choose owner
-                    </label>
-                    <div class="col-sm-7">
-                        <select
-                            id="new-owner"
-                            name="email"
-                            title="Select..."
-                            class="form-select">
-                            <option></option>
-                            {% for m in memberships %}
-                            <option>{{ m.user.email }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
-                {% else %}
-                <p>
-                    This project currently has no team members.
-                    To transfer the ownership of this project, please start by
-                    inviting the new owner as a team member.
-                </p>
-                {% endif %}
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button
-                    id="transfer-confirm"
-                    disabled
-                    type="submit"
-                    class="btn btn-primary">Initiate Transfer</button>
-            </div>
-        </div>
-    </form>
-    </div>
-</div>
-{% endif %}
 
 {% if new_key %}
 <div id="key-created-modal" class="modal" tabindex="-1">
@@ -613,9 +267,6 @@
 </div>
 {% endif %}
 
-
-
-{% endwith %}
 {% endblock %}
 
 {% block scripts %}

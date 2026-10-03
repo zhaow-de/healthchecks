@@ -56,15 +56,11 @@ class ResumeTestCase(BaseTestCase):
         r = self.client.get(self.url)
         self.assertEqual(r.status_code, 405)
 
-    def test_it_allows_cross_team_access(self) -> None:
-        self.client.login(username="bob@example.org", password="password")
+    def test_it_checks_ownership(self) -> None:
+        self.client.login(username="charlie@example.org", password="password")
         r = self.client.post(self.url)
-        self.assertRedirects(r, self.redirect_url)
+        self.assertEqual(r.status_code, 404)
 
-    def test_it_requires_rw_access(self) -> None:
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
-
-        self.client.login(username="bob@example.org", password="password")
-        r = self.client.post(self.url)
-        self.assertEqual(r.status_code, 403)
+        self.check.refresh_from_db()
+        self.assertEqual(self.check.status, "paused")
+        self.assertFalse(Flip.objects.exists())

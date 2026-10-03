@@ -42,17 +42,6 @@ class SendTestNotificationTestCase(BaseTestCase):
         self.assertEqual(n.channel, self.channel)
         self.assertEqual(n.error, "")
 
-    def test_it_allows_readonly_user(self) -> None:
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
-
-        self.client.login(username="bob@example.org", password="password")
-        r = self.client.post(self.url, {})
-        self.assertRedirects(r, self.channels_url)
-
-        # And email should have been sent
-        self.assertEqual(len(mail.outbox), 1)
-
     def test_it_clears_channel_last_error(self) -> None:
         self.channel.last_error = "Something went wrong"
         self.channel.save()
@@ -125,8 +114,10 @@ class SendTestNotificationTestCase(BaseTestCase):
 
     def test_it_checks_channel_ownership(self) -> None:
         self.client.login(username="charlie@example.org", password="password")
-        r = self.client.post(self.url, {}, follow=True)
+        r = self.client.post(self.url, {})
         self.assertEqual(r.status_code, 404)
+        self.assertEqual(len(mail.outbox), 0)
+        self.assertFalse(Notification.objects.exists())
 
     def test_it_handles_up_only_email_channel(self) -> None:
         self.channel.value = json.dumps({"value": "alice@example.org", "up": True, "down": False})

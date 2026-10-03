@@ -64,15 +64,6 @@ class EditEmailTestCase(BaseTestCase):
         # The email address did not change, so we should skip verification
         self.assertEqual(len(mail.outbox), 0)
 
-    def test_team_access_works(self) -> None:
-        form = {"value": "new@example.org", "down": "true", "up": "true"}
-
-        self.client.login(username="bob@example.org", password="password")
-        self.client.post(self.url, form)
-
-        self.channel.refresh_from_db()
-        self.assertEqual(self.channel.email.value, "new@example.org")
-
     @override_settings(EMAIL_USE_VERIFICATION=False)
     def test_it_hides_confirmation_needed_notice(self) -> None:
         self.client.login(username="alice@example.org", password="password")
@@ -123,10 +114,7 @@ class EditEmailTestCase(BaseTestCase):
         email = mail.outbox[0]
         self.assertTrue(email.subject.startswith("Verify email address on"))
 
-    def test_it_requires_rw_access(self) -> None:
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
-
-        self.client.login(username="bob@example.org", password="password")
+    def test_it_checks_ownership(self) -> None:
+        self.client.login(username="charlie@example.org", password="password")
         r = self.client.get(self.url)
-        self.assertEqual(r.status_code, 403)
+        self.assertEqual(r.status_code, 404)

@@ -19,9 +19,6 @@ class ProjectModelTestCase(BaseTestCase):
         # It's an issue if the project has no channels at all:
         self.assertTrue(self.project.have_channel_issues())
 
-    def test_team_emails_work(self) -> None:
-        self.assertEqual(self.project.team_emails(), ["alice@example.org", "bob@example.org"])
-
     def test_get_n_down_counts_down_checks(self) -> None:
         self.assertEqual(self.project.get_n_down(), 0)
 

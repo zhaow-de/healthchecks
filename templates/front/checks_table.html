@@ -1,7 +1,7 @@
 {% load hc_extras static %}
 <table
     id="checks-table"
-    class="table {% if rw %}rw{% endif%}"
+    class="table"
     {% if num_visible == 0 %}style="display: none"{% endif %}
     data-status-url="{% url 'hc-status' project.code %}"
     data-profile-tz="{{ profile_tz }}">
@@ -24,12 +24,10 @@
         </th>
         <th>
             Ping URL
-            {% if rw %}
             <small id="url-style-switcher">
                 <a id="to-uuid" href="?urls=uuid" {% if not project.show_slugs %}class="active"{% endif %}>uuid</a>
                 <a id="to-slug" href="?urls=slug" {% if project.show_slugs %}class="active"{% endif %}>slug</a>
             </small>
-            {% endif %}
         </th>
         <th class="th-integrations">Integrations</th>
         <th class="th-period">
@@ -116,11 +114,9 @@
             <div class="last-ping">{% include "front/last_ping_cell.html" with check=check %}</div>
         </td>
         <td class="actions">
-            {% if rw %}
             <button class="btn pause" type="button">
                 <span class="ic-paused"></span>
             </button>
-            {% endif %}
             <a href="{% url 'hc-details' check.code %}" class="btn" title="Show Details"><span class="ic-dots"></span></a>
         </td>
     </tr>

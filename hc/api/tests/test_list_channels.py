@@ -37,13 +37,13 @@ class ListChannelsTestCase(BaseTestCase):
         self.assertIn("GET", r["Access-Control-Allow-Methods"])
 
     def test_it_shows_only_users_channels(self) -> None:
-        Channel.objects.create(project=self.bobs_project, kind="email", name="Bob")
+        Channel.objects.create(project=self.charlies_project, kind="email", name="Charlie")
 
         r = self.get()
         data = r.json()
         self.assertEqual(len(data["channels"]), 1)
         for c in data["channels"]:
-            self.assertNotEqual(c["name"], "Bob")
+            self.assertNotEqual(c["name"], "Charlie")
 
     def test_it_handles_missing_api_key(self) -> None:
         r = self.client.get(self.url)

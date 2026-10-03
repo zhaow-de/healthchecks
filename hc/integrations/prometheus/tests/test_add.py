@@ -16,6 +16,11 @@ class AddPrometheusTestCase(BaseTestCase):
         self.assertContains(r, "Prometheus")
         self.assertContains(r, f"{self.project.code}/metrics/")
 
+    def test_it_checks_project_access(self) -> None:
+        self.client.login(username="charlie@example.org", password="password")
+        r = self.client.get(self.url)
+        self.assertEqual(r.status_code, 404)
+
     @override_settings(PROMETHEUS_ENABLED=False)
     def test_it_handles_disabled_integration(self) -> None:
         self.client.login(username="alice@example.org", password="password")

@@ -37,11 +37,13 @@ $<span class="w"> </span><span class="nb">cd</span><span class="w"> </span>healt
 versions listed in <code>uv.lock</code>. If you do not have Python 3.14, uv downloads it.</p>
 </li>
 <li>
-<p>Create database tables and a superuser account:</p>
+<p>Create database tables and the superuser account:</p>
 <div class="highlight"><pre><span></span><code>$<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>./manage.py<span class="w"> </span>migrate
 $<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>./manage.py<span class="w"> </span>createsuperuser
 </code></pre></div>
 
+<p>The superuser is the instance's only user: there is no sign-up, and
+<code>createsuperuser</code> refuses to run once a user exists.</p>
 <p>With the default configuration, Healthchecks stores data in a SQLite file
 <code>hc.sqlite</code> in the project directory (<code>~/webapps/healthchecks/</code>).</p>
 </li>
@@ -70,19 +72,16 @@ run <code>./manage.py</code> directly. The <code>./manage.py</code> examples in 
 assume an activated virtual environment.</p>
 <h2>Accessing Administration Panel</h2>
 <p>Healthchecks comes with Django's administration panel where you can perform
-administrative tasks: delete user accounts, change passwords, inspect contents of
+administrative tasks: change the user's password, inspect contents of
 database tables.</p>
-<p>To access the administration panel, if you haven't already, create a superuser account:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>./manage.py<span class="w"> </span>createsuperuser
-</code></pre></div>
-
-<p>This will trigger an interactive prompt.</p>
-<p>You can also provide credentials via parameters, bypassing the interactive prompt:</p>
+<p>To access the administration panel, log into the site as the superuser.
+<code>createsuperuser</code> in the setup steps above prompts for its credentials; you can
+also provide them via parameters, bypassing the interactive prompt:</p>
 <div class="highlight"><pre><span></span><code>$<span class="w"> </span>./manage.py<span class="w"> </span>createsuperuser<span class="w"> </span>--email<span class="w"> </span>user@example.com<span class="w"> </span>--password<span class="w"> </span>changeme123
 </code></pre></div>
 
-<p>Then, log into the site using the superuser credentials. Once logged in,
-click on the "Account" dropdown in top navigation, and select "Site Administration".</p>
+<p>Once logged in, click on the "Account" dropdown in top navigation, and select
+"Site Administration".</p>
 <h2>Sending Emails</h2>
 <p>Healthchecks must be able to send email messages, so it can send out login
 links and alerts to users. Specify your SMTP credentials using the following
@@ -132,21 +131,16 @@ tables automatically. By default, Healthchecks keeps the 100 most recent
 pings for every check. You can set the limit higher to keep a longer history:
 go to the Administration Panel, look up user's <strong>Profile</strong> and modify its
 "Ping log limit" field.</p>
-<p>Healthchecks provides management commands for cleaning up
-<code>auth_user</code> (user accounts) and <code>api_tokenbucket</code> (rate limiting records) tables.</p>
-<p>Remove user accounts that are older than 1 month and have never logged in:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>./manage.py<span class="w"> </span>pruneusers
-</code></pre></div>
-
-<p>Remove old records from the <code>api_tokenbucket</code> table. The TokenBucket
-model is used for rate-limiting login attempts and similar operations.
-Any records older than one day can be safely removed.</p>
+<p>Healthchecks provides a management command for cleaning up the <code>api_tokenbucket</code>
+(rate limiting records) table. The TokenBucket model is used for rate-limiting
+login attempts and similar operations. Any records older than one day can be
+safely removed.</p>
 <div class="highlight"><pre><span></span><code>$<span class="w"> </span>./manage.py<span class="w"> </span>prunetokenbucket
 </code></pre></div>
 
-<p>When you first try these commands on your data, it is a good idea to
-test them on a copy of your database, not on the live database right away.
-In a production setup, you will want to run these commands regularly, as well as
+<p>When you first try this command on your data, it is a good idea to
+test it on a copy of your database, not on the live database right away.
+In a production setup, you will want to run this command regularly, as well as
 have regular, automatic database backups set up.</p>
 <h2>Next Steps</h2>
 <p>Get the <a href="https://github.com/zhaow-de/healthchecks">source code</a>.</p>

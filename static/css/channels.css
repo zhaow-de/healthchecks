@@ -46,8 +46,8 @@
     color: var(--small-text-color);
 }
 
-.rw .channel-row:hover .edit-name,
-.rw .channel-row:hover .edit-checks {
+.channel-row:hover .edit-name,
+.channel-row:hover .edit-checks {
     border: 1px dotted #aaa;
     cursor: pointer;
 }

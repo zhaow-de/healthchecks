@@ -38,16 +38,6 @@ class ClearEventsTestCase(BaseTestCase):
         self.assertFalse(self.check.has_confirmation_link)
         self.assertFalse(self.check.ping_set.exists())
 
-    def test_team_access_works(self) -> None:
-        # Logging in as bob, not alice. Bob has team access so this
-        # should work.
-        self.client.login(username="bob@example.org", password="password")
-        r = self.client.post(self.clear_url)
-        self.assertRedirects(r, self.redirect_url)
-
-        self.check.refresh_from_db()
-        self.assertIsNone(self.check.last_ping)
-
     def test_it_handles_bad_uuid(self) -> None:
         self.client.login(username="alice@example.org", password="password")
         r = self.client.post("/checks/not-uuid/clear_events/")
@@ -70,11 +60,3 @@ class ClearEventsTestCase(BaseTestCase):
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.clear_url)
         self.assertEqual(r.status_code, 405)
-
-    def test_it_requires_rw_access(self) -> None:
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
-
-        self.client.login(username="bob@example.org", password="password")
-        r = self.client.post(self.clear_url)
-        self.assertEqual(r.status_code, 403)

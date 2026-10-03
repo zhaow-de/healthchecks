@@ -1,7 +1,7 @@
 hc.ready(function() {
     var cm = hc.$("#checks-modal");
 
-    hc.on(".rw .edit-checks", "click", function() {
+    hc.on(".edit-checks", "click", function() {
         var tip = bootstrap.Tooltip.getInstance(this);
         if (tip) tip.hide();
 

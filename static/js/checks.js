@@ -13,7 +13,7 @@ hc.ready(function () {
         return el.closest("tr.checks-row").id;
     }
 
-    hc.on(".rw .my-checks-name", "click", function () {
+    hc.on(".my-checks-name", "click", function () {
         var url = base + "/checks/" + rowCode(this) + "/name/";
 
         hc.$("#update-name-form").setAttribute("action", url);
@@ -41,7 +41,7 @@ hc.ready(function () {
         },
     });
 
-    hc.on(".rw .integrations", "click", "span", function () {
+    hc.on(".integrations", "click", "span", function () {
         var isOff = this.classList.toggle("off");
         var checkCode = rowCode(this);
         var channelCode = channelEl(this).dataset.code;
