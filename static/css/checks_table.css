@@ -73,16 +73,8 @@
     width: 24px;
 }
 
-body.dark .ic {
-    font-palette: --palette1;
-}
-
 #checks-table .integrations span.off {
     font-palette: --palette2;
-}
-
-body.dark #checks-table .integrations span.off {
-    font-palette: --palette3;
 }
 
 .timeout-grace .cron-expression {

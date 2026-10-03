@@ -904,23 +904,3 @@ def login_totp(request: HttpRequest) -> HttpResponse:
         form = forms.TotpForm(totp)
 
     return render(request, "accounts/login_totp.html", {"form": form})
-
-
-@login_required
-def appearance(request: AuthenticatedHttpRequest) -> HttpResponse:
-    profile = request.profile
-
-    ctx = {
-        "page": "appearance",
-        "profile": profile,
-        "status": "default",
-    }
-
-    if request.method == "POST":
-        theme = request.POST.get("theme", "")
-        if theme in ("", "dark", "system"):
-            profile.theme = theme
-            profile.save()
-            ctx["status"] = "info"
-
-    return render(request, "accounts/appearance.html", ctx)

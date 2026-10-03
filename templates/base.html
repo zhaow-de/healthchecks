@@ -25,7 +25,6 @@
 
     <link rel="stylesheet" href="{% static 'css/add_credential.css' %}" type="text/css">
     <link rel="stylesheet" href="{% static 'css/add_project_modal.css' %}" type="text/css">
-    <link rel="stylesheet" href="{% static 'css/appearance.css' %}" type="text/css">
     <link rel="stylesheet" href="{% static 'css/webhook_form.css' %}" type="text/css">
     <link rel="stylesheet" href="{% static 'css/badges.css' %}" type="text/css">
     <link rel="stylesheet" href="{% static 'css/channel_checks.css' %}" type="text/css">
@@ -43,7 +42,6 @@
     <link rel="stylesheet" href="{% static 'css/checks_table.css' %}" type="text/css">
     <link rel="stylesheet" href="{% static 'css/nouislider.min.css' %}" type="text/css">
     <link rel="stylesheet" href="{% static 'css/nouislider.hc.css' %}" type="text/css">
-    <link rel="stylesheet" href="{% static 'css/nouislider.dark.css' %}" type="text/css">
     <link rel="stylesheet" href="{% static 'css/ping_details.css' %}" type="text/css">
     <link rel="stylesheet" href="{% static 'css/profile.css' %}" type="text/css">
     <link rel="stylesheet" href="{% static 'css/projects.css' %}" type="text/css">
@@ -58,7 +56,7 @@
     <link rel="stylesheet" href="{% static 'css/slug-suggestions.css' %}" type="text/css">
     {% endcompress %}
 </head>
-<body class="page-{{ page }}{% if request.user.is_authenticated and request.profile.theme == 'dark' %} dark{% endif%}">
+<body class="page-{{ page }}">
     {% debug_warning %}
     {% if request.user.is_authenticated and request.profile.deletion_scheduled_date %}
     <div id="account-warning">
@@ -211,19 +209,6 @@
     </footer>
 
     {% block base_modals %}{% endblock %}
-
-    {% if request.user.is_authenticated and request.profile.theme == 'system' %}
-    <script>
-        (function() {
-            const prefersDark = window.matchMedia("(prefers-color-scheme: dark)");
-            function switchColors() {
-                document.body.classList.toggle("dark", prefersDark.matches);
-            }
-            switchColors();
-            prefersDark.addEventListener("change", switchColors);
-        })();
-    </script>
-    {% endif %}
 
     {% block base_scripts %}
     {% compress js %}

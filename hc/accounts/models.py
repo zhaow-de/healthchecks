@@ -76,7 +76,6 @@ class Profile(models.Model):
     deletion_scheduled_date = models.DateTimeField(null=True, blank=True)
     last_active_date = models.DateTimeField(null=True, blank=True)
     tz = models.CharField(max_length=36, default="UTC")
-    theme = models.CharField(max_length=10, null=True, blank=True)
 
     totp = models.CharField(max_length=32, null=True, blank=True)
     totp_created = models.DateTimeField(null=True, blank=True)

@@ -113,7 +113,6 @@ class ProfileAdmin(ModelAdmin[Profile]):
         "nag_period",
         "next_nag_date",
         "token",
-        "theme",
         "sort",
     )
 
