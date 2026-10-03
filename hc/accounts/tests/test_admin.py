@@ -141,6 +141,24 @@ class AccountsAdminTestCase(BaseTestCase):
         self.profile.refresh_from_db()
         self.assertEqual(self.profile.totp, "0" * 32)
 
+    def test_it_does_not_delete_profiles(self) -> None:
+        # A deleted profile comes back from Profile.objects.for_user without TOTP
+        self.profile.totp = "0" * 32
+        self.profile.totp_created = now()
+        self.profile.save()
+
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.post(reverse("admin:accounts_profile_delete", args=[self.profile.id]), {"post": "yes"})
+        self.assertEqual(r.status_code, 403)
+
+        r = self.client.get(reverse("admin:accounts_profile_changelist"))
+        self.assertNotContains(r, 'value="delete_selected"', status_code=200)
+
+        payload = {"action": "delete_selected", "_selected_action": [self.profile.id], "post": "yes"}
+        self.client.post(reverse("admin:accounts_profile_changelist"), payload)
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.totp, "0" * 32)
+
     def test_it_shows_project_usage(self) -> None:
         Check.objects.create(project=self.project)
         Channel.objects.create(project=self.project, kind="webhook")

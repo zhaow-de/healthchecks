@@ -120,6 +120,11 @@ class ProfileAdmin(ModelAdmin[Profile]):
         ("Limits", {"fields": _limits_fields}),
     )
 
+    def has_delete_permission(self, request: HttpRequest, obj: Profile | None = None) -> bool:
+        # Profile.objects.for_user recreates a deleted profile without TOTP, so a
+        # delete here would turn the second factor off outside sudo mode
+        return False
+
     def get_queryset(self, request: HttpRequest) -> QuerySet[Profile]:
         qs = super().get_queryset(request)
         qs = qs.prefetch_related("user__project_set")
