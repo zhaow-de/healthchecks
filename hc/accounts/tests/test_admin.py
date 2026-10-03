@@ -206,6 +206,49 @@ class AccountsAdminTestCase(BaseTestCase):
         self.assertNotContains(r, 'value="deactivate"', status_code=200)
         self.assertNotContains(r, 'value="activate"')
 
+    def test_it_keeps_the_user_able_to_log_in(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        url = reverse("admin:auth_user_change", args=[self.alice.id])
+        r = self.client.get(url)
+        for field in ("email", "is_active", "is_staff", "is_superuser"):
+            self.assertNotContains(r, f'name="{field}"', status_code=200)
+
+        # A save with a blank email and the boxes left out, as unticked checkboxes are,
+        # keeps all four
+        payload = {
+            "username": "alice",
+            "email": "",
+            "date_joined_0": "2020-01-01",
+            "date_joined_1": "00:00:00",
+        }
+        r = self.client.post(url, payload)
+        self.assertRedirects(r, reverse("admin:auth_user_changelist"))
+        self.alice.refresh_from_db()
+        self.assertEqual(self.alice.email, "alice@example.org")
+        self.assertTrue(self.alice.is_active)
+        self.assertTrue(self.alice.is_staff)
+        self.assertTrue(self.alice.is_superuser)
+
+    def test_it_keeps_password_log_in_on(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        url = reverse("admin:auth_user_password_change", args=[self.alice.id])
+        r = self.client.get(url)
+        self.assertNotContains(r, 'name="usable_password"', status_code=200)
+
+        r = self.client.post(url, {"usable_password": "false", "unset-password": "1"})
+        self.assertEqual(r.status_code, 200)
+        self.alice.refresh_from_db()
+        self.assertTrue(self.alice.check_password("password"))
+
+    def test_it_changes_the_password(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        url = reverse("admin:auth_user_password_change", args=[self.alice.id])
+        payload = {"password1": "Correct-Horse-9", "password2": "Correct-Horse-9"}
+        r = self.client.post(url, payload)
+        self.assertEqual(r.status_code, 302)
+        self.alice.refresh_from_db()
+        self.assertTrue(self.alice.check_password("Correct-Horse-9"))
+
     def test_it_shows_credentials(self) -> None:
         Credential.objects.create(user=self.charlie, name="Charlies Yubikey", data=b"")
 

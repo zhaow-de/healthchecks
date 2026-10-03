@@ -7,6 +7,7 @@ from typing import ClassVar, TypedDict
 from django.contrib import admin
 from django.contrib.admin import ModelAdmin
 from django.contrib.auth.admin import UserAdmin
+from django.contrib.auth.forms import AdminPasswordChangeForm
 from django.contrib.auth.models import User
 from django.db.models import Count, F, Func, OuterRef, QuerySet, Subquery
 from django.http import HttpRequest
@@ -222,6 +223,14 @@ class UserAnnotations(TypedDict):
 admin.site.unregister(User)
 
 
+class OneUserPasswordChangeForm(AdminPasswordChangeForm):
+    """The admin's password form without its switch that turns password log-in off."""
+
+    def __init__(self, user: User, *args: object, **kwargs: object) -> None:
+        super().__init__(user, *args, **kwargs)
+        self.fields.pop("usable_password", None)
+
+
 @admin.register(User)
 class HcUserAdmin(UserAdmin[User]):
     list_display = (
@@ -236,6 +245,12 @@ class HcUserAdmin(UserAdmin[User]):
 
     list_display_links = ("id", "email")
     list_filter = ("last_login", "date_joined", "is_staff", "is_active")
+    # Unticking a flag, blanking the email, which log-in goes by, or turning password
+    # log-in off would shut the one user out of the site or the admin, and
+    # createsuperuser refuses to make another user while it exists. The profile page
+    # changes the email, by a mailed link.
+    readonly_fields = ("email", "is_active", "is_staff", "is_superuser")
+    change_password_form = OneUserPasswordChangeForm
     ordering = ("-id",)
 
     def has_add_permission(self, request: HttpRequest) -> bool:
