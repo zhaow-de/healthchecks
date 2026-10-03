@@ -34,7 +34,7 @@ class LoginTestCase(BaseTestCase):
         r = self.client.get("/accounts/login/")
         self.assertRedirects(r, self.checks_url)
 
-    @override_settings(SITE_ROOT="http://testserver", SITE_LOGO_URL=None, SESSION_COOKIE_SECURE=False)
+    @override_settings(SITE_ROOT="http://testserver", SESSION_COOKIE_SECURE=False)
     def test_it_sends_link(self) -> None:
         form = {"identity": "alice@example.org"}
 
@@ -58,11 +58,6 @@ class LoginTestCase(BaseTestCase):
         form = {"identity": "alice@example.org"}
         r = self.client.post("/accounts/login/", form)
         self.assertTrue(r.cookies["auto-login"]["secure"])
-
-    @override_settings(SITE_LOGO_URL="https://example.org/logo.svg")
-    def test_it_uses_custom_logo(self) -> None:
-        self.client.post("/accounts/login/", {"identity": "alice@example.org"})
-        self.assertEmailContainsHtml("https://example.org/logo.svg")
 
     def test_it_sends_link_with_next(self) -> None:
         form = {"identity": "alice@example.org"}

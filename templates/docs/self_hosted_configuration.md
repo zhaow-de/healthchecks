@@ -37,7 +37,6 @@ from environment variables. Below is a list of environment variables it reads an
 <li><a href="#SECRET_KEY">SECRET_KEY</a></li>
 <li><a href="#SECRET_KEY_FILE">SECRET_KEY_FILE</a></li>
 <li><a href="#SECURE_PROXY_SSL_HEADER">SECURE_PROXY_SSL_HEADER</a></li>
-<li><a href="#SITE_LOGO_URL">SITE_LOGO_URL</a></li>
 <li><a href="#SITE_NAME">SITE_NAME</a></li>
 <li><a href="#SITE_ROOT">SITE_ROOT</a></li>
 <li><a href="#SLACK_CLIENT_ID">SLACK_CLIENT_ID</a></li>
@@ -428,46 +427,6 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 This environment variable maps to a standard Django setting, read more in
 [Django documentation](https://docs.djangoproject.com/en/6.1/ref/settings/#secure-proxy-ssl-header).
-
-## `SITE_LOGO_URL` {: #SITE_LOGO_URL }
-
-Default: `None`
-
-An URL pointing to the image you want to use as the site logo. If not set,
-Healthchecks will use a fallback image: `/static/img/logo.png`.
-
-You can place a custom logo in `/static/img/`, run `manage.py collectstatic`, and
-point `SITE_LOGO_URL` to it like so:
-
-```ini
-SITE_LOGO_URL=/static/img/my-custom-logo.png
-```
-
-Or you can serve the logo from another server, and point to it using an absolute URL:
-
-```ini
-SITE_LOGO_URL=https://example.org/cdn/my-custom-logo.png
-```
-
-Either way, Healthchecks will use the provided `SITE_LOGO_URL` value as-is in HTML
-pages, and you should use an URL that **the end user's browser will be able to
-access directly**. The logo image can use any image format supported by browsers
-(PNG, SVG, JPG are all fine).
-
-**Docker note.** You can build a custom Docker image with your logo "baked in". To
-do so, use a Dockerfile with the following contents, and with your logo.png placed next
-to it:
-
-```docker
-FROM ghcr.io/zhaow-de/healthchecks:vX.Y.Z
-COPY logo.png /opt/healthchecks/static-collected/img/
-```
-
-This overwrites the default placeholder logo, so, in this case, you do not need to
-specify `SITE_LOGO_URL`. Notice that the logo must be placed in `static-collected`, not
-`static`. This is because `manage.py collectstatic` has already been run in the base
-image's build time, and the web server will not recognize any new files placed in the
-`static` directory.
 
 ## `SITE_NAME` {: #SITE_NAME }
 

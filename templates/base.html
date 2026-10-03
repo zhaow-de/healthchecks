@@ -73,11 +73,7 @@
                 <img
                     id="logo"
                     height="50"
-                    {% if site_logo_url %}
-                    src="{{ site_logo_url }}"
-                    {% else %}
                     src="{% static 'img/logo.png' %}"
-                    {% endif %}
                     alt="{{ site_name }}">
             </a>
             {% endif %}

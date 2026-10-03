@@ -42,48 +42,21 @@ class HcExtrasTestCase(TestCase):
 
 
 class AbsoluteSiteLogoUrlTestCase(TestCase):
-    def _test(self, site_root: str, site_logo_url: str | None, expected_result: str) -> None:
+    def _test(self, site_root: str, expected_result: str) -> None:
         subpath = urlparse(site_root).path
-        with override_settings(
-            SITE_ROOT=site_root,
-            SITE_LOGO_URL=site_logo_url,
-            STATIC_URL=f"{subpath}/static/",
-        ):
+        with override_settings(SITE_ROOT=site_root, STATIC_URL=f"{subpath}/static/"):
             self.assertEqual(absolute_site_logo_url(), expected_result)
 
     def test_it_handles_default(self) -> None:
         self._test(
             site_root="http://example.org",
-            site_logo_url=None,
             expected_result="http://example.org/static/img/logo.png",
         )
 
     def test_it_handles_default_with_subpath(self) -> None:
         self._test(
             site_root="http://example.org/subpath",
-            site_logo_url=None,
             expected_result="http://example.org/subpath/static/img/logo.png",
-        )
-
-    def test_it_handles_external_url(self) -> None:
-        self._test(
-            site_root="http://example.org",
-            site_logo_url="http://example.com/foo.png",
-            expected_result="http://example.com/foo.png",
-        )
-
-    def test_it_handles_leading_slash(self) -> None:
-        self._test(
-            site_root="http://example.org",
-            site_logo_url="/foo/bar.png",
-            expected_result="http://example.org/foo/bar.png",
-        )
-
-    def test_it_handles_leading_slash_with_subpath(self) -> None:
-        self._test(
-            site_root="http://example.org/subpath",
-            site_logo_url="/foo/bar.png",
-            expected_result="http://example.org/foo/bar.png",
         )
 
 

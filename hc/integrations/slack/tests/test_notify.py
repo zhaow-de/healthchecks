@@ -40,7 +40,7 @@ class NotifySlackTestCase(BaseTestCase):
         self.flip.new_status = status
         self.flip.reason = "timeout"
 
-    @override_settings(SITE_ROOT="http://testserver", SITE_LOGO_URL=None)
+    @override_settings(SITE_ROOT="http://testserver")
     @patch("hc.api.transports.curl.request", autospec=True)
     def test_it_works(self, mock_post: Mock) -> None:
         self._setup_data("https://example.org")
@@ -70,7 +70,7 @@ class NotifySlackTestCase(BaseTestCase):
         self.assertNotIn(str(self.check.code), serialized)
         self.assertIn("http://testserver/static/img/logo.png", serialized)
 
-    @override_settings(SITE_ROOT="http://testserver", SITE_LOGO_URL=None)
+    @override_settings(SITE_ROOT="http://testserver")
     @patch("hc.api.transports.curl.request", autospec=True)
     def test_it_handles_reason_failure(self, mock_post: Mock) -> None:
         self._setup_data("https://example.org")
