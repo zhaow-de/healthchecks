@@ -57,3 +57,12 @@ class TokenBucketTestCase(BaseTestCase):
             TokenBucket.authorize_login_email(email)
 
         self.assertEqual(TokenBucket.objects.count(), 1)
+
+    def test_it_keys_a_trusted_device_apart(self) -> None:
+        nonce = "a" * 32
+        TokenBucket.authorize_login_password("alice@example.org", nonce)
+        TokenBucket.authorize_login_email("alice@example.org", nonce)
+
+        values = sorted(TokenBucket.objects.values_list("value", flat=True))
+        self.assertEqual(values, [f"em-{ALICE_HASH}-{nonce}", f"pw-{ALICE_HASH}-{nonce}"])
+        self.assertTrue(all(len(v) <= 80 for v in values))

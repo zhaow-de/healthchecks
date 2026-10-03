@@ -4,8 +4,10 @@ import time
 from unittest.mock import Mock, patch
 from urllib.parse import quote_plus
 
+from django.core import signing
 from django.test.utils import override_settings
 
+from hc.accounts import device
 from hc.test import BaseTestCase
 
 
@@ -83,6 +85,8 @@ class LoginWebAuthnTestCase(BaseTestCase):
 
         r = self.client.post(self.url, {"response": "dummy response"})
         self.assertRedirects(r, self.checks_url)
+        payload = signing.loads(r.cookies[device.COOKIE_NAME].value, salt=device.SALT)
+        self.assertEqual(payload["u"], self.alice.id)
 
         self.assertNotIn("state", self.client.session)
         self.assertNotIn("2fa_user_id", self.client.session)

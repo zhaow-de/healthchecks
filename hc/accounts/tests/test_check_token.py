@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from django.contrib.auth.hashers import make_password
+from django.core import signing
 from django.core.signing import TimestampSigner
 
+from hc.accounts import device
 from hc.accounts.models import Credential
 from hc.test import BaseTestCase
 
@@ -25,6 +27,8 @@ class CheckTokenTestCase(BaseTestCase):
         r = self.client.post(self.url)
 
         self.assertRedirects(r, self.checks_url)
+        payload = signing.loads(r.cookies[device.COOKIE_NAME].value, salt=device.SALT)
+        self.assertEqual(payload["u"], self.alice.id)
 
         # After login, token should be blank
         self.profile.refresh_from_db()
@@ -74,6 +78,7 @@ class CheckTokenTestCase(BaseTestCase):
 
         r = self.client.post(self.url)
         self.assertRedirects(r, "/accounts/login/two_factor/", fetch_redirect_response=False)
+        self.assertNotIn(device.COOKIE_NAME, r.cookies)
 
         # It should not log the user in yet
         self.assertNotIn("_auth_user_id", self.client.session)

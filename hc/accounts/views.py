@@ -24,7 +24,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.debug import sensitive_post_parameters
 from django.views.decorators.http import require_POST
 
-from hc.accounts import forms
+from hc.accounts import device, forms
 from hc.accounts.decorators import require_sudo_mode
 from hc.accounts.http import AuthenticatedHttpRequest
 from hc.accounts.models import Credential, Profile, Project
@@ -96,8 +96,15 @@ def _check_2fa(request: HttpRequest, user: User) -> HttpResponse:
         path = reverse(route, query=query)
         return redirect(path)
 
-    auth_login(request, user)
-    return _redirect_after_login(request)
+    return _complete_login(request, user)
+
+
+def _complete_login(request: HttpRequest, user: User, backend: str | None = None) -> HttpResponse:
+    """Log the user in once every step the login requires is done."""
+    auth_login(request, user, backend)
+    response = _redirect_after_login(request)
+    device.issue(request, response, user)
+    return response
 
 
 def _set_autologin_cookie(response: HttpResponse) -> None:
@@ -119,7 +126,7 @@ def login(request: HttpRequest) -> HttpResponse:
     magic_form = forms.EmailLoginForm()
     if request.method == "POST":
         if request.POST.get("action") == "login":
-            form = forms.PasswordLoginForm(request.POST)
+            form = forms.PasswordLoginForm(request)
             if form.is_valid():
                 assert isinstance(form.user, User)
                 return _check_2fa(request, form.user)
@@ -605,8 +612,7 @@ def login_webauthn(request: HttpRequest) -> HttpResponse:
 
         request.session.pop("state")
         request.session.pop("2fa_user")
-        auth_login(request, user, "hc.accounts.backends.EmailBackend")
-        return _redirect_after_login(request)
+        return _complete_login(request, user, "hc.accounts.backends.EmailBackend")
 
     options, request.session["state"] = helper.prepare()
 
@@ -659,8 +665,7 @@ def login_totp(request: HttpRequest) -> HttpResponse:
                 return render(request, "try_later.html")
 
             request.session.pop("2fa_user")
-            auth_login(request, user, "hc.accounts.backends.EmailBackend")
-            return _redirect_after_login(request)
+            return _complete_login(request, user, "hc.accounts.backends.EmailBackend")
     else:
         form = forms.TotpForm(totp)
 

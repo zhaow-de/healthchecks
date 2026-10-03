@@ -3,6 +3,9 @@ from __future__ import annotations
 import time
 from unittest.mock import Mock, patch
 
+from django.core import signing
+
+from hc.accounts import device
 from hc.api.models import TokenBucket
 from hc.test import BaseTestCase
 
@@ -69,6 +72,8 @@ class LoginTotpTestCase(BaseTestCase):
 
         r = self.client.post(self.url, {"code": "000000"})
         self.assertRedirects(r, self.checks_url)
+        payload = signing.loads(r.cookies[device.COOKIE_NAME].value, salt=device.SALT)
+        self.assertEqual(payload["u"], self.alice.id)
 
         self.assertNotIn("2fa_user_id", self.client.session)
 
