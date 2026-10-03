@@ -9,6 +9,12 @@ services:
     environment:
       - POSTGRES_DB=$DB_NAME
       - POSTGRES_PASSWORD=$DB_PASSWORD
+    healthcheck:
+      # Over TCP: while initdb runs, the server listens on its Unix socket alone
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres"]
+      start_period: 60s
+      start_interval: 1s
+      interval: 60s
   web:
     build:
       context: ..
@@ -21,5 +27,5 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - db
-    command: bash -c 'while !</dev/tcp/db/5432; do sleep 1; done; uwsgi /opt/healthchecks/docker/uwsgi.ini'
+      db:
+        condition: service_healthy
