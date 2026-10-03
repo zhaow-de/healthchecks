@@ -295,8 +295,7 @@ Default: `text`
 
 The format of the log records Healthchecks writes to the console (in Docker, the
 container's output), including the output of the `sendalerts` and `sendreports`
-management commands. Under uWSGI, as in the reference Docker image, the web workers write
-their records to stderr and the `sendalerts` and `sendreports` processes to stdout.
+management commands.
 
 With `text`, a record starts with a line holding the time, the level, the logger
 name and the message; a multi-line message or a traceback continues on the lines

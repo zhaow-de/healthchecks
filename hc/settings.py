@@ -143,12 +143,7 @@ TEMPLATES = [
     }
 ]
 
-# The console handler writes the records at INFO and above from hc.* and
-# django.*, except django.request below ERROR and django.server, and at WARNING
-# and above from any other logger (through the root); the database (the logs
-# Record table) keeps only the hc.* warnings and errors and the unhandled
-# exceptions. django.server, runserver's line per request, goes to a NullHandler;
-# docker/uwsgi.ini sets disable-logging for uWSGI's.
+# uWSGI's line per request is off in docker/uwsgi.ini (disable-logging)
 LOG_FORMAT = os.getenv("LOG_FORMAT", "text").strip().lower()
 LOGGING = {
     "version": 1,
@@ -284,8 +279,7 @@ def immutable_file_test(path: Any, url: str) -> bool:
 
 
 WHITENOISE_IMMUTABLE_FILE_TEST = immutable_file_test
-# Served at the site's root, where browsers and crawlers ask for them whatever a page
-# links: favicon.ico, the Apple touch icons and robots.txt
+# Served at the site's root, where browsers and crawlers ask for files whatever a page links
 WHITENOISE_ROOT = BASE_DIR / "webroot"
 
 # SMTP credentials for sending email

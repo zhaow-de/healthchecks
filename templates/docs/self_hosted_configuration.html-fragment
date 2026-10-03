@@ -202,8 +202,7 @@ IP address, you will need to enable <code>INTEGRATIONS_ALLOW_PRIVATE_IPS</code> 
 <p>Default: <code>text</code></p>
 <p>The format of the log records Healthchecks writes to the console (in Docker, the
 container's output), including the output of the <code>sendalerts</code> and <code>sendreports</code>
-management commands. Under uWSGI, as in the reference Docker image, the web workers write
-their records to stderr and the <code>sendalerts</code> and <code>sendreports</code> processes to stdout.</p>
+management commands.</p>
 <p>With <code>text</code>, a record starts with a line holding the time, the level, the logger
 name and the message; a multi-line message or a traceback continues on the lines
 after it. With <code>json</code>, each record is one JSON object on one line, with the keys

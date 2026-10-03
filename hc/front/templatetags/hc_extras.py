@@ -59,7 +59,6 @@ def site_name() -> str:
 
 @register.simple_tag
 def absolute_site_logo_url() -> str:
-    """Return the absolute URL of the site's logo, static/img/logo.png."""
     url = static("img/logo.png")
     if url.startswith("/"):
         url = absolute_url(url)

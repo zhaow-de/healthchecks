@@ -13,9 +13,7 @@ from django.test.utils import override_settings
 from hc.logs.models import Record
 from hc.test import BaseTestCase
 
-# Runs outside the test run, where the console handler is not replaced: of these
-# records only "Hello World", "Sending" and "Careful" should reach the console,
-# each once, and nothing should reach stderr
+# Runs outside the test run, where the console handler is not replaced
 SCRIPT = """
 import logging
 import django
