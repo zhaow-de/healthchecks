@@ -24,7 +24,6 @@ CLAUDE.md
 .vscode
 .cz.toml
 .pre-commit-config.yaml
-.yamllint.yaml
 ruff.toml
 scripts
 tests

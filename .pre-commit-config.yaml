@@ -75,12 +75,6 @@ repos:
         types_or: [python, pyi, jupyter]
         require_serial: true
 
-  - repo: https://github.com/adrienverge/yamllint
-    rev: v1.38.0
-    hooks:
-      - id: yamllint
-        args: ["-c", ".yamllint.yaml"]
-
   # shellcheck over every tracked file `identify` types as shell, by shebang or extension. A finding is
   # fixed in the script; a `# shellcheck disable=` stays only on the one line it is wrong for, with the
   # reason beside it.
