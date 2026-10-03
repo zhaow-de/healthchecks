@@ -7,7 +7,7 @@ This script is intended to be used in the Dockerfile, in the
 HEALTHCHECK instruction.
 
 When making the HTTP request, we must pass a valid Host header and a valid
-path (in case the app is not running at the root of the domnain). To
+path (in case the app is not running at the root of the domain). To
 figure this out, we need to see `settings.SITE_ROOT`. Loading full
 Django settings is a heavy operation so instead we replicate the logic that
 settings.py uses for reading SITE_ROOT:

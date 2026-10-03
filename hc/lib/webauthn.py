@@ -22,7 +22,7 @@ class CreateHelper:
 
     def prepare(self, email: str) -> tuple[dict[str, Any], Any]:
         # User handle (id) is used in a username-less authentication, to map a
-        # credential received from browser with an user account in the database.
+        # credential received from browser with a user account in the database.
         # Since we only use security keys as a second factor,
         # the user handle is not of much use to us.
         #

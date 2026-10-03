@@ -217,7 +217,7 @@ This is a standard Django setting, read more in
 
 Default: `""` (empty string)
 
-The hostname of a SMTP server to use for sending email. If this environment variable
+The hostname of an SMTP server to use for sending email. If this environment variable
 is not set, Healthchecks will not be able to send any email, and
 [`EMAIL_PORT`](#EMAIL_PORT), [`EMAIL_USE_TLS`](#EMAIL_USE_TLS),
 [`EMAIL_USE_SSL`](#EMAIL_USE_SSL), [`EMAIL_HOST_USER`](#EMAIL_HOST_USER) and
@@ -457,7 +457,7 @@ actually need to read.
 Default: `SITE_ROOT` + `/ping/`
 
 The base URL to use for constructing ping URLs for display. Healthchecks constructs ping
-URLs by appending either an UUID value or `<ping-key>/<slug>` value to `PING_ENDPOINT`.
+URLs by appending either a UUID value or `<ping-key>/<slug>` value to `PING_ENDPOINT`.
 
 Notes:
 

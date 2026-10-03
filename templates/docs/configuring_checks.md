@@ -205,12 +205,12 @@ follows:
 * Enable the **Request body of HTTP requests** – enables content filtering for
   HTTP pings.
 * In the **Success keywords** field enter "Backup successful" – if this string is found
-  in the request body of a HTTP ping, SITE_NAME will classify the ping as a success
+  in the request body of an HTTP ping, SITE_NAME will classify the ping as a success
   signal.
 * Select the **If no keywords match: Classify the ping as failure** option – SITE_NAME
   will classify all other HTTP requests as failure signals.
 
-With these settings, SITE_NAME will classify a HTTP ping as a success signal
+With these settings, SITE_NAME will classify an HTTP ping as a success signal
 if and only if the request body contains text "Backup successful". If the request
 body does not contain this string (or the request body is absent altogether),
 it will classify the ping as a failure signal.

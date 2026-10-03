@@ -87,7 +87,7 @@ class GetPingsTestCase(BaseTestCase):
 
     def test_it_disables_duration_calculation(self) -> None:
         self.ping.delete()
-        # Set up a worst case scenario where each success ping has an unique rid,
+        # Set up a worst case scenario where each success ping has a unique rid,
         # and there are no "start" pings:
         for i in range(1, 12):
             self.a1.ping_set.create(n=i, rid=uuid4(), created=EPOCH + td(minutes=i))

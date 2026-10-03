@@ -151,7 +151,7 @@ For each check, they show:
 or days)
 * the total downtime duration in each of the last two report periods
 
-You can opt-out from receiving the reports in the
+You can opt out of receiving the reports in the
 [Account Settings › Email Reports](../../accounts/profile/notifications/) page
 or by clicking the "Unsubscribe" link in the email report's footer. The
 "Unsubscribe" link in a report or a reminder turns off both the reports and the

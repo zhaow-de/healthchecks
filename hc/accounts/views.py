@@ -190,7 +190,7 @@ def check_token(request: HttpRequest, username: str, token: str, new_email: str 
     # *or* if the browser presents a cookie we had set when sending the login link.
     #
     # If the method is GET and the auto-login cookie isn't present, we serve
-    # a HTML form with a submit button.
+    # an HTML form with a submit button.
     if request.method != "POST" and "auto-login" not in request.COOKIES:
         return render(request, "accounts/check_token_submit.html")
 
@@ -668,7 +668,7 @@ def login_totp(request: HttpRequest) -> HttpResponse:
 
         form = forms.TotpForm(totp, request.POST)
         if form.is_valid():
-            # We blacklist an used TOTP code for 90 seconds,
+            # We blacklist a used TOTP code for 90 seconds,
             # so an attacker cannot reuse a stolen code.
             if not TokenBucket.authorize_totp_code(user, form.cleaned_data["code"]):
                 return render(request, "try_later.html")

@@ -59,7 +59,7 @@ You will need to make changes in the following files:
 * Update `TRANSPORTS` in `/hc/api/models.py`.
 * Edit the view(s) for provisioning the integration in
   `/hc/integrations/<kind>/views.py`.
-* Write a HTML template for the new view in
+* Write an HTML template for the new view in
   `/hc/integrations/<kind>/templates/add_<kind>.html`, and prepare any supporting
   illustrations in `/hc/integrations/<kind>/static/img/`.
 * Edit routes for the new view(s) in `/hc/integrations/<kind>/urls.py`.

@@ -556,7 +556,7 @@ class Check(models.Model):
 
         Flip objects record check status changes, and have two uses:
         - for sending notifications asynchronously (create a flip object in
-          wwww process, a separate "sendalerts" process picks it up and processes it)
+          www process, a separate "sendalerts" process picks it up and processes it)
         - for downtime statistics calculation. The Check.downtimes() method
           analyzes the flips and calculates downtime counts and durations per
           month.
@@ -1071,7 +1071,7 @@ class TokenBucket(models.Model):
         remote_addr = headers.get("HTTP_X_FORWARDED_FOR", headers["REMOTE_ADDR"])
         remote_addr = remote_addr.split(",")[0]
         if "." in remote_addr and ":" in remote_addr:
-            # If remote_addr is in a ipv4address:port format
+            # If remote_addr is in an ipv4address:port format
             # (like in Azure App Service), remove the port:
             remote_addr = remote_addr.split(":")[0]
 

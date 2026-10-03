@@ -160,7 +160,7 @@ precedence.</p>
 <a href="https://docs.djangoproject.com/en/6.1/ref/settings/#default-from-email">Django documentation</a>.</p>
 <h2 id="EMAIL_HOST"><code>EMAIL_HOST</code></h2>
 <p>Default: <code>""</code> (empty string)</p>
-<p>The hostname of a SMTP server to use for sending email. If this environment variable
+<p>The hostname of an SMTP server to use for sending email. If this environment variable
 is not set, Healthchecks will not be able to send any email, and
 <a href="#EMAIL_PORT"><code>EMAIL_PORT</code></a>, <a href="#EMAIL_USE_TLS"><code>EMAIL_USE_TLS</code></a>,
 <a href="#EMAIL_USE_SSL"><code>EMAIL_USE_SSL</code></a>, <a href="#EMAIL_HOST_USER"><code>EMAIL_HOST_USER</code></a> and
@@ -337,7 +337,7 @@ actually need to read.</p>
 <h2 id="PING_ENDPOINT"><code>PING_ENDPOINT</code></h2>
 <p>Default: <code>SITE_ROOT</code> + <code>/ping/</code></p>
 <p>The base URL to use for constructing ping URLs for display. Healthchecks constructs ping
-URLs by appending either an UUID value or <code>&lt;ping-key&gt;/&lt;slug&gt;</code> value to <code>PING_ENDPOINT</code>.</p>
+URLs by appending either a UUID value or <code>&lt;ping-key&gt;/&lt;slug&gt;</code> value to <code>PING_ENDPOINT</code>.</p>
 <p>Notes:</p>
 <ul>
 <li>Make sure the <code>PING_ENDPOINT</code> value ends with a trailing slash. If a trailing slash

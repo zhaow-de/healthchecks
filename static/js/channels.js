@@ -36,7 +36,7 @@ hc.ready(function() {
     hc.on(cm, "click", "#unselect-all", function() { setAll(false); });
     // When any checkbox changes its value, update the "(x of y)" in the title
     hc.on(cm, "change", "input", updateNumAssigned);
-    // Let the user to click anywhere in the row to toggle the checkbox
+    // Let the user click anywhere in the row to toggle the checkbox
     hc.on(cm, "click", "tr", function(event) {
         if (event.target.type !== "checkbox") {
             const box = hc.$("input[type=checkbox]", this);

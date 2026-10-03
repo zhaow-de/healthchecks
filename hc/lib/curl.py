@@ -59,7 +59,7 @@ def request(
     headers: Headers = None,
     timeout: Timeout = None,
 ) -> Response:
-    """Make a HTTP request using pycurl, return a Response object.
+    """Make an HTTP request using pycurl, return a Response object.
 
     The `method` argument specifies the HTTP verb, and must be
     one of: "get", "post", "put".

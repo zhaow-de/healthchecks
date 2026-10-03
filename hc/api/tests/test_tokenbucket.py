@@ -12,7 +12,7 @@ from django.utils.timezone import now
 from hc.api.models import TokenBucket
 from hc.test import BaseTestCase
 
-# This is sha1("alice@example.org" + "test-secred")
+# This is sha1("alice@example.org" + "test-secret")
 ALICE_HASH = "d60db3b2343e713a4de3e92d4eb417e4f05f06ab"
 
 

@@ -14,11 +14,12 @@ import pathlib
 import re
 import subprocess
 import sys
+import types
 
 _CHECKER = pathlib.Path(__file__).resolve().parent / "check-agent-lessons.py"
 
 
-def _validator():
+def _validator() -> types.ModuleType:
     spec = importlib.util.spec_from_file_location("check_agent_lessons", _CHECKER)
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module

@@ -35,7 +35,7 @@ class CopyCheckTestCase(BaseTestCase):
     def test_it_works(self) -> None:
         self.client.login(username="alice@example.org", password="password")
         r = self.client.post(self.copy_url, follow=True)
-        self.assertContains(r, "This is a brand new check")
+        self.assertContains(r, "This is a brand-new check")
 
         copy = Check.objects.get(name="Foo (copy)")
         self.assertEqual(copy.slug, "custom-slug-copy")
