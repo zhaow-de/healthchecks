@@ -98,17 +98,18 @@ class AddSlackCompleteTestCase(BaseTestCase):
         r = self.client.get("/integrations/add_slack_btn/?code=12345678&state=foo")
         self.assertEqual(r.status_code, 404)
 
-    def test_it_requires_rw_access(self) -> None:
+    @patch("hc.integrations.slack.views.curl.post", autospec=True)
+    def test_it_checks_ownership(self, mock_post: Mock) -> None:
         session = self.client.session
         session["add_slack"] = ("foo", str(self.project.code))
         session.save()
 
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
-
-        self.client.login(username="bob@example.org", password="password")
+        self.client.login(username="charlie@example.org", password="password")
         r = self.client.get("/integrations/add_slack_btn/?code=12345678&state=foo")
-        self.assertEqual(r.status_code, 403)
+        self.assertEqual(r.status_code, 404)
+
+        mock_post.assert_not_called()
+        self.assertFalse(Channel.objects.exists())
 
     @override_settings(SLACK_ENABLED=False)
     def test_it_requires_slack_enabled(self) -> None:

@@ -1,32 +1,8 @@
 hc.ready(function () {
     hc.showModal("#key-created-modal");
 
-    hc.on(".member-remove", "click", function () {
-        hc.$("#rtm-email").textContent = this.dataset.email;
-        hc.$("#remove-team-member-email").value = this.dataset.email;
-        hc.showModal("#remove-team-member-modal");
-
-        return false;
-    });
-
-    hc.on("#invite-team-member-modal", "shown.bs.modal", function () {
-        hc.$("#itm-email").focus();
-    });
-
     hc.on("#set-project-name-modal", "shown.bs.modal", function () {
         hc.$("#project-name").focus();
-    });
-
-    hc.on(".add-to-team", "click", function () {
-        hc.$("#itm-email").value = this.dataset.email;
-        hc.showModal("#invite-team-member-modal");
-        return false;
-    });
-
-    // Enable the submit button in transfer form when user selects
-    // the target owner:
-    hc.on("#new-owner", "change", function () {
-        hc.$("#transfer-confirm").disabled = !this.value;
     });
 
     hc.on("a[data-revoke-key]", "click", function () {

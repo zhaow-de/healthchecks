@@ -30,8 +30,6 @@ from environment variables. Below is a list of environment variables it reads an
 <li><a href="#PING_BODY_LIMIT">PING_BODY_LIMIT</a></li>
 <li><a href="#PING_ENDPOINT">PING_ENDPOINT</a></li>
 <li><a href="#PROMETHEUS_ENABLED">PROMETHEUS_ENABLED</a></li>
-<li><a href="#REGISTRATION_OPEN">REGISTRATION_OPEN</a></li>
-<li><a href="#REMOTE_USER_HEADER">REMOTE_USER_HEADER</a></li>
 <li><a href="#RP_ID">RP_ID</a></li>
 <li><a href="#SECRET_KEY">SECRET_KEY</a></li>
 <li><a href="#SECRET_KEY_FILE">SECRET_KEY_FILE</a></li>
@@ -236,50 +234,6 @@ https://ping.my-hc.example.org/1fj9XWM6Ns8vLGTmnPGk9g/dummy-slug
 <h2 id="PROMETHEUS_ENABLED"><code>PROMETHEUS_ENABLED</code></h2>
 <p>Default: <code>True</code></p>
 <p>A boolean that turns on/off the Prometheus integration. Enabled by default.</p>
-<h2 id="REGISTRATION_OPEN"><code>REGISTRATION_OPEN</code></h2>
-<p>Default: <code>True</code></p>
-<p>A boolean that controls whether site visitors can create new accounts.
-Set it to <code>False</code> if you are setting up a private Healthchecks instance, but
-it needs to be publicly accessible (so, for example, your cloud services
-can send pings to it).</p>
-<p>If you close new user registration, you can still selectively invite users
-to your team account.</p>
-<h2 id="REMOTE_USER_HEADER"><code>REMOTE_USER_HEADER</code></h2>
-<p>Default: <code>None</code></p>
-<p>Specifies the request header to use for external authentication. If you use
-a reverse proxy that handles user authentication, and the reverse proxy can pass
-the authenticated user's email address in an HTTP request header, you can use this
-setting to integrate Healthchecks with it.</p>
-<p>When <code>REMOTE_USER_HEADER</code> is set, Healthchecks will:</p>
-<ul>
-<li>in views that require authentication, look up the request header
-   specified in <code>REMOTE_USER_HEADER</code></li>
-<li>assume the header contains the user's email address</li>
-<li>automatically log in the user with a matching email address</li>
-<li>automatically create a user account if it does not exist</li>
-<li>disable the default authentication methods (login link to email, password)</li>
-</ul>
-<p>The header name in <code>REMOTE_USER_HEADER</code> must be specified in upper-case,
-with any dashes replaced with underscores, and prefixed with <code>HTTP_</code>. For
-example, if your authentication proxy sets a <code>X-Authenticated-User</code> request
-header, you should set <code>REMOTE_USER_HEADER=HTTP_X_AUTHENTICATED_USER</code>.</p>
-<p><strong>Important:</strong> When this option is enabled, <strong>Healthchecks will trust the header's
-value implicitly</strong>, so it is <strong>very important</strong> to ensure that attackers cannot
-set the value themselves (and thus impersonate any user). How to do this varies by
-your chosen proxy, but generally involves configuring it to strip out headers that
-normalize to the same name as the chosen identity header.</p>
-<p><strong>On using <code>local_settings.py</code>:</strong>
-When Healthchecks reads settings from environment variables and encounters
-the <code>REMOTE_USER_HEADER</code> environment variable, it sets <em>two</em> settings,
-<code>REMOTE_USER_HEADER</code> and <code>AUTHENTICATION_BACKENDS</code>. This logic has already run by the
-time Healthchecks reads <code>local_settings.py</code>. Therefore, if you configure Healthchecks
-using the <code>local_settings.py</code> file instead of environment variables, and specify
-<code>REMOTE_USER_HEADER</code> there, you will also need a line which sets the other setting,
-<code>AUTHENTICATION_BACKENDS</code>:</p>
-<div class="highlight"><pre><span></span><code><span class="n">REMOTE_USER_HEADER</span> <span class="o">=</span> <span class="s">"HTTP_X_AUTHENTICATED_USER"</span>
-<span class="n">AUTHENTICATION_BACKENDS</span> <span class="o">=</span> <span class="p">[</span><span class="s">"hc.accounts.backends.CustomHeaderBackend"</span><span class="p">]</span>
-</code></pre></div>
-
 <h2 id="RP_ID"><code>RP_ID</code></h2>
 <p>Default: <code>None</code></p>
 <p>The <a href="https://www.w3.org/TR/webauthn-2/#relying-party-identifier">Relying Party identifier</a>,

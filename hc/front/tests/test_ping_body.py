@@ -36,12 +36,10 @@ class PingBodyTestCase(BaseTestCase):
         r = self.client.get(self.url)
         self.assertEqual(r.status_code, 404)
 
-    def test_it_allows_cross_team_access(self) -> None:
-        Ping.objects.create(owner=self.check)
-
-        self.client.login(username="bob@example.org", password="password")
+    def test_it_checks_ownership(self) -> None:
+        self.client.login(username="charlie@example.org", password="password")
         r = self.client.get(self.url)
-        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.status_code, 404)
 
     def test_it_returns_original_bytes(self) -> None:
         self.ping.body_raw = b"Hello\x01\x99World"

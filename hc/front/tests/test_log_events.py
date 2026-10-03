@@ -60,13 +60,6 @@ class LogTestCase(BaseTestCase):
         r = self.client.get(self.url())
         self.assertEqual(r.status_code, 403)
 
-    def test_team_access_works(self) -> None:
-        # Logging in as bob, not alice. Bob has team access so this
-        # should work.
-        self.client.login(username="bob@example.org", password="password")
-        r = self.client.get(self.url())
-        self.assertEqual(r.status_code, 200)
-
     def test_it_handles_bad_uuid(self) -> None:
         url = "/checks/not-uuid/log_events/"
 

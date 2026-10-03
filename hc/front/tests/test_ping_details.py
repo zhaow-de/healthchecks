@@ -107,12 +107,12 @@ class PingDetailsTestCase(BaseTestCase):
         r = self.client.get(f"/checks/{self.check.code}/pings/2/")
         self.assertContains(r, "bar-456", status_code=200)
 
-    def test_it_allows_cross_team_access(self) -> None:
+    def test_it_checks_ownership(self) -> None:
         Ping.objects.create(owner=self.check, n=1)
 
-        self.client.login(username="bob@example.org", password="password")
+        self.client.login(username="charlie@example.org", password="password")
         r = self.client.get(self.url)
-        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.status_code, 404)
 
     def test_it_handles_missing_ping(self) -> None:
         self.client.login(username="alice@example.org", password="password")

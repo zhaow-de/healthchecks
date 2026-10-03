@@ -10,6 +10,7 @@ from django.core import mail
 from django.test.utils import override_settings
 from django.utils.timezone import now
 
+from hc.accounts.models import Project
 from hc.api.models import Check, Flip
 from hc.test import BaseTestCase
 
@@ -317,9 +318,12 @@ class ProfileModelTestCase(BaseTestCase):
         self.profile.reports = "off"
         self.assertIsNone(self.profile.choose_next_report_date())
 
-    def test_schedule_for_deletion_works(self) -> None:
-        with time_machine.travel(CURRENT_TIME, tick=False):
-            self.profile.schedule_for_deletion()
+    def test_projects_lists_own_projects_only(self) -> None:
+        second = Project.objects.create(owner=self.alice, name="Second Project")
+        self.assertEqual(list(self.profile.projects()), [self.project, second])
 
-        self.profile.refresh_from_db()
-        self.assertEqual(self.profile.deletion_scheduled_date, CURRENT_TIME + td(days=31))
+    def test_checks_from_all_projects_lists_own_checks_only(self) -> None:
+        second = Project.objects.create(owner=self.alice, name="Second Project")
+        other = Check.objects.create(project=second)
+        Check.objects.create(project=self.charlies_project)
+        self.assertEqual(set(self.profile.checks_from_all_projects()), {self.check, other})

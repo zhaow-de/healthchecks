@@ -7,13 +7,6 @@ hc.ready(function() {
         refreshThrottle: 0,
     });
 
-    hc.on(".leave-project", "click", function() {
-        hc.$("#leave-project-name").textContent = this.dataset.name;
-        hc.$("#leave-project-code").value = this.dataset.code;
-        hc.showModal("#leave-project-modal");
-        return false;
-    });
-
     var browserTz = null;
     try {
         browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;

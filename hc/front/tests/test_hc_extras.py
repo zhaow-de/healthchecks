@@ -19,7 +19,6 @@ from hc.front.templatetags.hc_extras import (
     mask_rw_key,
     site_hostname,
     sortchecks,
-    support_email,
 )
 
 
@@ -106,16 +105,6 @@ class MaskKeyTestCase(TestCase):
         key = f"ABCDEFGH.{'0' * 64}"
         self.assertEqual(mask_rw_key(key), "hcw_ABCD" + "*" * 24)
         self.assertEqual(mask_ro_key(key), "hcr_ABCD" + "*" * 24)
-
-
-class SupportEmailTestCase(TestCase):
-    @override_settings(SUPPORT_EMAIL="support@example.org")
-    def test_it_works(self) -> None:
-        self.assertEqual(support_email(), "support@example.org")
-
-    @override_settings(SUPPORT_EMAIL=None)
-    def test_it_handles_unset_setting(self) -> None:
-        self.assertIsNone(support_email())
 
 
 class SortChecksTestCase(TestCase):

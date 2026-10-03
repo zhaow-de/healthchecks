@@ -36,7 +36,7 @@ class EmailThread(Thread):
 
 def make_message(
     name: str,
-    to: str | list[str],
+    to: str,
     ctx: dict[str, Any],
     headers: dict[str, str] | None = None,
 ) -> Message:
@@ -61,8 +61,7 @@ def make_message(
     else:
         from_email = settings.DEFAULT_FROM_EMAIL
 
-    to_list = [to] if isinstance(to, str) else to
-    msg = Message(subject, body, from_email, to_list, headers=headers)
+    msg = Message(subject, body, from_email, [to], headers=headers)
     msg.attach_alternative(html, "text/html")
     return msg
 
@@ -83,10 +82,6 @@ def send(message: Message, block: bool = False) -> None:
 
 def login(to: str, ctx: dict[str, Any]) -> None:
     send(make_message("login", to, ctx))
-
-
-def transfer_request(to: str, ctx: dict[str, Any]) -> None:
-    send(make_message("transfer-request", to, ctx))
 
 
 def alert(to: str, ctx: dict[str, Any], headers: dict[str, str]) -> None:
@@ -110,16 +105,6 @@ def nag(to: str, ctx: dict[str, Any], headers: dict[str, str]) -> None:
 
 def flapping_notice(to: str, ctx: dict[str, Any]) -> None:
     m = make_message("flapping-notice", to, ctx)
-    send(m, block=True)
-
-
-def deletion_notice(to: str, ctx: dict[str, Any]) -> None:
-    m = make_message("deletion-notice", to, ctx)
-    send(m, block=True)
-
-
-def deletion_scheduled(to: list[str], ctx: dict[str, Any]) -> None:
-    m = make_message("deletion-scheduled", to, ctx)
     send(m, block=True)
 
 

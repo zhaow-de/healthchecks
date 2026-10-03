@@ -63,7 +63,7 @@ class ResumeTestCase(BaseTestCase):
         self.assertEqual(r.status_code, 405)
 
     def test_it_validates_ownership(self) -> None:
-        check = Check.objects.create(project=self.bobs_project, status="up")
+        check = Check.objects.create(project=self.charlies_project, status="up")
         url = f"/api/v3/checks/{check.code}/resume"
         r = self.client.post(url, "", content_type="application/json", HTTP_X_API_KEY="X" * 32)
 

@@ -112,26 +112,16 @@ class AddCheckTestCase(BaseTestCase):
         r = self.client.post(self.url, self._payload(tz="Etc/Surprise"))
         self.assertEqual(r.status_code, 400)
 
-    def test_team_access_works(self) -> None:
-        self.client.login(username="bob@example.org", password="password")
-        self.client.post(self.url, self._payload())
-
-        check = Check.objects.get()
-        # Added by bob, but should belong to alice (bob has team access)
-        self.assertEqual(check.project, self.project)
-
     def test_it_rejects_get(self) -> None:
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.url)
         self.assertEqual(r.status_code, 405)
 
-    def test_it_requires_rw_access(self) -> None:
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
-
-        self.client.login(username="bob@example.org", password="password")
+    def test_it_checks_ownership(self) -> None:
+        self.client.login(username="charlie@example.org", password="password")
         r = self.client.post(self.url, self._payload())
-        self.assertEqual(r.status_code, 403)
+        self.assertEqual(r.status_code, 404)
+        self.assertFalse(Check.objects.exists())
 
     def test_it_has_no_check_limit(self) -> None:
         Check.objects.bulk_create([Check(project=self.project) for _ in range(25)])

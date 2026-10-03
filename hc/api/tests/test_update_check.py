@@ -98,7 +98,7 @@ class UpdateCheckTestCase(BaseTestCase):
         self.assertEqual(r.status_code, 404)
 
     def test_it_validates_ownership(self) -> None:
-        check = Check.objects.create(project=self.bobs_project, status="up")
+        check = Check.objects.create(project=self.charlies_project, status="up")
 
         r = self.post(check.code, {})
         self.assertEqual(r.status_code, 403)

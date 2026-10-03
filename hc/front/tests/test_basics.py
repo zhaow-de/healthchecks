@@ -27,12 +27,6 @@ class BasicsTestCase(TestCase):
         self.assertContains(r, "Log In to", status_code=200)
         self.assertContains(r, "Running with an insecure SECRET_KEY value")
 
-    @override_settings(REGISTRATION_OPEN=False)
-    def test_it_obeys_registration_open(self) -> None:
-        r = self.client.get("/accounts/login/")
-
-        self.assertNotContains(r, "Sign Up")
-
     def test_it_loads_bootstrap_5_without_jquery(self) -> None:
         r = self.client.get("/docs/")
         self.assertContains(r, "vendor/bootstrap/bootstrap.bundle.min.js")

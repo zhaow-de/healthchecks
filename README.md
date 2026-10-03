@@ -15,6 +15,9 @@ This project is a hard fork of
 * It removes the features that the
   [zcrypto-kraken](https://github.com/zhaow-de/zcrypto-kraken) project does not
   need.
+* It has one user, the superuser that `manage.py createsuperuser` creates: there
+  is no sign-up and there are no teams, and `createsuperuser` refuses to run once
+  a user exists.
 * It introduces the MIT license on top of the original BSD 3-clause license:
   this repository's changes are under MIT, and the code from the original
   project stays under its BSD 3-clause license. Both are in [LICENSE](LICENSE).
@@ -29,8 +32,8 @@ When a ping does not arrive on time, Healthchecks sends out alerts.
 
 Healthchecks comes with a web dashboard, API, integrations for
 delivering notifications (email, webhooks, Slack, groups), a Prometheus
-metrics endpoint, monthly email reports, WebAuthn 2FA support, team
-management features: projects, team members, read-only access.
+metrics endpoint, monthly email reports, WebAuthn 2FA support, and projects
+to group checks, each with its own read-write and read-only API keys.
 
 The building blocks are:
 
@@ -78,7 +81,7 @@ To set up Healthchecks development environment:
   dependency has no pre-built wheel (for example, `cryptography` on Intel Macs),
   uv compiles it from source, and you will need a C compiler and a Rust toolchain.
 
-* Create database tables and a superuser account:
+* Create database tables and the superuser account:
 
   ```sh
   uv run ./manage.py migrate
@@ -109,7 +112,7 @@ To set up Healthchecks development environment:
   ```
 
 The site should now be running at `http://localhost:8000`.
-To access Django administration site, log in as a superuser, then
+To access Django administration site, log in as the superuser, then
 visit `http://localhost:8000/admin/`
 
 `uv run` runs a command in the project's virtual environment. Alternatively,
@@ -138,13 +141,12 @@ the latter takes precedence.
 ## Accessing Administration Panel
 
 Healthchecks comes with Django's administration panel where you can perform
-administrative tasks: delete user accounts, change passwords, inspect contents of
+administrative tasks: change the user's password, inspect contents of
 database tables.
 
 To access the administration panel,
 
- * if you haven't already, create a superuser account: `./manage.py createsuperuser`
- * log into the site using superuser credentials
+ * log into the site using the superuser credentials
  * in the top navigation, "Account" dropdown, select "Site Administration"
 
 
@@ -220,25 +222,17 @@ pings for every check. You can set the limit higher to keep a longer history:
 go to the Administration Panel, look up user's **Profile** and modify its
 "Ping log limit" field.
 
-Healthchecks also provides management commands for cleaning up
-`auth_user` (user accounts) and `api_tokenbucket` (rate limiting records) tables.
+Healthchecks also provides a management command for cleaning up the
+`api_tokenbucket` (rate limiting records) table. The TokenBucket model is used
+for rate-limiting login attempts and similar operations. Any records older than
+one day can be safely removed.
 
-* Remove user accounts that are older than 1 month and have never logged in:
+```sh
+./manage.py prunetokenbucket
+```
 
-  ```sh
-  ./manage.py pruneusers
-  ```
-
-* Remove old records from the `api_tokenbucket` table. The TokenBucket
-  model is used for rate-limiting login attempts and similar operations.
-  Any records older than one day can be safely removed.
-
-  ```sh
-  ./manage.py prunetokenbucket
-  ```
-
-When you first try these commands on your data, it is a good idea to
-test them on a copy of your database, not on the live database right away.
+When you first try this command on your data, it is a good idea to
+test it on a copy of your database, not on the live database right away.
 In a production setup, you should also have regular, automated database
 backups set up.
 
@@ -249,47 +243,6 @@ standard. To enable WebAuthn support, set the `RP_ID` (relying party identifier 
 setting to a non-null value. Set its value to your site's domain without scheme
 and without port. For example, if your site runs on `https://my-hc.example.org`,
 set `RP_ID` to `my-hc.example.org`.
-
-## External Authentication
-
-Healthchecks supports external authentication by means of HTTP headers set by
-reverse proxies or the WSGI server. This allows you to integrate it into your
-existing authentication system (e.g., LDAP or OAuth) via an authenticating proxy.
-When this option is enabled, **healthchecks will trust the header's value implicitly**,
-so it is **very important** to ensure that attackers cannot set the value themselves
-(and thus impersonate any user). How to do this varies by your chosen proxy,
-but generally involves configuring it to strip out headers that normalize to the
-same name as the chosen identity header.
-
-To enable this feature, set the `REMOTE_USER_HEADER` value to a header you wish to
-authenticate with. HTTP headers will be prefixed with `HTTP_` and have any dashes
-converted to underscores. Headers without that prefix can be set by the WSGI server
-itself only, which is more secure.
-
-When `REMOTE_USER_HEADER` is set, Healthchecks will:
- - assume the header contains user's email address
- - look up and automatically log in the user with a matching email address
- - automatically create an user account if it does not exist
- - disable the default authentication methods (login link to email, password)
-
-The header name in `REMOTE_USER_HEADER` must be specified in upper-case,
-with any dashes replaced with underscores, and prefixed with `HTTP_`. For
-example, if your authentication proxy sets a `X-Authenticated-User` request
-header, you should set `REMOTE_USER_HEADER=HTTP_X_AUTHENTICATED_USER`.
-
-**Note on using `local_settings.py`:**
-When Healthchecks reads settings from environment variables and encounters
-the `REMOTE_USER_HEADER` environment variable, it sets *two* settings,
-`REMOTE_USER_HEADER` and `AUTHENTICATION_BACKENDS`. This logic has already run by the
-time Healthchecks reads `local_settings.py`. Therefore, if you configure Healthchecks
-using the `local_settings.py` file instead of environment variables, and specify
-`REMOTE_USER_HEADER` there, you will also need a line which sets the other setting,
-`AUTHENTICATION_BACKENDS`:
-
-```
-REMOTE_USER_HEADER = "HTTP_X_AUTHENTICATED_USER"
-AUTHENTICATION_BACKENDS = ["hc.accounts.backends.CustomHeaderBackend"]
-```
 
 ## Integrations
 
@@ -353,13 +306,12 @@ Healthchecks instance in production.
      and data migrations.
 * Processes that need to be running constantly.
   * `manage.py runserver` is intended for development only.
-     **Do not use it in production**, instead consider using
-     [uWSGI](https://uwsgi-docs.readthedocs.io/en/latest/) or
-     [gunicorn](https://gunicorn.org/).
-     An example of a minimal setup would be to install uWSGI using
-     `uv sync --no-dev --extra uwsgi` (plus any other extras you use), and to run
-     `uv run --no-sync uwsgi --http :8000 --module hc.wsgi` from the project's root
-     directory.
+     **Do not use it in production**, use
+     [uWSGI](https://uwsgi-docs.readthedocs.io/en/latest/) instead, as the Docker
+     image does with [docker/uwsgi.ini](docker/uwsgi.ini). A minimal setup installs
+     uWSGI with `uv sync --no-dev --extra uwsgi` (plus any other extras you use) and
+     runs `uv run --no-sync uwsgi --http :8000 --module hc.wsgi` from the project's
+     root directory.
   *  `manage.py sendalerts` is the process that monitors checks and sends out
      monitoring alerts. It must be always running, it must be started on reboot, and it
      must be restarted if it itself crashes. On modern linux systems, a good option is

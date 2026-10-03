@@ -1077,7 +1077,7 @@ class TokenBucket(models.Model):
             remote_addr = remote_addr.split(":")[0]
 
         value = f"auth-ip-{remote_addr}"
-        # 20 signup/login attempts for a single IP per hour:
+        # 20 login attempts for a single IP per hour:
         return TokenBucket.authorize(value, 20, 3600)
 
     @staticmethod
@@ -1093,13 +1093,6 @@ class TokenBucket(models.Model):
 
         # 10 login attempts for a single email per hour:
         return TokenBucket.authorize(f"em-{hashed}", 10, 3600)
-
-    @staticmethod
-    def authorize_invite(user: User) -> bool:
-        value = f"invite-{user.id}"
-
-        # 20 invites per day
-        return TokenBucket.authorize(value, 20, 3600 * 24)
 
     @staticmethod
     def authorize_login_password(email: str) -> bool:

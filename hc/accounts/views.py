@@ -9,22 +9,14 @@ from uuid import UUID, uuid4
 import pyotp
 import segno
 from django.conf import settings
-from django.contrib import messages
 from django.contrib.auth import authenticate, update_session_auth_hash
 from django.contrib.auth import login as auth_login
 from django.contrib.auth import logout as auth_logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
-from django.db import transaction
 from django.db.models.functions import Lower
-from django.http import (
-    HttpRequest,
-    HttpResponse,
-    HttpResponseBadRequest,
-    HttpResponseForbidden,
-)
-from django.middleware import csrf
+from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import Resolver404, resolve, reverse
 from django.utils.timezone import now
@@ -35,8 +27,8 @@ from django.views.decorators.http import require_POST
 from hc.accounts import forms
 from hc.accounts.decorators import require_sudo_mode
 from hc.accounts.http import AuthenticatedHttpRequest
-from hc.accounts.models import Credential, Member, Profile, Project
-from hc.api.models import Channel, Check, TokenBucket
+from hc.accounts.models import Credential, Profile, Project
+from hc.api.models import TokenBucket
 from hc.lib.tz import all_timezones
 from hc.lib.webauthn import CreateHelper, GetHelper
 
@@ -68,40 +60,6 @@ def _allow_redirect(redirect_url: str | None) -> bool:
         return False
 
     return match.url_name in POST_LOGIN_ROUTES
-
-
-def _make_user(email: str, tz: str | None = None, with_project: bool = True) -> User:
-    username = str(uuid4())[:30]
-    user = User(username=username, email=email)
-    user.set_unusable_password()
-    user.save()
-
-    project = None
-    if with_project:
-        project = Project(owner=user)
-        project.badge_key = user.username
-        project.save()
-
-        check = Check(project=project)
-        check.name = "My First Check"
-        check.slug = "my-first-check"
-        check.save()
-
-        channel = Channel(project=project)
-        channel.kind = "email"
-        channel.value = email
-        channel.email_verified = True
-        channel.save()
-
-        channel.checks.add(check)
-
-    # Ensure a profile gets created
-    profile = Profile.objects.for_user(user)
-    if tz:
-        profile.tz = tz
-        profile.save()
-
-    return user
 
 
 def _redirect_after_login(request: HttpRequest) -> HttpResponse:
@@ -190,7 +148,6 @@ def login(request: HttpRequest) -> HttpResponse:
         "form": form,
         "magic_form": magic_form,
         "bad_link": bad_link,
-        "registration_open": settings.REGISTRATION_OPEN,
         "support_email": settings.SUPPORT_EMAIL,
         "account_closed": "account-closed" in request.GET,
         "use_magic_form": bool(settings.MAILERS),
@@ -202,46 +159,6 @@ def login(request: HttpRequest) -> HttpResponse:
 def logout(request: HttpRequest) -> HttpResponse:
     auth_logout(request)
     return redirect("hc-index")
-
-
-def signup_csrf(request: HttpRequest) -> HttpResponse:
-    if not settings.REGISTRATION_OPEN or request.user.is_authenticated:
-        return HttpResponseForbidden()
-
-    return HttpResponse(csrf.get_token(request))
-
-
-@require_POST
-def signup(request: HttpRequest) -> HttpResponse:
-    if not settings.REGISTRATION_OPEN or request.user.is_authenticated:
-        return HttpResponseForbidden()
-
-    ctx: dict[str, object] = {}
-    form = forms.SignupForm(request)
-    if form.is_valid():
-        email = form.cleaned_data["identity"]
-        try:
-            user = User.objects.get(email=email)
-            # Sometimes existing users forget they already have an account.
-            # They use the signup form and are confused why no email arrives.
-            # To avoid this confusion, if we see the user account already exists,
-            # we will send them sign-in link even though they used the wrong form
-            # ("sign up" instead of "sign in").
-        except User.DoesNotExist:
-            # If the user does not exist, create a new user account.
-            tz = form.cleaned_data["tz"]
-            user = _make_user(email, tz)
-
-        profile = Profile.objects.for_user(user)
-        profile.send_instant_login_link()
-    else:
-        ctx = {"form": form}
-
-    response = render(request, "accounts/signup_result.html", ctx)
-    if "form" not in ctx:
-        _set_autologin_cookie(response)
-
-    return response
 
 
 def login_link_sent(request: HttpRequest) -> HttpResponse:
@@ -286,7 +203,6 @@ def profile(request: AuthenticatedHttpRequest) -> HttpResponse:
     ctx = {
         "page": "profile",
         "profile": profile,
-        "my_projects_status": "default",
         "2fa_status": "default",
         "tz_status": "default",
         "added_credential_name": request.session.pop("added_credential_name", ""),
@@ -308,21 +224,6 @@ def profile(request: AuthenticatedHttpRequest) -> HttpResponse:
         ctx["changed_password"] = True
         ctx["email_password_status"] = "success"
 
-    if request.method == "POST" and "leave_project" in request.POST:
-        leave_form = forms.LeaveForm(request.POST)
-        if not leave_form.is_valid():
-            return HttpResponseBadRequest()
-
-        try:
-            project = Project.objects.get(code=leave_form.cleaned_data["code"], member__user=request.user)
-        except Project.DoesNotExist:
-            return HttpResponseBadRequest()
-
-        Member.objects.filter(project=project, user=request.user).delete()
-
-        ctx["left_project"] = project
-        ctx["my_projects_status"] = "info"
-
     if request.method == "POST" and "tz" in request.POST:
         form = forms.TzForm(request.POST)
         if form.is_valid():
@@ -332,7 +233,6 @@ def profile(request: AuthenticatedHttpRequest) -> HttpResponse:
             ctx["tz_updated"] = True
 
     ctx["ownerships"] = request.user.project_set.order_by(Lower("name"))
-    ctx["memberships"] = request.user.memberships.order_by(Lower("project__name"))
     return render(request, "accounts/profile.html", ctx)
 
 
@@ -353,30 +253,11 @@ def add_project(request: AuthenticatedHttpRequest) -> HttpResponse:
 
 @login_required
 def project(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
-    project = get_object_or_404(Project, code=code)
-    is_owner = project.owner_id == request.user.id
-
-    if request.user.is_superuser or is_owner:
-        is_manager = True
-        rw = True
-    else:
-        membership = get_object_or_404(Member, project=project, user=request.user)
-        is_manager = membership.role == Member.Role.MANAGER
-        rw = membership.is_rw
-
-    ctx = {
-        "page": "project",
-        "rw": rw,
-        "project": project,
-        "is_owner": is_owner,
-        "is_manager": is_manager,
-    }
+    project = get_object_or_404(Project, code=code, owner=request.user)
+    ctx = {"page": "project", "project": project}
 
     if request.method == "POST":
         if "create_key" in request.POST:
-            if not rw:
-                return HttpResponseForbidden()
-
             if request.POST["create_key"] == "api_key":
                 ctx["new_key"] = project.set_api_key()
             elif request.POST["create_key"] == "api_key_readonly":
@@ -388,9 +269,6 @@ def project(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
             ctx["key_created"] = True
             ctx["api_status"] = "success"
         elif "revoke_key" in request.POST:
-            if not rw:
-                return HttpResponseForbidden()
-
             if request.POST["revoke_key"] == "api_key":
                 project.api_key = ""
             elif request.POST["revoke_key"] == "api_key_readonly":
@@ -401,57 +279,7 @@ def project(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
 
             ctx["key_revoked"] = True
             ctx["api_status"] = "info"
-        elif "invite_team_member" in request.POST:
-            if not is_manager:
-                return HttpResponseForbidden()
-
-            invite_form = forms.InviteTeamMemberForm(request.POST)
-            if invite_form.is_valid():
-                email = invite_form.cleaned_data["email"]
-
-                invite_suggestions = project.invite_suggestions()
-                if not invite_suggestions.filter(email=email).exists():
-                    # And are we not hitting a rate limit?
-                    if not TokenBucket.authorize_invite(request.user):
-                        return render(request, "try_later.html")
-
-                try:
-                    user = User.objects.get(email=email)
-                except User.DoesNotExist:
-                    user = _make_user(email, with_project=False)
-
-                if project.invite(user, role=invite_form.cleaned_data["role"]):
-                    ctx["team_member_invited"] = email
-                    ctx["team_status"] = "success"
-                else:
-                    ctx["team_member_duplicate"] = email
-                    ctx["team_status"] = "info"
-
-        elif "remove_team_member" in request.POST:
-            if not is_manager:
-                return HttpResponseForbidden()
-
-            remove_form = forms.RemoveTeamMemberForm(request.POST)
-            if remove_form.is_valid():
-                q = User.objects.filter(
-                    email=remove_form.cleaned_data["email"],
-                    memberships__project=project,
-                )
-                farewell_user = q.first()
-                if farewell_user is None:
-                    return HttpResponseBadRequest()
-
-                if farewell_user == request.user:
-                    return HttpResponseBadRequest()
-
-                Member.objects.filter(project=project, user=farewell_user).delete()
-
-                ctx["team_member_removed"] = remove_form.cleaned_data["email"]
-                ctx["team_status"] = "info"
         elif "set_project_name" in request.POST:
-            if not rw:
-                return HttpResponseForbidden()
-
             name_form = forms.ProjectNameForm(request.POST)
             if name_form.is_valid():
                 project.name = name_form.cleaned_data["name"]
@@ -460,73 +288,6 @@ def project(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
                 ctx["project_name_updated"] = True
                 ctx["project_name_status"] = "success"
 
-        elif "transfer_project" in request.POST:
-            if not is_owner:
-                return HttpResponseForbidden()
-
-            transfer_form = forms.TransferForm(request.POST)
-            if transfer_form.is_valid():
-                # Look up the proposed new owner
-                email = transfer_form.cleaned_data["email"]
-                try:
-                    membership = project.member_set.filter(user__email=email).get()
-                except Member.DoesNotExist:
-                    return HttpResponseBadRequest()
-
-                # Revoke any previous transfer requests
-                project.member_set.update(transfer_request_date=None)
-
-                # Initiate the new request
-                membership.transfer_request_date = now()
-                membership.save()
-
-                # Send an email notification
-                profile = Profile.objects.for_user(membership.user)
-                profile.send_transfer_request(project)
-
-                ctx["transfer_initiated"] = True
-                ctx["transfer_status"] = "success"
-
-        elif "cancel_transfer" in request.POST:
-            if not is_owner:
-                return HttpResponseForbidden()
-
-            project.member_set.update(transfer_request_date=None)
-            ctx["transfer_cancelled"] = True
-            ctx["transfer_status"] = "success"
-
-        elif "accept_transfer" in request.POST:
-            tr = project.transfer_request()
-            if not tr or tr.user != request.user:
-                return HttpResponseForbidden()
-
-            with transaction.atomic():
-                # 1. Reuse the existing membership, and change its user
-                tr.user = project.owner
-                tr.transfer_request_date = None
-                # The previous owner becomes a regular member
-                # (not readonly, not manager):
-                tr.role = Member.Role.REGULAR
-                tr.save()
-
-                # 2. Change project's owner
-                project.owner = request.user
-                project.save()
-
-            ctx["is_owner"] = True
-            ctx["is_manager"] = True
-            messages.success(request, "You are now the owner of this project!")
-
-        elif "reject_transfer" in request.POST:
-            tr = project.transfer_request()
-            if not tr or tr.user != request.user:
-                return HttpResponseForbidden()
-
-            tr.transfer_request_date = None
-            tr.save()
-
-    mq = project.member_set.select_related("user").order_by("user__email")
-    ctx["memberships"] = list(mq)
     return render(request, "accounts/project.html", ctx)
 
 

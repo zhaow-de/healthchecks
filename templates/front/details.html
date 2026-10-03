@@ -36,9 +36,7 @@
     <div id="details-head" class="col-sm-12">
         <h1>
             {{ check.name_then_code }}
-            {% if rw %}
             <small><a id="edit-name" href="#">(edit&hellip;)</a></small>
-            {% endif %}
         </h1>
         {% for tag in check.tags_list %}
             <span class="badge label-tag">{{ tag }}</span>
@@ -46,7 +44,6 @@
     </div>
 
     <div class="col-sm-5">
-        {% if rw %}
         <div class="details-block">
             <h2>Description</h2>
             {% if check.desc %}
@@ -60,22 +57,14 @@
             <small><a id="edit-desc" href="#">Add description&hellip;</a></small>
             {% endif %}
         </div>
-        {% elif check.desc %}
-        <div class="details-block">
-            <h2>Description</h2>
-            {{ check.desc|linebreaks|urlize }}
-        </div>
-        {% endif %}
 
         <div id="how-to-ping" class="details-block">
             <h2>
                 How To Ping
-                {% if rw %}
-                    <div class="btn-group float-end">
-                        <a href="?urls=uuid" class="btn btn-outline-secondary btn-sm {% if not project.show_slugs %}active{% endif %}">uuid</a>
-                        <a href="?urls=slug" class="btn btn-outline-secondary btn-sm {% if project.show_slugs %}active{% endif %}">slug</a>
-                    </div>
-                {% endif %}
+                <div class="btn-group float-end">
+                    <a href="?urls=uuid" class="btn btn-outline-secondary btn-sm {% if not project.show_slugs %}active{% endif %}">uuid</a>
+                    <a href="?urls=slug" class="btn btn-outline-secondary btn-sm {% if project.show_slugs %}active{% endif %}">slug</a>
+                </div>
             </h2>
             <div>
                 <p>
@@ -89,7 +78,7 @@
                 <code>(unavailable, set slug first)</code>
                 {% endif %}
 
-                {% if rw and project.show_slugs and not project.ping_key %}
+                {% if project.show_slugs and not project.ping_key %}
                 <p class="alert alert-info">
                     The ping key is currently not set. Go to
                     <a href="{% url 'hc-project-settings' project.code %}">project settings</a>
@@ -106,12 +95,10 @@
                 </p>
             </div>
             <div class="text-end">
-                {% if rw %}
                 <button
                     data-bs-toggle="modal"
                     data-bs-target="#filtering-rules-modal"
                     class="btn btn-sm btn-outline-secondary">Filtering Rules&hellip;</button>
-                {% endif %}
                 {% if check.url %}
                 <button
                     data-bs-toggle="modal"
@@ -132,7 +119,6 @@
                 {% include "front/details_downtimes.html" %}
             </div>
             <div class="text-end">
-                {% if rw %}
                 <form action="{% url 'hc-pause' check.code %}" method="post">
                     {% csrf_token %}
                     <input
@@ -141,16 +127,13 @@
                         {% if check.status == "paused" %}disabled{% endif %}
                         class="btn btn-sm btn-outline-secondary" value="Pause" />
                 </form>
-                {% endif %}
 
                 {% if check.url %}
                 {% if project.show_slugs and not project.ping_key %}
-                    {% if rw %}
                     <button
                         data-bs-toggle="modal"
                         data-bs-target="#no-ping-key-modal"
                         class="btn btn-sm btn-outline-secondary">Ping Now!</button>
-                    {% endif %}
                 {% else %}
                 <button
                     id="ping-now"
@@ -203,8 +186,7 @@
                     </td>
                 </tr>
             </table>
-            {% if rw %}
-            <div class="text-end rw">
+            <div class="text-end">
                 <button
                     id="edit-timeout"
                     class="btn btn-sm btn-outline-secondary timeout-grace"
@@ -217,13 +199,12 @@
                     data-tz="{{ check.tz }}">
                     Change Schedule&hellip;</button>
             </div>
-            {% endif %}
         </div>
 
         <div class="details-block">
             {% if group_channels %}
             <h2>Notification Groups</h2>
-            <table class="details-integrations table {% if rw %}rw table-hover{% endif %}">
+            <table class="details-integrations table table-hover">
                 {% for channel in group_channels %}
                     <tr data-url="{% url 'hc-switch-channel' check.code channel.code %}" {% if channel in enabled_channels %}class="on"{% endif %}>
                         <th>
@@ -241,7 +222,7 @@
             {% endif %}
             <h2>Notification Methods</h2>
             {% if channels %}
-            <table class="details-integrations table {% if rw %}rw table-hover{% endif %}">
+            <table class="details-integrations table table-hover">
             {% for channel in channels %}
                 <tr data-url="{% url 'hc-switch-channel' check.code channel.code %}" {% if channel in enabled_channels %}class="on"{% endif %}>
                     <th>
@@ -266,7 +247,6 @@
             {% endif %}
         </div>
 
-        {% if rw %}
         <div class="details-block">
             <h2>Danger Zone</h2>
             <p>Copy, transfer, or permanently remove this check.</p>
@@ -295,7 +275,6 @@
                     class="btn btn-sm btn-outline-danger">Remove</button>
             </div>
         </div>
-        {% endif %}
     </div>
 
     <div id="events" class="col-sm-7" data-status-url="{% url 'hc-status-single' check.code %}">
@@ -346,7 +325,7 @@
 {% include "front/filtering_rules_modal.html" %}
 {% include "front/copy_modal.html" %}
 
-{% if rw and project.show_slugs and not project.ping_key %}
+{% if project.show_slugs and not project.ping_key %}
 <div id="no-ping-key-modal" class="modal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">

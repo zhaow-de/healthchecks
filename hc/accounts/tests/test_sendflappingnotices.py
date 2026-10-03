@@ -27,11 +27,6 @@ class SendFlappingNoticesTestCase(BaseTestCase):
         cmd = Command(stdout=Mock())
         cmd.handle()
 
-        tos = set()
-        for email in mail.outbox:
-            self.assertEqual(email.subject, """The Check "Foo" Is Flapping""")
-            tos.update(email.to)
-
-        self.assertIn("alice@example.org", tos)
-        # Team members should receive this too
-        self.assertIn("bob@example.org", tos)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].subject, """The Check "Foo" Is Flapping""")
+        self.assertEqual(mail.outbox[0].to, ["alice@example.org"])

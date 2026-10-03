@@ -31,10 +31,8 @@ class CheckTokenTestCase(BaseTestCase):
         self.assertEqual(self.profile.token, "")
 
     def test_it_handles_email_in_username(self) -> None:
-        # Healthchecks will generate usernames that look like UUIDs. But custom
-        # authentication backends like django-auth-ldap can also create User objects
-        # with non-UUID usernames. In this testcase we check if check_token works
-        # with an username that looks like an email address.
+        # createsuperuser makes UUID-like usernames, but the Django admin can set one
+        # that looks like an email address
         self.alice.username = "alice@example.org"
         self.alice.save()
         r = self.client.post(self.url.replace("alice", "alice@example.org"))

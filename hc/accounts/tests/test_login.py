@@ -3,6 +3,7 @@ from __future__ import annotations
 from urllib.parse import quote_plus
 
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.core import mail
 from django.test.utils import override_settings
 
@@ -49,7 +50,8 @@ class LoginTestCase(BaseTestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].subject, f"Log in to {settings.SITE_NAME}")
         self.assertEmailContainsHtml("http://testserver/static/img/logo.png")
-        self.assertEmailContains("http://testserver/docs/")
+        self.assertEmailContains("http://testserver/accounts/check_token/alice/")
+        self.assertEmailNotContains("Need help getting started")
 
     @override_settings(SESSION_COOKIE_SECURE=True)
     def test_it_sets_secure_autologin_cookie(self) -> None:
@@ -188,10 +190,20 @@ class LoginTestCase(BaseTestCase):
         r = self.client.post("/accounts/login/", form)
         self.assertContains(r, "Incorrect email or password")
 
-    @override_settings(REGISTRATION_OPEN=False)
-    def test_it_obeys_registration_open(self) -> None:
+    def test_it_offers_no_sign_up(self) -> None:
         r = self.client.get("/accounts/login/")
+        self.assertContains(r, "magic-link-form")
+        self.assertNotContains(r, "signup-modal")
         self.assertNotContains(r, "Create Your Account")
+        self.assertNotContains(r, "Sign Up")
+        self.assertNotContains(r, "js/signup.js")
+
+        r = self.client.get("/accounts/signup/csrf/")
+        self.assertEqual(r.status_code, 404)
+
+        r = self.client.post("/accounts/signup/", {"identity": "eve@example.org", "tz": "UTC"})
+        self.assertEqual(r.status_code, 404)
+        self.assertFalse(User.objects.filter(email="eve@example.org").exists())
 
     def test_it_redirects_to_webauthn_form(self) -> None:
         Credential.objects.create(user=self.alice, name="Alices Key")

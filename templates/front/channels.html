@@ -16,7 +16,7 @@
 
 <div class="col-sm-12">
     {% if channels %}
-    <table class="table table-hover channels-table {% if rw %}rw{% endif %}">
+    <table class="table table-hover channels-table">
         <thead>
         <tr>
             <th></th>
@@ -34,7 +34,7 @@
                 <img src="{% static ch.icon_path %}" alt="{{ ch.get_kind_display }}" class="kind-{{ ch.kind }}" />
             </td>
             <td>
-                <div class="edit-name"{% if rw %} data-bs-toggle="modal" data-bs-target="#name-{{ ch.code }}"{% endif %}>
+                <div class="edit-name" data-bs-toggle="modal" data-bs-target="#name-{{ ch.code }}">
                     {% if ch.name %}
                     {{ ch.name }}
                     {% else %}
@@ -76,7 +76,7 @@
                 {% endif %}
             </td>
             <td class="actions">
-                {% if ch.is_editable and rw %}
+                {% if ch.is_editable %}
                 <a class="btn btn-sm btn-outline-secondary" href="{% url 'hc-edit-channel' ch.code %}">
                     {% if ch.kind == "email" and ch.disabled %}Fix&hellip;{% else %}Edit{% endif %}
                 </a>
@@ -91,7 +91,6 @@
                         Test!
                     </button>
                 </form>
-                {% if rw %}
                 <button
                     data-kind="{{ ch.get_kind_display }}"
                     data-url="{% url 'hc-remove-channel' ch.code %}"
@@ -99,7 +98,6 @@
                     type="button">
                     <span class="ic-delete"></span>
                 </button>
-                {% endif %}
             </td>
         </tr>
         {% endfor %}
@@ -118,7 +116,6 @@
     {% endif %}
 
 
-    {% if rw %}
     <h1 class="ai-title">Add More</h1>
     <ul class="add-integration list-group">
         <li class="list-group-item d-flex align-items-center gap-3">
@@ -182,7 +179,6 @@
         {% endif %}
 
     </ul>
-    {% endif %}
 </div>
 </div>
 
@@ -224,7 +220,6 @@
     </div>
 </div>
 
-{% if rw  %}
 {% for ch in channels %}
 <div id="name-{{ ch.code }}" class="modal channel-modal" tabindex="-1">
     <div class="modal-dialog">
@@ -301,7 +296,6 @@
     </div>
 </div>
 {% endfor %}
-{% endif %}
 
 {% endblock %}
 

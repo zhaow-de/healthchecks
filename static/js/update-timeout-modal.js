@@ -10,7 +10,7 @@ hc.ready(function () {
     var graceOncalendarUnit = document.getElementById("update-timeout-grace-oncalendar-unit");
 
 
-    hc.on(".rw .timeout-grace", "click", function() {
+    hc.on(".timeout-grace", "click", function() {
         var row = this.closest("tr.checks-row");
         var code = row ? row.id : this.dataset.code;
 

@@ -89,10 +89,18 @@ class EditWebhookTestCase(BaseTestCase):
         r = self.client.get(self.url)
         self.assertEqual(r.status_code, 400)
 
-    def test_it_requires_rw_access(self) -> None:
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
+    def test_it_checks_ownership(self) -> None:
+        form = {
+            "name": "Charlie was here",
+            "method_down": "GET",
+            "url_down": "http://foo.com",
+            "method_up": "GET",
+            "url_up": "",
+        }
 
-        self.client.login(username="bob@example.org", password="password")
-        r = self.client.post(self.url, {})
-        self.assertEqual(r.status_code, 403)
+        self.client.login(username="charlie@example.org", password="password")
+        r = self.client.post(self.url, form)
+        self.assertEqual(r.status_code, 404)
+
+        self.channel.refresh_from_db()
+        self.assertEqual(self.channel.name, "Call example.org")

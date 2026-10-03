@@ -24,13 +24,10 @@ class EditGroupTestCase(BaseTestCase):
         self.assertContains(r, "multiple integrations at once.")
         self.assertContains(r, self.c1_code_str)
 
-    def test_it_requires_rw_access(self) -> None:
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
-
-        self.client.login(username="bob@example.org", password="password")
+    def test_it_checks_ownership(self) -> None:
+        self.client.login(username="charlie@example.org", password="password")
         r = self.client.get(self.url)
-        self.assertEqual(r.status_code, 403)
+        self.assertEqual(r.status_code, 404)
 
     def test_it_handles_nonexistent_members_in_value_field(self) -> None:
         # value references a channel that does not exist. The "edit group"

@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from datetime import timedelta as td
 
-import time_machine
 from django.contrib import admin
 from django.contrib.auth.models import User
 from django.contrib.messages import get_messages
@@ -13,11 +12,9 @@ from django.urls import reverse
 from django.utils.timezone import now
 
 from hc.accounts.admin import HcUserAdmin, ProfileAdmin
-from hc.accounts.models import DELETION_GRACE, Credential, Profile
+from hc.accounts.models import Credential, Profile, Project
 from hc.api.models import Channel, Check
 from hc.test import BaseTestCase, TestHttpResponse
-
-CURRENT_TIME = datetime(2020, 1, 15, tzinfo=timezone.utc)
 
 
 class AccountsAdminTestCase(BaseTestCase):
@@ -35,46 +32,45 @@ class AccountsAdminTestCase(BaseTestCase):
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get("/admin/accounts/profile/")
         self.assertContains(r, "alice@example.org")
-        self.assertContains(r, "bob@example.org")
+        self.assertContains(r, "charlie@example.org")
 
     def test_it_escapes_emails_when_showing_profiles(self) -> None:
-        self.bob.email = "bob&friends@example.org"
-        self.bob.save()
+        self.charlie.email = "charlie&friends@example.org"
+        self.charlie.save()
 
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get("/admin/accounts/profile/")
         # The amperstand should be escaped
-        self.assertNotContains(r, "bob&friends@example.org")
+        self.assertNotContains(r, "charlie&friends@example.org")
 
     def test_it_shows_projects(self) -> None:
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get("/admin/accounts/project/")
         self.assertContains(r, "Alices Project")
-        self.assertContains(r, "Default Project for bob@example.org")
+        self.assertContains(r, "Default Project for charlie@example.org")
 
     def test_it_escapes_emails_when_showing_projects(self) -> None:
-        self.bob.email = "bob&friends@example.org"
-        self.bob.save()
+        self.charlie.email = "charlie&friends@example.org"
+        self.charlie.save()
 
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get("/admin/accounts/project/")
         # The amperstand should be escaped
-        self.assertNotContains(r, "bob&friends@example.org")
+        self.assertNotContains(r, "charlie&friends@example.org")
 
     def test_it_highlights_check_count_above_one(self) -> None:
         Check.objects.create(project=self.project)
         Check.objects.create(project=self.project)
-        Check.objects.create(project=self.bobs_project)
+        Check.objects.create(project=self.charlies_project)
 
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(reverse("admin:accounts_profile_changelist"))
         self.assertContains(r, '<td class="field-checks"><b>2</b></td>', html=True)
         self.assertContains(r, '<td class="field-checks">1</td>', html=True)
-        self.assertContains(r, '<td class="field-checks">0</td>', html=True)
 
     def test_it_filters_profiles_by_check_count(self) -> None:
         Check.objects.bulk_create([Check(project=self.project) for _ in range(11)])
-        Check.objects.bulk_create([Check(project=self.bobs_project) for _ in range(10)])
+        Check.objects.bulk_create([Check(project=self.charlies_project) for _ in range(10)])
 
         self.client.login(username="alice@example.org", password="password")
         url = reverse("admin:accounts_profile_changelist")
@@ -82,27 +78,25 @@ class AccountsAdminTestCase(BaseTestCase):
         self.assertEqual(list(r.context["cl"].result_list), [self.profile])
 
         r = self.client.get(url)
-        self.assertEqual(len(r.context["cl"].result_list), 3)
+        self.assertEqual(len(r.context["cl"].result_list), 2)
 
     def test_profile_date_columns_show_dates(self) -> None:
         self.profile.last_active_date = datetime(2020, 1, 2, 3, tzinfo=timezone.utc)
-        self.profile.deletion_scheduled_date = datetime(2020, 3, 4, 5, tzinfo=timezone.utc)
 
         profile_admin = ProfileAdmin(Profile, admin.site)
         self.assertEqual(profile_admin.last_active(self.profile), date(2020, 1, 2))
-        self.assertEqual(profile_admin.deletion(self.profile), date(2020, 3, 4))
 
     def test_profile_date_columns_handle_missing_dates(self) -> None:
         profile_admin = ProfileAdmin(Profile, admin.site)
-        self.assertIsNone(profile_admin.last_active(self.bobs_profile))
-        self.assertIsNone(profile_admin.deletion(self.bobs_profile))
+        self.assertIsNone(profile_admin.last_active(self.charlies_profile))
 
-    def test_login_action_logs_in_as_selected_user(self) -> None:
+    def test_it_has_no_login_as_action(self) -> None:
         self.client.login(username="alice@example.org", password="password")
-        payload = {"action": "login", "_selected_action": [self.bobs_profile.id]}
+        payload = {"action": "login", "_selected_action": [self.charlies_profile.id]}
         r = self.client.post(reverse("admin:accounts_profile_changelist"), payload)
-        self.assertRedirects(r, reverse("hc-index"), fetch_redirect_response=False)
-        self.assertEqual(self.client.session["_auth_user_id"], str(self.bob.id))
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(self.messages(r), ["No action selected."])
+        self.assertEqual(self.client.session["_auth_user_id"], str(self.alice.id))
 
     def test_send_report_action_sends_report(self) -> None:
         Check.objects.create(project=self.project, name="Foo", status="up", last_ping=now())
@@ -134,59 +128,27 @@ class AccountsAdminTestCase(BaseTestCase):
         self.assertEqual(mail.outbox[0].subject, "Reminder: 1 check still down")
 
     def test_remove_totp_action_clears_totp(self) -> None:
-        self.bobs_profile.totp = "0" * 32
-        self.bobs_profile.totp_created = now()
-        self.bobs_profile.save()
+        self.charlies_profile.totp = "0" * 32
+        self.charlies_profile.totp_created = now()
+        self.charlies_profile.save()
 
         self.client.login(username="alice@example.org", password="password")
-        payload = {"action": "remove_totp", "_selected_action": [self.bobs_profile.id]}
+        payload = {"action": "remove_totp", "_selected_action": [self.charlies_profile.id]}
         r = self.client.post(reverse("admin:accounts_profile_changelist"), payload)
         self.assertEqual(r.status_code, 302)
         self.assertEqual(self.messages(r), ["Removed TOTP for 1 profile(s)"])
 
-        self.bobs_profile.refresh_from_db()
-        self.assertIsNone(self.bobs_profile.totp)
-        self.assertIsNone(self.bobs_profile.totp_created)
-
-    @time_machine.travel(CURRENT_TIME, tick=False)
-    def test_schedule_for_deletion_action_sets_date(self) -> None:
-        self.client.login(username="alice@example.org", password="password")
-        selected = [self.bobs_profile.id, self.charlies_profile.id]
-        payload = {"action": "schedule_for_deletion", "_selected_action": selected}
-        r = self.client.post(reverse("admin:accounts_profile_changelist"), payload)
-        self.assertEqual(r.status_code, 302)
-        self.assertEqual(self.messages(r), ["2 user(s) scheduled for deletion"])
-
-        for profile in (self.bobs_profile, self.charlies_profile):
-            profile.refresh_from_db()
-            self.assertEqual(profile.deletion_scheduled_date, CURRENT_TIME + DELETION_GRACE)
-
-        self.profile.refresh_from_db()
-        self.assertIsNone(self.profile.deletion_scheduled_date)
-
-    def test_unschedule_for_deletion_action_clears_date(self) -> None:
-        for profile in (self.bobs_profile, self.charlies_profile):
-            profile.deletion_scheduled_date = now()
-            profile.save()
-
-        self.client.login(username="alice@example.org", password="password")
-        payload = {"action": "unschedule_for_deletion", "_selected_action": [self.bobs_profile.id]}
-        r = self.client.post(reverse("admin:accounts_profile_changelist"), payload)
-        self.assertEqual(r.status_code, 302)
-        self.assertEqual(self.messages(r), ["1 user(s) unscheduled for deletion"])
-
-        self.bobs_profile.refresh_from_db()
-        self.assertIsNone(self.bobs_profile.deletion_scheduled_date)
-        # Charlie was not selected and stays scheduled
         self.charlies_profile.refresh_from_db()
-        self.assertIsNotNone(self.charlies_profile.deletion_scheduled_date)
+        self.assertIsNone(self.charlies_profile.totp)
+        self.assertIsNone(self.charlies_profile.totp_created)
 
     def test_it_shows_project_usage(self) -> None:
         Check.objects.create(project=self.project)
         Channel.objects.create(project=self.project, kind="webhook")
         for _ in range(2):
-            Check.objects.create(project=self.bobs_project)
-            Channel.objects.create(project=self.bobs_project, kind="webhook")
+            Check.objects.create(project=self.charlies_project)
+            Channel.objects.create(project=self.charlies_project, kind="webhook")
+        Project.objects.create(owner=self.alice, name="Empty Project")
 
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(reverse("admin:accounts_project_changelist"))
@@ -205,9 +167,23 @@ class AccountsAdminTestCase(BaseTestCase):
 
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(reverse("admin:auth_user_changelist"))
-        self.assertEqual(len(r.context["cl"].result_list), 3)
+        self.assertEqual(len(r.context["cl"].result_list), 2)
         self.assertContains(r, '<td class="field-usage"><strong>2 checks</strong>, 1 channel</td>', html=True)
-        self.assertContains(r, '<td class="field-usage">0 checks, 0 channels</td>', html=True, count=2)
+        self.assertContains(r, '<td class="field-usage">0 checks, 0 channels</td>', html=True, count=1)
+
+    def test_it_does_not_add_users(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(reverse("admin:auth_user_changelist"))
+        self.assertEqual(r.status_code, 200)
+        self.assertNotContains(r, reverse("admin:auth_user_add"))
+
+        r = self.client.get(reverse("admin:auth_user_add"))
+        self.assertEqual(r.status_code, 403)
+
+        payload = {"username": "eve", "password1": "Correct-Horse-9", "password2": "Correct-Horse-9"}
+        r = self.client.post(reverse("admin:auth_user_add"), payload)
+        self.assertEqual(r.status_code, 403)
+        self.assertEqual(User.objects.count(), 2)
 
     def test_user_list_shows_last_active_date(self) -> None:
         last_active = datetime(2020, 1, 2, 3, tzinfo=timezone.utc)
@@ -220,40 +196,63 @@ class AccountsAdminTestCase(BaseTestCase):
         users = {u.id: u for u in user_admin.get_queryset(request)}
 
         self.assertEqual(user_admin.last_active(users[self.alice.id]), last_active)
-        self.assertIsNone(user_admin.last_active(users[self.bob.id]))
+        self.assertIsNone(user_admin.last_active(users[self.charlie.id]))
 
-    def test_activate_action_activates_users(self) -> None:
-        self.charlie.is_active = False
-        self.charlie.save()
-
+    def test_it_offers_no_activate_or_deactivate_action(self) -> None:
+        # Deactivating the one user would lock the instance: createsuperuser refuses
+        # while a user exists
         self.client.login(username="alice@example.org", password="password")
-        payload = {"action": "activate", "_selected_action": [self.charlie.id]}
-        r = self.client.post(reverse("admin:auth_user_changelist"), payload)
-        self.assertEqual(r.status_code, 302)
-        self.assertEqual(self.messages(r), ["1 user(s) activated"])
+        r = self.client.get(reverse("admin:auth_user_changelist"))
+        self.assertNotContains(r, 'value="deactivate"', status_code=200)
+        self.assertNotContains(r, 'value="activate"')
 
-        self.charlie.refresh_from_db()
-        self.assertTrue(self.charlie.is_active)
-
-    def test_deactivate_action_deactivates_users(self) -> None:
+    def test_it_keeps_the_user_able_to_log_in(self) -> None:
         self.client.login(username="alice@example.org", password="password")
-        payload = {"action": "deactivate", "_selected_action": [self.bob.id, self.charlie.id]}
-        r = self.client.post(reverse("admin:auth_user_changelist"), payload)
-        self.assertEqual(r.status_code, 302)
-        self.assertEqual(self.messages(r), ["2 user(s) deactivated"])
+        url = reverse("admin:auth_user_change", args=[self.alice.id])
+        r = self.client.get(url)
+        for field in ("email", "is_active", "is_staff", "is_superuser"):
+            self.assertNotContains(r, f'name="{field}"', status_code=200)
 
-        for user in (self.bob, self.charlie):
-            user.refresh_from_db()
-            self.assertFalse(user.is_active)
-            self.assertFalse(user.has_usable_password())
-
+        # A save with a blank email and the boxes left out, as unticked checkboxes are,
+        # keeps all four
+        payload = {
+            "username": "alice",
+            "email": "",
+            "date_joined_0": "2020-01-01",
+            "date_joined_1": "00:00:00",
+        }
+        r = self.client.post(url, payload)
+        self.assertRedirects(r, reverse("admin:auth_user_changelist"))
         self.alice.refresh_from_db()
+        self.assertEqual(self.alice.email, "alice@example.org")
         self.assertTrue(self.alice.is_active)
+        self.assertTrue(self.alice.is_staff)
+        self.assertTrue(self.alice.is_superuser)
+
+    def test_it_keeps_password_log_in_on(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        url = reverse("admin:auth_user_password_change", args=[self.alice.id])
+        r = self.client.get(url)
+        self.assertNotContains(r, 'name="usable_password"', status_code=200)
+
+        r = self.client.post(url, {"usable_password": "false", "unset-password": "1"})
+        self.assertEqual(r.status_code, 200)
+        self.alice.refresh_from_db()
+        self.assertTrue(self.alice.check_password("password"))
+
+    def test_it_changes_the_password(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        url = reverse("admin:auth_user_password_change", args=[self.alice.id])
+        payload = {"password1": "Correct-Horse-9", "password2": "Correct-Horse-9"}
+        r = self.client.post(url, payload)
+        self.assertEqual(r.status_code, 302)
+        self.alice.refresh_from_db()
+        self.assertTrue(self.alice.check_password("Correct-Horse-9"))
 
     def test_it_shows_credentials(self) -> None:
-        Credential.objects.create(user=self.bob, name="Bobs Yubikey", data=b"")
+        Credential.objects.create(user=self.charlie, name="Charlies Yubikey", data=b"")
 
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(reverse("admin:accounts_credential_changelist"))
-        self.assertContains(r, '<td class="field-name">Bobs Yubikey</td>', html=True)
-        self.assertContains(r, '<td class="field-email">bob@example.org</td>', html=True)
+        self.assertContains(r, '<td class="field-name">Charlies Yubikey</td>', html=True)
+        self.assertContains(r, '<td class="field-email">charlie@example.org</td>', html=True)

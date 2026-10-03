@@ -40,22 +40,6 @@ class UpdateNameTestCase(BaseTestCase):
         self.check.refresh_from_db()
         self.assertEqual(self.check.name, "Hey")
 
-    def test_team_access_works(self) -> None:
-        payload = {"name": "Bob Was Here"}
-
-        # Logging in as bob, not alice. Bob has team access so this
-        # should work.
-        self.client.login(username="bob@example.org", password="password")
-        self.client.post(self.url, data=payload)
-
-        self.check.refresh_from_db()
-        self.assertEqual(self.check.name, "Bob Was Here")
-
-    def test_it_allows_cross_team_access(self) -> None:
-        self.client.login(username="bob@example.org", password="password")
-        r = self.client.post(self.url, data={"name": "Bob Was Here"})
-        self.assertRedirects(r, self.redirect_url)
-
     def test_it_checks_ownership(self) -> None:
         payload = {"name": "Charlie Sent This"}
 
@@ -63,15 +47,8 @@ class UpdateNameTestCase(BaseTestCase):
         r = self.client.post(self.url, data=payload)
         self.assertEqual(r.status_code, 404)
 
-    def test_it_requires_rw_access(self) -> None:
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
-
-        payload = {"name": "Charlie Sent This"}
-
-        self.client.login(username="bob@example.org", password="password")
-        r = self.client.post(self.url, data=payload)
-        self.assertEqual(r.status_code, 403)
+        self.check.refresh_from_db()
+        self.assertEqual(self.check.name, "")
 
     def test_it_handles_bad_uuid(self) -> None:
         url = "/checks/not-uuid/name/"

@@ -24,6 +24,12 @@ class ProjectsMenuTestCase(BaseTestCase):
         self.assertContains(r, '<li class="project-item">')
         self.assertContains(r, 'class="dropdown-item"')
 
+    def test_it_lists_only_own_projects(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(self.url)
+        self.assertContains(r, f"/projects/{self.project.code}/checks/", status_code=200)
+        self.assertNotContains(r, str(self.charlies_project.code))
+
     def test_it_requires_logged_in_user(self) -> None:
         r = self.client.get(self.url)
         self.assertEqual(r.status_code, 302)

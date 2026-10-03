@@ -202,71 +202,42 @@
             {% endif %}
         </div>
 
-        <div class="card mb-4 border-{{ my_projects_status }}">
+        <div class="card mb-4">
             <div class="card-body settings-block">
-                    {% csrf_token %}
-                    <h2>My Projects</h2>
+                <h2>My Projects</h2>
 
-                    {% if ownerships or memberships %}
-                    <table id="my-projects" class="table align-middle">
-                        <tr>
-                            <th>Project</th>
-                            <th>My role</th>
-                            <th></th>
-                        </tr>
-                        {% for project in ownerships %}
-                        <tr>
-                            <td>
-                                <div class="name">
-                                    <a href="{% url 'hc-checks' project.code %}">
-                                        {{ project }}
-                                    </a>
-                                </div>
-                            </td>
-                            <td>Owner</td>
-                            <td class="text-end">
-                                <a href="{% url 'hc-project-settings' project.code %}">Settings</a>
-                            </td>
-                        </tr>
-                        {% endfor %}
+                {% if ownerships %}
+                <table id="my-projects" class="table align-middle">
+                    <tr>
+                        <th>Project</th>
+                        <th></th>
+                    </tr>
+                    {% for project in ownerships %}
+                    <tr>
+                        <td>
+                            <div class="name">
+                                <a href="{% url 'hc-checks' project.code %}">
+                                    {{ project }}
+                                </a>
+                            </div>
+                        </td>
+                        <td class="text-end">
+                            <a href="{% url 'hc-project-settings' project.code %}">Settings</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </table>
+                {% else %}
+                    <p>You do not have any projects. Create one!</p>
+                {% endif %}
 
-                        {% for m in memberships %}
-                        <tr>
-                            <td>
-                                <div class="name">
-                                    <a href="{% url 'hc-checks' m.project.code %}">
-                                        {{ m.project }}
-                                    </a>
-                                </div>
-                            </td>
-                            <td>{{ m.get_role_display }}</td>
-                            <td class="text-end">
-                                <a
-                                    href="#"
-                                    data-name="{{ m.project }}"
-                                    data-code="{{ m.project.code }}"
-                                    class="leave-project">Leave</a>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </table>
-                    {% else %}
-                        <p>You do not have any projects. Create one!</p>
-                    {% endif %}
-
-                    <a
-                        id="create-project"
-                        href="#"
-                        class="btn btn-outline-secondary float-end"
-                        data-bs-toggle="modal"
-                        data-bs-target="#add-project-modal">Create a New Project</a>
+                <a
+                    id="create-project"
+                    href="#"
+                    class="btn btn-outline-secondary float-end"
+                    data-bs-toggle="modal"
+                    data-bs-target="#add-project-modal">Create a New Project</a>
             </div>
-
-            {% if left_project %}
-            <div class="card-footer">
-                Left project <strong>{{ left_project }}</strong>.
-            </div>
-            {% endif %}
         </div>
 
         <div class="card mb-4 border-{{ tz_status }}">
@@ -318,38 +289,6 @@
                 </div>
             </div>
         </div>
-    </div>
-</div>
-
-<div id="leave-project-modal" class="modal" tabindex="-1">
-    <div class="modal-dialog">
-        <form id="leave-project-form" method="post">
-            {% csrf_token %}
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h4 class="modal-title">Leave This Project?</h4>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p>
-                        You are about to leave the project <strong id="leave-project-name"></strong>.
-                        You will lose access to its checks and integrations.
-                    </p>
-                    <p>Are you sure?</p>
-                    <input
-                        type="hidden"
-                        name="code"
-                        id="leave-project-code" />
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button
-                        type="submit"
-                        name="leave_project"
-                        class="btn btn-danger">Leave Project</button>
-                </div>
-            </div>
-        </form>
     </div>
 </div>
 

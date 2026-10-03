@@ -210,17 +210,6 @@ class UpdateTimeoutTestCase(BaseTestCase):
         self.check.refresh_from_db()
         self.assertEqual(self.check.kind, "simple")
 
-    def test_team_access_works(self) -> None:
-        payload = {"kind": "simple", "timeout": 7200, "grace": 60}
-
-        # Logging in as bob, not alice. Bob has team access so this
-        # should work.
-        self.client.login(username="bob@example.org", password="password")
-        self.client.post(self.url, data=payload)
-
-        check = Check.objects.get(code=self.check.code)
-        assert check.timeout.total_seconds() == 7200
-
     def test_it_handles_bad_uuid(self) -> None:
         url = "/checks/not-uuid/timeout/"
         payload = {"timeout": 3600, "grace": 60}
@@ -239,33 +228,19 @@ class UpdateTimeoutTestCase(BaseTestCase):
         assert r.status_code == 404
 
     def test_it_checks_ownership(self) -> None:
-        payload = {"timeout": 3600, "grace": 60}
+        payload = {"kind": "simple", "timeout": 3600, "grace": 60}
 
         self.client.login(username="charlie@example.org", password="password")
         r = self.client.post(self.url, data=payload)
         self.assertEqual(r.status_code, 404)
 
+        self.check.refresh_from_db()
+        self.assertEqual(self.check.timeout, td(days=1))
+
     def test_it_rejects_get(self) -> None:
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.url)
         self.assertEqual(r.status_code, 405)
-
-    def test_it_allows_cross_team_access(self) -> None:
-        payload = {"kind": "simple", "timeout": 3600, "grace": 60}
-
-        self.client.login(username="bob@example.org", password="password")
-        r = self.client.post(self.url, data=payload)
-        self.assertRedirects(r, self.redirect_url)
-
-    def test_it_requires_rw_access(self) -> None:
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
-
-        payload = {"kind": "simple", "timeout": 3600, "grace": 60}
-
-        self.client.login(username="bob@example.org", password="password")
-        r = self.client.post(self.url, data=payload)
-        self.assertEqual(r.status_code, 403)
 
     def test_it_rejects_out_of_range_simple_timeout(self) -> None:
         payload = {"kind": "simple", "timeout": 1, "grace": 60}

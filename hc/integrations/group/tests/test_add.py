@@ -19,13 +19,10 @@ class AddGroupTestCase(BaseTestCase):
         self.assertContains(r, "multiple integrations at once.")
         self.assertContains(r, self.c1_code_str)
 
-    def test_it_requires_rw_access(self) -> None:
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
-
-        self.client.login(username="bob@example.org", password="password")
+    def test_it_checks_ownership(self) -> None:
+        self.client.login(username="charlie@example.org", password="password")
         r = self.client.get(self.url)
-        self.assertEqual(r.status_code, 403)
+        self.assertEqual(r.status_code, 404)
 
     def test_it_creates_channel(self) -> None:
         self.client.login(username="alice@example.org", password="password")
@@ -51,8 +48,8 @@ class AddGroupTestCase(BaseTestCase):
         self.assertFalse(Channel.objects.filter(kind="group").exists())
 
     def test_it_rejects_another_projects_channel(self) -> None:
-        # c1 now belongs to Bob:
-        self.c1.project = self.bobs_project
+        # c1 now belongs to Charlie:
+        self.c1.project = self.charlies_project
         self.c1.save()
 
         self.client.login(username="alice@example.org", password="password")

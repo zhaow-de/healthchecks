@@ -92,20 +92,25 @@ class ChannelsTestCase(BaseTestCase):
         r = self.client.get(self.channels_url)
         self.assertContains(r, "broken-channels", status_code=200)
 
-    def test_it_hides_actions_from_readonly_users(self) -> None:
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
+    def test_it_shows_actions_to_the_owner(self) -> None:
+        ch = Channel.objects.create(project=self.project, kind="email", value="alice@example.org")
 
-        ch = Channel.objects.create(project=self.project, kind="webhook", value="{}")
-
-        self.client.login(username="bob@example.org", password="password")
+        self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.channels_url)
 
-        self.assertNotContains(r, "Add Integration", status_code=200)
-        self.assertNotContains(r, "ic-delete")
-        self.assertNotContains(r, f"/integrations/{ch.code}/edit/")
-        self.assertNotContains(r, f'id="name-{ch.code}"')
-        self.assertNotContains(r, f'data-bs-target="#name-{ch.code}"')
+        self.assertContains(r, "Add Integration", status_code=200)
+        self.assertContains(r, "ic-delete")
+        self.assertContains(r, f"/integrations/{ch.code}/edit/")
+        self.assertContains(r, f'id="name-{ch.code}"')
+        self.assertContains(r, f'data-bs-target="#name-{ch.code}"')
+        # channels.js and channels.css bind to these
+        self.assertContains(r, '<tr class="channel-row kind-email">')
+        self.assertContains(r, '<div class="edit-checks"')
+
+    def test_it_checks_ownership(self) -> None:
+        self.client.login(username="charlie@example.org", password="password")
+        r = self.client.get(self.channels_url)
+        self.assertEqual(r.status_code, 404)
 
     def test_it_shows_disabled_note(self) -> None:
         ch = Channel(kind="slack", project=self.project)

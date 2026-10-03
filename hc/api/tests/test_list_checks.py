@@ -98,13 +98,13 @@ class ListChecksTestCase(BaseTestCase):
         self.assertIn("GET", r["Access-Control-Allow-Methods"])
 
     def test_it_shows_only_users_checks(self) -> None:
-        Check.objects.create(project=self.bobs_project, name="Bob 1")
+        Check.objects.create(project=self.charlies_project, name="Charlie 1")
 
         r = self.get()
         data = r.json()
         self.assertEqual(len(data["checks"]), 2)
         for check in data["checks"]:
-            self.assertNotEqual(check["name"], "Bob 1")
+            self.assertNotEqual(check["name"], "Charlie 1")
 
     def test_it_works_with_tags_param(self) -> None:
         r = self.client.get("/api/v3/checks/?tag=a2-tag", HTTP_X_API_KEY="X" * 32)

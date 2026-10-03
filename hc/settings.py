@@ -72,7 +72,6 @@ METRICS_KEY = os.getenv("METRICS_KEY")
 DEBUG = envbool("DEBUG", "True")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "healthchecks@example.org")
 SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL")
-REGISTRATION_OPEN = envbool("REGISTRATION_OPEN", "True")
 if admins := os.getenv("ADMINS"):
     ADMINS = admins.split(",")
 
@@ -112,10 +111,9 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "hc.accounts.middleware.CustomHeaderMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "hc.accounts.middleware.TeamAccessMiddleware",
+    "hc.accounts.middleware.ProfileMiddleware",
 ]
 
 if envbool("USE_GZIP_MIDDLEWARE", "False"):
@@ -125,10 +123,6 @@ AUTHENTICATION_BACKENDS = [
     "hc.accounts.backends.EmailBackend",
     "hc.accounts.backends.ProfileBackend",
 ]
-
-REMOTE_USER_HEADER = os.getenv("REMOTE_USER_HEADER")
-if REMOTE_USER_HEADER:
-    AUTHENTICATION_BACKENDS = ["hc.accounts.backends.CustomHeaderBackend"]
 
 ROOT_URLCONF = "hc.urls"
 

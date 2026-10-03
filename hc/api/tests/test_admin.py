@@ -34,7 +34,7 @@ class ApiAdminTestCase(BaseTestCase):
     def test_it_shows_checks(self) -> None:
         self.check.name = "Backup & Restore"
         self.check.save()
-        bobs_check = Check.objects.create(project=self.bobs_project)
+        charlies_check = Check.objects.create(project=self.charlies_project)
 
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(reverse("admin:api_check_changelist"))
@@ -43,13 +43,13 @@ class ApiAdminTestCase(BaseTestCase):
         self.assertContains(r, ">Backup &amp; Restore</a> <span>foo</span> <span>bar</span>")
         self.assertContains(r, self.check.get_absolute_url())
         self.assertContains(r, ">unnamed</a>")
-        self.assertContains(r, bobs_check.get_absolute_url())
+        self.assertContains(r, charlies_check.get_absolute_url())
 
         # The owner's email and a link to the project
         project_url = self.project.get_absolute_url()
         self.assertContains(r, f'alice@example.org &rsaquo; <a href="{project_url}">Alices Project</a>')
-        bobs_project_url = self.bobs_project.get_absolute_url()
-        self.assertContains(r, f'bob@example.org &rsaquo; <a href="{bobs_project_url}">Default</a>')
+        charlies_project_url = self.charlies_project.get_absolute_url()
+        self.assertContains(r, f'charlie@example.org &rsaquo; <a href="{charlies_project_url}">Default</a>')
 
         # The default timeout of a simple check
         self.assertContains(r, '<td class="field-timeout_schedule">1 day</td>', html=True)
@@ -107,7 +107,7 @@ class ApiAdminTestCase(BaseTestCase):
         Channel.objects.create(project=self.project, kind="webhook", value=long_value, disabled=True)
         Channel.objects.create(project=self.project, kind="slack", last_error="Received status code 500")
         Channel.objects.create(
-            project=self.bobs_project,
+            project=self.charlies_project,
             kind="group",
             last_notify=now(),
             last_notify_duration=td(seconds=2.5),
@@ -125,8 +125,8 @@ class ApiAdminTestCase(BaseTestCase):
 
         channels_url = reverse("hc-channels", args=[self.project.code])
         self.assertContains(r, f'alice@example.org &rsaquo; <a href="{channels_url}">Alices Project</a>')
-        bobs_channels_url = reverse("hc-channels", args=[self.bobs_project.code])
-        self.assertContains(r, f'bob@example.org &rsaquo; <a href="{bobs_channels_url}">Default</a>')
+        charlies_channels_url = reverse("hc-channels", args=[self.charlies_project.code])
+        self.assertContains(r, f'charlie@example.org &rsaquo; <a href="{charlies_channels_url}">Default</a>')
 
     def test_channel_columns_for_new_channel(self) -> None:
         channel = Channel(project=self.project, kind="email", value=EMAIL_VALUE, email_verified=True)

@@ -46,18 +46,11 @@
     <link rel="stylesheet" href="{% static 'css/snippet-copy.css' %}" type="text/css">
     <link rel="stylesheet" href="{% static 'css/syntax.css' %}" type="text/css">
     <link rel="stylesheet" href="{% static 'css/project.css' %}" type="text/css">
-    <link rel="stylesheet" href="{% static 'css/signup.css' %}" type="text/css">
     <link rel="stylesheet" href="{% static 'css/slug-suggestions.css' %}" type="text/css">
     {% endcompress %}
 </head>
 <body class="page-{{ page }}">
     {% debug_warning %}
-    {% if request.user.is_authenticated and request.profile.deletion_scheduled_date %}
-    <div id="account-warning" class="alert alert-warning rounded-0 text-center mb-0">
-        Warning: Your account is scheduled for deletion on {{ request.profile.deletion_scheduled_date.date }}.
-        <a href="mailto:{% support_email %}">Contact support</a> to resolve.
-    </div>
-    {% endif %}
 
     <nav class="navbar navbar-expand-md border-bottom mb-4">
         <div class="container{% if page == "checks" or page == "details" or page == "log" %}-fluid{% endif %}">
@@ -154,14 +147,6 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'hc-login' %}">Log In</a>
                     </li>
-                    {% endif %}
-
-                    {% if registration_open %}
-                    {% if page == "login" %}
-                    <li class="nav-item">
-                        <a id="nav-sign-up" class="nav-link fw-bold text-success" href="#" data-bs-toggle="modal" data-bs-target="#signup-modal">Sign Up</a>
-                    </li>
-                    {% endif %}
                     {% endif %}
                 </ul>
             </div>

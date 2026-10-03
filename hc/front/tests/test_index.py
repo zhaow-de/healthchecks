@@ -18,6 +18,7 @@ class IndexTestCase(BaseTestCase):
         r = self.client.get("/")
 
         self.assertContains(r, "Alices Project")
+        self.assertNotContains(r, str(self.charlies_project.code))
         self.assertContains(r, "3 checks")
         self.assertContains(r, "status ic-up")
         self.assertContains(r, "favicon.svg")
@@ -44,8 +45,8 @@ class IndexTestCase(BaseTestCase):
         self.c1.save()
         self.c2.last_start = now()
         self.c2.save()
-        # Alice is not a member of Bob's project, so its check must not be summarized
-        Check.objects.create(project=self.bobs_project, status="down")
+        # Alice has no access to Charlie's project, so its check must not be summarized
+        Check.objects.create(project=self.charlies_project, status="down")
 
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get("/?refresh=1")

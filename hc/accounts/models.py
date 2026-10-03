@@ -46,8 +46,6 @@ REPORT_CHOICES = (
     ("weekly", "Weekly"),
     ("monthly", "Monthly"),
 )
-# When scheduling for deletion, how many days in the future to schedule
-DELETION_GRACE = td(days=31)
 
 
 class ProfileManager(models.Manager["Profile"]):
@@ -70,10 +68,6 @@ class Profile(models.Model):
     token = models.CharField(max_length=128, blank=True)
 
     sort = models.CharField(max_length=20, default="created")
-    # The date when "Inactive Account Notification" is sent
-    deletion_notice_date = models.DateTimeField(null=True, blank=True)
-    # Set manually by admin, causes an orange banner in web UI
-    deletion_scheduled_date = models.DateTimeField(null=True, blank=True)
     last_active_date = models.DateTimeField(null=True, blank=True)
     tz = models.CharField(max_length=36, default="UTC")
 
@@ -109,7 +103,7 @@ class Profile(models.Model):
 
         return check_password(token, self.token)
 
-    def send_instant_login_link(self, membership: Member | None = None, redirect_url: str | None = None) -> None:
+    def send_instant_login_link(self, redirect_url: str | None = None) -> None:
         token = self.prepare_token()
         query = {"next": redirect_url} if redirect_url else None
         url = absolute_reverse("hc-check-token", args=[self.user.username, token], query=query)
@@ -117,7 +111,6 @@ class Profile(models.Model):
         ctx = {
             "button_text": "Log In",
             "button_url": url,
-            "membership": membership,
         }
         emails.login(self.user.email, ctx)
 
@@ -136,42 +129,13 @@ class Profile(models.Model):
         }
         emails.login(new_email, ctx)
 
-    def send_transfer_request(self, project: Project) -> None:
-        token = self.prepare_token()
-        settings_path = reverse("hc-project-settings", args=[project.code])
-        url = absolute_reverse(
-            "hc-check-token",
-            args=[self.user.username, token],
-            query={"next": settings_path},
-        )
-
-        ctx = {
-            "button_text": "Project Settings",
-            "button_url": url,
-            "project": project,
-        }
-        emails.transfer_request(self.user.email, ctx)
-
-    def project_ids(self) -> QuerySet[Project, tuple[int]]:
-        """Return a queryset returning IDs of all projects we have access to."""
-        # Construct a UNION of two simple queries. This could be alternatively
-        # be done in a single query and filtering by Q(is_owner) | Q(is_member).
-        # But the single query approach has significantly worse performance
-        # on PostgreSQL.
-        owned_ids = Project.objects.filter(owner_id=self.user_id).values_list("id")
-        joined_ids = Member.objects.filter(user_id=self.user_id).values_list("project_id")
-        return owned_ids.union(joined_ids)
-
     def projects(self) -> QuerySet[Project]:
-        """Return a queryset of all projects we have access to."""
-        return Project.objects.filter(id__in=self.project_ids()).order_by(Lower("name"))
+        return Project.objects.filter(owner_id=self.user_id).order_by(Lower("name"))
 
     def checks_from_all_projects(self) -> CheckQuerySet:
-        """Return a queryset of checks from projects we have access to."""
-
         from hc.api.models import Check
 
-        return Check.objects.filter(project__in=self.project_ids())
+        return Check.objects.filter(project__owner_id=self.user_id)
 
     def send_report(self, nag: bool = False) -> bool:
         q = self.checks_from_all_projects()
@@ -298,10 +262,6 @@ class Profile(models.Model):
             if self.reports == "weekly" and dt.weekday() == 0:
                 return dt
 
-    def schedule_for_deletion(self) -> None:
-        self.deletion_scheduled_date = now() + DELETION_GRACE
-        self.save()
-
 
 class ProjectManager(models.Manager["Project"]):
     def for_api_key(self, api_key: str, accept_rw: bool, accept_ro: bool) -> Project | None:
@@ -369,36 +329,10 @@ class Project(models.Model):
     def owner_profile(self) -> Profile:
         return Profile.objects.for_user(self.owner)
 
-    def invite_suggestions(self) -> QuerySet[User]:
-        q = User.objects.filter(memberships__project__owner_id=self.owner_id)
-        q = q.exclude(memberships__project=self)
-        return q.distinct().order_by("email")
-
-    def invite(self, user: User, role: str) -> bool:
-        if Member.objects.filter(user=user, project=self).exists():
-            return False
-
-        if self.owner_id == user.id:
-            return False
-
-        m = Member.objects.create(user=user, project=self, role=role)
-        checks_url = reverse("hc-checks", args=[self.code])
-
-        if settings.MAILERS:
-            profile = Profile.objects.for_user(user)
-            profile.send_instant_login_link(membership=m, redirect_url=checks_url)
-        return True
-
     def update_next_nag_dates(self) -> None:
-        """Update next_nag_date on profiles of all members of this project."""
+        """Update next_nag_date on the owner's profile."""
 
-        # Use an UNION of two simple queries to look up project's user ids.
-        # On PostgreSQL this is much faster than using JOIN.
-        owner_id = User.objects.filter(id=self.owner_id).values_list("id")
-        member_ids = Member.objects.filter(project=self).values_list("user_id")
-        user_ids = owner_id.union(member_ids)
-
-        q = Profile.objects.filter(user_id__in=user_ids).exclude(nag_period=NO_NAG)
+        q = Profile.objects.filter(user_id=self.owner_id).exclude(nag_period=NO_NAG)
         for profile in q:
             profile.update_next_nag_date()
 
@@ -419,9 +353,6 @@ class Project(models.Model):
 
         # It's a problem if any integration has a logged error
         return any(errors)
-
-    def transfer_request(self) -> Member | None:
-        return self.member_set.filter(transfer_request_date__isnull=False).first()
 
     def checks_url(self) -> str:
         return absolute_reverse("hc-checks", args=[self.code])
@@ -487,30 +418,6 @@ class Project(models.Model):
 
         digest = hmac.digest(settings.SECRET_KEY.encode(), key.encode(), "sha256")
         return hmac.compare_digest(digest.hex(), key_hash)
-
-    def team_emails(self) -> list[str]:
-        q = User.objects.filter(memberships__project=self).order_by("email")
-        member_emails = list(q.values_list("email", flat=True))
-        return [self.owner.email] + member_emails
-
-
-class Member(models.Model):
-    class Role(models.TextChoices):
-        READONLY = "r", "Read-only"
-        REGULAR = "w", "Member"
-        MANAGER = "m", "Manager"
-
-    user = models.ForeignKey(User, models.CASCADE, related_name="memberships")
-    project = models.ForeignKey(Project, models.CASCADE)
-    transfer_request_date = models.DateTimeField(null=True, blank=True)
-    role = models.CharField(max_length=1, default=Role.REGULAR, choices=Role.choices)
-
-    class Meta:
-        constraints = (models.UniqueConstraint(fields=["user", "project"], name="accounts_member_no_duplicates"),)
-
-    @property
-    def is_rw(self) -> bool:
-        return self.role in (Member.Role.REGULAR, Member.Role.MANAGER)
 
 
 class Credential(models.Model):

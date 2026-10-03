@@ -73,10 +73,10 @@ class StatusSingleTestCase(BaseTestCase):
 
         self.assertNotIn("events", doc)
 
-    def test_it_allows_cross_team_access(self) -> None:
-        self.client.login(username="bob@example.org", password="password")
+    def test_it_checks_ownership(self) -> None:
+        self.client.login(username="charlie@example.org", password="password")
         r = self.client.get(self.url)
-        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.status_code, 404)
 
     def test_it_handles_manual_resume(self) -> None:
         self.check.status = "paused"
@@ -90,22 +90,6 @@ class StatusSingleTestCase(BaseTestCase):
         self.assertEqual(doc["status"], "paused")
         self.assertIn("will ignore pings until resumed", doc["status_text"])
         self.assertIn("resume-btn", doc["status_text"])
-
-    def test_resume_requires_rw_access(self) -> None:
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
-
-        self.check.status = "paused"
-        self.check.manual_resume = True
-        self.check.save()
-
-        self.client.login(username="bob@example.org", password="password")
-        r = self.client.get(self.url)
-        doc = r.json()
-
-        self.assertEqual(doc["status"], "paused")
-        self.assertIn("will ignore pings until resumed", doc["status_text"])
-        self.assertNotIn("resume-btn", doc["status_text"])
 
     def test_it_shows_ignored_nonzero_exitstatus(self) -> None:
         p = Ping(owner=self.check)

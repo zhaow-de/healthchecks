@@ -198,12 +198,6 @@
         return m;
     }
 
-    function hideModal(target) {
-        var m = modal(target);
-        if (m) m.hide();
-        return m;
-    }
-
     // One tooltip per element: tooltip("#x", {title: "..."}) -> the instance of the first
     // match (or null), created on every match.
     function tooltip(target, opts) {
@@ -269,7 +263,6 @@
         isVisible: isVisible,
         modal: modal,
         showModal: showModal,
-        hideModal: hideModal,
         tooltip: tooltip,
         tooltips: tooltips,
         flashTooltip: flashTooltip

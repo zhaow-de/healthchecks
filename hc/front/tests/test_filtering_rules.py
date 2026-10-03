@@ -145,10 +145,7 @@ class FilteringRulesTestCase(BaseTestCase):
         self.check.refresh_from_db()
         self.assertFalse(self.check.manual_resume)
 
-    def test_it_requires_rw_access(self) -> None:
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
-
+    def test_it_checks_ownership(self) -> None:
         payload = {
             "filter_http_body": "on",
             "success_kw": "SUCCESS",
@@ -157,6 +154,12 @@ class FilteringRulesTestCase(BaseTestCase):
             "manual_resume": "1",
         }
 
-        self.client.login(username="bob@example.org", password="password")
+        self.client.login(username="charlie@example.org", password="password")
         r = self.client.post(self.url, payload)
-        self.assertEqual(r.status_code, 403)
+        self.assertEqual(r.status_code, 404)
+
+        self.check.refresh_from_db()
+        self.assertFalse(self.check.filter_http_body)
+        self.assertEqual(self.check.success_kw, "")
+        self.assertEqual(self.check.methods, "")
+        self.assertFalse(self.check.manual_resume)

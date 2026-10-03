@@ -112,40 +112,41 @@ class DetailsTestCase(BaseTestCase):
         r = self.client.get(self.url)
         self.assertContains(r, "Cron Expression", status_code=200)
 
-    def test_it_allows_cross_team_access(self) -> None:
-        self.client.login(username="bob@example.org", password="password")
-        r = self.client.get(self.url)
-        self.assertEqual(r.status_code, 200)
+    def test_it_shows_actions_to_the_owner(self) -> None:
+        Channel.objects.create(project=self.project, kind="email")
 
-    def test_it_hides_actions_from_readonly_users(self) -> None:
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
-
-        self.client.login(username="bob@example.org", password="password")
+        self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.url)
 
-        self.assertNotContains(r, "edit-name", status_code=200)
-        self.assertNotContains(r, "edit-desc")
-        self.assertNotContains(r, "Filtering Rules")
-        self.assertNotContains(r, "pause-btn")
-        self.assertNotContains(r, "Change Schedule")
-        self.assertNotContains(r, "Create a Copy&hellip;")
-        self.assertNotContains(r, "transfer-btn")
-        self.assertNotContains(r, 'data-bs-target="#clear-events-modal"')
-        self.assertNotContains(r, 'data-bs-target="#remove-check-modal"')
+        self.assertContains(r, 'id="edit-name"', status_code=200)
+        self.assertContains(r, 'id="edit-desc"')
+        self.assertContains(r, 'href="?urls=slug"')
+        self.assertContains(r, "Filtering Rules")
+        self.assertContains(r, 'id="pause-btn"')
+        self.assertContains(r, "Change Schedule")
+        self.assertContains(r, "btn btn-sm btn-outline-secondary timeout-grace")
+        self.assertContains(r, 'class="details-integrations table table-hover"')
+        self.assertContains(r, "Create a Copy&hellip;")
+        self.assertContains(r, 'id="transfer-btn"')
+        self.assertContains(r, 'data-bs-target="#clear-events-modal"')
+        self.assertContains(r, 'data-bs-target="#remove-check-modal"')
 
-    def test_it_hides_resume_action_from_readonly_users(self) -> None:
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
+        # The schedule dialog's Save buttons are enabled
+        html = r.content.decode()
+        self.assertRegex(html, r'id="update-cron-submit"')
+        self.assertNotRegex(html, r'id="update-cron-submit"[^>]*disabled')
+        self.assertRegex(html, r'id="update-oncalendar-submit"')
+        self.assertNotRegex(html, r'id="update-oncalendar-submit"[^>]*disabled')
 
+    def test_it_shows_resume_action_to_the_owner(self) -> None:
         self.check.status = "paused"
         self.check.manual_resume = True
         self.check.save()
 
-        self.client.login(username="bob@example.org", password="password")
+        self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.url)
 
-        self.assertNotContains(r, "resume-btn", status_code=200)
+        self.assertContains(r, 'id="resume-btn"', status_code=200)
 
     def test_crontab_example_guesses_schedules(self) -> None:
         self.client.login(username="alice@example.org", password="password")
@@ -286,25 +287,9 @@ class DetailsTestCase(BaseTestCase):
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.url)
         self.assertContains(r, "Ping Key Required", status_code=200)
+        self.assertContains(r, 'data-bs-target="#no-ping-key-modal"')
         self.assertNotContains(r, "ping-now")
         self.assertContains(r, "The ping key is currently not set")
-
-    def test_it_handles_no_ping_key_for_readonly_user(self) -> None:
-        self.project.show_slugs = True
-        self.project.ping_key = None
-        self.project.save()
-
-        self.check.slug = "foo"
-        self.check.save()
-
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
-        self.client.login(username="bob@example.org", password="password")
-
-        r = self.client.get(self.url)
-        self.assertNotContains(r, "Ping Key Required", status_code=200)
-        self.assertNotContains(r, "ping-now")
-        self.assertNotContains(r, "The ping key is currently not set")
 
     def test_it_handles_empty_slug(self) -> None:
         self.project.show_slugs = True
@@ -372,12 +357,10 @@ class DetailsTestCase(BaseTestCase):
         r = self.client.get(self.url)
         self.assertNotContains(r, "Notification Groups", status_code=200)
 
-    def test_superuser_can_view_any_check(self) -> None:
+    def test_it_denies_a_superuser_outsider(self) -> None:
         self.charlie.is_superuser = True
         self.charlie.save()
 
         self.client.login(username="charlie@example.org", password="password")
         r = self.client.get(self.url)
-        self.assertContains(r, "How To Ping", status_code=200)
-        # Superusers get read-write access
-        self.assertContains(r, "edit-timeout")
+        self.assertEqual(r.status_code, 404)

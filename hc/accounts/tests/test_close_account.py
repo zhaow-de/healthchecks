@@ -52,18 +52,3 @@ class CloseAccountTestCase(BaseTestCase):
         # Alice should be still present
         self.alice.refresh_from_db()
         self.profile.refresh_from_db()
-
-    def test_partner_removal_works(self) -> None:
-        self.client.login(username="bob@example.org", password="password")
-        self.set_sudo_flag()
-
-        payload = {"confirmation": "bob@example.org"}
-        self.client.post("/accounts/close/", payload)
-
-        # Alice should be still present
-        self.alice.refresh_from_db()
-        self.profile.refresh_from_db()
-
-        # Bob should be gone
-        bobs = User.objects.filter(username="bob")
-        self.assertFalse(bobs.exists())

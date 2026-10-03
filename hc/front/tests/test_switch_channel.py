@@ -45,16 +45,3 @@ class SwitchChannelTestCase(BaseTestCase):
         self.client.login(username="charlie@example.org", password="password")
         r = self.client.post(self.url, {"state": "on"})
         self.assertEqual(r.status_code, 400)
-
-    def test_it_allows_cross_team_access(self) -> None:
-        self.client.login(username="bob@example.org", password="password")
-        r = self.client.post(self.url, {"state": "on"})
-        self.assertEqual(r.status_code, 200)
-
-    def test_it_requires_rw_access(self) -> None:
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
-
-        self.client.login(username="bob@example.org", password="password")
-        r = self.client.post(self.url, {"state": "on"})
-        self.assertEqual(r.status_code, 403)

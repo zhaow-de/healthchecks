@@ -69,7 +69,7 @@
     background: var(--bs-success);
 }
 
-.details-integrations.rw tr {
+.details-integrations tr {
     cursor: pointer;
 }
 

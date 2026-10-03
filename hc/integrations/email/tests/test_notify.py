@@ -123,11 +123,11 @@ class NotifyEmailTestCase(BaseTestCase):
 
     @time_machine.travel(EPOCH + td(hours=1))
     def test_it_uses_users_preferred_timezone(self) -> None:
-        self.channel.value = "bob@example.org"
+        self.channel.value = "charlie@example.org"
         self.channel.save()
 
-        self.bobs_profile.tz = "Europe/Riga"
-        self.bobs_profile.save()
+        self.charlies_profile.tz = "Europe/Riga"
+        self.charlies_profile.save()
         self.channel.notify(self.flip)
 
         self.assertEmailContains("Wed, 01 Jan 2020 03:00:00 +0200")

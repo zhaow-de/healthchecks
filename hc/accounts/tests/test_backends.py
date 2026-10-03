@@ -35,7 +35,8 @@ class ProfileBackendTestCase(BaseTestCase):
         self.assertIsNone(ProfileBackend().authenticate(self.request, "eve", self.token))
 
     def test_it_rejects_token_of_another_user(self) -> None:
-        self.assertIsNone(ProfileBackend().authenticate(self.request, "bob", self.token))
+        self.charlies_profile.prepare_token()
+        self.assertIsNone(ProfileBackend().authenticate(self.request, "charlie", self.token))
 
 
 class EmailBackendTestCase(BaseTestCase):

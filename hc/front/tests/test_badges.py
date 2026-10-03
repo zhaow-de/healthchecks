@@ -30,13 +30,6 @@ class BadgesTestCase(BaseTestCase):
         r = self.client.get(self.url)
         self.assertEqual(r.status_code, 404)
 
-    def test_team_access_works(self) -> None:
-        # Logging in as bob, not alice. Bob has team access so this
-        # should work.
-        self.client.login(username="bob@example.org", password="password")
-        r = self.client.get(self.url)
-        self.assertEqual(r.status_code, 200)
-
     @override_settings(MASTER_BADGE_LABEL="Overall Status")
     def test_it_previews_master_svg(self) -> None:
         self.client.login(username="alice@example.org", password="password")

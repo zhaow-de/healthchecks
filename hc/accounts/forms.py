@@ -9,56 +9,15 @@ from django.contrib.auth.models import User
 from django.http import HttpRequest
 from pyotp.totp import TOTP
 
-from hc.accounts.models import REPORT_CHOICES, Member
+from hc.accounts.models import REPORT_CHOICES
 from hc.api.models import TokenBucket
 from hc.front.validators import TimezoneValidator
-from hc.lib.tz import all_timezones
 
 
 class LowercaseEmailField(forms.EmailField):
     def clean(self, value: str) -> str:
         value = super().clean(value)
         return value.lower()
-
-
-class SignupForm(forms.Form):
-    # Call it "identity" instead of "email"
-    # to avoid some of the dumber bots
-    identity = LowercaseEmailField(error_messages={"required": "Please enter your email address."})
-    tz = forms.CharField(required=False)
-
-    def __init__(self, request: HttpRequest):
-        self.request = request
-        super().__init__(request.POST)
-
-    def clean_identity(self) -> str:
-        if not TokenBucket.authorize_auth_ip(self.request):
-            raise forms.ValidationError("Too many attempts, please try later.")
-
-        v = self.cleaned_data["identity"]
-        assert isinstance(v, str)
-        if len(v) > 254:
-            raise forms.ValidationError("Address is too long.")
-        # When user signs up with an email address that already has an account
-        # we send them the magic login link. Hence we must rate-limit attempts
-        # to sign up with a specific email address the same as we would rate-limit
-        # attempts to log in with that email address:
-        if not TokenBucket.authorize_login_email(v):
-            raise forms.ValidationError("Too many attempts, please try later.")
-
-        return v
-
-    def clean_tz(self) -> str | None:
-        assert isinstance(self.cleaned_data["tz"], str)
-
-        # Declare tz as "clean" only if we can find it in hc.lib.tz.all_timezones
-        if self.cleaned_data["tz"] in all_timezones:
-            return self.cleaned_data["tz"]
-
-        # Otherwise, return None, and *don't* throw a validation exception:
-        # If user's browser reports a timezone we don't recognize, we
-        # should ignore the timezone but still save the rest of the form.
-        return None
 
 
 class EmailLoginForm(forms.Form):
@@ -139,21 +98,8 @@ class ChangeEmailForm(forms.Form):
         return v
 
 
-class InviteTeamMemberForm(forms.Form):
-    email = LowercaseEmailField(max_length=254)
-    role = forms.ChoiceField(choices=Member.Role.choices)
-
-
-class RemoveTeamMemberForm(forms.Form):
-    email = LowercaseEmailField()
-
-
 class ProjectNameForm(forms.Form):
     name = forms.CharField(max_length=60)
-
-
-class TransferForm(forms.Form):
-    email = LowercaseEmailField()
 
 
 class AddWebAuthnForm(forms.Form):
@@ -183,7 +129,3 @@ class TotpForm(forms.Form):
 
 class TzForm(forms.Form):
     tz = forms.CharField(max_length=36, validators=[TimezoneValidator()])
-
-
-class LeaveForm(forms.Form):
-    code = forms.UUIDField()
