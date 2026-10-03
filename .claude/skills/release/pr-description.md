@@ -7,7 +7,7 @@ Use this template when creating the release PR (fill in `{version}`, and paste t
 
 This PR promotes `develop` to `main` for release **v{version}**. It contains:
 - Everything merged into `develop` since the previous release
-- The version bump to {version} (`.cz.toml`, `pyproject.toml`, the README `Version` badge, `uv.lock`)
+- The version bump to {version} (`.cz.toml`, `pyproject.toml`, `uv.lock`)
 
 **Merge with a merge commit (do not squash)** so the tagged bump commit is preserved on `main`.
 
