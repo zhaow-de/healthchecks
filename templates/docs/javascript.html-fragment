@@ -1,37 +1,43 @@
 <h1>Javascript</h1>
-<p>Below is a minimal example of making an HTTP request to SITE_NAME from Node.js.</p>
-<div class="highlight"><pre><span></span><code><span class="kd">var</span><span class="w"> </span><span class="nx">https</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">require</span><span class="p">(</span><span class="s1">&#39;https&#39;</span><span class="p">);</span>
-<span class="nx">https</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="s1">&#39;PING_URL&#39;</span><span class="p">).</span><span class="nx">on</span><span class="p">(</span><span class="s1">&#39;error&#39;</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s1">&#39;Ping failed: &#39;</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="nx">err</span><span class="p">)</span>
-<span class="p">});</span>
-</code></pre></div>
-
-<p>Note: the "https" library executes requests asynchronously. If you send both "start"
-and "success" signals, you can encounter a race condition where the "success" signal
-arrives before the "start" signal. Avoid the race condition by using callbacks,
-promises or the async/await feature. Here is an example that uses async/await and the
-<a href="https://axios-http.com/">axios</a> library:</p>
-<div class="highlight"><pre><span></span><code><span class="kd">const</span><span class="w"> </span><span class="nx">axios</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">require</span><span class="p">(</span><span class="s2">&quot;axios&quot;</span><span class="p">);</span>
-
-<span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">ping</span><span class="p">(</span><span class="nx">url</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<p>Below is a minimal example of making an HTTP request to SITE_NAME from Node.js. It
+uses the global <code>fetch</code> of Node.js 18 and later, which handles both <code>http://</code> and
+<code>https://</code> URLs and needs no package:</p>
+<div class="highlight"><pre><span></span><code><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">ping</span><span class="p">(</span><span class="nx">url</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="k">try</span><span class="w"> </span><span class="p">{</span>
-<span class="w">        </span><span class="k">await</span><span class="w"> </span><span class="nx">axios</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="nx">url</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="nx">timeout</span><span class="o">:</span><span class="w"> </span><span class="mf">5000</span><span class="p">});</span>
-<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">catch</span><span class="p">(</span><span class="nx">error</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="kd">const</span><span class="w"> </span><span class="nx">res</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">await</span><span class="w"> </span><span class="nx">fetch</span><span class="p">(</span><span class="nx">url</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="nx">signal</span><span class="o">:</span><span class="w"> </span><span class="nx">AbortSignal</span><span class="p">.</span><span class="nx">timeout</span><span class="p">(</span><span class="mf">10000</span><span class="p">)});</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="nx">res</span><span class="p">.</span><span class="nx">ok</span><span class="p">)</span><span class="w"> </span><span class="k">throw</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="ne">Error</span><span class="p">(</span><span class="s2">"HTTP "</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="nx">res</span><span class="p">.</span><span class="nx">status</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="nx">error</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
 <span class="w">        </span><span class="c1">// Log the error and continue. A ping failure should</span>
 <span class="w">        </span><span class="c1">// not prevent the job from running.</span>
 <span class="w">        </span><span class="nx">console</span><span class="p">.</span><span class="nx">error</span><span class="p">(</span><span class="s2">&quot;Ping failed: &quot;</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="nx">error</span><span class="p">);</span>
 <span class="w">    </span><span class="p">}</span>
 <span class="p">}</span>
 
-<span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">runJob</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="kd">var</span><span class="w"> </span><span class="nx">pingUrl</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;PING_URL&quot;</span><span class="p">;</span>
+<span class="nx">ping</span><span class="p">(</span><span class="s2">"PING_URL"</span><span class="p">);</span>
+</code></pre></div>
+
+<p><code>fetch</code> rejects only when the request itself fails (a timeout, a refused
+connection). A response with an error status, such as the 404 of a wrong UUID,
+resolves normally, so the example checks <code>res.ok</code>: a 2xx status means the ping was
+recorded, and any other status means it was not (see
+<a href="../http_api/#status-codes">Status Codes</a>). Node's <code>https</code> module, used by older
+examples, accepts only <code>https://</code> URLs: <code>https.get()</code> throws
+<code>ERR_INVALID_PROTOCOL</code> for an <code>http://</code> ping URL.</p>
+<p>Note: requests run asynchronously. If you send both "start" and "success" signals
+without waiting for the first to finish, you can encounter a race condition where
+the "success" signal arrives before the "start" signal. The check is then left
+running, and goes down when its grace time passes. Avoid the race condition by
+using callbacks, promises or the async/await feature. Here is an example that uses
+async/await and the <code>ping</code> function above:</p>
+<div class="highlight"><pre><span></span><code><span class="k">async</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">runJob</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">const</span><span class="w"> </span><span class="nx">pingUrl</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"PING_URL"</span><span class="p">;</span>
 
 <span class="w">    </span><span class="k">await</span><span class="w"> </span><span class="nx">ping</span><span class="p">(</span><span class="nx">pingUrl</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="s2">&quot;/start&quot;</span><span class="p">);</span>
 <span class="w">    </span><span class="k">try</span><span class="w"> </span><span class="p">{</span>
 <span class="w">        </span><span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="s2">&quot;TODO: run the job here&quot;</span><span class="p">);</span>
 
 <span class="w">        </span><span class="k">await</span><span class="w"> </span><span class="nx">ping</span><span class="p">(</span><span class="nx">pingUrl</span><span class="p">);</span><span class="w"> </span><span class="c1">// success</span>
-<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">catch</span><span class="p">(</span><span class="nx">error</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="nx">error</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
 <span class="w">        </span><span class="k">await</span><span class="w"> </span><span class="nx">ping</span><span class="p">(</span><span class="nx">pingUrl</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="s2">&quot;/fail&quot;</span><span class="p">);</span>
 <span class="w">    </span><span class="p">}</span>
 <span class="p">}</span>
@@ -40,9 +46,25 @@ promises or the async/await feature. Here is an example that uses async/await an
 </code></pre></div>
 
 <h2>Browser</h2>
-<p>You can also send pings from a browser environment. SITE_NAME sets the
-<code>Access-Control-Allow-Origin:*</code> CORS header, so cross-domain AJAX requests work.</p>
+<p>You can also send pings from a browser environment. SITE_NAME sets
+<code>Access-Control-Allow-Origin: *</code> on successful (200 and 201) responses, so a GET,
+HEAD, or POST with a <code>text/plain</code> body (or no body) from a page on another origin
+works:</p>
 <div class="highlight"><pre><span></span><code><span class="kd">var</span><span class="w"> </span><span class="nx">xhr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">XMLHttpRequest</span><span class="p">();</span>
 <span class="nx">xhr</span><span class="p">.</span><span class="nx">open</span><span class="p">(</span><span class="s1">&#39;GET&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;PING_URL&#39;</span><span class="p">,</span><span class="w"> </span><span class="kc">true</span><span class="p">);</span>
 <span class="nx">xhr</span><span class="p">.</span><span class="nx">send</span><span class="p">(</span><span class="kc">null</span><span class="p">);</span>
 </code></pre></div>
+
+<p>Error responses carry no CORS header, so the page cannot read their status:
+<code>XMLHttpRequest</code> reports status 0 and <code>fetch</code> rejects, instead of showing the 404.</p>
+<p>Do not send a request that needs a CORS preflight, such as one with a JSON content
+type, custom headers, or a method other than GET, HEAD and POST. SITE_NAME records
+the preflight OPTIONS request as a ping, and the browser then blocks the real
+request, because the response has no <code>Access-Control-Allow-Methods</code> or
+<code>Access-Control-Allow-Headers</code> header. The preflight is classified as a ping of that
+URL with an empty body would be: by default, as a ping of the URL's kind (a preflight
+of a <code>/fail</code> URL is a failure); on a check that accepts POST requests only, as
+"Ignored"; on a check that filters by keywords, as "Ignored", or as a failure when
+"If no keywords match" is set to "Classify the ping as failure" (see
+<a href="../http_api/#interpreting-pings">How SITE_NAME Interprets a Ping</a>).</p>
+<p>A ping URL in a page's source can be read, and used, by anyone who loads the page.</p>

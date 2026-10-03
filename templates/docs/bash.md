@@ -2,7 +2,7 @@
 
 You can easily add SITE_NAME monitoring to a shell script. All you
 have to do is make an HTTP request at an appropriate place in the script.
-[curl](https://curl.haxx.se/docs/manpage.html) and
+[curl](https://curl.se/docs/manpage.html) and
 [wget](https://www.gnu.org/software/wget/manual/wget.html)
 are two common command-line HTTP clients you can use.
 
@@ -13,7 +13,12 @@ curl -m 10 --retry 5 PING_URL
 # Silent version (no stdout/stderr output unless curl hits an error):
 curl -fsS -m 10 --retry 5 -o /dev/null PING_URL
 
+# Sends an HTTP GET request with wget:
+wget PING_URL -T 10 -t 5 -O /dev/null
 ```
+
+With wget, `-T 10` is the timeout in seconds, `-t 5` the number of tries in total,
+and `-O /dev/null` discards the response.
 
 Here's what each curl parameter does:
 
@@ -25,12 +30,15 @@ Here's what each curl parameter does:
 **--retry &lt;num&gt;**
 :   On transient errors, retry up to this many times. By default, curl
     uses an increasing delay between each retry (1s, 2s, 4s, 8s, ...).
-    See also [--retry-delay](https://curl.haxx.se/docs/manpage.html#--retry-delay).
+    See also [--retry-delay](https://curl.se/docs/manpage.html#--retry-delay).
     Transient errors are: timeouts, HTTP status codes 408, 429, 500, 502, 503, 504.
+    A refused connection, such as while the server restarts, is not a transient
+    error; add `--retry-connrefused` to retry it too.
 
 **-f, --fail**
-:   Makes curl treat non-200 responses as errors, and
-    [return error 22](https://curl.se/docs/manpage.html#-f).
+:   Makes curl treat HTTP responses with a status of 400 or above as errors, and
+    [exit with code 22](https://curl.se/docs/manpage.html#-f). A 201 (auto-provisioning
+    created the check) is not an error.
 
 **-s, --silent**
 :   Silent or quiet mode. Hides the progress meter, but also
@@ -47,6 +55,11 @@ Here's what each curl parameter does:
 You can append `/fail` or `/{exit-status}` to any ping URL and use the resulting URL
 to actively signal a failure. The exit status should be a 0-255 integer.
 SITE_NAME will interpret exit status 0 as success and all non-zero values as failures.
+An exit status above 255 gets "400 invalid url format" and is not recorded. On a check
+that filters by keywords, the body decides instead of the exit status; on a check that
+accepts POST requests only, a GET ping such as a plain curl call is ignored. See
+[Report Script's Exit Status](../http_api/#exitcode-uuid) and
+[How SITE_NAME Interprets a Ping](../http_api/#interpreting-pings).
 
 The following example runs `/usr/bin/certbot renew`, and uses the `$?` variable to
 look up its exit status:
@@ -66,30 +79,42 @@ Use `set -o pipefail` if you need the pipeline to return non-zero exit status if
 part of the pipeline fails:
 
 ```bash
-#!/bin/sh
+#!/bin/bash
 
 set -o pipefail
 pg_dump somedb | gpg --encrypt --recipient alice@example.org --output somedb.sql.gpg
 # Without pipefail, if pg_dump command fails, but gpg succeeds, $? will be 0,
 # and the script will report success.
-# With pipefail, if pg_dump fails, the script will report the exit code returned by pg_dump.
+# With pipefail, the pipeline's status is that of the last command in it that failed:
+# pg_dump's code when only pg_dump fails, gpg's when both fail.
 curl -m 10 --retry 5 PING_URL/$?
 ```
 
 ## Logging Command Output
 
-When pinging with HTTP POST, you can put extra diagnostic information in the request
-body. If the request body looks like a valid UTF-8 string, SITE_NAME
-will accept and store the first PING_BODY_LIMIT_FORMATTED of the request body.
+Any request may carry extra diagnostic information in its body. SITE_NAME stores
+at most the first PING_BODY_LIMIT_FORMATTED of it, as bytes whatever the encoding,
+and drops the rest (with the server's body limit setting `None`, it stores the body
+whole). A body larger than 2.5 MiB, or than the body limit when that is higher, is
+refused with 400 and the ping is not recorded. See
+[Request Body](../http_api/#request-body).
 
-In the below example, certbot's output is captured and submitted via HTTP POST:
+In the below example, certbot's output is captured and submitted via HTTP POST,
+together with certbot's exit status:
 
 ```bash
 #!/bin/sh
 
 m=$(/usr/bin/certbot renew 2>&1)
-curl -fsS -m 10 --retry 5 --data-raw "$m" PING_URL
+rc=$?
+printf '%s' "$m" | tail -c PING_BODY_LIMIT | curl -fsS -m 10 --retry 5 --data-binary @- PING_URL/$rc
 ```
+
+`tail -c` sends only the last PING_BODY_LIMIT bytes, which is the most SITE_NAME
+keeps; this avoids the 400 that a body over the size cap gets, which loses the
+ping. Reading the body from stdin (`@-`) also avoids the shell's limit on argument
+length (128 KiB per argument on Linux), which `--data-raw "$m"` hits. `/$rc`
+reports certbot's exit status together with its output.
 
 ## Auto Provisioning New Checks
 
@@ -103,12 +128,19 @@ write services that automatically register with SITE_NAME the first time they ru
 
 PING_KEY=fixme-your-ping-key-here
 
-# Use system's hostname as check's slug
-SLUG=$(hostname)
+# Use the system's short hostname, lowercased, as the check's slug
+SLUG=$(hostname | cut -d. -f1 | tr '[:upper:]' '[:lower:]')
 
 # Construct a ping URL and append "?create=1" at the end:
-URL=PING_ENDPOINT$PING_KEY/$SLUG?create=1
+URL="PING_ENDPOINT$PING_KEY/$SLUG?create=1"
 
 # Send a ping:
-curl -m 10 --retry 5 $URL
+curl -fsS -m 10 --retry 5 "$URL"
 ```
+
+A slug may contain only `a-z`, `0-9`, hyphens and underscores, so the example cuts
+the domain off the hostname and lowercases it: a dot gets 404, an uppercase letter
+"400 invalid url format". The ping key is created and shown on the project's
+Settings page (see [UUIDs and Slugs](../http_api/#uuids-and-slugs)).
+[Auto-Provisioning](../http_api/#auto-provisioning) gives the new check's defaults:
+a period of 1 day, a grace time of 1 hour, and every integration assigned.

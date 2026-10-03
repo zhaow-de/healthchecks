@@ -1,10 +1,15 @@
 # Measuring Script Run Time
 
  Append `/start` to a ping URL and use it to signal when a job starts.
- After receiving a start signal, SITE_NAME will show the check as "Started."
- It will store the "start" events and display the job execution times. SITE_NAME
- calculates the job execution times as the time gaps between adjacent "start" and
- "success" events.
+ After receiving a start signal, SITE_NAME shows the check as running: on the
+ "Checks" page three pulsing grey dots appear below its status icon (the status
+ filter's "Started" entry lists such checks), the check's details page says
+ "Currently running, started … ago.", and the Management API returns
+ `"started": true`. The check's status (up, down, new…) does not change.
+ SITE_NAME stores the "start" events and displays the job execution times. It
+ calculates a run's execution time as the time from a "start" event to the next
+ success or failure event with the same run ID (or both without one); log and
+ ignored events in between do not matter. See [Run IDs](../http_api/#run-ids).
 
 Note: if appending `/start` to the ping URL on the client side is not feasible, you can
 alternatively configure SITE_NAME to classify HTTP pings as start, success, or failure
@@ -57,7 +62,11 @@ In the list of checks, the duration appears in the "Last Ping" column, below the
 time of the last ping and after a stopwatch icon (for example, "7 min 22 sec"), and
 when any check in the list shows one, the column heading gains a "Last Duration" line.
 It is the duration of the run that the last success or failure ended: a later success
-or failure that ends no run removes it.
+or failure that ends no run removes it. The duration is not shown while the check
+carries a "confirmation link" badge, which takes its place in that cell; the badge
+appears when the stored body of the check's latest ping (of any kind, log and start
+included) contains the letters "confirm" anywhere, in any case, so "Confirmation" and
+"unconfirmed" count too.
 
 You can also see the durations of the previous runs when viewing an individual
 check: in the "Events" section of its details page, a success or failure that has
@@ -93,13 +102,16 @@ makes HTTP requests using curl:
 RID=`uuidgen`
 
 # send a start ping, specify rid parameter:
-curl -fsS -m 10 --retry 5 PING_URL/start?rid=$RID
+curl -fsS -m 10 --retry 5 "PING_URL/start?rid=$RID"
 
 # ... FIXME: run the job here ...
 
 # send the success ping, use the same rid parameter:
-curl -fsS -m 10 --retry 5 PING_URL?rid=$RID
+curl -fsS -m 10 --retry 5 "PING_URL?rid=$RID"
 ```
+
+The URLs are quoted because `?` is a glob character: zsh, for one, refuses the
+unquoted line with "no matches found".
 
 If the client specifies run IDs, SITE_NAME will display them in the "Events"
 section in a shortened form, the first five characters in a grey label before the
@@ -122,7 +134,9 @@ caveat: SITE_NAME **will not monitor the execution times of all
 concurrent job runs**. It will only monitor the execution time of the
 most recently started run.
 
-To illustrate, let's assume the grace time of 1 minute and look at the above example
-again. The event #4 ran for 6 minutes 39 seconds and so overshot the time budget
-of 1 minute. But SITE_NAME generated no alerts because **the most recently started
-run completed within the time limit** (it took 37 seconds, which is less than 1 minute).
+To illustrate, let's assume the grace time of 5 minutes and look at the above example
+again. The run that ended as event #4 took 6 minutes 39 seconds and so overshot the
+time budget of 5 minutes. But SITE_NAME generated no alerts: the start at event #2
+replaced the run that event #1 opened, and **the most recently started run completed
+within the time limit** (it took 37 seconds). With a grace time of 1 minute, the
+check would have gone down a minute after event #1, before event #2 arrived.

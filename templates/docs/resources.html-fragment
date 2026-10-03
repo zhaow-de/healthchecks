@@ -2,6 +2,12 @@
 <p>A collection of third-party software projects that integrate with SITE_NAME.
 Please submit additions and corrections
 <a href="https://github.com/zhaow-de/healthchecks/issues">on GitHub</a>.</p>
+<p>These tools are written for Healthchecks.io. Point them at this server rather than
+healthchecks.io: its ping endpoint is PING_ENDPOINT and its base URL is SITE_ROOT
+(a tool that pings <code>https://hc-ping.com</code> by default, such as runitor, needs its own
+option for it). This server serves the <a href="../api/">Management API</a> at <code>/api/v3/</code>
+only, so a tool that calls <code>/api/v1/</code> or <code>/api/v2/</code>, or the notification status
+endpoint that this server does not have, gets 404.</p>
 <h2>Command Runners, Shell Wrappers</h2>
 <ul>
 <li><a href="https://github.com/bdd/runitor">runitor</a> - A command runner with Healthchecks.io integration to keep your scripts and containers simple.</li>
@@ -11,11 +17,11 @@ Please submit additions and corrections
 <li><a href="https://github.com/hartwork/pytocron">pytocron</a> – Cron implementation in Python with built-in Healthchecks support.</li>
 </ul>
 <h2>Tools for Self-Hosting</h2>
-<ul>
-<li><a href="https://github.com/linuxserver/docker-healthchecks">linuxserver/docker-healthchecks</a> – Alternative Docker image</li>
-<li><a href="https://github.com/galexrt/docker-healthchecks">galexrt/docker-healthchecks</a> – Alternative Docker image</li>
-<li><a href="https://elest.io/open-source/healthchecks">Elestio</a> – Managed hosting platform with Healthchecks support (uses the linuxserver image)</li>
-</ul>
+<p>This server's own Docker image is <code>ghcr.io/zhaow-de/healthchecks</code>; see
+<a href="../self_hosted_docker/">Running with Docker</a>. Third-party images and hosting
+platforms, such as linuxserver/docker-healthchecks, galexrt/docker-healthchecks and
+Elestio, package the original healthchecks/healthchecks project, not this one: they
+bring back the teams, sign-up, integrations and settings this server does not have.</p>
 <h2>API Wrappers</h2>
 <h3>Ansible</h3>
 <ul>
@@ -25,11 +31,6 @@ Please submit additions and corrections
 <ul>
 <li><a href="https://github.com/kristofferahl/go-healthchecksio">kristofferahl/go-healthchecksio</a> – Supports listing, creating, updating, deleting, pausing, pinging.</li>
 <li><a href="https://gitlab.com/etke.cc/go/healthchecks">gitlab.com/etke.cc/go/healthchecks</a> – Supports pinging.</li>
-</ul>
-<h3>PowerShell</h3>
-<ul>
-<li><a href="https://github.com/davehope/HealthChecksIOStatusReport">davehope/HealthChecksIOStatusReport</a> – Supports pinging.</li>
-<li><a href="https://github.com/ptmorris1/healthchecks-pwsh">ptmorris1/healthchecks-pwsh</a> – Supports pinging and all Management API calls.</li>
 </ul>
 <h3>Python</h3>
 <ul>

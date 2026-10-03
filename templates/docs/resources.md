@@ -4,6 +4,13 @@ A collection of third-party software projects that integrate with SITE_NAME.
 Please submit additions and corrections
 [on GitHub](https://github.com/zhaow-de/healthchecks/issues).
 
+These tools are written for Healthchecks.io. Point them at this server rather than
+healthchecks.io: its ping endpoint is PING_ENDPOINT and its base URL is SITE_ROOT
+(a tool that pings `https://hc-ping.com` by default, such as runitor, needs its own
+option for it). This server serves the [Management API](../api/) at `/api/v3/`
+only, so a tool that calls `/api/v1/` or `/api/v2/`, or the notification status
+endpoint that this server does not have, gets 404.
+
 ## Command Runners, Shell Wrappers
 
 * [runitor](https://github.com/bdd/runitor) - A command runner with Healthchecks.io integration to keep your scripts and containers simple.
@@ -14,9 +21,11 @@ Please submit additions and corrections
 
 ## Tools for Self-Hosting
 
-* [linuxserver/docker-healthchecks](https://github.com/linuxserver/docker-healthchecks) – Alternative Docker image
-* [galexrt/docker-healthchecks](https://github.com/galexrt/docker-healthchecks) – Alternative Docker image
-* [Elestio](https://elest.io/open-source/healthchecks) – Managed hosting platform with Healthchecks support (uses the linuxserver image)
+This server's own Docker image is `ghcr.io/zhaow-de/healthchecks`; see
+[Running with Docker](../self_hosted_docker/). Third-party images and hosting
+platforms, such as linuxserver/docker-healthchecks, galexrt/docker-healthchecks and
+Elestio, package the original healthchecks/healthchecks project, not this one: they
+bring back the teams, sign-up, integrations and settings this server does not have.
 
 ## API Wrappers
 
@@ -28,11 +37,6 @@ Please submit additions and corrections
 
 * [kristofferahl/go-healthchecksio](https://github.com/kristofferahl/go-healthchecksio) – Supports listing, creating, updating, deleting, pausing, pinging.
 * [gitlab.com/etke.cc/go/healthchecks](https://gitlab.com/etke.cc/go/healthchecks) – Supports pinging.
-
-### PowerShell
-
-* [davehope/HealthChecksIOStatusReport](https://github.com/davehope/HealthChecksIOStatusReport) – Supports pinging.
-* [ptmorris1/healthchecks-pwsh](https://github.com/ptmorris1/healthchecks-pwsh) – Supports pinging and all Management API calls.
 
 ### Python
 

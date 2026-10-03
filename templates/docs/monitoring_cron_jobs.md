@@ -42,8 +42,11 @@ details page, to copy it), and update the job's definition:
 ```
 
 The extra curl call lets SITE_NAME know the cron job has run successfully.
-SITE_NAME keeps track of the received pings and notifies you as soon as a ping does
-not arrive on time.
+SITE_NAME keeps track of the received pings and notifies you when a ping has not
+arrived by the expected time plus the check's Grace Time (see "Grace Time" below).
+With `&&`, a run that exits with a non-zero exit code sends no ping, so it too is
+caught only then; to be alerted at once, report the exit status instead (see
+[Signaling failures](../signaling_failures/)).
 
 Note: you can alternatively add the extra `curl` call as a final line inside the
 `/home/me/backup.sh` script to keep the cron job's definition clean and short.
@@ -59,7 +62,9 @@ Feel free to adjust the curl options to suit your needs.
 :   Run curl only if `/home/me/backup.sh` exits with an exit code 0.
 
 **-f, --fail**
-:   Makes curl treat non-200 responses as errors.
+:   Makes curl exit with an error (exit code 22) when the server answers with an
+    HTTP status of 400 or above. A 2xx response, such as the 201 of a slug URL with
+    `?create=1`, is not an error. See [Status Codes](../http_api/#status-codes).
 
 **-s, --silent**
 :   Silent or quiet mode. Hides the progress meter but also hides error messages.
@@ -74,7 +79,10 @@ Feel free to adjust the curl options to suit your needs.
 :   If a transient error is returned when curl tries to perform a
     transfer, it will retry this number of times before giving up.
     Setting the number to 0 makes curl do no retries (which is the default).
-    A transient error is a timeout or an HTTP 5xx response code.
+    A transient error is a timeout or an HTTP 408, 429, 500, 502, 503 or 504
+    response. curl does not retry other 4xx responses (such as the 404 of a wrong
+    UUID or the 400 of an exit status above 255), nor a refused connection unless
+    `--retry-connrefused` is added.
 
 **-o /dev/null**
 :   Redirect curl's stdout to /dev/null (error messages still go to stderr).

@@ -39,14 +39,17 @@ class ServeDocTestCase(TestCase):
     @override_settings(PING_BODY_LIMIT=1234)
     def test_it_formats_ping_body_limit_in_bytes(self) -> None:
         r = self.client.get("/docs/attaching_logs/")
-        self.assertContains(r, "will log the first 1234 bytes (1234 bytes)", status_code=200)
+        self.assertContains(r, "will log the first 1234 bytes", status_code=200)
+        self.assertContains(r, "Handling More Than 1234 bytes of Logs")
 
     @override_settings(PING_BODY_LIMIT=20000)
     def test_it_formats_ping_body_limit_in_kilobytes(self) -> None:
         r = self.client.get("/docs/attaching_logs/")
-        self.assertContains(r, "will log the first 20 kB (20000 bytes)", status_code=200)
+        self.assertContains(r, "will log the first 20000 bytes", status_code=200)
+        self.assertContains(r, "Handling More Than 20 kB of Logs")
 
     @override_settings(PING_BODY_LIMIT=None)
     def test_it_gives_request_size_cap_when_body_limit_is_none(self) -> None:
         r = self.client.get("/docs/attaching_logs/")
-        self.assertContains(r, "will log the first 2621440 bytes (2621440 bytes)", status_code=200)
+        self.assertContains(r, "will log the first 2621440 bytes", status_code=200)
+        self.assertContains(r, "Handling More Than 2621440 bytes of Logs")

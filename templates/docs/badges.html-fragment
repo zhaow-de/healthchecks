@@ -5,12 +5,30 @@ all checks in the project, the status of checks tagged with a specific tag, or t
 status of a single specific check.</p>
 <p>To get a badge, open the project's "Badges" page from the top navigation. Its Badge
 Generator has three choices: what the badge reports on (all checks in the project,
-the checks tagged with one tag, or one specific check), the badge format, and the
-badge states. The Preview beside it shows the resulting badge with its URL, and for
-the SVG and Shields.io formats also ready-to-paste HTML and Markdown code.</p>
-<p>The badges have public but hard-to-guess URLs. Badges do not expose information
-other than the badge label and the aggregate status of their corresponding checks.
-It is not possible to reverse-engineer ping URLs from badge URLs.</p>
+the checks tagged with one tag, or one specific check; the tag choice appears only
+when some check in the project has a tag, and the check choice only when the project
+has checks), the badge format, and the badge states. The Preview beside it shows the
+resulting badge with its URL, and for the SVG and Shields.io formats also
+ready-to-paste HTML and Markdown code.</p>
+<p>The badges have public but hard-to-guess URLs. A badge shows its label and status;
+the JSON format also gives the numbers of matching, late and down checks. Ping URLs
+cannot be derived from badge URLs. A single-check badge's label is the check's name,
+or, for a check with no name, its UUID, which is the secret in its ping URL: name a
+check before you publish its badge.</p>
+<h2 id="badge-urls">Badge URLs</h2>
+<ul>
+<li>All checks in the project: <code>SITE_ROOT/badge/&lt;project badge key&gt;/&lt;signature&gt;.&lt;fmt&gt;</code></li>
+<li>The checks with one tag: <code>SITE_ROOT/badge/&lt;project badge key&gt;/&lt;signature&gt;/&lt;tag&gt;.&lt;fmt&gt;</code></li>
+<li>One check: <code>SITE_ROOT/b/&lt;states&gt;/&lt;check badge key&gt;.&lt;fmt&gt;</code></li>
+</ul>
+<p><code>&lt;fmt&gt;</code> is <code>svg</code>, <code>json</code> or <code>shields</code>. <code>&lt;states&gt;</code> is <code>2</code> or <code>3</code>; for the project and
+tag badges, a signature that ends in <code>-2</code> means two states. The Management API
+returns the project and tag badge URLs from
+<a href="../api/#list-badges">List Project's Badges</a>, and a check's two-state SVG badge URL
+as its <code>badge_url</code>. Badge URLs need no key, allow cross-origin GET requests and are
+not cached. There is no way to change them: a check's badge works until the check is
+deleted, and the project and tag badge signatures change only if the server's
+<a href="../self_hosted_configuration/#SECRET_KEY"><code>SECRET_KEY</code></a> changes.</p>
 <h2>Badge States</h2>
 <p>Each badge can be in one of the following three states:</p>
 <ul>
@@ -21,17 +39,32 @@ It is not possible to reverse-engineer ping URLs from badge URLs.</p>
 <p>By default, SITE_NAME displays badge URLs that only report the
 <strong>up</strong> and <strong>down</strong> states (and treat <strong>late</strong> as <strong>up</strong>). Using the "Badge states"
 radio buttons, you can switch to alternate URLs that report all three states.</p>
+<p>Only down and late checks change a badge: new and paused checks count as up, and a
+tag badge whose tag matches no check reports up. The label of the all-checks badge
+is the server's
+<a href="../self_hosted_configuration/#MASTER_BADGE_LABEL"><code>MASTER_BADGE_LABEL</code></a> setting
+(by default, the site name); a tag badge's label is the tag; a check badge's label is
+the check's name (its UUID if it has none).</p>
 <h2>Badge Formats</h2>
 <p>SITE_NAME offers badges in three different formats:</p>
 <ul>
 <li>SVG: returns an SVG document that you can use directly in an <code>&lt;img&gt;</code> element or
   a Markdown document.</li>
-<li>JSON: returns the badge label and the current status as a JSON document. Use this
+<li>JSON: returns the current status and the check counts as a JSON document,
+  <code>{"status": "up", "total": 3, "grace": 0, "down": 0}</code>, with no label; <code>status</code> is
+  <code>up</code>, <code>late</code> or <code>down</code>, <code>total</code> is the number of matching checks, <code>grace</code> the
+  number of late ones and <code>down</code> the number of down ones. Use this
   if you want to render the badge yourself. This can also serve as an integration
   point with a hosted status page: instruct your status page provider to monitor the
   badge URL and look for the keyword "up" in the returned data.</li>
 <li>Shields.io: returns the badge label and the current status as a
-  Shields.io-compatible JSON document. See <a href="https://shields.io/endpoint">Shields.io documentation</a>
-  on how to use it. The main benefit of using Shields.io to generate badges is
-  the extra visual styles and customization options that Shields.io supports.</li>
+  Shields.io-compatible JSON document,
+  <code>{"schemaVersion": 1, "label": "...", "message": "up", "color": "success"}</code>, with
+  the color <code>success</code>, <code>important</code> or <code>critical</code> for up, late and down. See
+  <a href="https://shields.io/endpoint">Shields.io documentation</a>
+  on how to use it. The generator shows an <code>https://img.shields.io/endpoint?url=…</code>
+  address that wraps the badge's own <code>.shields</code> URL, so Shields.io must be able to
+  reach this SITE_NAME instance over the internet. The main benefit of using
+  Shields.io to generate badges is the extra visual styles and customization options
+  that Shields.io supports.</li>
 </ul>

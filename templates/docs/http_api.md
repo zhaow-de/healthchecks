@@ -59,9 +59,10 @@ Cache-Control: max-age=0, no-cache, no-store, must-revalidate, private
 OK
 ```
 
-`Ping-Body-Limit` is the number of request body bytes SITE_NAME stores per ping; it
-is absent when the server's body limit setting is `None`, which stores every body
-whole (see the body limit setting in
+`Ping-Body-Limit` is the number of request body bytes SITE_NAME stores per ping.
+When the server's body limit setting is `None`, which stores every body whole, the
+header is absent from every response, including those the examples on this page
+show (see the body limit setting in
 [Server Configuration](../self_hosted_configuration/#PING%5FBODY%5FLIMIT)).
 `Access-Control-Allow-Origin: *` is set on 200 and 201 responses only, so a browser
 page on another origin can read a successful response; error responses do not
@@ -217,11 +218,13 @@ counted it, and the ping's details in the web UI show the number.
 ## Request Body {: #request-body }
 
 Any request may carry a body, of any content type and with any method (a POST is
-the usual way). SITE_NAME stores the first PING_BODY_LIMIT bytes of it with
-the ping and drops the rest, without an error; the `Ping-Body-Limit` response header
-states that limit in bytes, so a client can adjust what it sends next. For example,
-if the limit is 100 and the client sends 123 bytes, SITE_NAME stores the first 100
-and ignores the remaining 23.
+the usual way). SITE_NAME stores up to PING_BODY_LIMIT bytes of it with the ping.
+With a numeric body limit, it stores the first that many bytes and drops the rest,
+without an error, and the `Ping-Body-Limit` response header states the limit in bytes,
+so a client can adjust what it sends next. For example, if the limit is 100 and the
+client sends 123 bytes, SITE_NAME stores the first 100 and ignores the remaining 23.
+When the server's body limit setting is `None`, SITE_NAME stores the body whole and
+sends no `Ping-Body-Limit` header; the size cap below is then the only limit.
 
 A request whose body is larger than 2.5 MiB (2,621,440 bytes), or than the body
 limit when that is higher, is refused with 400 and an HTML error page, and nothing

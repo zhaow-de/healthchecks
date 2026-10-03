@@ -3,18 +3,32 @@
 You can actively signal a failure to SITE_NAME by slightly changing the
 ping URL: append either `/fail` or `/{exit-status}` to your normal ping URL.
 The exit status should be a 0-255 integer. SITE_NAME will interpret
-exit status 0 as success and all non-zero values as failures.
+exit status 0 as success and all non-zero values as failures. An exit status above
+255 gets "400 invalid url format" and is not recorded.
+
+A failure signal turns the check down at once and sends alerts, unless the check
+was down already; it also ends a run opened by a start signal. Two check settings
+can change its meaning: a check that accepts POST requests only records a GET or HEAD
+failure ping as "Ignored", and a check with keyword filtering classifies every ping
+by its body instead of by the URL. See
+[How SITE_NAME Interprets a Ping](../http_api/#interpreting-pings). In the check's
+"Events" section, a `/fail` ping shows a red "Failure" badge, and a non-zero exit
+status a red "Status N" badge.
 
 Examples:
 
 ```bash
 
 # Reports failure by appending the /fail suffix:
-curl --retry 3 PING_URL/fail
+curl -fsS -m 10 --retry 5 -o /dev/null PING_URL/fail
 
 # Reports failure by appending a non-zero exit status:
-curl --retry 3 PING_URL/1
+curl -fsS -m 10 --retry 5 -o /dev/null PING_URL/1
 ```
+
+The curl options are the ones the [cron jobs page](../monitoring_cron_jobs/)
+explains. With a bare `--retry 3`, curl has no time limit, and it prints a progress
+meter to stderr when its output is not a terminal, which cron then mails to you.
 
 By actively signaling failures to SITE_NAME, you can minimize the delay from your
 monitored service encountering a problem to you getting notified about it.
@@ -32,7 +46,7 @@ exit status of the last executed command) to the ping URL:
 #!/bin/sh
 
 /usr/bin/certbot renew
-curl --retry 3 PING_URL/$?
+curl -fsS -m 10 --retry 5 -o /dev/null PING_URL/$?
 
 ```
 

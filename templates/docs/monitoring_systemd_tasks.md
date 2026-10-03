@@ -58,16 +58,28 @@ command is important and tells Systemd to ignore curl failure (timeout or non-ze
 status), which could otherwise prevent the main command from running.
 
 The `ExecStopPost` command runs after the main process finishes. Systemd provides an
-`$EXIT_STATUS` variable with the exit status of the main process (a 0-255 number).
-SITE_NAME will consider exit status 0 as success, and anything above 0 as failure.
+`$EXIT_STATUS` variable: the exit status of the main process (a 0-255 number) when it
+exited, or the name of the signal (for example `TERM` or `KILL`) when it was killed,
+as on `systemctl stop` or when `TimeoutStartSec=` runs out. SITE_NAME considers exit
+status 0 success and 1-255 failure (see
+[Report Script's Exit Status](../http_api/#exitcode-uuid)). A signal name is not a
+valid suffix: the URL `PING_URL/TERM` gets "400 invalid url format" and nothing is
+recorded, so such a run is reported only when the grace time after its start signal
+runs out and the check goes down.
 
 curl flags:
 
-* `-sS` means "suppress output except errors". This is so that if the curl call fails,
-  the error is printed in system logs.
+* `-sS` hides the progress meter but keeps curl's error messages, so a failed request
+  (a timeout, a refused connection) is printed in the unit's journal. It does not hide
+  the response body: the server's `OK` (or `not found`, `invalid url format`) goes to
+  the journal too, and without `-f` an HTTP error status does not count as a curl
+  failure. Add `-o /dev/null` to drop the body and `-f` to make a response with a
+  status of 400 or above fail, as on the
+  [cron jobs page](../monitoring_cron_jobs/).
 * `-m <seconds>` is the maximum in seconds that the HTTP request is allowed to take.
 * `--retry <num>` is how many times curl will retry transient failures
-  (timeouts, HTTP 5xx status codes).
+  (timeouts and HTTP 408, 429, 500, 502, 503 and 504 responses; not a refused
+  connection unless `--retry-connrefused` is added).
 
 This example only requires curl to be installed on the system but does not capture
 the command's output.
@@ -89,11 +101,13 @@ Requires=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=runitor -uuid your-uuid-here -- rsync -a /opt/media/ remote_user@remote_host:/opt/media/
+ExecStart=runitor -api-url PING_ENDPOINT -uuid your-uuid-here -- rsync -a /opt/media/ remote_user@remote_host:/opt/media/
 ```
 
-Of course, the above example relies on the runitor binary being available in the
-system PATH.
+runitor sends its pings to https://hc-ping.com unless `-api-url` (or the
+`HC_API_URL` environment variable) names this server's ping endpoint,
+`PING_ENDPOINT`. Of course, the above example relies on the runitor binary being
+available in the system PATH.
 
 ## OnCalendar Schedules
 

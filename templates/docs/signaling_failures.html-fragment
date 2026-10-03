@@ -2,15 +2,27 @@
 <p>You can actively signal a failure to SITE_NAME by slightly changing the
 ping URL: append either <code>/fail</code> or <code>/{exit-status}</code> to your normal ping URL.
 The exit status should be a 0-255 integer. SITE_NAME will interpret
-exit status 0 as success and all non-zero values as failures.</p>
+exit status 0 as success and all non-zero values as failures. An exit status above
+255 gets "400 invalid url format" and is not recorded.</p>
+<p>A failure signal turns the check down at once and sends alerts, unless the check
+was down already; it also ends a run opened by a start signal. Two check settings
+can change its meaning: a check that accepts POST requests only records a GET or HEAD
+failure ping as "Ignored", and a check with keyword filtering classifies every ping
+by its body instead of by the URL. See
+<a href="../http_api/#interpreting-pings">How SITE_NAME Interprets a Ping</a>. In the check's
+"Events" section, a <code>/fail</code> ping shows a red "Failure" badge, and a non-zero exit
+status a red "Status N" badge.</p>
 <p>Examples:</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Reports failure by appending the /fail suffix:</span>
-curl<span class="w"> </span>--retry<span class="w"> </span><span class="m">3</span><span class="w"> </span>PING_URL/fail
+curl<span class="w"> </span>-fsS<span class="w"> </span>-m<span class="w"> </span><span class="m">10</span><span class="w"> </span>--retry<span class="w"> </span><span class="m">5</span><span class="w"> </span>-o<span class="w"> </span>/dev/null<span class="w"> </span>PING_URL/fail
 
 <span class="c1"># Reports failure by appending a non-zero exit status:</span>
-curl<span class="w"> </span>--retry<span class="w"> </span><span class="m">3</span><span class="w"> </span>PING_URL/1
+curl<span class="w"> </span>-fsS<span class="w"> </span>-m<span class="w"> </span><span class="m">10</span><span class="w"> </span>--retry<span class="w"> </span><span class="m">5</span><span class="w"> </span>-o<span class="w"> </span>/dev/null<span class="w"> </span>PING_URL/1
 </code></pre></div>
 
+<p>The curl options are the ones the <a href="../monitoring_cron_jobs/">cron jobs page</a>
+explains. With a bare <code>--retry 3</code>, curl has no time limit, and it prints a progress
+meter to stderr when its output is not a terminal, which cron then mails to you.</p>
 <p>By actively signaling failures to SITE_NAME, you can minimize the delay from your
 monitored service encountering a problem to you getting notified about it.</p>
 <p>Alternatively, if using different URLs for success and failure signals is
@@ -22,7 +34,7 @@ exit status of the last executed command) to the ping URL:</p>
 <div class="highlight"><pre><span></span><code><span class="ch">#!/bin/sh</span>
 
 /usr/bin/certbot<span class="w"> </span>renew
-curl<span class="w"> </span>--retry<span class="w"> </span><span class="m">3</span><span class="w"> </span>PING_URL/<span class="nv">$?</span>
+curl<span class="w"> </span>-fsS<span class="w"> </span>-m<span class="w"> </span><span class="m">10</span><span class="w"> </span>--retry<span class="w"> </span><span class="m">5</span><span class="w"> </span>-o<span class="w"> </span>/dev/null<span class="w"> </span>PING_URL/<span class="nv">$?</span>
 </code></pre></div>
 
 <h2>Python</h2>
