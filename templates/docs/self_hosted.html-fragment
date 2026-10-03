@@ -77,7 +77,7 @@ database tables.</p>
 <p>To access the administration panel, log into the site as the superuser. In the
 setup steps above, <code>createsuperuser</code> can take its credentials as parameters
 instead of prompting:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>./manage.py<span class="w"> </span>createsuperuser<span class="w"> </span>--email<span class="w"> </span>user@example.com<span class="w"> </span>--password<span class="w"> </span>changeme123
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>./manage.py<span class="w"> </span>createsuperuser<span class="w"> </span>--email<span class="w"> </span>user@example.com<span class="w"> </span>--password<span class="w"> </span>correct-horse-battery-staple
 </code></pre></div>
 
 <p>Once logged in, click on the "Account" dropdown in top navigation, and select
@@ -142,6 +142,15 @@ safely removed.</p>
 test it on a copy of your database, not on the live database right away.
 In a production setup, you will want to run this command regularly, as well as
 have regular, automatic database backups set up.</p>
+<p>A browser that has completed a login gets login rate limits of its own, but a
+new browser shares them with everyone else, so a run of wrong passwords for the
+account's email, from anywhere, can lock it out. To get back in, wait for the
+limits to refill, use the login link sent by email if email is set up, or clear
+every rate limit record, the recent ones too:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>./manage.py<span class="w"> </span>prunetokenbucket<span class="w"> </span>--all
+</code></pre></div>
+
+<p>If you have forgotten the password, set a new one with <code>./manage.py changepassword</code>.</p>
 <h2>Next Steps</h2>
 <p>Get the <a href="https://github.com/zhaow-de/healthchecks">source code</a>.</p>
 <p>See <a href="../self_hosted_configuration/">Configuration</a> for a list of configuration options.</p>

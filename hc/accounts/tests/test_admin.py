@@ -127,20 +127,36 @@ class AccountsAdminTestCase(BaseTestCase):
         self.assertEqual(mail.outbox[0].to, ["alice@example.org"])
         self.assertEqual(mail.outbox[0].subject, "Reminder: 1 check still down")
 
-    def test_remove_totp_action_clears_totp(self) -> None:
-        self.charlies_profile.totp = "0" * 32
-        self.charlies_profile.totp_created = now()
-        self.charlies_profile.save()
+    def test_it_has_no_remove_totp_action(self) -> None:
+        self.profile.totp = "0" * 32
+        self.profile.totp_created = now()
+        self.profile.save()
 
         self.client.login(username="alice@example.org", password="password")
-        payload = {"action": "remove_totp", "_selected_action": [self.charlies_profile.id]}
+        payload = {"action": "remove_totp", "_selected_action": [self.profile.id]}
         r = self.client.post(reverse("admin:accounts_profile_changelist"), payload)
         self.assertEqual(r.status_code, 302)
-        self.assertEqual(self.messages(r), ["Removed TOTP for 1 profile(s)"])
+        self.assertEqual(self.messages(r), ["No action selected."])
 
-        self.charlies_profile.refresh_from_db()
-        self.assertIsNone(self.charlies_profile.totp)
-        self.assertIsNone(self.charlies_profile.totp_created)
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.totp, "0" * 32)
+
+    def test_it_does_not_delete_profiles(self) -> None:
+        self.profile.totp = "0" * 32
+        self.profile.totp_created = now()
+        self.profile.save()
+
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.post(reverse("admin:accounts_profile_delete", args=[self.profile.id]), {"post": "yes"})
+        self.assertEqual(r.status_code, 403)
+
+        r = self.client.get(reverse("admin:accounts_profile_changelist"))
+        self.assertNotContains(r, 'value="delete_selected"', status_code=200)
+
+        payload = {"action": "delete_selected", "_selected_action": [self.profile.id], "post": "yes"}
+        self.client.post(reverse("admin:accounts_profile_changelist"), payload)
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.totp, "0" * 32)
 
     def test_it_shows_project_usage(self) -> None:
         Check.objects.create(project=self.project)
@@ -231,23 +247,86 @@ class AccountsAdminTestCase(BaseTestCase):
 
     def test_it_keeps_password_log_in_on(self) -> None:
         self.client.login(username="alice@example.org", password="password")
+        self.set_sudo_flag()
         url = reverse("admin:auth_user_password_change", args=[self.alice.id])
         r = self.client.get(url)
-        self.assertNotContains(r, 'name="usable_password"', status_code=200)
+        self.assertContains(r, 'name="password1"')
+        self.assertNotContains(r, 'name="usable_password"')
 
         r = self.client.post(url, {"usable_password": "false", "unset-password": "1"})
         self.assertEqual(r.status_code, 200)
         self.alice.refresh_from_db()
         self.assertTrue(self.alice.check_password("password"))
 
+    def test_password_page_requires_sudo_mode(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        url = reverse("admin:auth_user_password_change", args=[self.alice.id])
+        r = self.client.get(url)
+        self.assertTemplateUsed(r, "accounts/sudo.html")
+        self.assertContains(r, "We have sent a confirmation code")
+        self.assertEqual(len(mail.outbox), 1)
+
+        payload = {"password1": "Correct-Horse-9", "password2": "Correct-Horse-9"}
+        r = self.client.post(url, payload)
+        self.assertTemplateUsed(r, "accounts/sudo.html")
+        self.alice.refresh_from_db()
+        self.assertTrue(self.alice.check_password("password"))
+
     def test_it_changes_the_password(self) -> None:
         self.client.login(username="alice@example.org", password="password")
+        self.set_sudo_flag()
         url = reverse("admin:auth_user_password_change", args=[self.alice.id])
         payload = {"password1": "Correct-Horse-9", "password2": "Correct-Horse-9"}
         r = self.client.post(url, payload)
         self.assertEqual(r.status_code, 302)
         self.alice.refresh_from_db()
         self.assertTrue(self.alice.check_password("Correct-Horse-9"))
+
+    def test_it_runs_the_password_validators(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        self.set_sudo_flag()
+        url = reverse("admin:auth_user_password_change", args=[self.alice.id])
+        payload = {"password1": "1qaz2wsx3edc", "password2": "1qaz2wsx3edc"}
+        r = self.client.post(url, payload)
+        self.assertContains(r, "This password is too common.")
+        self.alice.refresh_from_db()
+        self.assertTrue(self.alice.check_password("password"))
+
+    def test_own_password_page_requires_sudo_mode(self) -> None:
+        url = reverse("admin:password_change")
+        r = self.client.get(url)
+        self.assertRedirects(r, f"/admin/login/?next={url}", fetch_redirect_response=False)
+
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(url)
+        self.assertTemplateUsed(r, "accounts/sudo.html")
+
+        payload = {
+            "old_password": "password",
+            "new_password1": "Correct-Horse-9",
+            "new_password2": "Correct-Horse-9",
+        }
+        r = self.client.post(url, payload)
+        self.assertTemplateUsed(r, "accounts/sudo.html")
+        self.alice.refresh_from_db()
+        self.assertTrue(self.alice.check_password("password"))
+
+        self.set_sudo_flag()
+        r = self.client.post(url, payload)
+        self.assertRedirects(r, reverse("admin:password_change_done"))
+        self.alice.refresh_from_db()
+        self.assertTrue(self.alice.check_password("Correct-Horse-9"))
+
+    def test_password_pages_hide_post_data_on_the_sudo_page(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        urls = (
+            reverse("admin:auth_user_password_change", args=[self.alice.id]),
+            reverse("admin:password_change"),
+        )
+        for url in urls:
+            r = self.client.post(url, {"old_password": "password", "sudo_code": "123456"})
+            self.assertTemplateUsed(r, "accounts/sudo.html")
+            self.assertEqual(r.wsgi_request.sensitive_post_parameters, "__ALL__")
 
     def test_it_shows_credentials(self) -> None:
         Credential.objects.create(user=self.charlie, name="Charlies Yubikey", data=b"")
@@ -256,3 +335,29 @@ class AccountsAdminTestCase(BaseTestCase):
         r = self.client.get(reverse("admin:accounts_credential_changelist"))
         self.assertContains(r, '<td class="field-name">Charlies Yubikey</td>', html=True)
         self.assertContains(r, '<td class="field-email">charlie@example.org</td>', html=True)
+
+    def test_it_does_not_add_credentials(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(reverse("admin:accounts_credential_changelist"))
+        self.assertNotContains(r, reverse("admin:accounts_credential_add"), status_code=200)
+
+        r = self.client.get(reverse("admin:accounts_credential_add"))
+        self.assertEqual(r.status_code, 403)
+
+        payload = {"name": "Eve's Key", "code": "00000000-0000-0000-0000-000000000000"}
+        r = self.client.post(reverse("admin:accounts_credential_add"), payload)
+        self.assertEqual(r.status_code, 403)
+
+    def test_it_does_not_delete_credentials(self) -> None:
+        c = Credential.objects.create(user=self.alice, name="Alices Yubikey", data=b"")
+
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.post(reverse("admin:accounts_credential_delete", args=[c.id]), {"post": "yes"})
+        self.assertEqual(r.status_code, 403)
+
+        r = self.client.get(reverse("admin:accounts_credential_changelist"))
+        self.assertNotContains(r, 'value="delete_selected"', status_code=200)
+
+        payload = {"action": "delete_selected", "_selected_action": [c.id], "post": "yes"}
+        self.client.post(reverse("admin:accounts_credential_changelist"), payload)
+        self.assertTrue(Credential.objects.filter(id=c.id).exists())

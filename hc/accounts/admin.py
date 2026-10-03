@@ -10,12 +10,15 @@ from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.forms import AdminPasswordChangeForm
 from django.contrib.auth.models import User
 from django.db.models import Count, F, Func, OuterRef, QuerySet, Subquery
-from django.http import HttpRequest
+from django.http import HttpRequest, HttpResponse
 from django.template.loader import render_to_string
 from django.urls import reverse
+from django.utils.decorators import method_decorator
 from django.utils.html import format_html
+from django.views.decorators.debug import sensitive_post_parameters
 from django_stubs_ext import WithAnnotations
 
+from hc.accounts.decorators import require_sudo_mode
 from hc.accounts.models import Credential, Profile, Project
 from hc.api.models import Check
 
@@ -94,10 +97,10 @@ class ProfileAdmin(ModelAdmin[Profile]):
         "last_active_date",
         "reports",
     )
+    # No action that removes TOTP: that goes through the profile page, behind sudo mode
     actions = (
         "send_report",
         "send_nag",
-        "remove_totp",
     )
 
     _profile_fields = (
@@ -116,6 +119,11 @@ class ProfileAdmin(ModelAdmin[Profile]):
         ("User Profile", {"fields": _profile_fields}),
         ("Limits", {"fields": _limits_fields}),
     )
+
+    def has_delete_permission(self, request: HttpRequest, obj: Profile | None = None) -> bool:
+        # Profile.objects.for_user recreates a deleted profile without TOTP, so a
+        # delete here would turn the second factor off outside sudo mode
+        return False
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Profile]:
         qs = super().get_queryset(request)
@@ -168,15 +176,6 @@ class ProfileAdmin(ModelAdmin[Profile]):
             profile.send_report(nag=True)
 
         self.message_user(request, f"{len(qs)} email(s) sent")
-
-    @admin.action(description="Remove TOTP")
-    def remove_totp(self, request: HttpRequest, qs: QuerySet[Profile]) -> None:
-        for profile in qs:
-            profile.totp = None
-            profile.totp_created = None
-            profile.save()
-
-        self.message_user(request, f"Removed TOTP for {len(qs)} profile(s)")
 
 
 class ProjectAnnotations(TypedDict):
@@ -257,6 +256,11 @@ class HcUserAdmin(UserAdmin[User]):
         # The instance has one user, created by the createsuperuser command
         return False
 
+    @method_decorator(sensitive_post_parameters())
+    @method_decorator(require_sudo_mode)
+    def user_change_password(self, request: HttpRequest, id: str, form_url: str = "") -> HttpResponse:
+        return super().user_change_password(request, id, form_url)
+
     def get_queryset(self, request: HttpRequest) -> QuerySet[User]:
         qs = super().get_queryset(request)
         qs = qs.annotate(num_checks=Count("project__check", distinct=True))
@@ -278,6 +282,14 @@ class CredentialAdmin(ModelAdmin[Credential]):
     search_fields = ("id", "code", "name", "user__email")
     list_filter = ("created",)
     readonly_fields = ("user",)
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        # A security key is registered on the profile page, behind sudo mode
+        return False
+
+    def has_delete_permission(self, request: HttpRequest, obj: Credential | None = None) -> bool:
+        # A security key is removed on the profile page, behind sudo mode
+        return False
 
     def email(self, obj: Credential) -> str:
         return obj.user.email

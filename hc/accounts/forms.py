@@ -6,9 +6,11 @@ from typing import Any
 from django import forms
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password
 from django.http import HttpRequest
 from pyotp.totp import TOTP
 
+from hc.accounts import device
 from hc.accounts.models import REPORT_CHOICES
 from hc.api.models import TokenBucket
 from hc.front.validators import TimezoneValidator
@@ -33,18 +35,14 @@ class EmailLoginForm(forms.Form):
         v = self.cleaned_data["identity"]
 
         assert isinstance(v, str)
-        if not TokenBucket.authorize_login_email(v):
-            raise forms.ValidationError("Too many attempts, please try later.")
-
         assert self.request
-        if not TokenBucket.authorize_auth_ip(self.request):
+        self.user: User | None = User.objects.filter(email=v).first()
+        nonce = device.nonce(self.request, self.user)
+        if not TokenBucket.authorize_login_email(v, nonce):
             raise forms.ValidationError("Too many attempts, please try later.")
 
-        self.user: User | None
-        try:
-            self.user = User.objects.get(email=v)
-        except User.DoesNotExist:
-            self.user = None
+        if not nonce and not TokenBucket.authorize_auth_ip(self.request):
+            raise forms.ValidationError("Too many attempts, please try later.")
 
         return v
 
@@ -53,12 +51,19 @@ class PasswordLoginForm(forms.Form):
     email = LowercaseEmailField()
     password = forms.CharField()
 
+    def __init__(self, request: HttpRequest | None = None):
+        self.request = request
+        super().__init__(request.POST if request else None)
+
     def clean(self) -> dict[str, Any]:
         username = self.cleaned_data.get("email")
         password = self.cleaned_data.get("password")
 
         if username and password:
-            if not TokenBucket.authorize_login_password(username):
+            assert self.request
+            user = User.objects.filter(email=username).first()
+            nonce = device.nonce(self.request, user)
+            if not TokenBucket.authorize_login_password(username, nonce):
                 raise forms.ValidationError("Too many attempts, please try later.")
 
             self.user = authenticate(username=username, password=password)
@@ -82,7 +87,18 @@ class ReportSettingsForm(forms.Form):
 
 
 class SetPasswordForm(forms.Form):
-    password = forms.CharField(min_length=8)
+    error_css_class = "has-error"
+    password = forms.CharField()
+
+    def __init__(self, user: User, *args: Any, **kwargs: Any) -> None:
+        self.user = user
+        super().__init__(*args, **kwargs)
+
+    def clean_password(self) -> str:
+        password = self.cleaned_data["password"]
+        assert isinstance(password, str)
+        validate_password(password, self.user)
+        return password
 
 
 class ChangeEmailForm(forms.Form):

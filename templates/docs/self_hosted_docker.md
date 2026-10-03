@@ -37,10 +37,25 @@ termination.
 
     You can also provide credentials via parameters, bypassing the interactive prompt:
 
-        $ docker compose run web /opt/healthchecks/manage.py createsuperuser --email user@example.com --password changeme123
+        $ docker compose run web /opt/healthchecks/manage.py createsuperuser --email user@example.com --password correct-horse-battery-staple
 
 * Open [http://localhost:8000](http://localhost:8000) in your browser and log in with
   the credentials from the previous step.
+
+## Login Lockout
+
+A browser that has completed a login gets login rate limits of its own, but a
+new browser shares them with everyone else, so a run of wrong passwords for the
+account's email, from anywhere, can lock it out. To get back in, wait for the
+limits to refill, use the login link sent by email if email is set up, or clear
+every rate limit record, the recent ones too:
+
+```sh
+$ docker compose exec web /opt/healthchecks/manage.py prunetokenbucket --all
+```
+
+If you have forgotten the password, set a new one with
+`docker compose exec web /opt/healthchecks/manage.py changepassword`.
 
 ## uWSGI Configuration
 

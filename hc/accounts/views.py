@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import time
 from datetime import timedelta as td
+from secrets import token_urlsafe
 from urllib.parse import urlparse
 from uuid import UUID, uuid4
 
@@ -13,6 +14,7 @@ from django.contrib.auth import authenticate, update_session_auth_hash
 from django.contrib.auth import login as auth_login
 from django.contrib.auth import logout as auth_logout
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 from django.db.models.functions import Lower
@@ -24,7 +26,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.debug import sensitive_post_parameters
 from django.views.decorators.http import require_POST
 
-from hc.accounts import forms
+from hc.accounts import device, forms
 from hc.accounts.decorators import require_sudo_mode
 from hc.accounts.http import AuthenticatedHttpRequest
 from hc.accounts.models import Credential, Profile, Project
@@ -96,8 +98,15 @@ def _check_2fa(request: HttpRequest, user: User) -> HttpResponse:
         path = reverse(route, query=query)
         return redirect(path)
 
-    auth_login(request, user)
-    return _redirect_after_login(request)
+    return _complete_login(request, user)
+
+
+def _complete_login(request: HttpRequest, user: User, backend: str | None = None) -> HttpResponse:
+    """Log the user in once every step the login requires is done."""
+    auth_login(request, user, backend)
+    response = _redirect_after_login(request)
+    device.issue(request, response, user)
+    return response
 
 
 def _set_autologin_cookie(response: HttpResponse) -> None:
@@ -119,7 +128,7 @@ def login(request: HttpRequest) -> HttpResponse:
     magic_form = forms.EmailLoginForm()
     if request.method == "POST":
         if request.POST.get("action") == "login":
-            form = forms.PasswordLoginForm(request.POST)
+            form = forms.PasswordLoginForm(request)
             if form.is_valid():
                 assert isinstance(form.user, User)
                 return _check_2fa(request, form.user)
@@ -131,9 +140,16 @@ def login(request: HttpRequest) -> HttpResponse:
                 if not _allow_redirect(redirect_url):
                     redirect_url = None
 
-                if magic_form.user:
+                # Every email gets the same redirect. Without MAILERS the form
+                # is hidden, but a crafted POST still arrives and sends nothing.
+                if settings.MAILERS and magic_form.user:
                     profile = Profile.objects.for_user(magic_form.user)
                     profile.send_instant_login_link(redirect_url=redirect_url)
+                elif settings.MAILERS:
+                    # Hash a throwaway token as prepare_token() hashes the
+                    # owner's, so the response time does not tell which email
+                    # exists.
+                    make_password(token_urlsafe(24))
 
                 response = redirect("hc-login-link-sent")
                 _set_autologin_cookie(response)
@@ -326,8 +342,9 @@ def notifications(request: AuthenticatedHttpRequest) -> HttpResponse:
 @sensitive_post_parameters()
 @require_sudo_mode
 def set_password(request: AuthenticatedHttpRequest) -> HttpResponse:
+    form = forms.SetPasswordForm(request.user)
     if request.method == "POST":
-        form = forms.SetPasswordForm(request.POST)
+        form = forms.SetPasswordForm(request.user, request.POST)
         if form.is_valid():
             password = form.cleaned_data["password"]
             request.user.set_password(password)
@@ -343,7 +360,7 @@ def set_password(request: AuthenticatedHttpRequest) -> HttpResponse:
             request.session["changed_password"] = True
             return redirect("hc-profile")
 
-    return render(request, "accounts/set_password.html", {})
+    return render(request, "accounts/set_password.html", {"form": form})
 
 
 @login_required
@@ -605,8 +622,7 @@ def login_webauthn(request: HttpRequest) -> HttpResponse:
 
         request.session.pop("state")
         request.session.pop("2fa_user")
-        auth_login(request, user, "hc.accounts.backends.EmailBackend")
-        return _redirect_after_login(request)
+        return _complete_login(request, user, "hc.accounts.backends.EmailBackend")
 
     options, request.session["state"] = helper.prepare()
 
@@ -659,8 +675,7 @@ def login_totp(request: HttpRequest) -> HttpResponse:
                 return render(request, "try_later.html")
 
             request.session.pop("2fa_user")
-            auth_login(request, user, "hc.accounts.backends.EmailBackend")
-            return _redirect_after_login(request)
+            return _complete_login(request, user, "hc.accounts.backends.EmailBackend")
     else:
         form = forms.TotpForm(totp)
 

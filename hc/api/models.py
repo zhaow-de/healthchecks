@@ -1045,24 +1045,28 @@ class TokenBucket(models.Model):
 
     @staticmethod
     def authorize(value: str, capacity: int, refill_time_secs: int) -> bool:
-        frozen_now = now()
-        obj, created = TokenBucket.objects.get_or_create(value=value)
+        # The row lock (PostgreSQL) or the IMMEDIATE transaction (SQLite)
+        # makes concurrent calls on one key wait for each other, so none
+        # overwrites another's deduction.
+        with transaction.atomic():
+            q = TokenBucket.objects.select_for_update()
+            obj, created = q.get_or_create(value=value)
+            # Read the clock after the lock: a call that waited must not
+            # see a negative top-up.
+            frozen_now = now()
 
-        if not created:
-            # Top up the bucket:
-            duration_secs = (frozen_now - obj.updated).total_seconds()
-            obj.tokens = min(1.0, obj.tokens + duration_secs / refill_time_secs)
+            if not created:
+                # Top up the bucket:
+                duration_secs = (frozen_now - obj.updated).total_seconds()
+                obj.tokens = min(1.0, obj.tokens + duration_secs / refill_time_secs)
 
-        obj.tokens -= 1.0 / capacity
-        if obj.tokens < 0:
-            # Not enough tokens
-            return False
+            obj.tokens -= 1.0 / capacity
+            if obj.tokens < 0:
+                # Not enough tokens
+                return False
 
-        # Race condition: two concurrent authorize calls can overwrite each
-        # other's changes. It's OK to be a little inexact here for the sake
-        # of simplicity.
-        obj.updated = frozen_now
-        obj.save()
+            obj.updated = frozen_now
+            obj.save()
 
         return True
 
@@ -1081,7 +1085,8 @@ class TokenBucket(models.Model):
         return TokenBucket.authorize(value, 20, 3600)
 
     @staticmethod
-    def authorize_login_email(email: str) -> bool:
+    def authorize_login_email(email: str, device: str = "") -> bool:
+        """Charge a login link request; `device` is a trusted device's nonce."""
         # remove dots and alias:
         mailbox, domain = email.split("@")
         mailbox = mailbox.replace(".", "")
@@ -1089,18 +1094,23 @@ class TokenBucket(models.Model):
         email = mailbox + "@" + domain
 
         salted_encoded = (email + settings.SECRET_KEY).encode()
-        hashed = hashlib.sha1(salted_encoded).hexdigest()
+        value = "em-" + hashlib.sha1(salted_encoded).hexdigest()
+        if device:
+            value += "-" + device
 
         # 10 login attempts for a single email per hour:
-        return TokenBucket.authorize(f"em-{hashed}", 10, 3600)
+        return TokenBucket.authorize(value, 10, 3600)
 
     @staticmethod
-    def authorize_login_password(email: str) -> bool:
+    def authorize_login_password(email: str, device: str = "") -> bool:
+        """Charge a password attempt; `device` is a trusted device's nonce."""
         salted_encoded = (email + settings.SECRET_KEY).encode()
-        hashed = hashlib.sha1(salted_encoded).hexdigest()
+        value = "pw-" + hashlib.sha1(salted_encoded).hexdigest()
+        if device:
+            value += "-" + device
 
         # 20 password attempts per day
-        return TokenBucket.authorize(f"pw-{hashed}", 20, 3600 * 24)
+        return TokenBucket.authorize(value, 20, 3600 * 24)
 
     @staticmethod
     def authorize_sudo_code(user: User) -> bool:

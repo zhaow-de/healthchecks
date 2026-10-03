@@ -6,6 +6,7 @@ from getpass import getpass
 from typing import Any
 from uuid import uuid4
 
+from django.contrib.auth import password_validation
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand
@@ -55,9 +56,15 @@ class Command(BaseCommand):
 
         return email
 
-    def validate_password(self, password: str) -> str | None:
+    def validate_password(self, password: str, email: str) -> str | None:
         if password.strip() == "":
             self.stderr.write("Error: Blank passwords aren't allowed.")
+            return None
+
+        try:
+            password_validation.validate_password(password, User(email=email))
+        except ValidationError as e:
+            self.stderr.write("Error: " + " ".join(e.messages))
             return None
 
         return password
@@ -86,9 +93,6 @@ class Command(BaseCommand):
         if email is not None:
             email = self.validate_email(email)
 
-        if password is not None:
-            password = self.validate_password(password)
-
         if sys.stdin.isatty():
             while email is None:
                 raw = input("Email address:")
@@ -96,6 +100,10 @@ class Command(BaseCommand):
         elif email is None:
             self.stderr.write("Missing or invalid required argument: --email")
             sys.exit(2)
+
+        # After the email, which the similarity validator compares the password with
+        if password is not None:
+            password = self.validate_password(password, email)
 
         if sys.stdin.isatty():
             while password is None:
@@ -107,7 +115,7 @@ class Command(BaseCommand):
                     password = None
                     continue
 
-                password = self.validate_password(p1)
+                password = self.validate_password(p1, email)
         elif password is None:
             self.stderr.write("Missing or invalid required argument: --password/--pass")
             sys.exit(2)

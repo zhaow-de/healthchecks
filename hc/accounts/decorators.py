@@ -4,6 +4,7 @@ import secrets
 from functools import wraps
 from typing import Any
 
+from django.conf import settings
 from django.core.signing import SignatureExpired, TimestampSigner
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
@@ -31,6 +32,11 @@ def require_sudo_mode(f: ViewFunc) -> ViewFunc:
         # is sudo mode active and has not expired yet?
         if _session_unsign(request, "sudo", 1800) == "active":
             return f(request, *args, **kwds)
+
+        # Without mail no code can be sent (hc.lib.emails.send asserts MAILERS), and
+        # nothing is charged to the bucket for a code that never goes out
+        if not settings.MAILERS:
+            return render(request, "accounts/sudo.html", {"no_mail": True})
 
         if not TokenBucket.authorize_sudo_code(request.user):
             return render(request, "try_later.html")

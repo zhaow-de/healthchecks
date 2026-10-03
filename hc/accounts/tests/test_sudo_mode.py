@@ -5,6 +5,7 @@ from datetime import timedelta as td
 import time_machine
 from django.core import mail
 from django.core.signing import TimestampSigner
+from django.test.utils import override_settings
 from django.utils.timezone import now
 
 from hc.accounts.models import Credential
@@ -111,3 +112,23 @@ class SudoModeTestCase(BaseTestCase):
 
         # A fresh code should have been sent
         self.assertEqual(len(mail.outbox), 1)
+
+    @override_settings(MAILERS={})
+    def test_it_explains_that_it_needs_mail(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+
+        r = self.client.get(self.url)
+        self.assertContains(r, "has not set up email")
+        self.assertContains(r, "manage.py changepassword")
+        self.assertNotContains(r, "Please pick a password")
+        self.assertNotIn("sudo_code", self.client.session)
+        self.assertFalse(TokenBucket.objects.filter(value=f"sudo-{self.alice.id}").exists())
+
+    @override_settings(MAILERS={})
+    def test_it_changes_nothing_without_mail(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+
+        r = self.client.post(self.url, {"password": "correct horse battery staple"})
+        self.assertContains(r, "manage.py changepassword")
+        self.alice.refresh_from_db()
+        self.assertTrue(self.alice.check_password("password"))

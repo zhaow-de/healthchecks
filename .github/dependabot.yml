@@ -21,17 +21,3 @@ updates:
     target-branch: "develop"
     schedule:
       interval: "weekly"
-
-  # docker/Dockerfile: the python base image and the uv binary. Python is 3.14 only, pinned in
-  # four places that move together, so its minor and major updates are not proposed. A uv bump
-  # here has to be copied into tests.yml and uv-cache.yml by hand.
-  - package-ecosystem: "docker"
-    directory: "/docker"
-    target-branch: "develop"
-    schedule:
-      interval: "weekly"
-    ignore:
-      - dependency-name: "python"
-        update-types:
-          - "version-update:semver-major"
-          - "version-update:semver-minor"

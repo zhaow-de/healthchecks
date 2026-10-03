@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from unittest.mock import patch
+
+from django.contrib.auth.hashers import get_hasher
 from django.http import HttpRequest
 
 from hc.accounts.backends import BasicBackend, EmailBackend, ProfileBackend
@@ -56,7 +59,12 @@ class EmailBackendTestCase(BaseTestCase):
             self.assertIsNone(EmailBackend().authenticate(self.request, "alice@example.org", ""))
 
     def test_it_handles_unknown_email(self) -> None:
-        self.assertIsNone(EmailBackend().authenticate(self.request, "eve@example.org", "password"))
+        hasher = get_hasher()
+        with patch.object(hasher, "encode", wraps=hasher.encode) as encode:
+            self.assertIsNone(EmailBackend().authenticate(self.request, "eve@example.org", "password"))
+
+        encode.assert_called_once()
+        self.assertEqual(encode.call_args.args[0], "password")
 
     def test_it_rejects_wrong_password(self) -> None:
         self.assertIsNone(EmailBackend().authenticate(self.request, "alice@example.org", "hunter2"))

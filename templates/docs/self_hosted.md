@@ -76,7 +76,7 @@ To access the administration panel, log into the site as the superuser. In the
 setup steps above, `createsuperuser` can take its credentials as parameters
 instead of prompting:
 
-    $ ./manage.py createsuperuser --email user@example.com --password changeme123
+    $ ./manage.py createsuperuser --email user@example.com --password correct-horse-battery-staple
 
 Once logged in, click on the "Account" dropdown in top navigation, and select
 "Site Administration".
@@ -153,6 +153,18 @@ When you first try this command on your data, it is a good idea to
 test it on a copy of your database, not on the live database right away.
 In a production setup, you will want to run this command regularly, as well as
 have regular, automatic database backups set up.
+
+A browser that has completed a login gets login rate limits of its own, but a
+new browser shares them with everyone else, so a run of wrong passwords for the
+account's email, from anywhere, can lock it out. To get back in, wait for the
+limits to refill, use the login link sent by email if email is set up, or clear
+every rate limit record, the recent ones too:
+
+```sh
+$ ./manage.py prunetokenbucket --all
+```
+
+If you have forgotten the password, set a new one with `./manage.py changepassword`.
 
 ## Next Steps
 
