@@ -93,26 +93,8 @@ class TokenBucketTestCase(BaseTestCase):
         self.assertEqual(values, [f"em-{ALICE_HASH}-{nonce}", f"pw-{ALICE_HASH}-{nonce}"])
         self.assertTrue(all(len(v) <= 80 for v in values))
 
-    def test_it_caps_untrusted_password_attempts(self) -> None:
-        for i in range(100):
+    def test_other_emails_leave_the_password_bucket_alone(self) -> None:
+        for i in range(200):
             self.assertTrue(TokenBucket.authorize_login_password(f"user{i}@example.org"))
 
-        self.assertFalse(TokenBucket.authorize_login_password("alice@example.org"))
-        self.assertFalse(TokenBucket.objects.filter(value=f"pw-{ALICE_HASH}").exists())
-        self.assertEqual(TokenBucket.objects.count(), 101)
-
-    def test_untrusted_cap_refills_over_a_day(self) -> None:
-        # 100 attempts per 24 hours: one attempt's worth refills in 864 seconds
-        obj = TokenBucket.objects.create(value="pw-untrusted", tokens=0, updated=now() - td(seconds=800))
-        self.assertFalse(TokenBucket.authorize_login_password("alice@example.org"))
-
-        obj.updated = now() - td(seconds=900)
-        obj.save()
         self.assertTrue(TokenBucket.authorize_login_password("alice@example.org"))
-
-    def test_trusted_device_skips_the_untrusted_cap(self) -> None:
-        TokenBucket.objects.create(value="pw-untrusted", tokens=0)
-
-        self.assertTrue(TokenBucket.authorize_login_password("alice@example.org", "a" * 32))
-        obj = TokenBucket.objects.get(value="pw-untrusted")
-        self.assertEqual(obj.tokens, 0)

@@ -239,10 +239,10 @@ backups set up.
 ### Getting Back In After a Login Lockout
 
 A browser that has completed a login gets login rate limits of its own, but a
-new browser shares them with everyone else, so a run of wrong passwords from
-anywhere can lock it out. To get back in, wait for the limits to refill, use
-the login link sent by email if email is set up, or clear every rate limit
-record, the recent ones too:
+new browser shares them with everyone else, so a run of wrong passwords for the
+account's email, from anywhere, can lock it out. To get back in, wait for the
+limits to refill, use the login link sent by email if email is set up, or clear
+every rate limit record, the recent ones too:
 
 ```sh
 ./manage.py prunetokenbucket --all
