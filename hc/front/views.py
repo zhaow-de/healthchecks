@@ -381,7 +381,12 @@ def _replace_placeholders(doc: str, html: str) -> str:
     if doc.startswith("self_hosted"):
         return html
 
-    limit = settings.PING_BODY_LIMIT or 100
+    limit = settings.PING_BODY_LIMIT
+    if limit is None:
+        # With no body limit a body is stored whole, and Django refuses one over
+        # DATA_UPLOAD_MAX_MEMORY_SIZE (2.5 MiB by default), so that size is the
+        # most a ping can store
+        limit = settings.DATA_UPLOAD_MAX_MEMORY_SIZE or 2621440
     if limit % 1000 == 0:
         limit_fmt = f"{limit // 1000} kB"
     else:
