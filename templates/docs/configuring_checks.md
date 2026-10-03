@@ -102,6 +102,8 @@ how SITE_NAME handles incoming pings for a particular check. Open it with the
 * **Allowed HTTP Request Methods**. You can require the ping
 requests to use HTTP POST. Use the "Only POST" option if you run into issues of
 preview bots hitting the ping URLs when you send them in email or post them in chat.
+The default option, labelled "HEAD, GET, POST, PUT", counts pings sent with any
+HTTP method, not only those four.
 * **Content Filtering**. You can instruct SITE_NAME to look for specific keywords
 in the HTTP request body of HTTP pings.
 * **Pinging a Paused Check**. Normally, when you ping a paused check, it leaves the

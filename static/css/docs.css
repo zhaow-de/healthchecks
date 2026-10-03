@@ -91,10 +91,7 @@ h2.rule {
 }
 
 .docs-api th,
-.docs-http_api th {
-    display: none;
-}
-
+.docs-http_api th,
 .docs-api td,
 .docs-http_api td {
     padding: 8px;
