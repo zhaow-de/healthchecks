@@ -1,6 +1,8 @@
+from datetime import timedelta as td
+
 from django.utils.timezone import now
 
-from hc.api.models import Channel, Check, Flip, Notification
+from hc.api.models import Channel, Check, Flip, Notification, Ping
 from hc.api.transports import Transport
 from hc.test import BaseTestCase
 
@@ -25,3 +27,18 @@ class TransportBaseTestCase(BaseTestCase):
         transport = Transport(self.channel)
         self.assertFalse(transport.is_noop("down"))
         self.assertFalse(transport.is_noop("up"))
+
+    def test_last_ping_is_the_highest_n_before_the_flip(self) -> None:
+        # n=2 came after n=1 although the clock had stepped back; n=3 came after the flip
+        Ping.objects.create(owner=self.check, n=1, created=self.flip.created - td(minutes=2))
+        Ping.objects.create(owner=self.check, n=2, created=self.flip.created - td(minutes=3))
+        Ping.objects.create(owner=self.check, n=3, created=self.flip.created + td(minutes=1))
+
+        ping = Transport(self.channel).last_ping(self.flip)
+        assert ping
+        self.assertEqual(ping.n, 2)
+
+    def test_last_ping_is_none_without_a_ping_before_the_flip(self) -> None:
+        Ping.objects.create(owner=self.check, n=1, created=self.flip.created + td(minutes=1))
+
+        self.assertIsNone(Transport(self.channel).last_ping(self.flip))

@@ -438,6 +438,7 @@ class NotifyWebhookTestCase(BaseTestCase):
 
         ping_body = b"Body Line 1"
         self.ping = Ping(owner=self.check)
+        self.ping.n = 112234
         self.flip.created = now()
         self.ping.body_raw = ping_body
         self.ping.save()
@@ -536,6 +537,7 @@ class NotifyWebhookTestCase(BaseTestCase):
         self._setup_data(json.dumps(definition))
 
         self.ping = Ping(owner=self.check)
+        self.ping.n = 112234
         self.flip.created = now()
         self.ping.body_raw = b'Project "Foo"'
         self.ping.save()

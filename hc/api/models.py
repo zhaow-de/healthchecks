@@ -145,7 +145,8 @@ class Check(models.Model):
     tags = models.CharField(max_length=500, blank=True)
     code = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     desc = models.TextField(blank=True)
-    project = models.ForeignKey(Project, models.CASCADE)
+    # No index of its own: api_check_project_slug in Meta leads with project_id
+    project = models.ForeignKey(Project, models.CASCADE, db_index=False)
     created = models.DateTimeField(default=now)
     kind = models.CharField(max_length=10, default="simple", choices=CHECK_KINDS)
     timeout = models.DurationField(default=DEFAULT_TIMEOUT)
@@ -495,25 +496,22 @@ class Check(models.Model):
         # Remove ping objects from db
         self.ping_set.filter(n__lte=threshold).delete()
 
-        try:
-            # Important: sort by "created", not by "id". Sorting by id
-            # may cause Postgres to use the "api_ping_pkey" index, and scan
-            # a huge number of rows.
-            ping = self.ping_set.earliest("created")
+        # By "n", not "created" or "id": see Ping.Meta
+        ping = self.ping_set.order_by("n").first()
+        if ping is None:
+            return
 
-            # Delete notifications older than the oldest retained ping
-            self.notification_set.filter(created__lt=ping.created).delete()
+        # Delete notifications older than the oldest retained ping
+        self.notification_set.filter(created__lt=ping.created).delete()
 
-            # Delete flips older than the oldest retained ping *and*
-            # older than 93 days. We need ~3 months of flips for calculating
-            # downtime statistics. The precise requirement is
-            # "we need the current month and full two previous months of data".
-            # We could calculate this precisely, but 3*31 is close enough and
-            # much simpler.
-            flip_threshold = min(ping.created, now() - td(days=93))
-            self.flip_set.filter(created__lt=flip_threshold).delete()
-        except Ping.DoesNotExist:
-            pass
+        # Delete flips older than the oldest retained ping *and*
+        # older than 93 days. We need ~3 months of flips for calculating
+        # downtime statistics. The precise requirement is
+        # "we need the current month and full two previous months of data".
+        # We could calculate this precisely, but 3*31 is close enough and
+        # much simpler.
+        flip_threshold = min(ping.created, now() - td(days=93))
+        self.flip_set.filter(created__lt=flip_threshold).delete()
 
     @property
     def visible_pings(self) -> QuerySet[Ping]:
@@ -630,7 +628,8 @@ class PingDict(TypedDict):
 class Ping(models.Model):
     id = models.BigAutoField(primary_key=True)
     n = models.IntegerField(null=True)
-    owner = models.ForeignKey(Check, models.CASCADE)
+    # No index of its own: api_ping_owner_n in Meta leads with owner
+    owner = models.ForeignKey(Check, models.CASCADE, db_index=False)
     created = models.DateTimeField(default=now)
     # NULL is a success ping: Check.ping leaves kind unset for one, and the readers
     # compare with None.
@@ -642,6 +641,17 @@ class Ping(models.Model):
     body_raw = models.BinaryField(null=True)
     exitstatus = models.SmallIntegerField(null=True)
     rid = models.UUIDField(null=True)
+
+    class Meta:
+        indexes = (
+            # The one index on api_ping besides the primary key. A query over one check's
+            # pings filters by owner and orders by "n", which this index serves; ordering
+            # by "created" or "id" instead sorts every ping of the check, or makes
+            # PostgreSQL walk api_ping_pkey. Check.ping numbers a check's pings under its
+            # row lock, so n and id rise together, and created with them unless the clock
+            # steps back.
+            models.Index(fields=["owner", "n"], name="api_ping_owner_n"),
+        )
 
     def __str__(self) -> str:
         return f"Ping #{self.n} ({self.kind or 'success'})"
@@ -712,11 +722,12 @@ class Ping(models.Model):
             return None
 
         pings = Ping.objects.filter(owner=self.owner_id)
-        # only look backwards but don't look further than MAX_DURATION in the past
-        pings = pings.filter(id__lt=self.id, created__gte=self.created - MAX_DURATION)
+        # only look backwards, by "n" (see Meta), but don't look further than
+        # MAX_DURATION in the past
+        pings = pings.filter(n__lt=self.n, created__gte=self.created - MAX_DURATION)
 
         # Look for a "start" event, with no success/fail event in between:
-        for ping in pings.order_by("-id").only("created", "kind", "rid"):
+        for ping in pings.order_by("-n").only("created", "kind", "rid"):
             if ping.kind == "start" and ping.rid == self.rid:
                 return self.created - ping.created
             if ping.kind in (None, "fail") and ping.rid == self.rid:
@@ -990,8 +1001,8 @@ class Channel(models.Model):
 class Notification(models.Model):
     code = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     # owner is null for test notifications, produced by the "Test!" button
-    # in the Integrations page
-    owner = models.ForeignKey(Check, models.CASCADE, null=True)
+    # in the Integrations page. No index of its own: the one in Meta leads with it.
+    owner = models.ForeignKey(Check, models.CASCADE, null=True, db_index=False)
     check_status = models.CharField(max_length=6)
     channel = models.ForeignKey(Channel, models.CASCADE)
     created = models.DateTimeField(default=now)
@@ -999,6 +1010,10 @@ class Notification(models.Model):
 
     class Meta:
         get_latest_by = "created"
+        indexes = (
+            # Check.prune and the event log select a check's notifications by created
+            models.Index(fields=["owner", "created"], name="api_notification_owner_created"),
+        )
 
     def __str__(self) -> str:
         return f"Notification {self.code} ({self.check_status})"
@@ -1010,7 +1025,8 @@ class FlipDict(TypedDict):
 
 
 class Flip(models.Model):
-    owner = models.ForeignKey(Check, models.CASCADE)
+    # No index of its own: api_flip_owner_created in Meta leads with owner
+    owner = models.ForeignKey(Check, models.CASCADE, db_index=False)
     created = models.DateTimeField()
     processed = models.DateTimeField(null=True, blank=True)
     old_status = models.CharField(max_length=8, choices=STATUSES)

@@ -778,10 +778,7 @@ def _get_events(
     end: datetime,
     kinds: tuple[str, ...] | None = None,
 ) -> list[Notification | WithAnnotations[Ping, PingAnnotations] | Flip]:
-    # Sorting by "n" instead of "id" is important here. Both give the same
-    # query results, but sorting by "id" can cause postgres to pick
-    # api_ping.id index (slow if the api_ping table is big). Sorting by
-    # "n" works around the problem--postgres picks the api_ping.owner_id index.
+    # By "n", not "created" or "id": see Ping.Meta
     pq = check.visible_pings.order_by("-n")
     pq = pq.filter(created__gte=start, created__lte=end)
     if kinds is not None:

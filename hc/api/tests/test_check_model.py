@@ -403,6 +403,20 @@ class CheckModelTestCase(BaseTestCase):
 
         self.assertEqual(Flip.objects.count(), 1)
 
+    @time_machine.travel(CURRENT_TIME)
+    def test_it_keeps_flips_and_notifications_when_no_ping_is_retained(self) -> None:
+        check = Check.objects.create(project=self.project, n_pings=101)
+        Ping.objects.create(owner=check, n=1)
+        Flip.objects.create(owner=check, created=CURRENT_TIME - td(days=100), old_status="new", new_status="down")
+        channel = Channel.objects.create(project=self.project, kind="email")
+        Notification.objects.create(owner=check, channel=channel, check_status="down", created=CURRENT_TIME - td(days=1))
+
+        check.prune()
+
+        self.assertFalse(Ping.objects.exists())
+        self.assertEqual(Flip.objects.count(), 1)
+        self.assertEqual(Notification.objects.count(), 1)
+
     def test_get_grace_start_returns_utc(self) -> None:
         check = Check(project=self.project)
         check.kind = "cron"
