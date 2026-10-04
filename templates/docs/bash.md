@@ -95,7 +95,8 @@ Any request may carry extra diagnostic information in its body. SITE_NAME stores
 at most the first PING_BODY_LIMIT_FORMATTED of it, as bytes whatever the encoding,
 and drops the rest (with the server's body limit setting `None`, it stores the body
 whole). A body larger than 2.5 MiB, or than the body limit when that is higher, is
-refused with 400 and the ping is not recorded. See
+refused and the ping is not recorded: the server may close the connection without a
+response, and curl then exits with code 52. See
 [Request Body](../http_api/#request-body).
 
 In the below example, certbot's output is captured and submitted via HTTP POST,

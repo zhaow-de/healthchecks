@@ -39,22 +39,25 @@ API's keys, read-write and read-only, are neither needed nor read here.</p>
 only, and never returns the ping key: the ping key is created and shown on the
 project's <strong>Settings</strong> page in the web UI.</p>
 <h3 id="requests">Requests</h3>
-<p>Every endpoint accepts any HTTP method, which the endpoint sections write as <code>ANY</code>;
-GET, HEAD and POST are the usual ones, and a check can be set to accept POST only (see
-<a href="#interpreting-pings">How SITE_NAME Interprets a Ping</a>). The one query parameter
-is <code>rid</code>, a <a href="#run-ids">run ID</a>. The request body is optional, may be any
-content type, and is stored with the ping (see <a href="#request-body">Request Body</a>).
-No cookies, CSRF token or special headers are needed.</p>
-<h3>Responses</h3>
+<p>Every endpoint records a ping for any HTTP method but OPTIONS, which the endpoint
+sections write as <code>ANY</code>; GET, HEAD and POST are the usual ones, and a check can be set
+to accept POST only (see <a href="#interpreting-pings">How SITE_NAME Interprets a Ping</a>). An
+OPTIONS request is a browser's CORS preflight: it gets "204 No Content" and records
+nothing (see <a href="#responses">Responses</a>). The one query parameter is <code>rid</code>, a
+<a href="#run-ids">run ID</a>. The request body is optional, may be any content type, and is
+stored with the ping (see <a href="#request-body">Request Body</a>). No cookies, CSRF token or
+special headers are needed.</p>
+<h3 id="responses">Responses</h3>
 <p>The response body is short plain text, although the
 <code>Content-Type</code> header says <code>text/html; charset=utf-8</code>; a HEAD response has no
-body. Read the status code, not the body. A 2xx response means the ping was
+body. Read the status code, not the body. A 200 response means the ping was
 recorded; any other response means it was not. Successful responses carry these
 headers:</p>
 <div class="highlight"><pre><span></span><code><span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span> <span class="m">200</span> <span class="ne">OK</span>
 <span class="na">Content-Type</span><span class="o">:</span> <span class="l">text/html; charset=utf-8</span>
 <span class="na">Ping-Body-Limit</span><span class="o">:</span> <span class="l">PING_BODY_LIMIT</span>
 <span class="na">Access-Control-Allow-Origin</span><span class="o">:</span> <span class="l">*</span>
+<span class="na">Access-Control-Expose-Headers</span><span class="o">:</span> <span class="l">Ping-Body-Limit</span>
 <span class="na">Cache-Control</span><span class="o">:</span> <span class="l">max-age=0, no-cache, no-store, must-revalidate, private</span>
 
 OK
@@ -65,9 +68,23 @@ When the server's body limit setting is <code>None</code>, which stores every bo
 header is absent from every response, including those the examples on this page
 show (see the body limit setting in
 <a href="../self_hosted_configuration/#PING%5FBODY%5FLIMIT">Server Configuration</a>).
-<code>Access-Control-Allow-Origin: *</code> is set on 200 responses only, so a browser
-page on another origin can read a successful response; error responses do not
-carry it.</p>
+<code>Access-Control-Allow-Origin: *</code> and <code>Access-Control-Expose-Headers</code> are set on 200
+responses, so a browser page on another origin can read a successful response and
+its <code>Ping-Body-Limit</code> header; error responses carry neither.</p>
+<p>An OPTIONS request, the preflight a browser sends before a cross-origin request with
+a JSON body or a custom header, gets "204 No Content" with these headers, and records
+no ping:</p>
+<div class="highlight"><pre><span></span><code><span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span> <span class="m">204</span> <span class="ne">No Content</span>
+<span class="na">Access-Control-Allow-Origin</span><span class="o">:</span> <span class="l">*</span>
+<span class="na">Access-Control-Allow-Methods</span><span class="o">:</span> <span class="l">GET, HEAD, POST, OPTIONS</span>
+<span class="na">Access-Control-Allow-Headers</span><span class="o">:</span> <span class="l">content-type</span>
+<span class="na">Access-Control-Max-Age</span><span class="o">:</span> <span class="l">600</span>
+<span class="na">Cache-Control</span><span class="o">:</span> <span class="l">max-age=0, no-cache, no-store, must-revalidate, private</span>
+</code></pre></div>
+
+<p><code>Access-Control-Allow-Headers</code> repeats the request's <code>Access-Control-Request-Headers</code>,
+and is <code>Content-Type</code> when the request has none. Every ping URL answers OPTIONS this
+way, also one that names no check.</p>
 <h3 id="status-codes">Status Codes</h3>
 <table>
 <thead>
@@ -84,6 +101,11 @@ carry it.</p>
 <td>The ping was recorded (also when it was recorded as "ignored").</td>
 </tr>
 <tr>
+<td>204</td>
+<td>empty</td>
+<td>An OPTIONS request, a CORS preflight. No ping was recorded.</td>
+</tr>
+<tr>
 <td>400</td>
 <td><code>invalid url format</code></td>
 <td>The slug has uppercase letters (an uppercase suffix after a UUID, such as <code>/Fail</code>, counts as a slug), or the exit status is above 255.</td>
@@ -94,9 +116,9 @@ carry it.</p>
 <td>The <code>rid</code> parameter is not a UUID.</td>
 </tr>
 <tr>
-<td>400</td>
-<td>an HTML error page</td>
-<td>The request body is larger than 2.5 MiB (2,621,440 bytes), or than the body limit when that is higher.</td>
+<td>none</td>
+<td>none</td>
+<td>The request body is larger than 2.5 MiB (2,621,440 bytes), or than the body limit when that is higher. The Docker image closes the connection without a response (curl exits with code 52, "Empty reply from server"); a server without that limit answers 400 with an HTML error page.</td>
 </tr>
 <tr>
 <td>404</td>
@@ -115,6 +137,8 @@ carry it.</p>
 </tr>
 </tbody>
 </table>
+<p>The exit status and the <code>rid</code> are checked before the check is looked up, so a ping
+to a check that does not exist gets their 400 rather than the 404.</p>
 <p>A 4xx response means the request itself is wrong: fix the URL, the <code>rid</code> or the
 body rather than repeating it.</p>
 <h3>Rate Limits</h3>
@@ -124,7 +148,10 @@ most recent pings (100 by default), so a job that pings more often than needed
 pushes useful events out of the log sooner.</p>
 <h3>Protocol</h3>
 <p>HTTP or HTTPS, the HTTP version and IPv4 or IPv6 are decided by the
-web server in front of SITE_NAME, not by SITE_NAME itself.</p>
+web server in front of SITE_NAME, not by SITE_NAME itself. Use the <code>https://</code> ping
+URL where the server offers one. A server that redirects plain HTTP to HTTPS answers
+an <code>http://</code> ping URL with a redirect and records nothing: <code>curl -fsS</code> takes that
+for success, exits with 0 and prints nothing. <code>curl -L</code> follows the redirect.</p>
 <h3 id="task-index">What to Call</h3>
 <table>
 <thead>
@@ -327,9 +354,12 @@ SITE_NAME applies these steps in order:</p>
 </tbody>
 </table>
 <p>Every ping, ignored ones included, is added to the check's event log and counted in
-its <code>n_pings</code>. SITE_NAME records with it the time, the HTTP method, the scheme (from
-the <code>X-Forwarded-Proto</code> request header, "http" when absent), the client's IP address
-(the first address in <code>X-Forwarded-For</code> when present), the first 200 characters of
+its <code>n_pings</code>. SITE_NAME records with it the time, the HTTP method (its first 10
+characters), the scheme ("https" when the request reached the server over HTTPS, as
+its reverse proxy reports in the <code>X-Forwarded-Proto</code> request header, and "http"
+otherwise), the client's IP address (the <code>X-Forwarded-For</code> entry that the server's
+trusted proxy count, <code>TRUSTED_PROXY_HOPS</code>, selects from the right, or the address of
+the connection; none when that is not an IP address), the first 200 characters of
 the <code>User-Agent</code>, the body, the run ID and the exit status. The
 <a href="../api/#list-pings">list pings</a> call of the Management API returns all of them but
 the exit status, which no API call returns: a ping's <code>type</code> says only how SITE_NAME
@@ -344,8 +374,10 @@ client sends 123 bytes, SITE_NAME stores the first 100 and ignores the remaining
 When the server's body limit setting is <code>None</code>, SITE_NAME stores the body whole and
 sends no <code>Ping-Body-Limit</code> header; the size cap below is then the only limit.</p>
 <p>A request whose body is larger than 2.5 MiB (2,621,440 bytes), or than the body
-limit when that is higher, is refused with 400 and an HTML error page, and nothing
-is recorded.</p>
+limit when that is higher, is refused, and nothing is recorded. The Docker image
+closes the connection without an HTTP response, before it reads the body, and curl
+exits with code 52 ("Empty reply from server"); a server without that limit answers
+400 with an HTML error page.</p>
 <p>The body is stored as bytes, so it need not be text, also when the check
 <a href="#interpreting-pings">filters by keywords</a>.</p>
 <h2 id="run-ids">Run IDs</h2>

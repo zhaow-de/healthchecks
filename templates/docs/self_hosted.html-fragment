@@ -152,6 +152,37 @@ dictionary (a standard Django setting, <a href="https://docs.djangoproject.com/e
 <code>EMAIL_USE_SSL=True</code>: with both <code>True</code>, startup and <code>manage.py check</code> report
 nothing, but every email fails with Django's <code>InvalidMailer</code> error ("The 'use_ssl'
 and 'use_tls' OPTIONS are incompatible").</p>
+<p>By default every email leaves from
+<a href="../self_hosted_configuration/#DEFAULT_FROM_EMAIL">DEFAULT_FROM_EMAIL</a>, as its
+<code>From:</code> header and as its envelope sender, Django's error emails to <code>ADMINS</code>
+included: <a href="../self_hosted_configuration/#SERVER_EMAIL">SERVER_EMAIL</a> defaults to it,
+and only <a href="../self_hosted_configuration/#EMAIL_MAIL_FROM_TMPL">EMAIL_MAIL_FROM_TMPL</a>
+changes the envelope sender.</p>
+<h3 id="ses">Example: Amazon SES</h3>
+<p>Amazon SES takes email over SMTP with STARTTLS on port 587:</p>
+<div class="highlight"><pre><span></span><code><span class="na">DEFAULT_FROM_EMAIL</span><span class="o">=</span><span class="s">healthchecks@example.org</span>
+<span class="na">EMAIL_HOST</span><span class="o">=</span><span class="s">email-smtp.&lt;region&gt;.amazonaws.com</span>
+<span class="na">EMAIL_PORT</span><span class="o">=</span><span class="s">587</span>
+<span class="na">EMAIL_HOST_USER</span><span class="o">=</span><span class="s">&lt;SES SMTP user name&gt;</span>
+<span class="na">EMAIL_HOST_PASSWORD</span><span class="o">=</span><span class="s">&lt;SES SMTP password&gt;</span>
+<span class="na">EMAIL_USE_TLS</span><span class="o">=</span><span class="s">True</span>
+</code></pre></div>
+
+<ul>
+<li><code>EMAIL_HOST</code> is the SMTP endpoint of the AWS region your SES account sends from,
+  such as <code>email-smtp.eu-central-1.amazonaws.com</code>.</li>
+<li><code>EMAIL_HOST_USER</code> and <code>EMAIL_HOST_PASSWORD</code> are SES SMTP credentials, which the SES
+  console creates under its SMTP settings. An IAM access key ID and its secret access
+  key are not SMTP credentials, and SES refuses them.</li>
+<li><code>DEFAULT_FROM_EMAIL</code> has to be a verified identity in SES, the address itself or
+  its domain: SES refuses a message from any sender it has not verified. Leave
+  <code>SERVER_EMAIL</code> and
+  <a href="../self_hosted_configuration/#EMAIL_MAIL_FROM_TMPL">EMAIL_MAIL_FROM_TMPL</a> unset,
+  or point them at verified addresses too.</li>
+<li>While the SES account is in the sandbox, SES delivers only to verified addresses
+  as well: verify the user's own email address, each <code>ADMINS</code> address and the address
+  of each email integration, or ask AWS for production access.</li>
+</ul>
 <h2 id="sending-notifications">Sending Status Notifications</h2>
 <p>The <code>sendalerts</code> management command continuously polls the database for any checks
 changing state, and sends out notifications as needed.
@@ -254,8 +285,10 @@ account's email it gets per-email limits of its own and skips the per-IP one. A 
 browser shares the per-email limits with everyone else, so a run of wrong passwords
 for the account's email, from anywhere, can lock it out; and 20 attempts from one
 address, on either form, lock out every new browser behind that address until the
-limit refills. The client address is the one the reverse proxy puts in
-<code>X-Forwarded-For</code> (see <a href="../self_hosted_docker/#tls-termination">Reverse Proxy</a>).</p>
+limit refills. The client address is the one your reverse proxy puts in
+<code>X-Forwarded-For</code>, as <a href="../self_hosted_configuration/#TRUSTED_PROXY_HOPS">TRUSTED_PROXY_HOPS</a>
+selects it; attempts whose address is not an IP address share one limit (see
+<a href="../self_hosted_docker/#tls-termination">Reverse Proxy and TLS</a>).</p>
 <p>To get back in, wait for the limits to refill, log in from a browser that has
 logged in before, use the login link sent by email if email is set up, or clear
 every rate limit record, the recent ones too:</p>
@@ -267,14 +300,21 @@ every rate limit record, the recent ones too:</p>
 per-email limits, but not the per-IP one, and has other effects, listed there.</p>
 <h2 id="checklist">Before Going Live</h2>
 <ul>
-<li><code>DEBUG=False</code>. The default is <code>True</code>, and the Docker image does not change it; the
-  sample <code>.env</code> sets <code>False</code>.</li>
-<li><a href="../self_hosted_configuration/#SECRET_KEY">SECRET_KEY</a> set to a random value before
-  the first API key is created, and kept.</li>
-<li><a href="../self_hosted_configuration/#SITE_ROOT">SITE_ROOT</a> set to the public URL, and
-  <code>ALLOWED_HOSTS</code> unset or listing its host.</li>
-<li>A reverse proxy in front that terminates TLS and sets <code>X-Forwarded-For</code> and
-  <code>X-Forwarded-Proto</code> (see <a href="../self_hosted_docker/#tls-termination">Reverse Proxy</a>).</li>
+<li><code>DEBUG=False</code>. The Docker image sets it; from source, the default is <code>True</code>.</li>
+<li><a href="../self_hosted_configuration/#SECRET_KEY">SECRET_KEY</a> set to a random value of at
+  least 50 characters before the first API key is created, and kept. With
+  <code>DEBUG=False</code>, a weak key stops the start.</li>
+<li><a href="../self_hosted_configuration/#SITE_ROOT">SITE_ROOT</a> set to the public <code>https://</code>
+  URL, which marks the console's cookies Secure, and <code>ALLOWED_HOSTS</code> unset or listing
+  its host.</li>
+<li>A reverse proxy in front that terminates TLS, passes <code>Host</code>, and sets
+  <code>X-Forwarded-For</code> and <code>X-Forwarded-Proto</code>, with
+  <a href="../self_hosted_configuration/#TRUSTED_PROXY_HOPS">TRUSTED_PROXY_HOPS</a> matching the
+  number of proxies (see <a href="../self_hosted_docker/#tls-termination">Reverse Proxy and TLS</a>).</li>
+<li>Ping URLs over HTTPS, or the proxy's redirect to HTTPS kept off <code>/ping/</code> (see
+  <a href="../self_hosted_docker/#http-pings">Pings over Plain HTTP</a>).</li>
+<li><a href="../self_hosted_configuration/#SECURE_HSTS_SECONDS">SECURE_HSTS_SECONDS</a> raised once
+  HTTPS works, if you want browsers to use HTTPS only.</li>
 <li>Email set up, if you want email alerts, and
   <a href="../self_hosted_configuration/#ADMINS">ADMINS</a> set to receive the error emails.</li>
 <li>Backups, and a restore tried once.</li>

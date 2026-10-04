@@ -33,18 +33,20 @@ project's **Settings** page in the web UI.
 
 ### Requests {: #requests }
 
-Every endpoint accepts any HTTP method, which the endpoint sections write as `ANY`;
-GET, HEAD and POST are the usual ones, and a check can be set to accept POST only (see
-[How SITE_NAME Interprets a Ping](#interpreting-pings)). The one query parameter
-is `rid`, a [run ID](#run-ids). The request body is optional, may be any
-content type, and is stored with the ping (see [Request Body](#request-body)).
-No cookies, CSRF token or special headers are needed.
+Every endpoint records a ping for any HTTP method but OPTIONS, which the endpoint
+sections write as `ANY`; GET, HEAD and POST are the usual ones, and a check can be set
+to accept POST only (see [How SITE_NAME Interprets a Ping](#interpreting-pings)). An
+OPTIONS request is a browser's CORS preflight: it gets "204 No Content" and records
+nothing (see [Responses](#responses)). The one query parameter is `rid`, a
+[run ID](#run-ids). The request body is optional, may be any content type, and is
+stored with the ping (see [Request Body](#request-body)). No cookies, CSRF token or
+special headers are needed.
 
-### Responses
+### Responses {: #responses }
 
 The response body is short plain text, although the
 `Content-Type` header says `text/html; charset=utf-8`; a HEAD response has no
-body. Read the status code, not the body. A 2xx response means the ping was
+body. Read the status code, not the body. A 200 response means the ping was
 recorded; any other response means it was not. Successful responses carry these
 headers:
 
@@ -53,6 +55,7 @@ HTTP/1.1 200 OK
 Content-Type: text/html; charset=utf-8
 Ping-Body-Limit: PING_BODY_LIMIT
 Access-Control-Allow-Origin: *
+Access-Control-Expose-Headers: Ping-Body-Limit
 Cache-Control: max-age=0, no-cache, no-store, must-revalidate, private
 
 OK
@@ -63,21 +66,42 @@ When the server's body limit setting is `None`, which stores every body whole, t
 header is absent from every response, including those the examples on this page
 show (see the body limit setting in
 [Server Configuration](../self_hosted_configuration/#PING%5FBODY%5FLIMIT)).
-`Access-Control-Allow-Origin: *` is set on 200 responses only, so a browser
-page on another origin can read a successful response; error responses do not
-carry it.
+`Access-Control-Allow-Origin: *` and `Access-Control-Expose-Headers` are set on 200
+responses, so a browser page on another origin can read a successful response and
+its `Ping-Body-Limit` header; error responses carry neither.
+
+An OPTIONS request, the preflight a browser sends before a cross-origin request with
+a JSON body or a custom header, gets "204 No Content" with these headers, and records
+no ping:
+
+```http
+HTTP/1.1 204 No Content
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Methods: GET, HEAD, POST, OPTIONS
+Access-Control-Allow-Headers: content-type
+Access-Control-Max-Age: 600
+Cache-Control: max-age=0, no-cache, no-store, must-revalidate, private
+```
+
+`Access-Control-Allow-Headers` repeats the request's `Access-Control-Request-Headers`,
+and is `Content-Type` when the request has none. Every ping URL answers OPTIONS this
+way, also one that names no check.
 
 ### Status Codes {: #status-codes }
 
 Status | Body | Meaning
 -------|------|--------
 200 | `OK` | The ping was recorded (also when it was recorded as "ignored").
+204 | empty | An OPTIONS request, a CORS preflight. No ping was recorded.
 400 | `invalid url format` | The slug has uppercase letters (an uppercase suffix after a UUID, such as `/Fail`, counts as a slug), or the exit status is above 255.
 400 | `invalid uuid format` | The `rid` parameter is not a UUID.
-400 | an HTML error page | The request body is larger than 2.5 MiB (2,621,440 bytes), or than the body limit when that is higher.
+none | none | The request body is larger than 2.5 MiB (2,621,440 bytes), or than the body limit when that is higher. The Docker image closes the connection without a response (curl exits with code 52, "Empty reply from server"); a server without that limit answers 400 with an HTML error page.
 404 | `not found` | No check has this UUID; no check has this slug under this ping key; no project has this ping key; an unknown lowercase suffix follows a UUID; or any lowercase suffix follows an uppercase or undashed UUID (in these two, the URL is read as a slug URL).
 404 | an HTML error page | The URL matches no ping route: an uppercase or undashed UUID with no suffix, a trailing slash after a slug or a suffix, or an unknown suffix after a slug.
 409 | `ambiguous slug` | More than one check in the project has this slug.
+
+The exit status and the `rid` are checked before the check is looked up, so a ping
+to a check that does not exist gets their 400 rather than the 404.
 
 A 4xx response means the request itself is wrong: fix the URL, the `rid` or the
 body rather than repeating it.
@@ -92,7 +116,10 @@ pushes useful events out of the log sooner.
 ### Protocol
 
 HTTP or HTTPS, the HTTP version and IPv4 or IPv6 are decided by the
-web server in front of SITE_NAME, not by SITE_NAME itself.
+web server in front of SITE_NAME, not by SITE_NAME itself. Use the `https://` ping
+URL where the server offers one. A server that redirects plain HTTP to HTTPS answers
+an `http://` ping URL with a redirect and records nothing: `curl -fsS` takes that
+for success, exits with 0 and prints nothing. `curl -L` follows the redirect.
 
 ### What to Call {: #task-index }
 
@@ -197,9 +224,12 @@ log | Unchanged. | None.
 ignored | Unchanged. | None; the event shows as "Ignored".
 
 Every ping, ignored ones included, is added to the check's event log and counted in
-its `n_pings`. SITE_NAME records with it the time, the HTTP method, the scheme (from
-the `X-Forwarded-Proto` request header, "http" when absent), the client's IP address
-(the first address in `X-Forwarded-For` when present), the first 200 characters of
+its `n_pings`. SITE_NAME records with it the time, the HTTP method (its first 10
+characters), the scheme ("https" when the request reached the server over HTTPS, as
+its reverse proxy reports in the `X-Forwarded-Proto` request header, and "http"
+otherwise), the client's IP address (the `X-Forwarded-For` entry that the server's
+trusted proxy count, `TRUSTED_PROXY_HOPS`, selects from the right, or the address of
+the connection; none when that is not an IP address), the first 200 characters of
 the `User-Agent`, the body, the run ID and the exit status. The
 [list pings](../api/#list-pings) call of the Management API returns all of them but
 the exit status, which no API call returns: a ping's `type` says only how SITE_NAME
@@ -217,8 +247,10 @@ When the server's body limit setting is `None`, SITE_NAME stores the body whole 
 sends no `Ping-Body-Limit` header; the size cap below is then the only limit.
 
 A request whose body is larger than 2.5 MiB (2,621,440 bytes), or than the body
-limit when that is higher, is refused with 400 and an HTML error page, and nothing
-is recorded.
+limit when that is higher, is refused, and nothing is recorded. The Docker image
+closes the connection without an HTTP response, before it reads the body, and curl
+exits with code 52 ("Empty reply from server"); a server without that limit answers
+400 with an HTML error page.
 
 The body is stored as bytes, so it need not be text, also when the check
 [filters by keywords](#interpreting-pings).

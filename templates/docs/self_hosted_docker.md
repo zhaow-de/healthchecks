@@ -14,7 +14,8 @@ holds the files this page uses:
 
 The container serves plain HTTP on port 8000, published on the Docker host's
 loopback address alone. Put a reverse proxy in front of it that terminates TLS (see
-[Reverse Proxy, TLS Termination, and CSRF Protection](#tls-termination)).
+[Reverse Proxy and TLS](#tls-termination)); [Example: Debian 13 on a VPS](#debian-vps)
+puts the pieces together, with Caddy in front.
 
 ## The Image {: #image }
 
@@ -33,6 +34,8 @@ The image:
 * runs as the user `hc` (user ID 100, group ID 101), in `/opt/healthchecks`;
 * keeps its SQLite database at `/data/hc.sqlite`: it sets `DB_NAME=/data/hc.sqlite`,
   and `/data` is the one directory `hc` can write to;
+* sets `DEBUG=False`, and does not start without a strong `SECRET_KEY` (see
+  [Getting Started](#getting-started));
 * runs uWSGI, which applies the database migrations at every start, serves the web
   application, and runs `sendalerts`, `sendreports` and the daily housekeeping (see
   [What Runs in the Container](#processes));
@@ -54,11 +57,17 @@ The image:
     * `HC_IMAGE` – the image to run, a release. Example:
     `HC_IMAGE=ghcr.io/zhaow-de/healthchecks:vX.Y.Z`. Without it, the compose file
     runs `latest`.
-    * `SECRET_KEY` – secures HTTP sessions, set to a random value. Set it before
+    * `SECRET_KEY` – secures HTTP sessions, set to a random value of at least 50
+    characters, with at least 5 different ones, that does not start with
+    `django-insecure-`.
+    The sample's `---` does not pass: with it, or any weaker key, the container does
+    not start. Generate one with
+    `python3 -c 'import secrets; print(secrets.token_urlsafe(50))'`. Set it before
     you create the first API key and keep it: changing it later invalidates the
     API keys and more (see [SECRET_KEY](../self_hosted_configuration/#SECRET_KEY)).
     * `SITE_ROOT` – The base public URL of your Healthchecks instance. Example:
-    `SITE_ROOT=https://hc.example.org`.
+    `SITE_ROOT=https://hc.example.org`. With an `https://` URL, the console's
+    cookies are marked Secure, so you log in over HTTPS only.
     * `ALLOWED_HOSTS` – the sample sets `localhost`. Set it to the host of
     `SITE_ROOT`, or delete the line to derive it from `SITE_ROOT`: when the host of
     `SITE_ROOT` is not in it, the container does not start.
@@ -66,11 +75,12 @@ The image:
     `http://localhost:8000/ping/`, so set it to your `SITE_ROOT` followed by
     `/ping/`, or delete the line to derive it from `SITE_ROOT`.
 
-    Keep `DEBUG=False` from the sample: the image does not set it, and the default
-    is `True`. Leave out `DB` and `DB_NAME`: the image's SQLite path is the default
-    (see [SQLite and the /data Volume](#sqlite)).
+    The image sets `DEBUG=False`, as does the sample; keep it so. Leave out `DB`
+    and `DB_NAME`: the image's SQLite path is the default (see
+    [SQLite and the /data Volume](#sqlite)).
 
-    For email (see [Sending Emails](../self_hosted/#sending-emails)), also set:
+    For email (see [Sending Emails](../self_hosted/#sending-emails), and
+    [Example: Amazon SES](../self_hosted/#ses)), also set:
 
     * `DEFAULT_FROM_EMAIL` – the "From:" address for outbound emails.
     * `EMAIL_HOST` – the SMTP server.
@@ -84,7 +94,11 @@ The image:
         $ docker compose up -d
 
     Wait until `docker compose ps` shows the `web` container as healthy: by then
-    the database file exists and the migrations have run.
+    the database file exists and the migrations have run. A container that keeps
+    restarting instead, which `docker compose up -d --wait` reports as unhealthy,
+    refused to start: `docker compose logs web` shows why, such as `hc.api.E004`
+    for a weak `SECRET_KEY`, or `hc.api.E002` for a `SITE_ROOT` host missing from
+    `ALLOWED_HOSTS`.
 
 * Create the superuser:
 
@@ -113,7 +127,9 @@ The image:
 * `ports: "127.0.0.1:8000:8000"` publishes the port on the Docker host's loopback
   address, for a reverse proxy on the same host. For a proxy on another host,
   publish it on an address that proxy reaches, and keep every other client away from
-  it: a client that reaches port 8000 directly chooses its own `X-Forwarded-For`.
+  it: a client that reaches port 8000 directly, a process on the Docker host
+  included, chooses its own `X-Forwarded-For` (see
+  [TRUSTED_PROXY_HOPS](#trusted-proxy-hops)).
 * `restart: unless-stopped` starts the container again when it exits and when the
   Docker host restarts, unless you stopped it. Docker does not restart a container
   that is only unhealthy.
@@ -138,6 +154,27 @@ the file system (see [Data Retention](../self_hosted/#database-cleanup)).
 A new named volume takes its owner from the image's `/data`, so the `hc` user can
 write to it; a host directory mounted there instead must be writable by user ID 100.
 
+The database runs in SQLite's WAL mode: while it is in use, `hc.sqlite-wal` and
+`hc.sqlite-shm` sit beside `hc.sqlite` in `/data`, and the latest commits are in the
+`-wal` file until a checkpoint copies them into `hc.sqlite`. So:
+
+* `/data` must be a local file system, used by the containers of one host: WAL mode
+  does not work over a network file system.
+* Never copy `hc.sqlite` alone while the container runs: the copy misses what the
+  `-wal` file holds, and a restore of it is inconsistent. Back up with `VACUUM INTO`
+  (see [Backups and Restore](#backups)).
+* A clean stop (`docker compose stop` or `down`) checkpoints the `-wal` file and
+  removes both files. A killed container (`docker kill`, out of memory, a host
+  crash) leaves them, and the next start applies the `-wal` file to `hc.sqlite`.
+* Once the `-wal` file has grown past 16 MiB (16,777,216 bytes), the first write
+  after a checkpoint cuts it back to that size, which it then keeps. Under sustained
+  concurrent writes it grows beyond 16 MiB between checkpoints, to 24 to 32 MiB at
+  about 300 pings per second: keep about 50 MiB of disk free for it beside the
+  database.
+
+Commits use `synchronous = NORMAL`: a crash of the container loses no committed ping,
+but a power loss or a crash of the host's operating system can lose the last ones.
+
 ## PostgreSQL {: #postgresql }
 
 To run on PostgreSQL 18 instead, layer `docker-compose.postgres.yml` over
@@ -147,9 +184,12 @@ the `db-data` volume, makes `web` wait until `db` is healthy, and points `web` a
 * Copy `docker-compose.postgres.yml` beside `docker-compose.yml`.
 * In `.env`, set `DB_PASSWORD`, the PostgreSQL password: both services refuse to
   start without it. The `db` container applies it only when it first creates its
-  data volume, so changing it later breaks the connection. `DB_CONN_MAX_AGE`,
-  `DB_SSLMODE` and `DB_TARGET_SESSION_ATTRS` tune the connection; leave `DB`,
-  `DB_HOST`, `DB_NAME` and `DB_USER` to the override.
+  data volume, so changing it later breaks the connection. `DB_SSLMODE` and
+  `DB_TARGET_SESSION_ATTRS` tune the connection; leave `DB`, `DB_HOST`, `DB_NAME`
+  and `DB_USER` to the override. With
+  [DB_CONN_MAX_AGE](../self_hosted_configuration/#DB_CONN_MAX_AGE) at its default,
+  600 seconds, each uWSGI worker keeps its connection open between requests, so
+  PostgreSQL holds a connection per worker beside those of the daemons.
 * Name both files in every `docker compose` command:
 
         $ docker compose -f docker-compose.yml -f docker-compose.postgres.yml up -d
@@ -186,24 +226,35 @@ The container's main process is uWSGI, configured by `docker/uwsgi.ini`. At ever
 start it:
 
 * runs `./manage.py migrate`, which applies new migrations and runs the system
-  checks; when either fails, the container does not start;
+  checks; when either fails, uWSGI exits before it starts any worker, and the
+  compose file's restart policy starts the container again, in a loop, until the
+  cause is fixed;
 * loads the web application and serves it on port 8000;
 * starts `./manage.py sendalerts` and `./manage.py sendreports --loop` as daemons,
   and starts either again when it exits;
 * schedules `./manage.py prune` every day at 03:17 UTC (see
   [Housekeeping](#housekeeping)).
 
-The start of the container's log shows each of them:
+The start of the container's log shows each of them, among uWSGI's other lines:
 
 ```text
-[uwsgi-cron] command "./manage.py prune --skip-checks" registered as cron task
-running "exec:./manage.py migrate" (pre app)...
+running "exec:./manage.py migrate" (asap)...
   No migrations to apply.
+*** Starting uWSGI 2.0.31 (64bit) on [Sun Oct  4 20:05:03 2026] ***
+[uwsgi-cron] command "./manage.py prune --skip-checks" registered as cron task
+spawned uWSGI worker 1 (pid: 8, cores: 1)
+spawned uWSGI worker 2 (pid: 9, cores: 1)
+spawned uWSGI worker 3 (pid: 10, cores: 1)
+spawned uWSGI worker 4 (pid: 11, cores: 1)
 [uwsgi-daemons] spawning "./manage.py sendalerts --skip-checks" (uid: 100 gid: 101)
 [uwsgi-daemons] spawning "./manage.py sendreports --loop --skip-checks" (uid: 100 gid: 101)
-2026-10-04 13:51:53,391 INFO hc sendreports is now running
-2026-10-04 13:51:53,525 INFO hc sendalerts is now running
+2026-10-04 20:05:06,036 INFO hc sendreports is now running
+2026-10-04 20:05:06,156 INFO hc sendalerts is now running
 ```
+
+When `migrate` or a system check fails, its error, such as `?: (hc.api.E004) Your
+SECRET_KEY has less than 50 characters, ...`, is followed by
+`FATAL hook failed, destroying instance`, and no worker starts.
 
 `docker compose logs -f web` follows the log (see [Logs](../self_hosted/#logs)).
 
@@ -223,12 +274,21 @@ What `docker/uwsgi.ini` and the Dockerfile set:
   `False`, it listens on `[::]:8000` instead.
 * uWSGI kills a worker whose request runs longer than 10 seconds
   (`harakiri = 10`), and a `prune` run that runs longer than 1800 seconds.
-* The image sets `USE_GZIP_MIDDLEWARE=True`.
+* uWSGI refuses a request whose body is larger than 2,621,440 bytes (2.5 MiB)
+  before it reads the body, and closes the connection without an HTTP response
+  (`limit-post`; curl reports "Empty reply from server", exit code 52).
+  `UWSGI_LIMIT_POST` replaces that limit: with a
+  [PING_BODY_LIMIT](../self_hosted_configuration/#PING_BODY_LIMIT) above 2,621,440,
+  set it to the same value.
+* uWSGI treats a request with `X-Forwarded-Proto: https` as HTTPS, as Healthchecks
+  does by default (see
+  [SECURE_PROXY_SSL_HEADER](../self_hosted_configuration/#SECURE_PROXY_SSL_HEADER)).
+* The image sets `DEBUG=False` and `USE_GZIP_MIDDLEWARE=True`.
 * The image's Docker `HEALTHCHECK` runs `fetchstatus.py`, which requests
-  `/api/v3/status/` on port 8000, under `SITE_ROOT`'s path, with `SITE_ROOT`'s host
-  as the `Host` header. `SITE_ROOT`'s host must therefore be in `ALLOWED_HOSTS`, or
-  the container reports unhealthy (and the `web` container never shows as healthy
-  in `docker compose ps`).
+  `/api/v3/status/` on port 8000, over plain HTTP, under `SITE_ROOT`'s path, with
+  `SITE_ROOT`'s host as the `Host` header; it works with an `https://` `SITE_ROOT`
+  too. A `SITE_ROOT` host missing from `ALLOWED_HOSTS` stops the container before
+  that, with `hc.api.E002`.
 
 ## Housekeeping {: #housekeeping }
 
@@ -247,14 +307,18 @@ A run logs the time it started, one summary line, and how long it took, for exam
 
 ```text
 Sun Oct  4 13:54:42 2026 - [uwsgi-cron] running "./manage.py prune --skip-checks" (pid 14)
-Deleted api_ping 1400, api_notification 250, api_flip 300, api_tokenbucket 2500, django_session 1234, django_admin_log 0; freed 1522 SQLite pages, 0 left free
+Deleted api_ping 833, api_notification 0, api_flip 0, api_tokenbucket 0, django_session 0, django_admin_log 0; freed 90 SQLite pages, 0 left free; checkpointed 841 of 841 WAL frames
 [uwsgi-cron] command "./manage.py prune --skip-checks" running with pid 14 exited after 3 second(s)
 ```
 
-On PostgreSQL the summary line ends after `django_admin_log`. uWSGI does not log the
-exit status: a run that fails prints a Python traceback in place of the summary
-line. A summary that ends with "reached the 900 s time limit" means the run left
-work for the next one.
+On SQLite, the run ends with a checkpoint, which moves the `-wal` file's frames into
+`hc.sqlite`, so the file shrinks by the pages the run freed; "checkpointed N of M"
+with N below M means another connection still needed some frames, and a later
+checkpoint moves them. On PostgreSQL the summary line ends after `django_admin_log`.
+
+uWSGI does not log the exit status: a run that fails prints a Python traceback in
+place of the summary line. A summary that ends with "reached the 900 s time limit"
+means the run left work for the next one.
 
 To run it now, by hand:
 
@@ -274,8 +338,8 @@ Keep the backups off the Docker host, and try a restore once.
 
 ### SQLite
 
-Back up while the container runs: `VACUUM INTO` writes a consistent copy, and only
-reads the live file.
+Back up while the container runs: `VACUUM INTO` writes a consistent copy, the
+commits still in `hc.sqlite-wal` included, and only reads the live database.
 
 ```sh
 $ docker compose exec web python -c "import sqlite3; sqlite3.connect('/data/hc.sqlite').execute(\"VACUUM INTO '/tmp/hc-backup.sqlite'\")"
@@ -284,25 +348,34 @@ $ docker compose cp web:/tmp/hc-backup.sqlite ./hc-backup.sqlite
 
 `VACUUM INTO` refuses an existing target: for a second backup from the same
 container, remove `/tmp/hc-backup.sqlite` first. The copy keeps the database's
-auto-vacuum mode.
+auto-vacuum mode, and is a single file in SQLite's rollback-journal mode; the first
+connection after a restore switches it back to WAL mode. Do not back up by copying
+`hc.sqlite` while the container runs (see [SQLite and the /data Volume](#sqlite)).
 
-To restore, stop `web`, write the backup into the volume as the `hc` user, and start
-`web` again:
+To restore, stop `web`, remove the `-wal` and `-shm` files, write the backup into
+the volume as the `hc` user, and start `web` again:
 
     $ docker compose stop web
-    $ docker compose run --rm --no-deps -T web sh -c 'cat > /data/hc.sqlite.restore && mv /data/hc.sqlite.restore /data/hc.sqlite' < hc-backup.sqlite
+    $ docker compose run --rm --no-deps -T web sh -c 'rm -f /data/hc.sqlite-wal /data/hc.sqlite-shm /data/hc.sqlite-journal && cat > /data/hc.sqlite.restore && mv /data/hc.sqlite.restore /data/hc.sqlite' < hc-backup.sqlite
     $ docker compose start web
 
-**Important:** `docker compose cp ./hc-backup.sqlite web:/data/hc.sqlite` alone
-leaves the file owned by your host user. The container then starts, reports healthy
-and shows the restored data, but cannot write the file: every ping fails with 500
-and the log shows "attempt to write a readonly database". After a `docker compose cp`,
-give the file to `hc` before you start `web`:
+**Important:** the `rm -f` is part of the restore. A clean stop removes the `-wal`
+and `-shm` files, but a container that was killed leaves them, and the next start
+applies that old `-wal` file to the restored `hc.sqlite`. The result is a corrupt
+database that mixes the two, and nothing reports it: the container stays healthy and
+takes pings, while `PRAGMA integrity_check` lists errors.
 
-    $ docker compose run --rm --no-deps --user root web chown hc:hc /data/hc.sqlite
+**Important:** `docker compose cp ./hc-backup.sqlite web:/data/hc.sqlite` alone
+leaves the `-wal` and `-shm` files in place, and the file owned by your host user. The
+container then starts, reports healthy and shows the restored data, but cannot write
+the file: every ping fails with 500 and the log shows "attempt to write a readonly
+database". After a `docker compose cp`, remove the two files and give the database
+to `hc` before you start `web`:
+
+    $ docker compose run --rm --no-deps --user root web sh -c 'rm -f /data/hc.sqlite-wal /data/hc.sqlite-shm /data/hc.sqlite-journal && chown hc:hc /data/hc.sqlite'
 
 Before `docker compose start web`, `docker compose run --rm --no-deps web ls -ln /data`
-should show `100` and `101` as the file's owner and group.
+should show `hc.sqlite` alone, with `100` and `101` as its owner and group.
 
 ### PostgreSQL
 
@@ -384,57 +457,204 @@ services:
 echo "SELECT format('ALTER DATABASE %I REFRESH COLLATION VERSION', datname) FROM pg_database WHERE datallowconn \gexec" | docker compose -f docker-compose.yml -f docker-compose.postgres.yml exec -T db psql -U postgres
 ```
 
-## Reverse Proxy, TLS Termination, and CSRF Protection {: #tls-termination }
+## Reverse Proxy and TLS {: #tls-termination }
 
-If you plan to expose your Healthchecks instance to the public internet, make sure you
-put a TLS-terminating reverse proxy or a load balancer in front of it.
+The container serves plain HTTP on `127.0.0.1:8000`. Expose Healthchecks to the
+internet only through a reverse proxy that terminates TLS and that:
 
-**Important:** configure the reverse proxy to replace the `X-Forwarded-For` request
-header with the client's address. Healthchecks trusts it to determine the client's
-IP address, and takes the first address in it, so appending to a value the client
-sent is not enough. In NGINX:
+* passes the `Host` header unchanged: Healthchecks answers 400 to a host that is not
+  in [ALLOWED_HOSTS](../self_hosted_configuration/#ALLOWED_HOSTS);
+* sets `X-Forwarded-Proto` to the scheme the client used, replacing any value the
+  client sent: Healthchecks trusts it to tell an HTTPS request (see
+  [SECURE_PROXY_SSL_HEADER](../self_hosted_configuration/#SECURE_PROXY_SSL_HEADER)),
+  for the scheme it records with each ping, for HSTS, and for Django's CSRF checks;
+* sets or appends to `X-Forwarded-For` the client's address: Healthchecks takes the
+  client's address from it, as [TRUSTED_PROXY_HOPS](#trusted-proxy-hops) describes.
+
+Caddy does all three by default.
+
+### Caddy {: #caddy }
+
+On Debian 13, install Caddy from Debian's own repository. The package is Caddy 2.6.2
+(`2.6.2-12+deb13u1`); it runs Caddy under systemd as the `caddy` user, and keeps the
+certificates in that user's home, `/var/lib/caddy`:
+
+    $ sudo apt install caddy
+
+Replace the package's `/etc/caddy/Caddyfile`, which serves a placeholder page on port
+80, with one site block that names your `SITE_ROOT` host and forwards to the
+container:
 
 ```text
+hc.example.org {
+	reverse_proxy 127.0.0.1:8000
+}
+```
+
+Check the file, and reload Caddy:
+
+    $ sudo caddy validate --config /etc/caddy/Caddyfile
+    $ sudo systemctl reload caddy
+
+With this, Caddy:
+
+* listens on TCP ports 80 and 443 on every IPv4 and IPv6 address of the host, and on
+  UDP port 443 for HTTP/3;
+* gets a public certificate for the name, which needs the name's `A` and `AAAA` DNS
+  records to point at the host, and ports 80 and 443 to be reachable: keep port 80
+  open beside 443, for the certificate authority's challenge and for the redirect;
+* answers every plain-HTTP request with a 308 redirect to HTTPS, ping URLs included
+  (see [Pings over Plain HTTP](#http-pings));
+* passes `Host` unchanged, and replaces `X-Forwarded-For`, `X-Forwarded-Proto` and
+  `X-Forwarded-Host` with what it saw: one address, the client's, IPv4 or IPv6, and
+  `https`. A client that forges these headers changes nothing Healthchecks records,
+  and [TRUSTED_PROXY_HOPS](#trusted-proxy-hops) stays at its default, `1`;
+* adds no `Strict-Transport-Security` header (see [HSTS](#hsts)).
+
+### Pings over Plain HTTP {: #http-pings }
+
+Behind Caddy, give your jobs `https://` ping URLs. With an `https://` `SITE_ROOT`,
+`PING_ENDPOINT`, and so every ping URL Healthchecks shows, is one already. An
+`http://` ping URL gets Caddy's 308 redirect, which `curl -fsS` takes for success: it
+exits with 0, prints nothing, and the ping is not recorded, `--retry` or not. With
+`-L`, curl follows the redirect, keeps the method and the body, and the ping is
+recorded.
+
+Healthchecks itself never redirects to HTTPS: `SECURE_SSL_REDIRECT` stays off, so
+pings and the image's health check work over plain HTTP wherever the proxy lets them
+through. The redirect to HTTPS belongs at the proxy, and is for the console: if you
+have jobs that ping over plain HTTP and that you cannot change, keep `/ping/` out of
+it. In Caddy, add this block to the Caddyfile, which forwards `/ping/` over plain
+HTTP and redirects every other path:
+
+```text
+http://hc.example.org {
+	handle /ping/* {
+		reverse_proxy 127.0.0.1:8000
+	}
+	handle {
+		redir https://{host}{uri} 308
+	}
+}
+```
+
+Such pings are recorded with the scheme `http`; Caddy still replaces a forged
+`X-Forwarded-Proto: https`. With a path in `SITE_ROOT`, the ping path is
+`/<path>/ping/*`.
+
+### TRUSTED_PROXY_HOPS {: #trusted-proxy-hops }
+
+Healthchecks records each ping's client address, and limits login attempts per
+client address (see [Login Lockout](../self_hosted/#login-lockout)). It reads the
+address from `X-Forwarded-For`, counting entries from the right: with
+[TRUSTED_PROXY_HOPS](../self_hosted_configuration/#TRUSTED_PROXY_HOPS) set to N, it
+takes the N-th entry from the right, the one the outermost of your N proxies wrote.
+A client can put anything in the header, but only to the left of what your proxies
+add, so a proxy may append to it as well as replace it.
+
+* `1`, the default: one proxy in front of the container, such as Caddy or NGINX.
+* `2`: two proxies in a chain that each append to the header, such as a CDN or a
+  load balancer in front of your proxy. Caddy replaces the header, and so does not
+  append, unless the outer proxy's addresses are in its `trusted_proxies` option.
+* `0`: no proxy. Healthchecks ignores the header and records the address of the
+  connection.
+
+A request whose header has fewer than N entries did not come through every proxy, and
+Healthchecks records the address of the connection. Whatever reaches port 8000
+without passing the proxy chooses its own address: with the compose file's
+`127.0.0.1` binding, that is any process on the Docker host.
+
+### NGINX {: #nginx }
+
+NGINX needs the three headers set in the `location` that forwards to the container:
+
+```text
+proxy_pass http://127.0.0.1:8000;
+proxy_set_header Host $host;
 proxy_set_header X-Forwarded-For $remote_addr;
-```
-
-(not `$proxy_add_x_forwarded_for`, which appends). In HAProxy:
-
-```text
-http-request set-header X-Forwarded-For %[src]
-```
-
-Otherwise a client can choose the IP address Healthchecks records for its pings, and
-the address its login attempts count against: the per-IP limit of a new browser,
-20 attempts per hour on the password and the login link forms together (see
-[Login Lockout](../self_hosted/#login-lockout)). A proxy that sets no
-`X-Forwarded-For` at all makes every client share the proxy's address, and so one
-limit.
-
-**Important:** This Dockerfile uses uWSGI, which relies on the [X-Forwarded-Proto](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Forwarded-Proto)
-header to determine if a request is secure or not. Without this information you
-may run into HTTP 403 "CSRF verification failed." errors when using your Healthchecks
-instance. See [this issue comment](https://github.com/healthchecks/healthchecks/discussions/851#discussioncomment-6293396)
-for more information.
-
-Make sure your TLS-terminating reverse proxy:
-
-* Discards the `X-Forwarded-Proto` header sent by the end user.
-* Sets the `X-Forwarded-Proto` header value to match the protocol of the original request
-  ("http" or "https").
-
-For example, in NGINX you can use the `$scheme` variable like so:
-
-```text
 proxy_set_header X-Forwarded-Proto $scheme;
 ```
 
-If you are using haproxy, you can do the same like so:
+`$proxy_add_x_forwarded_for`, which appends, works with `TRUSTED_PROXY_HOPS=1` too.
+On port 80, forward `location /ping/` the same way, and answer every other path with
+`return 308 https://$host$request_uri;`.
+
+In HAProxy:
 
 ```text
+http-request set-header X-Forwarded-For %[src]
 http-request set-header X-Forwarded-Proto https if { ssl_fc }
 http-request set-header X-Forwarded-Proto http unless { ssl_fc }
 ```
+
+### HSTS and the Content Security Policy {: #hsts }
+
+HSTS, the `Strict-Transport-Security` response header, makes a browser that has seen
+it use only HTTPS for the host, for as long as its `max-age` says, even if you go back
+to plain HTTP. Neither Caddy nor Healthchecks sends it by default. Once HTTPS works,
+set [SECURE_HSTS_SECONDS](../self_hosted_configuration/#SECURE_HSTS_SECONDS): small
+first, such as `3600`, then `31536000` (a year). Healthchecks then sends the header
+on every response to an HTTPS request. It changes nothing for your jobs' pings: curl
+keeps no HSTS list unless it runs with `--hsts`, and a client that keeps one only
+moves its pings to HTTPS.
+
+Every response carries an enforced `Content-Security-Policy`: scripts, styles and
+images come only from the site itself, the console connects only to itself and to
+`PING_ENDPOINT`'s origin (the details page's "Ping Now!" button posts there), and no
+other site may frame it. The proxy needs to add none. If you customise a template, an
+inline `<script>` or `<style>` element needs `{% csp_nonce_attr %}` in its tag, and a
+`style` attribute or an inline event handler such as `onclick` has to move to a
+static file: the browser blocks them otherwise.
+
+## Example: Debian 13 on a VPS {: #debian-vps }
+
+One host, such as a Linode node with Debian 13, runs the image on SQLite under Docker
+Compose; Caddy, from Debian's package, terminates TLS on port 443 over IPv4 and IPv6
+and forwards to the container on `127.0.0.1:8000`; email goes out through Amazon SES.
+The image under this compose file, behind Caddy 2.6.2 from Debian 13's package with
+the Caddyfile of [Caddy](#caddy), is tested. The steps on the host that are not are
+marked *(not tested here)*: follow their own documentation where it differs.
+
+* **DNS** *(not tested here)*: point the `A` and `AAAA` records of the name, here
+  `hc.example.org`, at the host's IPv4 and IPv6 addresses. Caddy needs them for the
+  certificate.
+* **Firewall** *(not tested here)*: allow inbound TCP 80 and 443, and UDP 443 for
+  HTTP/3, over IPv4 and IPv6, besides SSH. Port 8000 needs no rule: the compose file
+  publishes it on `127.0.0.1` only.
+* **Docker** *(not tested here)*: install Docker Engine and its Compose plugin from
+  Docker's own apt repository, as
+  [Docker's guide for Debian](https://docs.docker.com/engine/install/debian/)
+  describes.
+* **Healthchecks**: in a directory such as `/srv/healthchecks`, put
+  `docker-compose.yml` and `.env.example` from the repository's `docker/` directory,
+  copy `.env.example` to `.env`, and set in it:
+
+        HC_IMAGE=ghcr.io/zhaow-de/healthchecks:vX.Y.Z
+        SECRET_KEY=<the output of: python3 -c 'import secrets; print(secrets.token_urlsafe(50))'>
+        SITE_ROOT=https://hc.example.org
+
+    Delete the `ALLOWED_HOSTS` and `PING_ENDPOINT` lines, so that both follow
+    `SITE_ROOT`, and set the email settings of
+    [Example: Amazon SES](../self_hosted/#ses). `TRUSTED_PROXY_HOPS=1` and the default
+    `SECURE_PROXY_SSL_HEADER` fit Caddy. Start the container, which waits until it is
+    healthy, and create the superuser:
+
+        $ docker compose up -d --wait
+        $ docker compose exec web ./manage.py createsuperuser
+
+* **Caddy**: install it, put the site block of [Caddy](#caddy) with your name in
+  `/etc/caddy/Caddyfile`, check it, and reload (*systemd's reload not tested here*):
+
+        $ sudo apt install caddy
+        $ sudo caddy validate --config /etc/caddy/Caddyfile
+        $ sudo systemctl reload caddy
+
+* **Check** *(the public certificate not tested here)*: open
+  `https://hc.example.org`, log in, and ping "My First Check" with the URL its
+  details page shows:
+
+        $ curl -fsS https://hc.example.org/ping/<uuid>
+        OK
 
 ## Making Healthchecks Trust Your Self-signed TLS Certificate
 
