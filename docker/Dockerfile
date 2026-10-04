@@ -50,6 +50,8 @@ ENV DB_NAME=/data/hc.sqlite
 
 USER hc
 
+# hc/settings.py defaults DEBUG to True for runserver
+ENV DEBUG=False
 ENV USE_GZIP_MIDDLEWARE=True
 HEALTHCHECK --start-period=20s --start-interval=5s --interval=60s --retries=1 CMD ./fetchstatus.py
 CMD [ "uwsgi", "/opt/healthchecks/docker/uwsgi.ini"]

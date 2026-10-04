@@ -180,6 +180,9 @@ LOGGING = {
         },
         # Without a handler, its 4xx and 5xx lines would reach logging.lastResort
         "django.server": {"handlers": ["null"], "propagate": False},
+        # A request with a Host outside ALLOWED_HOSTS still gets 400; scanners send them,
+        # and each would otherwise log a traceback and email ADMINS
+        "django.security.DisallowedHost": {"handlers": ["null"], "propagate": False},
         "hc": {"level": "INFO", "handlers": ["console"], "propagate": False},
     },
 }
@@ -330,6 +333,8 @@ if (BASE_DIR / "hc/local_settings.py").exists():
 if sys.argv[1:2] == ["test"] or "pytest" in sys.modules:
     # For speed:
     PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+    # The test runner sets DEBUG to False, so hc.api.E004 would refuse a weak key
+    SECRET_KEY = "test-only-secret-key-0123456789abcdefghijklmnopqrstuvwxyz"
     # Send emails synchronously
     BLOCKING_EMAILS = True
     # Keep log records out of the test output, assertLogs captures them anyway;

@@ -68,15 +68,15 @@ class LoggingConfigTestCase(BaseTestCase):
 
     @override_settings(ADMINS=["admin@example.org"])
     def test_django_errors_reach_admins_unless_debug(self) -> None:
-        logger = logging.getLogger("django.security.DisallowedHost")
+        logger = logging.getLogger("django.security.SuspiciousOperation")
         with override_settings(DEBUG=True):
-            logger.error("Invalid HTTP_HOST header")
+            logger.error("Suspicious operation")
         self.assertEqual(len(mail.outbox), 0)
 
-        logger.warning("Forbidden (CSRF cookie not set.)")
+        logger.warning("Suspicious operation")
         self.assertEqual(len(mail.outbox), 0)
 
-        logger.error("Invalid HTTP_HOST header")
+        logger.error("Suspicious operation")
         self.assertEqual([m.to for m in mail.outbox], [["admin@example.org"]])
 
     def test_django_server_is_silent(self) -> None:

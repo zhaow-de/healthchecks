@@ -5,6 +5,7 @@ from urllib.parse import urlsplit
 from django.apps import AppConfig
 from django.conf import settings
 from django.core import checks
+from django.core.checks.security.base import check_secret_key
 from django.db.backends.base.base import BaseDatabaseWrapper
 from django.db.backends.signals import connection_created
 from django.http.request import split_domain_port, validate_host
@@ -89,3 +90,27 @@ def settings_check(
         )
 
     return items
+
+
+@checks.register(checks.Tags.security)  # E004
+def secret_key_check(
+    app_configs: Sequence[AppConfig] | None,
+    databases: Sequence[str] | None,
+    **kwargs: dict[str, Any],
+) -> list[checks.CheckMessage]:
+    # Django's own check of this rule is a warning that only "check --deploy" runs
+    if settings.DEBUG:
+        return []
+
+    return [
+        checks.Error(
+            warning.msg,
+            hint=(
+                "This is an error when DEBUG is False. Set SECRET_KEY (or SECRET_KEY_FILE) "
+                "to a random value, for example the output of "
+                "python3 -c 'import secrets; print(secrets.token_urlsafe(50))'"
+            ),
+            id="hc.api.E004",
+        )
+        for warning in check_secret_key(app_configs)
+    ]

@@ -1,6 +1,7 @@
 from datetime import timedelta as td
 from uuid import UUID, uuid4
 
+from django.core import mail
 from django.test import Client
 from django.test.utils import override_settings
 from django.utils.timezone import now
@@ -86,6 +87,15 @@ class PingTestCase(BaseTestCase):
         r = self.client.get("/ping/07c2f548-9850-4b27-af5d-6c9dc157ec02/")
         self.assertEqual(r.status_code, 404)
         self.assertEqual(r.text, "not found")
+
+    @override_settings(ADMINS=["admin@example.org"])
+    def test_it_refuses_foreign_host_without_emailing_admins(self) -> None:
+        r = self.client.get(self.url, HTTP_HOST="foreign.example.org")
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(mail.outbox, [])
+
+        self.check.refresh_from_db()
+        self.assertEqual(self.check.n_pings, 0)
 
     def test_it_handles_120_char_ua(self) -> None:
         ua = (
