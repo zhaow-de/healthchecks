@@ -1,46 +1,23 @@
 from __future__ import annotations
 
 import signal
-from collections.abc import Iterator
-from contextlib import contextmanager
 from datetime import UTC, date, datetime
 from datetime import timedelta as td
 from io import StringIO
 from types import SimpleNamespace
-from typing import Any
 from unittest.mock import Mock, call, patch
 
 import time_machine
 from django.core import mail
 from django.core.management import call_command
-from django.db.models import QuerySet
 from django.utils.timezone import now
 
 from hc.api.management.commands.sendreports import Command
 from hc.api.models import Check, Flip
-from hc.test import BaseTestCase
+from hc.test import BaseTestCase, updated_concurrently
 
 CURRENT_TIME = datetime(2020, 1, 13, 2, tzinfo=UTC)
 MOCK_SLEEP = Mock()
-
-
-@contextmanager
-def updated_concurrently(**fields: Any) -> Iterator[None]:
-    """Make QuerySet.first() return its row, then change that row in the database.
-
-    This is what another sendreports process does when it handles the same
-    profile between our SELECT and our UPDATE.
-    """
-    first = QuerySet.first
-
-    def first_then_update(qs: QuerySet[Any]) -> Any:
-        obj = first(qs)
-        if obj is not None:
-            qs.model._default_manager.filter(pk=obj.pk).update(**fields)
-        return obj
-
-    with patch.object(QuerySet, "first", first_then_update):
-        yield
 
 
 @time_machine.travel(CURRENT_TIME)

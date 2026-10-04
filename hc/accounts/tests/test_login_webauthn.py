@@ -89,7 +89,7 @@ class LoginWebAuthnTestCase(BaseTestCase):
         self.assertEqual(payload["u"], self.alice.id)
 
         self.assertNotIn("state", self.client.session)
-        self.assertNotIn("2fa_user_id", self.client.session)
+        self.assertNotIn("2fa_user", self.client.session)
 
     @patch("hc.accounts.views.GetHelper.verify")
     def test_it_redirects_after_login(self, mock_verify: Mock) -> None:

@@ -1,11 +1,15 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from collections.abc import Iterator
+from contextlib import contextmanager
+from typing import TYPE_CHECKING, Any
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.core import mail
 from django.core.mail import EmailMultiAlternatives
 from django.core.signing import TimestampSigner
+from django.db.models import QuerySet
 from django.test import Client, TestCase
 
 from hc.accounts.models import Profile, Project
@@ -18,7 +22,26 @@ if TYPE_CHECKING:
 else:
     from django.http import HttpResponse as TestHttpResponse
 
-__all__ = ["BaseTestCase", "TestHttpResponse"]
+__all__ = ["BaseTestCase", "TestHttpResponse", "updated_concurrently"]
+
+
+@contextmanager
+def updated_concurrently(**fields: Any) -> Iterator[None]:
+    """Make QuerySet.first() return its row, then change that row in the database.
+
+    This is what a concurrent process does when it claims the same row
+    between our SELECT and our UPDATE.
+    """
+    first = QuerySet.first
+
+    def first_then_update(qs: QuerySet[Any]) -> Any:
+        obj = first(qs)
+        if obj is not None:
+            qs.model._default_manager.filter(pk=obj.pk).update(**fields)
+        return obj
+
+    with patch.object(QuerySet, "first", first_then_update):
+        yield
 
 
 class BaseTestCase(TestCase):

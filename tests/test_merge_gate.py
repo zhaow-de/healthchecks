@@ -111,6 +111,22 @@ def _git(cwd: pathlib.Path, *args: str) -> str:
 CLOSED = "Refine-Round-Closed: 2026-09-23T00:00:00Z"
 
 
+def _feat_repo(root: pathlib.Path, *, notes: bool = False) -> None:
+    """A new repo whose develop, also origin/develop, holds code.py (and notes.txt "a", with `notes`), with branch feat
+    checked out one commit above it, "feat: code"."""
+    root.mkdir()
+    _git(root, "init", "-q", "-b", "develop")
+    (root / "code.py").write_text("x = 1\n")
+    if notes:
+        (root / "notes.txt").write_text("a\n")
+    _git(root, "add", "-A")
+    _git(root, "commit", "-q", "-m", "base")
+    _git(root, "update-ref", "refs/remotes/origin/develop", "HEAD")
+    _git(root, "checkout", "-q", "-b", "feat")
+    (root / "code.py").write_text("x = 2\n")
+    _git(root, "commit", "-q", "-am", "feat: code")
+
+
 def _rebased_repo(
     root: pathlib.Path,
     *,
@@ -126,16 +142,7 @@ def _rebased_repo(
     """A branch of two patches, the second a line in notes.txt, rebased onto — or, `merge_instead`, merged with — a base
     that moved in a file of its own, or with `collide` in notes.txt at the same place, resolved by hand; returns (the
     read's tip, the head). Each other flag varies the head."""
-    root.mkdir()
-    _git(root, "init", "-q", "-b", "develop")
-    (root / "code.py").write_text("x = 1\n")
-    (root / "notes.txt").write_text("a\n")
-    _git(root, "add", "-A")
-    _git(root, "commit", "-q", "-m", "base")
-    _git(root, "update-ref", "refs/remotes/origin/develop", "HEAD")
-    _git(root, "checkout", "-q", "-b", "feat")
-    (root / "code.py").write_text("x = 2\n")
-    _git(root, "commit", "-q", "-am", "feat: code")
+    _feat_repo(root, notes=True)
     (root / "notes.txt").write_text("a\nb\n")
     _git(root, "commit", "-q", "-am", "docs: note b")
     read = _git(root, "rev-parse", "HEAD")
@@ -186,15 +193,7 @@ def _unmoved_repo(root: pathlib.Path, extras: str, *, merge_above: bool = False)
     """The read on a base that has not moved, with `extras` above it in order (`e` a refine closing commit, `x` an
     empty commit that closes nothing); `merge_above` tops the head with a merge, which `git log --no-merges` drops
     from the message list, so only a tree check can refuse the file it adds."""
-    root.mkdir()
-    _git(root, "init", "-q", "-b", "develop")
-    (root / "code.py").write_text("x = 1\n")
-    _git(root, "add", "-A")
-    _git(root, "commit", "-q", "-m", "base")
-    _git(root, "update-ref", "refs/remotes/origin/develop", "HEAD")
-    _git(root, "checkout", "-q", "-b", "feat")
-    (root / "code.py").write_text("x = 2\n")
-    _git(root, "commit", "-q", "-am", "feat: code")
+    _feat_repo(root)
     read = _git(root, "rev-parse", "HEAD")
     for kind in extras:
         if kind == "e":
@@ -304,15 +303,7 @@ def test_the_arm_refuses_a_reworded_commit_and_names_what_it_could_not_compare(t
 
 def _amended_repo(root: pathlib.Path, kind: str) -> tuple[str, str]:
     """A branch of two patches on a base that did not move, its tip re-created as `kind` says; returns (the read's tip, the head)."""
-    root.mkdir()
-    _git(root, "init", "-q", "-b", "develop")
-    (root / "code.py").write_text("x = 1\n")
-    _git(root, "add", "-A")
-    _git(root, "commit", "-q", "-m", "base")
-    _git(root, "update-ref", "refs/remotes/origin/develop", "HEAD")
-    _git(root, "checkout", "-q", "-b", "feat")
-    (root / "code.py").write_text("x = 2\n")
-    _git(root, "commit", "-q", "-am", "feat: code")
+    _feat_repo(root)
     (root / "note.txt").write_text("n\n")
     _git(root, "add", "-A")
     _git(root, "commit", "-q", "-m", "feat: note\n\nProbe: SURVIVED")

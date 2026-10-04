@@ -267,7 +267,7 @@ class LoginTestCase(BaseTestCase):
         # It should not log the user in yet
         self.assertNotIn("_auth_user_id", self.client.session)
 
-        # Instead, it should set 2fa_user_id in the session
+        # Instead, it should set 2fa_user in the session
         user_id, _email, _valid_until = self.client.session["2fa_user"]
         self.assertEqual(user_id, self.alice.id)
 
@@ -294,7 +294,7 @@ class LoginTestCase(BaseTestCase):
         # It should not log the user in yet
         self.assertNotIn("_auth_user_id", self.client.session)
 
-        # Instead, it should set 2fa_user_id in the session
+        # Instead, it should set 2fa_user in the session
         user_id, _email, _valid_until = self.client.session["2fa_user"]
         self.assertEqual(user_id, self.alice.id)
 

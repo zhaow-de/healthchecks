@@ -1,47 +1,24 @@
 from __future__ import annotations
 
 import signal
-from collections.abc import Iterator
 from concurrent.futures import Future, ThreadPoolExecutor
-from contextlib import contextmanager
 from datetime import UTC, datetime
 from datetime import timedelta as td
 from io import StringIO
 from threading import BoundedSemaphore, Event
 from types import SimpleNamespace
-from typing import Any
 from unittest.mock import Mock, call, patch
 
 import time_machine
 from django.core.management import call_command
-from django.db.models import QuerySet
 from django.utils.timezone import now
 
 from hc.api.management.commands.sendalerts import Command, notify
 from hc.api.models import Channel, Check, Flip
 from hc.api.transports import TransportError
-from hc.test import BaseTestCase
+from hc.test import BaseTestCase, updated_concurrently
 
 CURRENT_TIME = datetime(2020, 1, 13, 2, tzinfo=UTC)
-
-
-@contextmanager
-def updated_concurrently(**fields: Any) -> Iterator[None]:
-    """Make QuerySet.first() return its row, then change that row in the database.
-
-    This is what another sendalerts process does when it claims the same row
-    between our SELECT and our UPDATE.
-    """
-    first = QuerySet.first
-
-    def first_then_update(qs: QuerySet[Any]) -> Any:
-        obj = first(qs)
-        if obj is not None:
-            qs.model._default_manager.filter(pk=obj.pk).update(**fields)
-        return obj
-
-    with patch.object(QuerySet, "first", first_then_update):
-        yield
 
 
 class SendAlertsTestCase(BaseTestCase):

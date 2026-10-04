@@ -345,6 +345,7 @@ class CheckModelTestCase(BaseTestCase):
         # Nov. 2019
         self.assertTrue(nov.no_data)
 
+    @time_machine.travel(CURRENT_TIME)
     def test_it_prunes(self) -> None:
         check = Check.objects.create(project=self.project, n_pings=101)
         Ping.objects.create(owner=check, created=CURRENT_TIME, n=101)
@@ -387,6 +388,7 @@ class CheckModelTestCase(BaseTestCase):
 
         self.assertEqual(Flip.objects.count(), 1)
 
+    @time_machine.travel(CURRENT_TIME)
     def test_it_does_not_prune_flips_newer_than_the_earliest_ping(self) -> None:
         check = Check.objects.create(project=self.project, n_pings=101)
         Ping.objects.create(owner=check, n=101)
@@ -394,7 +396,7 @@ class CheckModelTestCase(BaseTestCase):
 
         f = Flip(owner=check)
         # older than 93 days, but not older than the earliest ping
-        f.created = CURRENT_TIME - td(days=92)
+        f.created = CURRENT_TIME - td(days=94)
         f.old_status = "new"
         f.new_status = "down"
         f.save()
