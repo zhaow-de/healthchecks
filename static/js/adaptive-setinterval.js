@@ -1,3 +1,4 @@
+/* exported adaptiveSetInterval */
 function adaptiveSetInterval(fn, runNow) {
     // unconditionally run every minute
     setInterval(fn, 60000);

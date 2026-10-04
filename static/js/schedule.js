@@ -1,6 +1,7 @@
 // The schedule inputs shared by the timeout dialog (update-timeout-modal.js), the add-check
 // dialog (add-check-modal.js) and the cron cheatsheet (docs_cron.js). makeSlider needs
 // nouislider.min.js on the page.
+/* exported makeSlider, bindDuration, schedulePreview */
 
 // Seconds as {value, unit}, in the largest of days, hours and minutes that divides them.
 function secsToUnits(secs) {

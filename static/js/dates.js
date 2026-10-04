@@ -1,3 +1,4 @@
+/* exported DateFormatter */
 class DateFormatter {
     constructor(tz) {
         this.yearFmt = null;

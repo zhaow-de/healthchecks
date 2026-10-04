@@ -19,7 +19,11 @@ the next version number is computed from them. Every pull request runs the
 * Run the commit gate, `uv run pre-commit run -a`, before every commit. It
   formats and lints Python with [ruff](https://docs.astral.sh/ruff/), refusing
   the commit over a lint finding it cannot fix itself (the rule set is in
-  `ruff.toml`), and checks file hygiene and YAML.
+  `ruff.toml`), lints our JavaScript under `static/js` and the integrations'
+  `static/js` with [ESLint](https://eslint.org/) for undefined and unused names
+  (`eslint.config.js`, no formatter), and checks file hygiene and YAML. You do
+  not need Node: on its first run pre-commit downloads the Node version the hook
+  pins, together with ESLint, into its cache.
 * Prefer simplicity over cleverness.
 * If you are fixing a bug or adding a feature, add a test. Run
   `uv run pytest hc -n auto` (the Django suite) and `uv run pytest -n auto` (the
