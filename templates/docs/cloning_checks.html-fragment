@@ -7,8 +7,8 @@ over the following:</p>
 <ul>
 <li>Name, with " (copy)" appended; when that would make it longer than 100 characters,
   the first 90 characters of the name followed by "... (copy)"</li>
-<li>Slug, with "-copy" appended; the copy gets an empty slug when that would make it
-  longer than 100 characters</li>
+<li>Slug, with "-copy" appended; the copy gets an empty slug when the check has none,
+  or when "-copy" would make it longer than 100 characters</li>
 <li>Tags, description</li>
 <li>Schedule: its type, period or expression, time zone, and grace time</li>
 <li>Filtering rules: every setting of the "Filtering Rules" dialog</li>

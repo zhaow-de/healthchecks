@@ -12,7 +12,10 @@ hc.ready(function() {
             tip.hide();
         });
         button.addEventListener("click", function() {
-            navigator.clipboard.writeText(el.innerText).then(() => tip.show());
+            navigator.clipboard.writeText(el.innerText).then(
+                () => hc.flashTooltip(button, "Copied"),
+                () => hc.flashTooltip(button, "Copy failed"),
+            );
         });
     });
 });

@@ -9,8 +9,8 @@ over the following:
 
 * Name, with " (copy)" appended; when that would make it longer than 100 characters,
   the first 90 characters of the name followed by "... (copy)"
-* Slug, with "-copy" appended; the copy gets an empty slug when that would make it
-  longer than 100 characters
+* Slug, with "-copy" appended; the copy gets an empty slug when the check has none,
+  or when "-copy" would make it longer than 100 characters
 * Tags, description
 * Schedule: its type, period or expression, time zone, and grace time
 * Filtering rules: every setting of the "Filtering Rules" dialog

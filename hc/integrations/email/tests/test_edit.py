@@ -114,6 +114,31 @@ class EditEmailTestCase(BaseTestCase):
         email = mail.outbox[0]
         self.assertTrue(email.subject.startswith("Verify email address on"))
 
+    @override_settings(MAILERS={})
+    def test_it_saves_flags_of_unconfirmed_address_without_smtp(self) -> None:
+        self.channel.email_verified = False
+        self.channel.save()
+
+        form = {"value": "alerts@example.org", "down": "true", "up": "false"}
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.post(self.url, form)
+        self.assertRedirects(r, self.channels_url)
+
+        self.channel.refresh_from_db()
+        self.assertFalse(self.channel.email.notify_up)
+        self.assertFalse(self.channel.email_verified)
+
+    @override_settings(MAILERS={})
+    def test_it_refuses_changed_address_without_smtp(self) -> None:
+        form = {"value": "dan@example.org", "down": "true", "up": "true"}
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.post(self.url, form)
+        self.assertContains(r, "This server cannot send email, so it cannot confirm this address.")
+
+        self.channel.refresh_from_db()
+        self.assertEqual(self.channel.email.value, "alerts@example.org")
+        self.assertTrue(self.channel.email_verified)
+
     def test_it_checks_ownership(self) -> None:
         self.client.login(username="charlie@example.org", password="password")
         r = self.client.get(self.url)

@@ -28,10 +28,11 @@ def email_form(request: AuthenticatedHttpRequest, channel: Channel) -> HttpRespo
                 # If the user is adding *their own* address we skip the verification step
                 verified = not settings.EMAIL_USE_VERIFICATION or form.cleaned_data["value"] == request.user.email
 
-            # Without mail no confirmation link can be sent. The address is refused
-            # rather than confirmed unasked, so an address nobody confirmed never
-            # receives alerts, not even after SMTP is configured
-            if not verified and not settings.MAILERS:
+            # Without mail no confirmation link can be sent. A new or changed address
+            # is refused rather than confirmed unasked, so an address nobody confirmed
+            # never receives alerts, not even after SMTP is configured. An unchanged
+            # one keeps its state, and only its flags are saved
+            if changed and not verified and not settings.MAILERS:
                 form.add_error(
                     "value",
                     "This server cannot send email, so it cannot confirm this address. "
@@ -48,7 +49,7 @@ def email_form(request: AuthenticatedHttpRequest, channel: Channel) -> HttpRespo
                 if adding:
                     channel.assign_all_checks()
 
-                if not channel.email_verified:
+                if not channel.email_verified and settings.MAILERS:
                     channel.send_verify_link()
 
                 return redirect("hc-channels", channel.project.code)
