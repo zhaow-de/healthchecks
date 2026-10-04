@@ -11,6 +11,7 @@ from django.conf import settings
 from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.models import User
 from django.core.signing import BadSignature, TimestampSigner
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import QuerySet
 from django.db.models.functions import Lower
@@ -60,7 +61,9 @@ class Profile(models.Model):
     reports = models.CharField(max_length=10, default="monthly", choices=REPORT_CHOICES)
     nag_period = models.DurationField(default=NO_NAG, choices=NAG_PERIODS)
     next_nag_date = models.DateTimeField(null=True, blank=True)
-    ping_log_limit = models.IntegerField(default=100)
+    # At 0, Check.prune keeps no ping and then never prunes the check's flips
+    # and notifications. The cap bounds a check's pings (the limit + 99).
+    ping_log_limit = models.IntegerField(default=100, validators=[MinValueValidator(1), MaxValueValidator(1000)])
     token = models.CharField(max_length=128, blank=True)
 
     sort = models.CharField(max_length=20, default="created")

@@ -1,4 +1,5 @@
 from django.contrib.auth.hashers import make_password
+from django.contrib.sessions.models import Session
 from django.core import signing
 from django.core.signing import TimestampSigner
 
@@ -58,8 +59,20 @@ class CheckTokenTestCase(BaseTestCase):
         # Login with a bad token
         url = "/accounts/check_token/alice/invalid-token/"
         r = self.client.post(url, follow=True)
-        self.assertRedirects(r, "/accounts/login/")
+        self.assertRedirects(r, "/accounts/login/?bad-link=1")
         self.assertContains(r, "incorrect or expired")
+
+    def test_bad_token_creates_no_session(self) -> None:
+        self.client.cookies["auto-login"] = "1"
+        for i in range(3):
+            url = f"/accounts/check_token/nobody{i}/bad-token/"
+            r = self.client.get(url)
+            self.assertRedirects(r, "/accounts/login/?bad-link=1")
+
+            r = self.client.post(url)
+            self.assertRedirects(r, "/accounts/login/?bad-link=1")
+
+        self.assertFalse(Session.objects.exists())
 
     def test_it_handles_next_parameter(self) -> None:
         url = self.url + "?next=" + self.channels_url

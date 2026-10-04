@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 import time_machine
 from django.conf import settings
 from django.core import mail
+from django.core.exceptions import ValidationError
 from django.test.utils import override_settings
 from django.utils.timezone import now
 
@@ -325,6 +326,17 @@ class ProfileModelTestCase(BaseTestCase):
     def test_choose_next_report_date_handles_off(self) -> None:
         self.profile.reports = "off"
         self.assertIsNone(self.profile.choose_next_report_date())
+
+    def test_ping_log_limit_is_between_1_and_1000(self) -> None:
+        for limit in (1, 1000):
+            self.profile.ping_log_limit = limit
+            self.profile.full_clean()
+
+        for limit in (0, 1001):
+            self.profile.ping_log_limit = limit
+            with self.assertRaises(ValidationError) as cm:
+                self.profile.full_clean()
+            self.assertEqual(list(cm.exception.message_dict), ["ping_log_limit"])
 
     def test_projects_lists_own_projects_only(self) -> None:
         second = Project.objects.create(owner=self.alice, name="Second Project")

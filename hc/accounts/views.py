@@ -156,12 +156,11 @@ def login(request: HttpRequest) -> HttpResponse:
     if request.user.is_authenticated:
         return _redirect_after_login(request)
 
-    bad_link = request.session.pop("bad_link", None)
     ctx = {
         "page": "login",
         "form": form,
         "magic_form": magic_form,
-        "bad_link": bad_link,
+        "bad_link": "bad-link" in request.GET,
         "support_email": settings.SUPPORT_EMAIL,
         "account_closed": "account-closed" in request.GET,
         "use_magic_form": bool(settings.MAILERS),
@@ -177,6 +176,12 @@ def logout(request: HttpRequest) -> HttpResponse:
 
 def login_link_sent(request: HttpRequest) -> HttpResponse:
     return render(request, "accounts/login_link_sent.html")
+
+
+def _bad_link_redirect() -> HttpResponse:
+    # The flag rides in the URL: a session write here would add a session row
+    # for every anonymous request.
+    return redirect(reverse("hc-login", query={"bad-link": 1}))
 
 
 def check_token(request: HttpRequest, username: str, token: str, new_email: str | None = None) -> HttpResponse:
@@ -196,8 +201,7 @@ def check_token(request: HttpRequest, username: str, token: str, new_email: str 
     if user is not None and user.is_active:
         if new_email:
             if User.objects.filter(email=new_email).exists():
-                request.session["bad_link"] = True
-                return redirect("hc-login")
+                return _bad_link_redirect()
 
             user.email = new_email
             user.save()
@@ -206,8 +210,7 @@ def check_token(request: HttpRequest, username: str, token: str, new_email: str 
         user.profile.save(update_fields=["token"])
         return _check_2fa(request, user)
 
-    request.session["bad_link"] = True
-    return redirect("hc-login")
+    return _bad_link_redirect()
 
 
 @login_required

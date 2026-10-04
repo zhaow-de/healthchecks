@@ -1,0 +1,148 @@
+<h1>Running from Source</h1>
+<p>A checkout of the repository, run with uv, is how you develop Healthchecks, and how you run an instance on a host without Docker. For production, <a href="../self_hosted_docker/">Running with Docker</a> is simpler: the image starts, restarts and schedules every process by itself, while from source you set up each of them.</p>
+<h2 id="setting-up-for-development">Setting Up for Development</h2>
+<p>Healthchecks uses <a href="https://docs.astral.sh/uv/">uv</a> to manage the Python interpreter, the <a href="https://docs.python.org/3/tutorial/venv.html">virtual environment</a> and the dependencies.</p>
+<ul>
+<li>Install uv by following <a href="https://docs.astral.sh/uv/getting-started/installation/">its installation instructions</a>.</li>
+<li>
+<p>Check out project code. Feel free to use a different location:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>mkdir<span class="w"> </span>-p<span class="w"> </span>~/webapps
+$<span class="w"> </span><span class="nb">cd</span><span class="w"> </span>~/webapps
+$<span class="w"> </span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/zhaow-de/healthchecks.git
+$<span class="w"> </span><span class="nb">cd</span><span class="w"> </span>healthchecks
+</code></pre></div>
+
+</li>
+<li>
+<p>Install requirements (Django, ...):</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>uv<span class="w"> </span>sync
+</code></pre></div>
+
+<p>This creates a virtual environment in <code>.venv</code> and installs the exact package versions listed in <code>uv.lock</code>, the development tools included. If you do not have Python 3.14, uv downloads it.</p>
+</li>
+<li>
+<p>Create database tables and the superuser account (see <a href="../self_hosted/#superuser">Creating the Superuser</a>):</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>./manage.py<span class="w"> </span>migrate
+$<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>./manage.py<span class="w"> </span>createsuperuser
+</code></pre></div>
+
+<p>With the default configuration, Healthchecks stores data in a SQLite file <code>hc.sqlite</code> in the project directory (<code>~/webapps/healthchecks/</code>).</p>
+</li>
+<li>
+<p>Run tests:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>./manage.py<span class="w"> </span><span class="nb">test</span>
+</code></pre></div>
+
+</li>
+<li>
+<p>Run development server:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>./manage.py<span class="w"> </span>runserver
+</code></pre></div>
+
+</li>
+<li>
+<p>From another shell, run the <code>sendalerts</code> management command, responsible for sending out notifications:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>./manage.py<span class="w"> </span>sendalerts
+</code></pre></div>
+
+</li>
+</ul>
+<p>At this point, the site should now be running at <code>http://localhost:8000</code>.</p>
+<p><code>uv run</code> runs a command in the project's virtual environment. Alternatively, activate the virtual environment with <code>source .venv/bin/activate</code>, and then run <code>./manage.py</code> directly.</p>
+<p>Outside Docker, nothing reads a <code>.env</code> file: Healthchecks reads its settings from the environment of each process, and from <code>hc/local_settings.py</code>, which overrides the environment. Copy <code>hc/local_settings.py.example</code> to <code>hc/local_settings.py</code> for a starting point (see <a href="../self_hosted_configuration/">Configuration</a>).</p>
+<h2 id="production">Running in Production</h2>
+<p><code>manage.py runserver</code> is intended for development only. In production, an instance from source needs:</p>
+<ul>
+<li>the dependencies without the development tools, and uWSGI;</li>
+<li>its settings, <code>DEBUG=False</code> among them (see <a href="../self_hosted/#checklist">Before Going Live</a>), in the environment of every process below, or in <code>hc/local_settings.py</code>;</li>
+<li>the database migrations and the static files, after every checkout of a new version;</li>
+<li>the web application under uWSGI, behind a reverse proxy that terminates TLS;</li>
+<li><code>sendalerts</code> and <code>sendreports --loop</code>, always running;</li>
+<li><code>prune</code>, once a day.</li>
+</ul>
+<p>Install the dependencies, from the project's root directory:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>uv<span class="w"> </span>sync<span class="w"> </span>--locked<span class="w"> </span>--no-dev<span class="w"> </span>--extra<span class="w"> </span>uwsgi
+</code></pre></div>
+
+<p>For PostgreSQL, the host needs the libpq library, which the driver loads; <code>--extra psycopg-c</code> also compiles the driver's C implementation, as the Docker image does.</p>
+<p>Apply the migrations, and collect and compress the static files into <code>static-collected/</code>, with the production settings in the environment:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>--no-sync<span class="w"> </span>./manage.py<span class="w"> </span>migrate
+$<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>--no-sync<span class="w"> </span>./manage.py<span class="w"> </span>collectstatic<span class="w"> </span>--noinput
+$<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>--no-sync<span class="w"> </span>./manage.py<span class="w"> </span>compress
+</code></pre></div>
+
+<p><code>compress</code> builds the combined JS and CSS bundles the pages load. Healthchecks serves the files in <code>static-collected/</code> itself.</p>
+<p>Run the web application under uWSGI, from the project's root directory:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>--no-sync<span class="w"> </span>uwsgi<span class="w"> </span>--http<span class="w"> </span>:8000<span class="w"> </span>--module<span class="w"> </span>hc.wsgi<span class="w"> </span>--disable-logging
+</code></pre></div>
+
+<p><a href="https://github.com/zhaow-de/healthchecks/blob/main/docker/uwsgi.ini">docker/uwsgi.ini</a> is the configuration the image runs: worker count, time limits, buffer sizes, the migrations at start, the two daemons and the daily <code>prune</code>. A copy of it with <code>chdir</code> set to your project directory runs all of that from source too, under <code>uv run --no-sync uwsgi &lt;your copy&gt;</code>; its <code>./manage.py</code> commands run the first <code>python</code> on the <code>PATH</code>, which <code>uv run</code> makes the virtual environment's. With such a copy, skip the daemons and the schedule below.</p>
+<p>Put a reverse proxy in front of uWSGI that terminates TLS and sets <code>X-Forwarded-For</code> and <code>X-Forwarded-Proto</code> as <a href="../self_hosted_docker/#tls-termination">Reverse Proxy, TLS Termination, and CSRF Protection</a> describes. If submitting a form then fails with 403 "CSRF verification failed.", see <a href="../self_hosted_configuration/#SECURE_PROXY_SSL_HEADER">SECURE_PROXY_SSL_HEADER</a>.</p>
+<h3 id="daemons">Running sendalerts and sendreports</h3>
+<p><code>sendalerts</code> and <code>sendreports --loop</code> have to be always running: started on boot, and started again when they exit. With systemd, give each a service unit. For example, <code>/etc/systemd/system/hc-sendalerts.service</code>, with the checkout in <code>/home/hc/healthchecks</code> and the settings in <code>/home/hc/healthchecks.env</code> as <code>NAME=value</code> lines:</p>
+<div class="highlight"><pre><span></span><code><span class="k">[Unit]</span>
+<span class="na">Description</span><span class="o">=</span><span class="s">Healthchecks sendalerts</span>
+<span class="na">After</span><span class="o">=</span><span class="s">network.target</span>
+
+<span class="k">[Service]</span>
+<span class="na">User</span><span class="o">=</span><span class="s">hc</span>
+<span class="na">WorkingDirectory</span><span class="o">=</span><span class="s">/home/hc/healthchecks</span>
+<span class="na">EnvironmentFile</span><span class="o">=</span><span class="s">/home/hc/healthchecks.env</span>
+<span class="na">ExecStart</span><span class="o">=</span><span class="s">/home/hc/healthchecks/.venv/bin/python manage.py sendalerts --skip-checks</span>
+<span class="na">Restart</span><span class="o">=</span><span class="s">always</span>
+
+<span class="k">[Install]</span>
+<span class="na">WantedBy</span><span class="o">=</span><span class="s">multi-user.target</span>
+</code></pre></div>
+
+<p><code>hc-sendreports.service</code> is the same with <code>sendreports --loop --skip-checks</code>. Enable and start both:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>sudo<span class="w"> </span>systemctl<span class="w"> </span><span class="nb">enable</span><span class="w"> </span>--now<span class="w"> </span>hc-sendalerts<span class="w"> </span>hc-sendreports
+</code></pre></div>
+
+<h3 id="prune">Scheduling the Daily Cleanup</h3>
+<p><code>manage.py prune</code> deletes what each table keeps past its retention (see <a href="../self_hosted/#database-cleanup">Data Retention</a>), and nothing runs it by itself outside Docker. Schedule it once a day, with the same settings as the other processes.</p>
+<p>With a systemd timer, <code>/etc/systemd/system/hc-prune.service</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="k">[Unit]</span>
+<span class="na">Description</span><span class="o">=</span><span class="s">Healthchecks daily cleanup</span>
+
+<span class="k">[Service]</span>
+<span class="na">Type</span><span class="o">=</span><span class="s">oneshot</span>
+<span class="na">User</span><span class="o">=</span><span class="s">hc</span>
+<span class="na">WorkingDirectory</span><span class="o">=</span><span class="s">/home/hc/healthchecks</span>
+<span class="na">EnvironmentFile</span><span class="o">=</span><span class="s">/home/hc/healthchecks.env</span>
+<span class="na">ExecStart</span><span class="o">=</span><span class="s">/home/hc/healthchecks/.venv/bin/python manage.py prune --skip-checks</span>
+</code></pre></div>
+
+<p>and <code>/etc/systemd/system/hc-prune.timer</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="k">[Unit]</span>
+<span class="na">Description</span><span class="o">=</span><span class="s">Run the Healthchecks cleanup daily</span>
+
+<span class="k">[Timer]</span>
+<span class="na">OnCalendar</span><span class="o">=</span><span class="s">*-*-* 03:17:00 UTC</span>
+<span class="na">Persistent</span><span class="o">=</span><span class="s">true</span>
+
+<span class="k">[Install]</span>
+<span class="na">WantedBy</span><span class="o">=</span><span class="s">timers.target</span>
+</code></pre></div>
+
+<p>Enable the timer, and check when it runs next and how the last run went:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>sudo<span class="w"> </span>systemctl<span class="w"> </span><span class="nb">enable</span><span class="w"> </span>--now<span class="w"> </span>hc-prune.timer
+$<span class="w"> </span>systemctl<span class="w"> </span>list-timers<span class="w"> </span>hc-prune.timer
+$<span class="w"> </span>journalctl<span class="w"> </span>-u<span class="w"> </span>hc-prune.service
+</code></pre></div>
+
+<p><code>Persistent=true</code> makes up for a run missed while the host was down.</p>
+<p>With cron instead, add a line to the crontab of the user that owns the checkout, for example:</p>
+<div class="highlight"><pre><span></span><code>17 3 * * * cd /home/hc/healthchecks &amp;&amp; .venv/bin/python manage.py prune --skip-checks
+</code></pre></div>
+
+<p>cron gives the command a minimal environment and the host's time zone: keep the settings in <code>hc/local_settings.py</code>, or set them in the crontab, and mind that the times are not UTC unless the host's are.</p>
+<p>The run prints one summary line, and exits with status 1 and a traceback when it fails. On SQLite, <code>prune</code> frees space only in a database file with incremental auto-vacuum; <a href="../self_hosted/#database-cleanup">Data Retention</a> shows how to switch an older file.</p>
+<h2 id="upgrading">Upgrading</h2>
+<ul>
+<li>Take a backup of the database.</li>
+<li>Check out the new version, for example with <code>git pull</code>, or <code>git checkout vX.Y.Z</code> for a release.</li>
+<li>Install its dependencies: <code>uv sync --locked --no-dev --extra uwsgi</code>.</li>
+<li>Apply the migrations and rebuild the static files: <code>migrate</code>, <code>collectstatic --noinput</code> and <code>compress</code>, as above.</li>
+<li>Restart uWSGI, <code>sendalerts</code> and <code>sendreports</code>.</li>
+</ul>

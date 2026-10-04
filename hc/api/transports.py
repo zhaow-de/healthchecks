@@ -55,9 +55,8 @@ class Transport:
         if not flip.owner.pk:
             return None
 
-        # Sort by "created". Sorting by "id" can cause postgres to pick api_ping.id
-        # index (slow if the api_ping table is big)
-        q = flip.owner.ping_set.order_by("created")
+        # By "n", not "created" or "id": see Ping.Meta
+        q = flip.owner.ping_set.order_by("n")
         # Make sure we're not selecting pings that occurred after the flip
         q = q.filter(created__lte=flip.created)
 

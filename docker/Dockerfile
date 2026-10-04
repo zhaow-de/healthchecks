@@ -44,6 +44,9 @@ RUN \
     DEBUG=False SECRET_KEY=build-key ./manage.py compress
 
 RUN mkdir /data && chown hc /data
+# SQLite on the /data volume. With DB=postgres, set DB_NAME as well: left as
+# it is, this path names the PostgreSQL database.
+ENV DB_NAME=/data/hc.sqlite
 
 USER hc
 

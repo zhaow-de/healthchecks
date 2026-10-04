@@ -39,8 +39,12 @@ class LoginTestCase(BaseTestCase):
         return r, encode.call_count
 
     def drain_password_bucket(self) -> None:
-        for _ in range(20):
-            self.client.post("/accounts/login/", self.bad)
+        # From other addresses, so the client IP bucket stays full
+        for i in range(20):
+            self.client.post("/accounts/login/", self.bad, HTTP_X_FORWARDED_FOR=f"10.0.0.{i}")
+
+    def drain_ip_bucket(self) -> None:
+        TokenBucket.objects.update_or_create(value="auth-ip-127.0.0.1", defaults={"tokens": 0})
 
     def test_it_shows_form(self) -> None:
         r = self.client.get("/accounts/login/")
@@ -172,10 +176,65 @@ class LoginTestCase(BaseTestCase):
         # No email should have been sent
         self.assertEqual(len(mail.outbox), 0)
 
-    def test_it_pops_bad_link_from_session(self) -> None:
-        self.client.session["bad_link"] = True
-        self.client.get("/accounts/login/")
-        assert "bad_link" not in self.client.session
+    def test_it_shows_bad_link_notice(self) -> None:
+        r = self.client.get("/accounts/login/?bad-link=1")
+        self.assertContains(r, "incorrect or expired")
+
+        r = self.client.get("/accounts/login/")
+        self.assertNotContains(r, "incorrect or expired")
+
+    def test_exhausted_ip_adds_no_email_bucket(self) -> None:
+        self.drain_ip_bucket()
+
+        for i in range(3):
+            r = self.client.post("/accounts/login/", {"identity": f"user{i}@example.org"})
+            self.assertContains(r, "Too many attempts")
+
+        self.assertFalse(TokenBucket.objects.filter(value__startswith="em-").exists())
+
+    def test_exhausted_ip_adds_no_password_bucket(self) -> None:
+        self.drain_ip_bucket()
+
+        for i in range(3):
+            form = {**self.bad, "email": f"user{i}@example.org"}
+            r, hashes = self.post_counting_hashes(form)
+            self.assertContains(r, "Too many attempts")
+            self.assertEqual(hashes, 0)
+
+        self.assertFalse(TokenBucket.objects.filter(value__startswith="pw-").exists())
+
+    def test_password_attempts_share_the_client_ip_bucket(self) -> None:
+        # 20 link requests for other emails drain the IP bucket
+        for i in range(20):
+            r = self.client.post("/accounts/login/", {"identity": f"user{i}@example.org"})
+            self.assertRedirects(r, "/accounts/login_link_sent/")
+
+        r = self.client.post("/accounts/login/", self.good)
+        self.assertContains(r, "Too many attempts")
+
+    @override_settings(SECRET_KEY="test-secret")
+    def test_every_refusal_reads_alike(self) -> None:
+        errors: set[tuple[str, ...]] = set()
+
+        def post_both_forms(email: str) -> None:
+            r = self.client.post("/accounts/login/", {"identity": email})
+            errors.add(tuple(r.context["magic_form"].errors["identity"]))
+            r = self.client.post("/accounts/login/", {**self.good, "email": email})
+            errors.add(tuple(r.context["form"].non_field_errors()))
+
+        # The client IP bucket refuses, for an existing and an unknown email
+        self.drain_ip_bucket()
+        post_both_forms("alice@example.org")
+        post_both_forms("surprise@example.org")
+
+        # Alice's own buckets refuse; d60d... is the SHA-1 of
+        # alice@example.org followed by test-secret
+        TokenBucket.objects.all().delete()
+        TokenBucket.objects.create(value="em-d60db3b2343e713a4de3e92d4eb417e4f05f06ab", tokens=0)
+        TokenBucket.objects.create(value="pw-d60db3b2343e713a4de3e92d4eb417e4f05f06ab", tokens=0)
+        post_both_forms("alice@example.org")
+
+        self.assertEqual(errors, {("Too many attempts, please try later.",)})
 
     def test_it_ignores_case(self) -> None:
         form = {"identity": "ALICE@EXAMPLE.ORG"}
@@ -432,7 +491,7 @@ class LoginTestCase(BaseTestCase):
 
     def test_trusted_device_skips_the_client_ip_bucket(self) -> None:
         cookie = self.device_cookie()
-        TokenBucket.objects.create(value="auth-ip-127.0.0.1", tokens=0)
+        self.drain_ip_bucket()
 
         self.client.cookies[device.COOKIE_NAME] = cookie
         form = {"identity": "alice@example.org"}
@@ -440,10 +499,21 @@ class LoginTestCase(BaseTestCase):
         self.assertRedirects(r, "/accounts/login_link_sent/")
         self.assertEqual(len(mail.outbox), 1)
 
+    def test_trusted_device_skips_the_client_ip_bucket_on_password(self) -> None:
+        cookie = self.device_cookie()
+        self.drain_ip_bucket()
+
+        r = self.client.post("/accounts/login/", self.good)
+        self.assertContains(r, "Too many attempts")
+
+        self.client.cookies[device.COOKIE_NAME] = cookie
+        r = self.client.post("/accounts/login/", self.good)
+        self.assertRedirects(r, self.checks_url)
+
     def test_wrong_passwords_for_other_emails_do_not_lock_out(self) -> None:
         for i in range(200):
             form = {"action": "login", "email": f"user{i}@example.org", "password": "wrong"}
-            self.client.post("/accounts/login/", form)
+            self.client.post("/accounts/login/", form, HTTP_X_FORWARDED_FOR=f"10.0.{i // 256}.{i % 256}")
 
         r = self.client.post("/accounts/login/", self.good)
         self.assertRedirects(r, self.checks_url)

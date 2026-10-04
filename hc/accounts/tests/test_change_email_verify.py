@@ -2,6 +2,7 @@ from unittest.mock import patch
 
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
+from django.contrib.sessions.models import Session
 from django.core.signing import TimestampSigner
 
 from hc.test import BaseTestCase
@@ -71,8 +72,9 @@ class ChangeEmailVerifyTestCase(BaseTestCase):
         User.objects.create(email="alice+new@example.org")
 
         r = self.client.post(self._url(), follow=True)
-        self.assertRedirects(r, "/accounts/login/")
+        self.assertRedirects(r, "/accounts/login/?bad-link=1")
         self.assertContains(r, "incorrect or expired")
+        self.assertFalse(Session.objects.exists())
 
         # Alice's email should have *not* been updated
         self.alice.refresh_from_db()

@@ -1,31 +1,29 @@
+# SQLite in the hc-data volume: the image sets DB_NAME=/data/hc.sqlite.
+# For PostgreSQL, layer docker-compose.postgres.yml over this file:
+#   docker compose -f docker-compose.yml -f docker-compose.postgres.yml up -d
 volumes:
-  db-data: {}
+  hc-data: {}
 
 services:
-  db:
-    image: postgres:18
-    volumes:
-      - db-data:/var/lib/postgresql
-    environment:
-      - POSTGRES_DB=$DB_NAME
-      - POSTGRES_PASSWORD=$DB_PASSWORD
-    healthcheck:
-      # Over TCP: while initdb runs, the server listens on its Unix socket alone
-      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres"]
-      start_period: 60s
-      start_interval: 1s
-      interval: 60s
   web:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    # To use a pre-built image, remove the above "build" section
-    # and uncomment the following line (`latest` is the newest build of main):
-    # image: ghcr.io/zhaow-de/healthchecks:latest
+    # In production, pin a release in .env, as
+    # HC_IMAGE=ghcr.io/zhaow-de/healthchecks:v<version>; `latest` follows main.
+    # To build this checkout instead, replace `image:` with:
+    # build:
+    #   context: ..
+    #   dockerfile: docker/Dockerfile
+    image: ${HC_IMAGE:-ghcr.io/zhaow-de/healthchecks:latest}
     env_file:
       - .env
+    volumes:
+      - hc-data:/data
+    # Loopback only: a reverse proxy on this host terminates TLS and forwards here.
     ports:
-      - "8000:8000"
-    depends_on:
-      db:
-        condition: service_healthy
+      - "127.0.0.1:8000:8000"
+    restart: unless-stopped
+    # The json-file driver keeps every line unless capped.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

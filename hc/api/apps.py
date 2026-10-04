@@ -5,11 +5,31 @@ from urllib.parse import urlsplit
 from django.apps import AppConfig
 from django.conf import settings
 from django.core import checks
+from django.db.backends.base.base import BaseDatabaseWrapper
+from django.db.backends.signals import connection_created
 from django.http.request import split_domain_port, validate_host
+
+
+def set_incremental_auto_vacuum(sender: object, connection: BaseDatabaseWrapper, **kwargs: Any) -> None:
+    """Give a SQLite file with no pages yet auto_vacuum INCREMENTAL, so prune can free pages.
+
+    The mode takes effect only before the first table exists, and setting it on an
+    existing file writes the header, so any other file is only read here.
+    """
+    if connection.vendor != "sqlite":
+        return
+
+    with connection.cursor() as cursor:
+        cursor.execute("PRAGMA page_count")
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("PRAGMA auto_vacuum = INCREMENTAL")
 
 
 class ApiConfig(AppConfig):
     name = "hc.api"
+
+    def ready(self) -> None:
+        connection_created.connect(set_incremental_auto_vacuum, dispatch_uid="hc.api.auto_vacuum")
 
 
 @checks.register()  # W001, W002, W005, E002, E003

@@ -93,7 +93,6 @@ INSTALLED_APPS = (
     "compressor",
     "hc.api",
     "hc.front",
-    "hc.logs",
     "hc.integrations.email",
     "hc.integrations.group",
     "hc.integrations.prometheus",
@@ -151,7 +150,7 @@ LOGGING = {
     },
     "formatters": {
         "text": {"format": "%(asctime)s %(levelname)s %(name)s %(message)s"},
-        "json": {"()": "hc.logs.JsonFormatter"},
+        "json": {"()": "hc.lib.logs.JsonFormatter"},
     },
     "handlers": {
         "console": {
@@ -159,10 +158,6 @@ LOGGING = {
             "class": "logging.StreamHandler",
             "stream": "ext://sys.stdout",
             "formatter": "json" if LOG_FORMAT == "json" else "text",
-        },
-        "db": {
-            "level": "WARNING",
-            "class": "hc.logs.Handler",
         },
         # Django's default handler for ADMINS, which configuring the "django"
         # logger here would otherwise drop
@@ -180,12 +175,12 @@ LOGGING = {
         "django": {"level": "INFO", "handlers": ["console", "mail_admins"], "propagate": False},
         "django.request": {
             "level": "ERROR",
-            "handlers": ["console", "db", "mail_admins"],
+            "handlers": ["console", "mail_admins"],
             "propagate": False,
         },
         # Without a handler, its 4xx and 5xx lines would reach logging.lastResort
         "django.server": {"handlers": ["null"], "propagate": False},
-        "hc": {"level": "INFO", "handlers": ["console", "db"], "propagate": False},
+        "hc": {"level": "INFO", "handlers": ["console"], "propagate": False},
     },
 }
 
@@ -200,6 +195,7 @@ DATABASES: Mapping[str, Any] = {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": os.getenv("DB_NAME", BASE_DIR / "hc.sqlite"),
         "OPTIONS": {
+            # auto_vacuum is set in hc/api/apps.py: here it would write the header on every connection
             "init_command": "PRAGMA busy_timeout = 5000;",
             "transaction_mode": "IMMEDIATE",
         },

@@ -11,72 +11,85 @@ The building blocks are:
 * Django 6.1
 * SQLite (the default) or PostgreSQL
 
-## Setting Up for Development {: #setting-up-for-development }
+There are two ways to run an instance:
 
-You can set up a development environment on your local system to develop a new
-feature, write a new integration or test a bugfix. Healthchecks uses
-[uv](https://docs.astral.sh/uv/) to manage the Python interpreter,
-the [virtual environment](https://docs.python.org/3/tutorial/venv.html)
-and the dependencies.
+* [Running with Docker](../self_hosted_docker/) is the way to run it in production.
+  The published image, `ghcr.io/zhaow-de/healthchecks`, runs everything an instance
+  needs in one container, with its SQLite database on a volume, or with PostgreSQL 18
+  in a second container.
+* [Running from Source](../self_hosted_source/) runs a checkout of the repository
+  with uv. It is how you develop Healthchecks, and it runs an instance on a host
+  without Docker, where you start, supervise and schedule each process yourself.
 
-* Install uv by following
-  [its installation instructions](https://docs.astral.sh/uv/getting-started/installation/).
+Both read their settings from environment variables, listed in
+[Configuration](../self_hosted_configuration/). The rest of this page applies to both.
 
-* Check out project code. Feel free to use a different location:
+## What Runs {: #what-runs }
 
-        $ mkdir -p ~/webapps
-        $ cd ~/webapps
-        $ git clone https://github.com/zhaow-de/healthchecks.git
-        $ cd healthchecks
+An instance is made of:
 
-* Install requirements (Django, ...):
+* the web application: the dashboard, the API and the ping endpoints, served by
+  uWSGI (`runserver` in development);
+* `manage.py migrate`, before the web application starts: it applies the database
+  changes a new version brings;
+* `manage.py sendalerts`, always running: it marks late checks down and sends the
+  alerts (see [Sending Status Notifications](#sending-notifications));
+* `manage.py sendreports --loop`, always running: it sends the reports and reminders;
+* `manage.py prune`, once a day: it deletes what each table keeps past its retention
+  (see [Data Retention](#database-cleanup)).
 
-        $ uv sync
+In the Docker image, uWSGI runs all of them: `migrate` at every start, `sendalerts`
+and `sendreports` as daemons it starts again when they exit, and `prune` every day at
+03:17 UTC (see [What Runs in the Container](../self_hosted_docker/#processes)). From
+source, you run each of them yourself (see
+[Running in Production](../self_hosted_source/#production)).
 
-    This creates a virtual environment in `.venv` and installs the exact package
-    versions listed in `uv.lock`. If you do not have Python 3.14, uv downloads it.
+## Running Management Commands {: #management-commands }
 
-* Create database tables and the superuser account:
+With Docker, run a management command in the `web` container, from the directory
+that holds `docker-compose.yml`:
 
-        $ uv run ./manage.py migrate
-        $ uv run ./manage.py createsuperuser
+    $ docker compose exec web ./manage.py <command>
 
-    The superuser is the instance's only user: there is no sign-up, and
-    `createsuperuser` refuses to run once a user exists: a second run prints
-    "Error: a user already exists, and this instance has only one" and exits with
-    status 2.
+From source, run it in the checkout:
 
-    Besides the user, `createsuperuser` creates the user's project, a check named
-    "My First Check" (slug `my-first-check`), and an email integration for the
-    user's address, already verified and assigned to that check. The password must
-    pass Django's password validators: at least 12 characters, not too similar to
-    the email address, not a common password, and not all digits. Without a
-    terminal, `--email` and `--password` (see
-    [Accessing Administration Panel](#admin-panel)) are both required: a missing
-    or invalid one prints an error and exits with status 2.
+    $ uv run ./manage.py <command>
 
-    With the default configuration, Healthchecks stores data in a SQLite file
-    `hc.sqlite` in the project directory (`~/webapps/healthchecks/`).
+This page names a command as `manage.py <command>`; run it in one of these two ways.
+The commands an operator runs by hand:
 
-* Run tests:
+* `createsuperuser` creates the instance's user (see [Creating the Superuser](#superuser)).
+* `changepassword` sets the user's password, and prompts for it twice.
+* `prunetokenbucket --all` lifts a [login lockout](#login-lockout).
+* `prune` runs the daily cleanup now.
+* `sendflappingnotices` emails the owner about flapping checks (see
+  [Sending Status Notifications](#sending-notifications)).
 
-        $ uv run ./manage.py test
+## Creating the Superuser {: #superuser }
 
-* Run development server:
+The superuser is the instance's only user: there is no sign-up. Create it once, after
+the first start (from source, after `migrate`):
 
-        $ uv run ./manage.py runserver
+    $ docker compose exec web ./manage.py createsuperuser
 
-* From another shell, run the `sendalerts` management command, responsible for
-  sending out notifications:
+It prompts for the email address and the password. It can also take both as
+parameters instead of prompting:
 
-        $ uv run ./manage.py sendalerts
+    $ docker compose exec web ./manage.py createsuperuser --email user@example.com --password correct-horse-battery-staple
 
-At this point, the site should now be running at `http://localhost:8000`.
+A password on the command line stays in the shell's history. Without a terminal,
+`--email` and `--password` are both required: a missing or invalid one prints an
+error and exits with status 2.
 
-`uv run` runs a command in the project's virtual environment. Alternatively,
-activate the virtual environment with `source .venv/bin/activate`, and then
-run `./manage.py` directly. The `./manage.py` examples in the rest of this document
-assume an activated virtual environment.
+Besides the user, `createsuperuser` creates the user's project, a check named
+"My First Check" (slug `my-first-check`), and an email integration for the
+user's address, already verified and assigned to that check. The password must
+pass Django's password validators: at least 12 characters, not too similar to
+the email address, not a common password, and not all digits.
+
+`createsuperuser` refuses to run once a user exists: a second run prints
+"Error: a user already exists, and this instance has only one" and exits with
+status 2.
 
 ## Accessing Administration Panel {: #admin-panel }
 
@@ -84,25 +97,19 @@ Healthchecks comes with Django's administration panel where you can perform
 administrative tasks: change the user's password, inspect contents of
 database tables.
 
-To access the administration panel, log into the site as the superuser. In the
-setup steps above, `createsuperuser` can take its credentials as parameters
-instead of prompting:
-
-    $ ./manage.py createsuperuser --email user@example.com --password correct-horse-battery-staple
-
-Once logged in, click on the "Account" dropdown in top navigation, and select
-"Site Administration". The panel is at `SITE_ROOT/admin/`.
+To access the administration panel, log into the site as the superuser, click on the
+"Account" dropdown in top navigation, and select "Site Administration". The panel is
+at `SITE_ROOT/admin/`.
 
 The panel lists checks, pings, channels (integrations), notifications and flips
 (status changes) under "Api"; credentials (security keys), profiles and projects
-under "Accounts"; log records under "Logs"; and groups and users under
-"Authentication and Authorization". Adding a user, a profile, a security key or a
-log record there is disabled.
+under "Accounts"; and groups and users under "Authentication and Authorization".
+Adding a user, a profile or a security key there is disabled.
 
 Changing the password in the panel goes through sudo mode, which emails a
 confirmation code, so it works only with [email set up](#sending-emails). Without
 email, the panel shows an "Email Needed" page instead; set the password from the
-shell with `./manage.py changepassword`, which prompts for the new password twice.
+shell with `manage.py changepassword`, which prompts for the new password twice.
 
 ## Sending Emails {: #sending-emails }
 
@@ -113,7 +120,7 @@ Email is optional. Without it, that is while `EMAIL_HOST` is unset:
 - sudo mode, which emails a confirmation code, cannot be entered, so Set Password,
   Change Email, Close Account, adding or removing a two-factor method, and the
   password change in the administration panel all show an "Email Needed" page;
-  set the password with `./manage.py changepassword` instead;
+  set the password with `manage.py changepassword` instead;
 - email alerts, reports and reminders, and the `ADMINS` error emails are not
   sent; an email integration records each alert it could not send with the error
   "No SMTP configuration";
@@ -123,10 +130,11 @@ Email is optional. Without it, that is while `EMAIL_HOST` is unset:
   `hc.api.W002` ("No SMTP configuration, cannot send email") and Django's
   `mail.W001` ("Your MAILERS setting has no 'default' entry").
 
-Healthchecks reads the SMTP variables below from the process environment, and
-outside Docker nothing loads a `.env` file for it: export them in the shell, or the
-service definition, that runs `runserver` (or your WSGI server), `sendalerts` and
-`sendreports`, or set `MAILERS` in `hc/local_settings.py` (see
+Healthchecks reads the SMTP variables below from the process environment. With
+Docker, set them in `.env` beside `docker-compose.yml` and run `docker compose up -d`,
+which recreates the container with them. From source, nothing loads a `.env` file:
+export them in the environment of every process, the web server, `sendalerts`,
+`sendreports` and `prune`, or set `MAILERS` in `hc/local_settings.py` (see
 [EMAIL_HOST](../self_hosted_configuration/#EMAIL_HOST)). Specify your SMTP
 credentials using the following environment variables:
 
@@ -171,103 +179,157 @@ changing state, and sends out notifications as needed.
 When `sendalerts` is not running, the Healthchecks instance will not send out any
 alerts.
 
-Within an activated virtualenv, run the `sendalerts` command like so:
-
-    $ ./manage.py sendalerts
-
 `sendalerts` takes `--num-workers N` (default 1), the number of notifications it
 sends at the same time. Several `sendalerts` processes can run at once: each check
 going down and each status change is handled by exactly one of them.
 
 The `sendreports` management command sends the monthly (or weekly or daily)
 reports and, while any check is down, the hourly or daily reminders, as each
-profile's notification settings choose. Run it as a second long-running process:
+profile's notification settings choose. With `--loop` it looks for due reports and
+reminders every 60 seconds; without it, it sends what is due once and exits.
 
-    $ ./manage.py sendreports --loop
+Both have to keep running and survive restarts. The Docker image runs
+`sendalerts` and `sendreports --loop` under uWSGI, and the compose file's restart
+policy starts the container again after a reboot. From source, run them as services
+(see [Running from Source](../self_hosted_source/#daemons)).
 
-With `--loop` it looks for due reports and reminders every 60 seconds; without
-it, it sends what is due once and exits.
+One more command is for occasional use; nothing runs it by itself:
 
-In a production setup, make sure the `sendalerts` and `sendreports --loop`
-commands can survive server restarts. The Docker image runs both under uWSGI
-(see [Running with Docker](../self_hosted_docker/)).
-
-Two more commands are for occasional use, from cron for example; nothing runs them
-by itself:
-
-* `./manage.py sendlogs` emails the `ADMINS` addresses the number of log records
-  written in the last 24 hours, with a link to them, and sends nothing when there
-  are none.
-* `./manage.py sendflappingnotices` emails the owner about each check that changed
+* `manage.py sendflappingnotices` emails the owner about each check that changed
   status more than 200 times in the last 24 hours.
 
-## Database Cleanup {: #database-cleanup }
+## Data Retention {: #database-cleanup }
 
-Healthchecks deletes old entries from the `api_ping`, `api_flip`, and
-`api_notification` tables automatically. Each check prunes its own entries on every
-100th ping it receives:
+Every table that grows by itself has a bound. Two mechanisms delete the old rows:
 
-* pings older than the newest "Ping log limit" pings are deleted (100 by default);
-* notifications older than the oldest kept ping are deleted;
-* status changes (flips) are deleted only when they are older than both the oldest
-  kept ping and 93 days, because the downtime statistics need about three months
-  of them.
+* each check prunes its own pings, notifications and flips on every 100th ping it
+  receives;
+* `manage.py prune` prunes every check the same way, and then the other tables. The
+  Docker image runs it every day at 03:17 UTC (see
+  [Housekeeping](../self_hosted_docker/#housekeeping)); from source, schedule it
+  yourself (see [Scheduling the Daily Cleanup](../self_hosted_source/#prune)).
 
-To keep a longer or a shorter history, go to the Administration Panel, open the
-user's **Profile**, and change its "Ping log limit" field. Lowering the limit
-hides the older pings at once, in the web UI and in the API, but deletes them only
-at the check's next prune. To prune every check now, run:
+What each table keeps:
+
+* `api_ping`: each check's pings, up to 99 over the "Ping log limit", 100 by
+  default. Each ping stores at most
+  [PING_BODY_LIMIT](../self_hosted_configuration/#PING_BODY_LIMIT) bytes of its body.
+* `api_notification`: each check's notifications no older than its oldest kept ping.
+  The notifications of the integrations' Test button belong to no check, and are
+  kept for 30 days.
+* `api_flip` (status changes): a check's flips are deleted only when they are older
+  than both its oldest kept ping and 93 days, because the downtime statistics need
+  about three months of them. A flip `sendalerts` has not handled yet is never
+  deleted.
+* `api_tokenbucket` (rate limiting records): a day after a record was last used.
+  Every limit refills within a day, so this lifts no limit early.
+* `django_session` (logins): a session until it expires.
+* `django_admin_log` (the administration panel's history of changes): 365 days.
+
+The other tables hold what you create: checks, integrations, projects, API keys and
+the user.
+
+To keep a longer or a shorter history of pings, go to the Administration Panel,
+open the user's **Profile**, and change its "Ping log limit" field, a number from 1
+to 1000. Lowering the limit hides the older pings at once, in the web UI and in the
+API, but deletes them only at the check's next prune: its next 100th ping, or the
+next daily run. Raising the limit does not bring back pings that were already
+deleted.
+
+On SQLite, deleted rows leave free pages in the database file. A database file
+that Healthchecks creates uses SQLite's incremental auto-vacuum, and `prune` gives
+the free pages back to the file system after it deletes, so the file shrinks to
+the data it holds. A file created without it, by an older version for example,
+keeps its mode: `prune` then frees no pages and says so in its summary line
+("SQLite auto_vacuum is 0, not 2 (INCREMENTAL): no pages freed"). To switch such a
+file, stop every process that uses it and run once, in the directory that holds it:
 
 ```sh
-$ ./manage.py prunepingsslow
+$ python3 -c "import sqlite3; c = sqlite3.connect('hc.sqlite'); c.execute('PRAGMA auto_vacuum = INCREMENTAL'); c.execute('VACUUM')"
 ```
 
-It prunes, one by one, every check that has received more than 100 pings. Raising
-the limit does not bring back pings that were already deleted. Whatever the limit,
-the API returns at most 1000 pings (see [List check's logged pings](../api/#list-pings)).
+`VACUUM` rewrites the whole file: plan for free disk space of twice the size of the
+data it holds.
 
-Log records (Site Administration › Logs › Records) are never pruned
-automatically; delete old ones in the Administration Panel.
+On PostgreSQL, `prune` deletes the same rows and leaves their space to autovacuum,
+which makes it reusable within each table.
 
-Healthchecks provides a management command for cleaning up the `api_tokenbucket`
-(rate limiting records) table. The TokenBucket model is used for rate-limiting
-login attempts and similar operations. Any records older than one day can be
-safely removed.
+Back the database up regularly (see [Backups and Restore](../self_hosted_docker/#backups)).
 
-```sh
-$ ./manage.py prunetokenbucket
-```
+## Logs {: #logs }
 
-When you first try this command on your data, it is a good idea to
-test it on a copy of your database, not on the live database right away.
-In a production setup, you will want to run this command regularly, as well as
-have regular, automatic database backups set up.
+Healthchecks writes its log to the console, the standard output of each process,
+and nowhere else. With Docker, that is the container's log:
+
+    $ docker compose logs -f web
+
+It shows uWSGI's lines, `migrate`'s output, the messages of `sendalerts` and
+`sendreports`, the daily `prune` summary, and the warnings and errors of the web
+application. Neither the image's uWSGI nor `runserver` writes a line per HTTP
+request. The compose file keeps at most three log files of 10 MB each. With
+[LOG_FORMAT](../self_hosted_configuration/#LOG_FORMAT) set to `json`, each record of
+Python's logging is a JSON object on one line; uWSGI's own lines, `migrate`'s output
+and `prune`'s summary stay plain text in the same stream.
+
+With email set up and `DEBUG=False`, the [ADMINS](../self_hosted_configuration/#ADMINS)
+addresses also get an email for each error Django logs, such as a server error (5xx)
+while handling a request.
 
 ## Login Lockout {: #login-lockout }
 
-Logging in is rate limited per email address:
+Logging in is rate limited:
 
-* password attempts: 20 per 24 hours, refilling at one attempt every 72 minutes;
-* login link requests: 10 per hour, plus, from a browser that has not logged in
-  before, 20 per client IP address per hour.
+* password attempts: 20 per 24 hours per email address, refilling at one attempt
+  every 72 minutes;
+* login link requests: 10 per hour per email address;
+* from a browser that has not logged in before, both forms together: 20 attempts
+  per hour per client IP address, refilling at one attempt every 3 minutes. IPv6
+  clients share the limit of their /64 network.
 
-A browser that has completed a login keeps a device cookie for 365 days and gets
-login rate limits of its own, but a new browser shares them with everyone else, so
-a run of wrong passwords for the account's email, from anywhere, can lock it out.
-To get back in, wait for the limits to refill, use the login link sent by email if
-email is set up, or clear every rate limit record, the recent ones too:
+A browser that has completed a login keeps a device cookie for 365 days. For the
+account's email it gets per-email limits of its own and skips the per-IP one. A new
+browser shares the per-email limits with everyone else, so a run of wrong passwords
+for the account's email, from anywhere, can lock it out; and 20 attempts from one
+address, on either form, lock out every new browser behind that address until the
+limit refills. The client address is the one the reverse proxy puts in
+`X-Forwarded-For` (see [Reverse Proxy](../self_hosted_docker/#tls-termination)).
+
+To get back in, wait for the limits to refill, log in from a browser that has
+logged in before, use the login link sent by email if email is set up, or clear
+every rate limit record, the recent ones too:
 
 ```sh
-$ ./manage.py prunetokenbucket --all
+$ docker compose exec web ./manage.py prunetokenbucket --all
 ```
+
+From source, that is `uv run ./manage.py prunetokenbucket --all`.
 
 Changing [SECRET_KEY](../self_hosted_configuration/#SECRET_KEY) also resets the
 per-email limits, but not the per-IP one, and has other effects, listed there.
 
-If you have forgotten the password, set a new one with `./manage.py changepassword`.
+## Before Going Live {: #checklist }
+
+* `DEBUG=False`. The default is `True`, and the Docker image does not change it; the
+  sample `.env` sets `False`.
+* [SECRET_KEY](../self_hosted_configuration/#SECRET_KEY) set to a random value before
+  the first API key is created, and kept.
+* [SITE_ROOT](../self_hosted_configuration/#SITE_ROOT) set to the public URL, and
+  `ALLOWED_HOSTS` unset or listing its host.
+* A reverse proxy in front that terminates TLS and sets `X-Forwarded-For` and
+  `X-Forwarded-Proto` (see [Reverse Proxy](../self_hosted_docker/#tls-termination)).
+* Email set up, if you want email alerts, and
+  [ADMINS](../self_hosted_configuration/#ADMINS) set to receive the error emails.
+* Backups, and a restore tried once.
+* Monitoring of the instance itself from outside it:
+  [Check Database Connectivity](../api/#status) (`/api/v3/status/`) for an uptime
+  monitor, and [Read Service Metrics](../api/#metrics) (`/api/v3/metrics/`, with
+  [METRICS_KEY](../self_hosted_configuration/#METRICS_KEY)), whose
+  `num_unprocessed_flips` grows while `sendalerts` is not running.
 
 ## Next Steps
 
-Get the [source code](https://github.com/zhaow-de/healthchecks).
-
-See [Configuration](../self_hosted_configuration/) for a list of configuration options.
+* [Running with Docker](../self_hosted_docker/): install, operate and upgrade an
+  instance from the published image.
+* [Configuration](../self_hosted_configuration/): every setting.
+* [Running from Source](../self_hosted_source/): develop Healthchecks, or run it
+  without Docker.

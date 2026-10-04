@@ -532,8 +532,8 @@ def pings(request: ApiRequest, check: Check) -> HttpResponse:
     limit = min(request.project.owner_profile.ping_log_limit, 1000)
 
     # Query in descending order so we're sure to get the most recent
-    # pings, regardless of the limit restriction
-    q = Ping.objects.filter(owner=check).order_by("-id")
+    # pings, regardless of the limit restriction. By "n", not "id": see Ping.Meta
+    q = Ping.objects.filter(owner=check).order_by("-n")
     # Optimization: query just the length of body_raw instead of body_raw itself.
     q = q.defer("body_raw").annotate(body_raw_length=Length("body_raw"))
     pings = list(q[:limit])

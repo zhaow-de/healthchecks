@@ -90,6 +90,16 @@ class GetPingsTestCase(BaseTestCase):
             self.assertEqual(doc["pings"][0]["duration"], 300.0)
             self.assertEqual(doc["pings"][1]["duration"], 120.0)
 
+    def test_it_returns_the_pings_by_n_descending(self) -> None:
+        self.ping.delete()
+        # n=3 has the lower id
+        self.a1.ping_set.create(n=1, created=EPOCH)
+        self.a1.ping_set.create(n=3, created=EPOCH + td(minutes=2))
+        self.a1.ping_set.create(n=2, created=EPOCH + td(minutes=1))
+
+        doc = self.get().json()
+        self.assertEqual([p["n"] for p in doc["pings"]], [3, 2, 1])
+
     def test_it_disables_duration_calculation(self) -> None:
         self.ping.delete()
         # Set up a worst case scenario where each success ping has a unique rid,
