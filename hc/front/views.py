@@ -1041,11 +1041,13 @@ def channels(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
                 new_checks.append(check)
 
         with _404_if_deleted(), transaction.atomic():
-            Channel.objects.select_for_update().get(id=channel.id)
+            # The checks before the channel, in id order: switch_channel and copy lock a
+            # check first too, so two concurrent writes cannot deadlock on PostgreSQL
             ids = {check.id for check in new_checks}
-            locked = Check.objects.select_for_update().filter(id__in=ids).values_list("id", flat=True)
-            if set(locked) != ids:
+            q = Check.objects.select_for_update().filter(id__in=ids).order_by("id")
+            if set(q.values_list("id", flat=True)) != ids:
                 raise Http404("not found")
+            Channel.objects.select_for_update().get(id=channel.id)
             channel.checks.set(new_checks)
 
         return redirect("hc-channels", project.code)

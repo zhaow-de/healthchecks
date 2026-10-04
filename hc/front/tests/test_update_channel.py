@@ -1,5 +1,8 @@
 from unittest.mock import patch
 
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
+
 from hc.accounts.models import Project
 from hc.api.models import Channel, Check
 from hc.lib.string import is_valid_uuid_string
@@ -117,3 +120,20 @@ class UpdateChannelTestCase(BaseTestCase):
             r = self.client.post(self.channels_url, data=payload)
         self.assertEqual(r.status_code, 404)
         self.assertFalse(Channel.checks.through.objects.exists())
+
+    def test_it_locks_the_checks_before_the_channel(self) -> None:
+        payload = {"channel": self.channel.code, f"check-{self.check.code}": True}
+
+        self.client.login(username="alice@example.org", password="password")
+        with CaptureQueriesContext(connection) as ctx:
+            self.client.post(self.channels_url, data=payload)
+
+        sqls = [q["sql"] for q in ctx.captured_queries]
+        # The view's transaction, a savepoint inside the test's own
+        locked = sqls[next(i for i, sql in enumerate(sqls) if sql.startswith("SAVEPOINT")) :]
+        check_read = next(i for i, sql in enumerate(locked) if sql.startswith("SELECT") and 'FROM "api_check"' in sql)
+        channel_read = next(i for i, sql in enumerate(locked) if sql.startswith("SELECT") and 'FROM "api_channel"' in sql)
+        self.assertLess(check_read, channel_read)
+        if connection.vendor == "postgresql":
+            self.assertIn("FOR UPDATE", locked[check_read])
+            self.assertIn("FOR UPDATE", locked[channel_read])
