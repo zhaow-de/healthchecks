@@ -284,6 +284,19 @@ class CreateCheckTestCase(BaseTestCase):
     def test_it_rejects_long_name(self) -> None:
         self.post({"name": "01234567890" * 20}, expect_fragment="name is too long")
 
+    def test_it_bounds_tags_by_the_column(self) -> None:
+        self.post({"tags": "a" * 501}, expect_fragment="tags is too long")
+
+        r = self.post({"tags": "a" * 500})
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(Check.objects.get().tags, "a" * 500)
+
+    def test_it_bounds_desc(self) -> None:
+        self.post({"desc": "a" * 10_001}, expect_fragment="desc is too long")
+
+        r = self.post({"desc": "a" * 10_000})
+        self.assertEqual(r.status_code, 201)
+
     def test_unique_accepts_only_specific_values(self) -> None:
         self.post(
             {"name": "Foo", "unique": ["status"]},

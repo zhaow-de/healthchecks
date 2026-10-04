@@ -1,4 +1,5 @@
 import email.policy
+import hmac
 import time
 from collections.abc import Callable, Iterable
 from datetime import UTC, datetime
@@ -11,8 +12,8 @@ from uuid import UUID
 from cronsim import CronSim, CronSimError
 from django.conf import settings
 from django.core.signing import BadSignature
-from django.db import connection
-from django.db.models import Prefetch, Q
+from django.db import connection, transaction
+from django.db.models import Q
 from django.db.models.functions import Length
 from django.http import (
     Http404,
@@ -58,7 +59,7 @@ def guess_kind(schedule: str) -> str:
 
 class Spec(BaseModel):
     channels: str | None = None
-    desc: str | None = None
+    desc: str | None = Field(None, max_length=10_000)
     failure_kw: str | None = Field(None, max_length=200)
     filter_subject: bool | None = None
     filter_body: bool | None = None
@@ -74,7 +75,7 @@ class Spec(BaseModel):
     subject: str | None = Field(None, max_length=200)
     subject_fail: str | None = Field(None, max_length=200)
     success_kw: str | None = Field(None, max_length=200)
-    tags: str | None = None
+    tags: str | None = Field(None, max_length=500)
     timeout: td | None = Field(None, ge=60, le=31536000)
     tz: str | None = None
     unique: list[Literal["name", "slug", "tags", "timeout", "grace"]] | None = None
@@ -259,7 +260,12 @@ def _with_check(view: Callable[..., HttpResponse]) -> ViewFunc:
         if check.project_id != request.project.id:
             return HttpResponseForbidden()
 
-        return view(request, check, **kwds)
+        check.project = request.project
+        try:
+            return view(request, check, **kwds)
+        except Check.DoesNotExist:
+            # Deleted between this read and the Check.lock() of a write
+            return HttpResponseNotFound()
 
     return wrapper
 
@@ -319,6 +325,14 @@ def _update(check: Check, spec: Spec) -> None:
 
                 new_channels.add(matches[0])
 
+    with transaction.atomic():
+        if not check._state.adding:
+            check.lock()
+        _apply(check, spec, new_channels)
+
+
+def _apply(check: Check, spec: Spec, new_channels: Iterable[Channel] | None) -> None:
+    """Set the spec's fields and alert_after on the check, save it, then set its channels."""
     update_fields = set()
 
     if spec.name is not None:
@@ -374,8 +388,6 @@ def _update(check: Check, spec: Spec) -> None:
     if check._state.adding:
         check.save()
     else:
-        # Update only the fields that were in the spec. Updating all fields risks
-        # overwriting concurrent changes with older values.
         check.save(update_fields=update_fields)
 
     # This needs to be done after saving the check, because of
@@ -386,11 +398,7 @@ def _update(check: Check, spec: Spec) -> None:
 
 @authorize_read
 def get_checks(request: ApiRequest) -> JsonResponse:
-    q = Check.objects.filter(project=request.project)
-    if not request.readonly:
-        # Use QuerySet.only() and Prefetch() to prefetch channel codes only:
-        channel_q = Channel.objects.only("code")
-        q = q.prefetch_related(Prefetch("channel_set", queryset=channel_q))
+    q = Check.objects.filter(project=request.project).order_by("created", "id")
 
     tags = set(request.GET.getlist("tag"))
     for tag in tags:
@@ -401,9 +409,17 @@ def get_checks(request: ApiRequest) -> JsonResponse:
         q = q.filter(slug=slug)
 
     # precise, final filtering
-    checks = [check.to_dict(readonly=request.readonly) for check in q if not tags or check.matches_tag_set(tags)]
+    checks = [check for check in q if not tags or check.matches_tag_set(tags)]
+    if request.readonly:
+        return JsonResponse({"checks": [check.to_dict(readonly=True) for check in checks]})
 
-    return JsonResponse({"checks": checks})
+    # Codes from the link table, not channel_set: building Channel instances for them costs more
+    codes: dict[int, list[UUID]] = {}
+    links = Channel.checks.through.objects.filter(check__project=request.project)
+    for check_id, code in links.values_list("check_id", "channel__code"):
+        codes.setdefault(check_id, []).append(code)
+
+    return JsonResponse({"checks": [check.to_dict(channel_codes=codes.get(check.id, [])) for check in checks]})
 
 
 @authorize
@@ -474,8 +490,6 @@ def update_check(request: ApiRequest, check: Check) -> HttpResponse:
         _update(check, spec)
     except BadChannelError as e:
         return JsonResponse({"error": e.message}, status=400)
-    except Check.NotUpdated:
-        return HttpResponseNotFound()
 
     return JsonResponse(check.to_dict())
 
@@ -488,7 +502,7 @@ def delete_check(request: ApiRequest, check: Check) -> HttpResponse:
 
 
 @csrf_exempt
-@cors("POST", "DELETE", "GET")
+@cors("GET", "POST", "DELETE")
 def single(request: HttpRequest, code: UUID) -> HttpResponse:
     if request.method == "POST":
         return update_check(request, code)
@@ -567,7 +581,8 @@ def flips(request: ApiRequest, check: Check) -> HttpResponse:
     if not form.is_valid():
         return HttpResponseBadRequest()
 
-    flips = Flip.objects.filter(owner=check).order_by("-id")
+    # api_flip_owner_created serves this order; sendalerts back-dates a down flip, so by id it would differ
+    flips = Flip.objects.filter(owner=check).order_by("-created")
 
     if form.cleaned_data["start"]:
         flips = flips.filter(created__gte=form.cleaned_data["start"])
@@ -601,12 +616,13 @@ def flips_by_unique_key(request: ApiRequest, unique_key: str) -> HttpResponse:
     return flips(request, check)
 
 
+@never_cache
 def metrics(request: HttpRequest) -> HttpResponse:
     if not settings.METRICS_KEY:
         return HttpResponseForbidden()
 
-    key = request.headers.get("X-Metrics-Key")
-    if key != settings.METRICS_KEY:
+    key = request.headers.get("X-Metrics-Key", "")
+    if not hmac.compare_digest(key.encode(), settings.METRICS_KEY.encode()):
         return HttpResponseForbidden()
 
     doc = {
@@ -619,6 +635,7 @@ def metrics(request: HttpRequest) -> HttpResponse:
     return JsonResponse(doc)
 
 
+@never_cache
 def status(request: HttpRequest) -> HttpResponse:
     with connection.cursor() as c:
         c.execute("SELECT 1")
@@ -628,6 +645,7 @@ def status(request: HttpRequest) -> HttpResponse:
 
 
 @csrf_exempt
+@never_cache
 def bounces(request: HttpRequest) -> HttpResponse:
     msg = message_from_bytes(request.body, policy=email.policy.SMTP)
     to_local = msg.get("To", "").split("@")[0]

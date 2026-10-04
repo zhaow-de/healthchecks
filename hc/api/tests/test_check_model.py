@@ -3,11 +3,13 @@ from datetime import timedelta as td
 from unittest.mock import patch
 
 import time_machine
+from cronsim import CronSim
 from django.db import IntegrityError, connection
 from django.db.models import Q, QuerySet
 from django.test.utils import CaptureQueriesContext
 from django.utils.timezone import now
 
+from hc.accounts.models import Project
 from hc.api.models import MAX_DURATION, Channel, Check, Flip, Notification, Ping
 from hc.test import BaseTestCase
 
@@ -182,6 +184,29 @@ class CheckModelTestCase(BaseTestCase):
 
         d = check.to_dict()
         self.assertEqual(d["next_ping"], "2000-01-01T01:00:00+00:00")
+
+    @time_machine.travel(datetime(2000, 1, 1, 0, 30, tzinfo=UTC))
+    def test_to_dict_iterates_a_cron_schedule_once(self) -> None:
+        check = Check(project=self.project, kind="cron", schedule="0 * * * *", status="up")
+        check.last_ping = datetime(2000, 1, 1, tzinfo=UTC)
+
+        with patch("hc.api.models.CronSim", wraps=CronSim) as cronsim:
+            d = check.to_dict(readonly=True)
+
+        self.assertEqual(cronsim.call_count, 1)
+        self.assertEqual(d["status"], "up")
+        self.assertEqual(d["next_ping"], "2000-01-01T01:00:00+00:00")
+
+    def test_to_dict_takes_the_channel_codes_it_is_given(self) -> None:
+        check = Check.objects.create(project=self.project)
+        c1, c2 = Channel.objects.create(project=self.project), Channel.objects.create(project=self.project)
+        check.channel_set.add(c1, c2)
+        expected = ",".join(sorted([str(c1.code), str(c2.code)]))
+
+        self.assertEqual(check.to_dict()["channels"], expected)
+        with self.assertNumQueries(0):
+            self.assertEqual(check.to_dict(channel_codes=[c2.code, c1.code])["channels"], expected)
+            self.assertEqual(check.to_dict(channel_codes=[])["channels"], "")
 
     @time_machine.travel(CURRENT_TIME)
     def test_downtimes_handles_no_flips(self) -> None:
@@ -535,6 +560,34 @@ class CheckModelTestCase(BaseTestCase):
 
         check.last_duration = None
         self.assertNotIn("last_duration", check.to_dict())
+
+    def test_pause_writes_nothing_if_a_step_fails(self) -> None:
+        check = Check.objects.create(project=self.project, status="up", last_ping=now())
+
+        with (
+            patch.object(Project, "update_next_nag_dates", side_effect=RuntimeError("boom")),
+            self.assertRaises(RuntimeError),
+        ):
+            check.pause()
+
+        check.refresh_from_db()
+        self.assertEqual(check.status, "up")
+        self.assertFalse(Flip.objects.exists())
+
+    def test_pause_and_resume_read_the_row_they_lock(self) -> None:
+        check = Check.objects.create(project=self.project, status="up", last_ping=now())
+        # sendalerts marks it down after this instance was read
+        Check.objects.filter(id=check.id).update(status="down")
+
+        check.pause()
+        flip = Flip.objects.get()
+        self.assertEqual(flip.old_status, "down")
+
+        stale = Check.objects.get(id=check.id)
+        Check.objects.filter(id=check.id).update(status="up")
+        # The row is not paused any longer, whatever the instance says
+        self.assertFalse(stale.resume())
+        self.assertEqual(Flip.objects.count(), 1)
 
     def test_every_hundredth_ping_prunes_old_pings(self) -> None:
         self.profile.ping_log_limit = 10

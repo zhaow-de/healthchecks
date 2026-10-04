@@ -1,6 +1,7 @@
-from django.urls import include, path, register_converter
+from django.urls import URLPattern, include, path, register_converter
 
 from hc.api import views
+from hc.lib.typealias import ViewFunc
 
 
 class SHA1Converter:
@@ -30,24 +31,34 @@ slug_urls = [
     path("<int:exitstatus>", views.ping_by_slug),
 ]
 
+
+def _collection(route: str, view: ViewFunc, name: str | None = None) -> list[URLPattern]:
+    """Route a collection with and without its trailing slash.
+
+    Without the second route APPEND_SLASH redirects the slashless path with a 301,
+    which clients commonly follow with a GET, so a POST would silently become a read.
+    """
+    return [path(route + "/", view, name=name), path(route, view)]
+
+
 api_urls = [
-    path("checks/", views.checks, name="hc-api-checks"),
+    *_collection("checks", views.checks, name="hc-api-checks"),
     path("checks/<uuid:code>", views.single, name="hc-api-single"),
     path("checks/<sha1:unique_key>", views.get_check_by_unique_key),
     path("checks/<uuid:code>/pause", views.pause, name="hc-api-pause"),
     path("checks/<uuid:code>/resume", views.resume, name="hc-api-resume"),
-    path("checks/<uuid:code>/pings/", views.pings, name="hc-api-pings"),
+    *_collection("checks/<uuid:code>/pings", views.pings, name="hc-api-pings"),
     path(
         "checks/<uuid:code>/pings/<int:n>/body",
         views.ping_body,
         name="hc-api-ping-body",
     ),
-    path("checks/<uuid:code>/flips/", views.flips_by_uuid, name="hc-api-flips"),
-    path("checks/<sha1:unique_key>/flips/", views.flips_by_unique_key),
-    path("channels/", views.channels),
-    path("metrics/", views.metrics),
-    path("status/", views.status),
-    path("bounces/", views.bounces),
+    *_collection("checks/<uuid:code>/flips", views.flips_by_uuid, name="hc-api-flips"),
+    *_collection("checks/<sha1:unique_key>/flips", views.flips_by_unique_key),
+    *_collection("channels", views.channels),
+    *_collection("metrics", views.metrics),
+    *_collection("status", views.status),
+    *_collection("bounces", views.bounces),
 ]
 
 urlpatterns = [

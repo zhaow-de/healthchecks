@@ -1,8 +1,11 @@
 import uuid
 from datetime import timedelta as td
 from typing import Any
+from unittest import skipUnless
 from unittest.mock import patch
 
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.utils.timezone import now
 
 from hc.api.models import Channel, Check
@@ -433,3 +436,44 @@ class UpdateCheckTestCase(BaseTestCase):
             r = self.post(self.check.code, {"name": "foo"})
 
         self.assertEqual(r.status_code, 404)
+
+    def test_it_computes_alert_after_from_the_row_it_locked(self) -> None:
+        started = now()
+
+        def get_then_start(*args: Any, **kwargs: Any) -> Check:
+            check = Check.objects.get(id=self.check.id)
+            # A start ping lands after the view read the check
+            Check.objects.filter(id=self.check.id).update(last_start=started)
+            return check
+
+        with patch("hc.api.views.get_object_or_404", get_then_start):
+            r = self.post(self.check.code, {"grace": 120})
+
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r.json()["started"])
+        self.check.refresh_from_db()
+        self.assertEqual(self.check.alert_after, started + td(seconds=120))
+
+    @skipUnless(connection.features.has_select_for_update_of, "no row locks")
+    def test_it_locks_the_check_and_not_its_project(self) -> None:
+        with CaptureQueriesContext(connection) as ctx:
+            r = self.post(self.check.code, {"name": "Foo"})
+        self.assertEqual(r.status_code, 200)
+
+        (lock,) = [q["sql"] for q in ctx.captured_queries if "FOR UPDATE" in q["sql"]]
+        self.assertTrue(lock.endswith(' FOR UPDATE OF "api_check"'), lock)
+
+    def test_it_does_not_reread_the_project(self) -> None:
+        channel = Channel.objects.create(project=self.project)
+
+        # The key's project, the check, the project's channels, the locked check
+        # (bracketed by a savepoint), the update, the links and the new link, and
+        # the check's channel codes for the response
+        with self.assertNumQueries(10):
+            r = self.post(self.check.code, {"schedule": "5 * * * *", "channels": str(channel.code)})
+        self.assertEqual(r.status_code, 200)
+
+    def test_it_rejects_long_tags(self) -> None:
+        r = self.post(self.check.code, {"tags": "a" * 501})
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(r.json()["error"], "json validation error: tags is too long")

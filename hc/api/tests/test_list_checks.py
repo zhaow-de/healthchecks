@@ -90,6 +90,20 @@ class ListChecksTestCase(BaseTestCase):
         self.assertEqual(a2["last_ping"], self.now.isoformat())
         self.assertEqual(a2["next_ping"], next_ping.isoformat())
 
+    def test_it_lists_the_checks_in_creation_order(self) -> None:
+        # a2's empty slug sorts before a1's
+        doc = self.get().json()
+        self.assertEqual([check["name"] for check in doc["checks"]], ["Alice 1", "Alice 2"])
+
+    def test_it_lists_each_checks_channel_codes(self) -> None:
+        c2 = Channel.objects.create(project=self.project)
+        self.a1.channel_set.add(c2)
+
+        doc = self.get().json()
+        by_name = {check["name"]: check for check in doc["checks"]}
+        self.assertEqual(by_name["Alice 1"]["channels"], ",".join(sorted([str(self.c1.code), str(c2.code)])))
+        self.assertEqual(by_name["Alice 2"]["channels"], "")
+
     def test_it_handles_options(self) -> None:
         r = self.client.options("/api/v3/checks/")
         self.assertEqual(r.status_code, 204)

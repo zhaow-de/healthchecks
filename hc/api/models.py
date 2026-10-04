@@ -235,6 +235,10 @@ class Check(models.Model):
 
         If the check is currently new, paused or down, return None.
         """
+        return self._grace_start(self._scheduled_grace_start(), with_started=with_started)
+
+    def _scheduled_grace_start(self) -> datetime:
+        """Return when the grace period starts by the schedule alone, NEVER if not up."""
         # NEVER is a constant sentinel value (year 3000).
         # Using None instead would make the min() logic clunky.
         result = NEVER
@@ -264,6 +268,11 @@ class Check(models.Model):
             except StopIteration:
                 result = NEVER
 
+        return result
+
+    def _grace_start(self, scheduled: datetime, *, with_started: bool) -> datetime | None:
+        """Return get_grace_start() from the _scheduled_grace_start() result."""
+        result = scheduled
         if with_started and self.last_start and self.status != "down":
             result = min(result, self.last_start)
 
@@ -287,6 +296,10 @@ class Check(models.Model):
 
     def get_status(self) -> str:
         """Return current status for display."""
+        return self._status(self._scheduled_grace_start())
+
+    def _status(self, scheduled: datetime) -> str:
+        """Return get_status() from the _scheduled_grace_start() result."""
         frozen_now = now()
 
         if self.last_start and frozen_now >= self.last_start + self.grace:
@@ -295,7 +308,7 @@ class Check(models.Model):
         if self.status in ("new", "paused", "down"):
             return self.status
 
-        grace_start = self.get_grace_start(with_started=False)
+        grace_start = self._grace_start(scheduled, with_started=False)
         if grace_start is None:
             # next elapse is "never", so this check will stay up indefinitely
             return "up"
@@ -346,17 +359,19 @@ class Check(models.Model):
     def matches_tag_set(self, tag_set: set[str]) -> bool:
         return tag_set.issubset(self.tags_list())
 
-    def channels_str(self) -> str:
-        """Return a comma-separated string of assigned channel codes."""
+    def channels_str(self, codes: Iterable[uuid.UUID] | None = None) -> str:
+        """Return a comma-separated string of assigned channel codes.
 
-        # Is this an unsaved instance?
-        if not self.id:
-            return ""
+        Pass `codes` if they have been read already; otherwise this reads them.
+        """
+        if codes is None:
+            # Is this an unsaved instance?
+            if not self.id:
+                return ""
 
-        # self.channel_set may already be prefetched.
-        # Sort in python to make sure we don't run additional queries
-        codes = [str(channel.code) for channel in self.channel_set.all()]
-        return ",".join(sorted(codes))
+            codes = self.channel_set.values_list("code", flat=True)
+
+        return ",".join(sorted(str(code) for code in codes))
 
     @property
     def unique_key(self) -> str:
@@ -366,7 +381,10 @@ class Check(models.Model):
     def filter_any(self) -> bool:
         return self.filter_http_body
 
-    def to_dict(self, *, readonly: bool = False) -> CheckDict:
+    def to_dict(self, *, readonly: bool = False, channel_codes: Iterable[uuid.UUID] | None = None) -> CheckDict:
+        """Return the API's check object; `channel_codes` as for channels_str()."""
+        # Computed once: for cron and OnCalendar checks it iterates the schedule
+        scheduled = self._scheduled_grace_start()
         result: CheckDict = {
             "name": self.name,
             "slug": self.slug,
@@ -374,10 +392,10 @@ class Check(models.Model):
             "desc": self.desc,
             "grace": int(self.grace.total_seconds()),
             "n_pings": self.n_pings,
-            "status": self.get_status(),
+            "status": self._status(scheduled),
             "started": self.last_start is not None,
             "last_ping": isostring(self.last_ping),
-            "next_ping": isostring(self.get_grace_start()),
+            "next_ping": isostring(self._grace_start(scheduled, with_started=True)),
             "manual_resume": self.manual_resume,
             "methods": self.methods,
             "subject": self.success_kw if self.filter_subject else "",
@@ -406,7 +424,7 @@ class Check(models.Model):
             result["update_url"] = update_url
             result["pause_url"] = update_url + "/pause"
             result["resume_url"] = update_url + "/resume"
-            result["channels"] = self.channels_str()
+            result["channels"] = self.channels_str(channel_codes)
 
         if self.kind == "simple":
             result["timeout"] = int(self.timeout.total_seconds())
@@ -618,36 +636,50 @@ class Check(models.Model):
         flip.reason = reason
         flip.save()
 
+    def lock(self) -> None:
+        """Reload the check and its project, and lock the check's row until the transaction ends.
+
+        Call it inside transaction.atomic(), before reading what a write depends on:
+        a ping may have changed the row since this instance was read. Raises
+        Check.DoesNotExist if the check is gone.
+        """
+        q = Check.objects.select_for_update(of=("self",)).select_related("project")
+        self.refresh_from_db(from_queryset=q)
+
     def pause(self) -> None:
         """Pause the check, unless it is paused already."""
-        if self.status == "paused":
-            return
+        with transaction.atomic():
+            self.lock()
+            if self.status == "paused":
+                return
 
-        # Track the status change for correct downtime calculation in Check.downtimes()
-        self.create_flip("paused", mark_as_processed=True)
+            # Track the status change for correct downtime calculation in Check.downtimes()
+            self.create_flip("paused", mark_as_processed=True)
 
-        self.status = "paused"
-        self.last_start = None
-        self.alert_after = None
-        self.save(update_fields=("status", "last_start", "alert_after"))
+            self.status = "paused"
+            self.last_start = None
+            self.alert_after = None
+            self.save(update_fields=("status", "last_start", "alert_after"))
 
-        # After pausing a check we must check if all checks are up,
-        # and Profile.next_nag_date needs to be cleared out:
-        self.project.update_next_nag_dates()
+            # After pausing a check we must check if all checks are up,
+            # and Profile.next_nag_date needs to be cleared out:
+            self.project.update_next_nag_dates()
 
     def resume(self) -> bool:
         """Resume a paused check as new; return False if it is not paused."""
-        if self.status != "paused":
-            return False
+        with transaction.atomic():
+            self.lock()
+            if self.status != "paused":
+                return False
 
-        self.create_flip("new", mark_as_processed=True)
+            self.create_flip("new", mark_as_processed=True)
 
-        self.status = "new"
-        self.last_start = None
-        self.last_ping = None
-        self.alert_after = None
-        self.save(update_fields=("status", "last_start", "last_ping", "alert_after"))
-        return True
+            self.status = "new"
+            self.last_start = None
+            self.last_ping = None
+            self.alert_after = None
+            self.save(update_fields=("status", "last_start", "last_ping", "alert_after"))
+            return True
 
 
 def find_by_unique_key(checks: Iterable[Check], unique_key: str) -> Check | None:
