@@ -164,7 +164,7 @@ the first PING_BODY_LIMIT_FORMATTED of the request body.
 
 The keywords decide what every ping counts as, overriding the URL: pings to `/start`,
 `/fail`, `/log` and `/<exit-status>` are classified by their body as well. The body
-must be valid UTF-8; otherwise the ping gets a "500" response and is not recorded.
+is read as UTF-8, with bytes that are not valid UTF-8 matching no keyword.
 See [How SITE_NAME Interprets a Ping](../http_api/#interpreting-pings) for the full
 order of rules. Saving the dialog with the option unchecked clears the keyword fields
 (unless the check's inert `filter_subject` or `filter_body` flag, described next,

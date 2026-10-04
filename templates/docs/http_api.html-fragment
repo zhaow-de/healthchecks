@@ -113,11 +113,6 @@ carry it.</p>
 <td><code>ambiguous slug</code></td>
 <td>More than one check in the project has this slug.</td>
 </tr>
-<tr>
-<td>500</td>
-<td>an HTML error page</td>
-<td>The check filters by keywords and the request body is not valid UTF-8.</td>
-</tr>
 </tbody>
 </table>
 <p>A 4xx response means the request itself is wrong: fix the URL, the <code>rid</code> or the
@@ -288,8 +283,9 @@ SITE_NAME applies these steps in order:</p>
    list, matched as case-sensitive substrings. The first list with a match decides:
    failure, success or start. When nothing matches, the ping is a failure if
    <code>filter_default_fail</code> is set and <strong>ignored</strong> otherwise. This step overrides the
-   endpoint, <code>/log</code> and <code>/&lt;exit-status&gt;</code> included, and a body that is not valid
-   UTF-8 gets a 500 response and is not recorded.</li>
+   endpoint, <code>/log</code> and <code>/&lt;exit-status&gt;</code> included. Bytes that are not valid UTF-8,
+   such as a multibyte character cut short by the body limit, are read as the
+   replacement character (U+FFFD), and the rest of the body is matched as usual.</li>
 <li><strong>Manual resume.</strong> If the check is paused and requires a manual resume
    (<code>manual_resume</code>), every ping is recorded as <strong>ignored</strong>.</li>
 </ol>
@@ -350,8 +346,8 @@ sends no <code>Ping-Body-Limit</code> header; the size cap below is then the onl
 <p>A request whose body is larger than 2.5 MiB (2,621,440 bytes), or than the body
 limit when that is higher, is refused with 400 and an HTML error page, and nothing
 is recorded.</p>
-<p>The body is stored as bytes, so it need not be text. It must be valid UTF-8 when
-the check <a href="#interpreting-pings">filters by keywords</a>.</p>
+<p>The body is stored as bytes, so it need not be text, also when the check
+<a href="#interpreting-pings">filters by keywords</a>.</p>
 <h2 id="run-ids">Run IDs</h2>
 <p>Every endpoint takes an optional <code>rid</code> query parameter: a client-picked UUID in the
 canonical textual representation, in lower or upper case

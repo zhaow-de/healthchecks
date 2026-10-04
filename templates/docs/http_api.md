@@ -78,7 +78,6 @@ Status | Body | Meaning
 404 | `not found` | No check has this UUID; no check has this slug under this ping key; no project has this ping key; an unknown lowercase suffix follows a UUID; or any lowercase suffix follows an uppercase or undashed UUID (in these two, the URL is read as a slug URL).
 404 | an HTML error page | The URL matches no ping route: an uppercase or undashed UUID with no suffix, a trailing slash after a slug or a suffix, or an unknown suffix after a slug.
 409 | `ambiguous slug` | More than one check in the project has this slug.
-500 | an HTML error page | The check filters by keywords and the request body is not valid UTF-8.
 
 A 4xx response means the request itself is wrong: fix the URL, the `rid` or the
 body rather than repeating it.
@@ -181,8 +180,9 @@ SITE_NAME applies these steps in order:
    list, matched as case-sensitive substrings. The first list with a match decides:
    failure, success or start. When nothing matches, the ping is a failure if
    `filter_default_fail` is set and **ignored** otherwise. This step overrides the
-   endpoint, `/log` and `/<exit-status>` included, and a body that is not valid
-   UTF-8 gets a 500 response and is not recorded.
+   endpoint, `/log` and `/<exit-status>` included. Bytes that are not valid UTF-8,
+   such as a multibyte character cut short by the body limit, are read as the
+   replacement character (U+FFFD), and the rest of the body is matched as usual.
 4. **Manual resume.** If the check is paused and requires a manual resume
    (`manual_resume`), every ping is recorded as **ignored**.
 
@@ -220,8 +220,8 @@ A request whose body is larger than 2.5 MiB (2,621,440 bytes), or than the body
 limit when that is higher, is refused with 400 and an HTML error page, and nothing
 is recorded.
 
-The body is stored as bytes, so it need not be text. It must be valid UTF-8 when
-the check [filters by keywords](#interpreting-pings).
+The body is stored as bytes, so it need not be text, also when the check
+[filters by keywords](#interpreting-pings).
 
 ## Run IDs {: #run-ids }
 

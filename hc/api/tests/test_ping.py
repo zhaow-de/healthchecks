@@ -471,6 +471,34 @@ class PingTestCase(BaseTestCase):
         ping = Ping.objects.get()
         self.assertEqual(ping.kind, "start")
 
+    def test_it_filters_body_that_is_not_utf8(self) -> None:
+        self.check.filter_http_body = True
+        self.check.failure_kw = "FAIL"
+        self.check.save()
+
+        r = self.client.post(self.url, data=b"\xff\xfe FAIL", content_type="text/plain")
+        self.assertEqual(r.status_code, 200)
+
+        ping = Ping.objects.get()
+        self.assertEqual(ping.kind, "fail")
+        assert ping.body_raw
+        self.assertEqual(bytes(ping.body_raw), b"\xff\xfe FAIL")
+
+    @override_settings(PING_BODY_LIMIT=8)
+    def test_it_filters_body_cut_inside_a_multibyte_character(self) -> None:
+        self.check.filter_http_body = True
+        self.check.success_kw = "SUCCESS"
+        self.check.save()
+
+        body = "SUCCESS\u00e9".encode()
+        r = self.client.post(self.url, data=body, content_type="text/plain")
+        self.assertEqual(r.status_code, 200)
+
+        ping = Ping.objects.get()
+        self.assertEqual(ping.kind, None)
+        assert ping.body_raw
+        self.assertEqual(bytes(ping.body_raw), body[:8])
+
     def test_manual_resume_takes_precedence_over_keywords(self) -> None:
         self.check.filter_http_body = True
         self.check.success_kw = "SUCCESS"

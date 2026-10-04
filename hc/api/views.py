@@ -214,7 +214,9 @@ def ping(
         action = "ign"
 
     if action != "ign" and check.filter_http_body:
-        body_text = body.decode()
+        # Undecodable bytes, a multibyte character cut by PING_BODY_LIMIT included,
+        # become U+FFFD, so the rest of the body is still matched
+        body_text = body.decode(errors="replace")
         if check.failure_kw and match_keywords(body_text, check.failure_kw):
             action = "fail"
         elif check.success_kw and match_keywords(body_text, check.success_kw):
