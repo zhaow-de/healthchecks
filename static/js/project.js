@@ -1,53 +1,27 @@
-$(function () {
-    $("#key-created-modal").modal("show");
+hc.ready(function () {
+    hc.showModal("#key-created-modal");
 
-    $("[title]").tooltip();
+    hc.on("#set-project-name-modal", "shown.bs.modal", function () {
+        hc.$("#project-name").focus();
+    });
 
-    $(".member-remove").click(function () {
-        $("#rtm-email").text(this.dataset.email);
-        $("#remove-team-member-email").val(this.dataset.email);
-        $("#remove-team-member-modal").modal("show");
-
+    hc.on("a[data-revoke-key]", "click", function () {
+        hc.$("#revoke-key-type").value = this.dataset.revokeKey;
+        const name = this.dataset.name;
+        hc.$$("#revoke-key-modal .name").forEach(function (el) {
+            el.textContent = name;
+        });
+        hc.showModal("#revoke-key-modal");
         return false;
     });
 
-    $("#invite-team-member-modal").on("shown.bs.modal", function () {
-        $("#itm-email").focus();
-    });
-
-    $("#set-project-name-modal").on("shown.bs.modal", function () {
-        $("#project-name").focus();
-    });
-
-    $(".add-to-team").click(function () {
-        $("#itm-email").val(this.dataset.email);
-        $("#itm-email-display").text(this.dataset.email);
-        $("#invite-team-member-modal").modal("show");
-        return false;
-    });
-
-    // Enable the submit button in transfer form when user selects
-    // the target owner:
-    $("#new-owner").on("change", function () {
-        $("#transfer-confirm").prop("disabled", !this.value);
-    });
-
-    $("a[data-revoke-key]").click(function () {
-        $("#revoke-key-type").val(this.dataset.revokeKey);
-        $("#revoke-key-modal .name").text(this.dataset.name);
-        $("#revoke-key-modal").modal("show");
-        return false;
-    });
-
-    $("a[data-create-key]").click(function () {
-        $("#create-key-type").val(this.dataset.createKey);
-        $("#create-key-form").submit();
-        return false;
-    });
-
-    $("code[data-plaintext]").tooltip({"title": "Click to reveal"});
-    $("code[data-plaintext]").click(function () {
-        $(this).text(this.dataset.plaintext).tooltip("destroy");
+    hc.tooltip("code[data-plaintext]", {"title": "Click to reveal"});
+    hc.on("code[data-plaintext]", "click", function () {
+        const tip = bootstrap.Tooltip.getInstance(this);
+        if (tip) {
+            tip.dispose();
+        }
+        this.textContent = this.dataset.plaintext;
     });
 
 

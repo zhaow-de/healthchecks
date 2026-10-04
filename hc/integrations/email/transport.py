@@ -1,13 +1,10 @@
-from __future__ import annotations
-
-import email
 import logging
-from email.message import EmailMessage
-from smtplib import SMTPDataError, SMTPServerDisconnected
+
+from django.conf import settings
 
 from hc.accounts.models import Profile
 from hc.api.models import Flip, Notification
-from hc.api.transports import Transport, TransportError, get_ping_body_bytes
+from hc.api.transports import Transport, TransportError, get_ping_body
 from hc.lib import emails
 from hc.lib.signing import sign_bounce_id
 
@@ -15,30 +12,12 @@ logger = logging.getLogger(__name__)
 
 
 class Email(Transport):
-    def bytes_to_sanitized_message(self, data: bytes) -> EmailMessage:
-        m = email.message_from_bytes(data, policy=email.policy.SMTP)
-        if m.is_multipart():
-            parts = m.get_payload()
-            # If is_multipart=True then get_payload() returns list[Message].
-            # Mypy does not know this, hence the assert.
-            assert isinstance(parts, list)
-            # use list() here so we don't mutate the same list we're iterating
-            for part in list(parts):
-                if part.get_content_type() == "message/rfc822":
-                    # Drop message/rfc822 parts to avoid recursion issues with
-                    # deep attachment-within-attachment stacks.
-                    parts.remove(part)
-                if part.get_content_maintype() == "text":
-                    # Call set_content to force correct content-transfer-encoding
-                    # selection and line wrapping
-                    part.set_content(part.get_content())
-        else:
-            # Call set_content to force correct content-transfer-encoding
-            # selection and line wrapping
-            m.set_content(m.get_content())
-        return m
-
     def notify(self, flip: Flip, notification: Notification) -> None:
+        # Not permanent: a permanent error disables the channel, which would stay
+        # disabled after SMTP is configured
+        if not settings.MAILERS:
+            raise TransportError("No SMTP configuration")
+
         if not self.channel.email_verified:
             raise TransportError("Email not verified")
 
@@ -62,32 +41,24 @@ class Email(Transport):
             projects = None
 
         ping = self.last_ping(flip)
-        body_bytes = get_ping_body_bytes(ping)
-        subject, attachment = None, None
-        if ping is not None and ping.scheme == "email" and body_bytes:
-            attachment = self.bytes_to_sanitized_message(body_bytes)
-            subject = attachment.get("subject", "")
-
         ctx = {
             "flip": flip,
             "check": flip.owner,
             "ping": ping,
-            "body": body_bytes.decode(errors="replace") if body_bytes else None,
-            "subject": subject,
+            "body": get_ping_body(ping),
             "projects": projects,
             "unsub_link": unsub_link,
             "tz": profile.tz,
-            "ping_attached": attachment is not None,
         }
 
         try:
-            emails.alert(self.channel.email.value, ctx, headers, attachment)
-        except (SMTPServerDisconnected, SMTPDataError, ConnectionRefusedError):
+            emails.alert(self.channel.email.value, ctx, headers)
+        except OSError as e:
+            # OSError covers SMTPException, socket timeouts and ssl errors
             logger.exception("Exception while sending email")
-            raise TransportError("SMTP connection error")
+            raise TransportError(f"SMTP error: {type(e).__name__}") from e
 
     def is_noop(self, status: str) -> bool:
         if status == "down":
             return not self.channel.email.notify_down
-        else:
-            return not self.channel.email.notify_up
+        return not self.channel.email.notify_up

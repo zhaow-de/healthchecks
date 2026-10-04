@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from hc.accounts.models import Project
 from hc.api.models import Channel, Check
 from hc.test import BaseTestCase
@@ -22,15 +20,6 @@ class UpdateChannelTestCase(BaseTestCase):
         checks = channel.checks.all()
         assert len(checks) == 1
         assert checks[0].code == self.check.code
-
-    def test_team_access_works(self) -> None:
-        payload = {"channel": self.channel.code, f"check-{self.check.code}": True}
-
-        # Logging in as bob, not alice. Bob has team access so this
-        # should work.
-        self.client.login(username="bob@example.org", password="password")
-        r = self.client.post(self.channels_url, data=payload, follow=True)
-        self.assertEqual(r.status_code, 200)
 
     def test_it_checks_channel_user(self) -> None:
         charlies_project = Project.objects.create(owner=self.charlie)
@@ -91,13 +80,3 @@ class UpdateChannelTestCase(BaseTestCase):
         self.client.login(username="alice@example.org", password="password")
         r = self.client.post(self.channels_url, data=payload)
         self.assertEqual(r.status_code, 400)
-
-    def test_it_requires_rw_access(self) -> None:
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
-
-        payload = {"channel": self.channel.code}
-
-        self.client.login(username="bob@example.org", password="password")
-        r = self.client.post(self.channels_url, data=payload)
-        self.assertEqual(r.status_code, 403)

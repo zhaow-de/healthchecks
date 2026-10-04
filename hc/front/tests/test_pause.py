@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from datetime import timedelta as td
 
 from django.utils.timezone import now
@@ -36,11 +34,6 @@ class PauseTestCase(BaseTestCase):
         r = self.client.get(self.url)
         self.assertEqual(r.status_code, 405)
 
-    def test_it_allows_cross_team_access(self) -> None:
-        self.client.login(username="bob@example.org", password="password")
-        r = self.client.post(self.url)
-        self.assertRedirects(r, self.redirect_url)
-
     def test_it_clears_last_start_alert_after(self) -> None:
         self.check.last_start = now()
         self.check.alert_after = self.check.last_start + td(hours=1)
@@ -58,13 +51,14 @@ class PauseTestCase(BaseTestCase):
         r = self.client.post(self.url, HTTP_X_REQUESTED_WITH="XMLHttpRequest")
         self.assertEqual(r.status_code, 200)
 
-    def test_it_requires_rw_access(self) -> None:
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
-
-        self.client.login(username="bob@example.org", password="password")
+    def test_it_checks_ownership(self) -> None:
+        self.client.login(username="charlie@example.org", password="password")
         r = self.client.post(self.url)
-        self.assertEqual(r.status_code, 403)
+        self.assertEqual(r.status_code, 404)
+
+        self.check.refresh_from_db()
+        self.assertEqual(self.check.status, "up")
+        self.assertFalse(Flip.objects.exists())
 
     def test_it_clears_next_nag_date(self) -> None:
         self.profile.nag_period = td(hours=1)

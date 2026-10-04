@@ -4,21 +4,19 @@
 <td></td>
 <td></td>
 <td>
-{% if event.kind == "ign" %}<span class="label label-ign">Ignored</span>
-{% elif event.exitstatus %}<span class="label label-danger">Status {{ event.exitstatus }}</span>
-{% elif event.kind == "fail" %}<span class="label label-danger">Failure</span>
-{% elif event.kind == "start" %}<span class="label label-start">Started</span>
-{% elif event.kind == "log" %}<span class="label label-log">Log</span>
-{% else %}<span class="label label-success">OK</span>
+{% if event.kind == "ign" %}<span class="badge text-bg-light label-ign">Ignored</span>
+{% elif event.exitstatus %}<span class="badge text-bg-danger">Status {{ event.exitstatus }}</span>
+{% elif event.kind == "fail" %}<span class="badge text-bg-danger">Failure</span>
+{% elif event.kind == "start" %}<span class="badge text-success border border-success label-start">Started</span>
+{% elif event.kind == "log" %}<span class="badge text-bg-light label-log">Log</span>
+{% else %}<span class="badge text-bg-success">OK</span>
 {% endif %}
 </td>
 <td>
 {% if event.duration %}<div class="duration"><span class="ic-timer"></span> {{ event.duration|hms }}</div>{% endif %}
-{% if event.rid %}<span class="label rid">{{ event.rid|first5 }}</span> {% endif %}
-{% if event.scheme == "email" %}{{ event.ua }}{% else %}
+{% if event.rid %}<span class="badge rid">{{ event.rid|first5 }}</span> {% endif %}
 {{ event.scheme|upper }} {{ event.method }}{% if event.remote_addr %} from {{ event.remote_addr }}{% endif %}
-<code>{% if event.body_raw_preview %}- {{ event.body_raw_preview|decode }}{% elif event.object_size %}- {{ event.object_size }} byte body{% endif %}{% if event.ua %} - {{ event.ua|truncatechars:80 }}{% endif %}</code>
-{% endif %}
+<code>{% if event.body_raw_preview %}- {{ event.body_raw_preview|decode }}{% endif %}{% if event.ua %} - {{ event.ua|truncatechars:80 }}{% endif %}</code>
 </td>
 </tr>
 {% elif event.check_status %}

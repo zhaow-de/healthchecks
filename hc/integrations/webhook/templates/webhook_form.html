@@ -20,12 +20,12 @@
             goes up or down.  You can use placeholders <strong>$NAME</strong>,
             <strong>$STATUS</strong> and others in webhook URLs, request body and
             header values
-            <a href="#" data-toggle="modal" data-target="#reference-modal">(available placeholders)</a>.
+            <a href="#" data-bs-toggle="modal" data-bs-target="#reference-modal">(available placeholders)</a>.
         </p>
         <p>
             Webhook retry policy:
             {% site_name %} retries failed webhook calls up to 2 additional times.
-            {% site_name %} considers a HTTP request failed if:
+            {% site_name %} considers an HTTP request failed if:
         </p>
         <ul>
             <li>The destination server does not return a complete response within 30 seconds.</li>
@@ -35,9 +35,8 @@
         <form id="add-webhook-form" method="post">
         {% csrf_token %}
 
-        <div class="form-group {{ form.name.css_classes }}">
-            <br>
-            <label>Name</label>
+        <div class="mb-3 {{ form.name.css_classes }}">
+            <label for="webhook-form-name" class="form-label">Name</label>
             <input
                 id="webhook-form-name"
                 name="name"
@@ -45,18 +44,18 @@
                 type="text"
                 class="form-control" />
 
-            <div class="help-block">Give this integration a descriptive name, so you can easily recognize it later. </div>
+            <div class="form-text">Give this integration a descriptive name, so you can easily recognize it later. </div>
         </div>
 
         <div class="row">
         <div class="col-sm-6">
-            <h2>Execute when a check goes <strong class="label-down">down</strong></h2>
+            <h2>Execute when a check goes <strong class="text-danger">down</strong></h2>
             <br />
 
-            <div class="form-group {{ form.url_down.css_classes }}">
-                <label>URL</label>
-                <div class="method-url-group">
-                    <select id="method-down" name="method_down" class="form-control">
+            <div class="mb-3 {{ form.url_down.css_classes }}">
+                <label class="form-label">URL</label>
+                <div class="input-group method-url-group">
+                    <select id="method-down" name="method_down" class="form-select">
                         <option{% if form.method_down.value == "GET" %} selected{% endif %}>GET</option>
                         <option{% if form.method_down.value == "POST" %} selected{% endif %}>POST</option>
                         <option{% if form.method_down.value == "PUT" %} selected{% endif %}>PUT</option>
@@ -69,34 +68,34 @@
                         placeholder="https://..." />
                 </div>
                 {% if form.url_down.errors %}
-                <div class="help-block">
+                <div class="form-text">
                     {{ form.url_down.errors|join:" " }}
                 </div>
                 {% endif %}
             </div>
 
-            <div id="body-down-group" class="form-group {{ form.body_down.css_classes }}" style="display: none">
-                <label class="control-label">Request Body</label>
+            <div id="body-down-group" class="mb-3 d-none {{ form.body_down.css_classes }}">
+                <label class="form-label">Request Body</label>
                 <textarea
                     class="form-control"
                     rows="3"
                     name="body_down"
                     placeholder='{"status": "$STATUS"}'>{{ form.body_down.value|default:"" }}</textarea>
                 {% if form.body_down.errors %}
-                <div class="help-block">
+                <div class="form-text">
                     {{ form.body_down.errors|join:" " }}
                 </div>
                 {% endif %}
             </div>
 
-            <div class="form-group {{ form.headers_down.css_classes }}">
-                <label class="control-label">Request Headers</label>
+            <div class="mb-3 {{ form.headers_down.css_classes }}">
+                <label class="form-label">Request Headers</label>
                 <textarea
                     class="form-control"
                     rows="3"
                     name="headers_down"
                     placeholder="X-Sample-Header: $NAME has gone down">{{ form.headers_down.value|default:"" }}</textarea>
-                <div class="help-block">
+                <div class="form-text">
                     {% if form.headers_down.errors %}
                         {{ form.headers_down.errors|join:" " }}
                     {% else %}
@@ -107,12 +106,12 @@
         </div>
 
         <div class="col-sm-6">
-            <h2>Execute when a check goes <strong class="label-up">up</strong></h2>
+            <h2>Execute when a check goes <strong class="text-success">up</strong></h2>
             <br />
-            <div class="form-group {{ form.url_up.css_classes }}">
-                <label>URL</label>
-                <div class="method-url-group">
-                    <select id="method-up" name="method_up" class="form-control">
+            <div class="mb-3 {{ form.url_up.css_classes }}">
+                <label class="form-label">URL</label>
+                <div class="input-group method-url-group">
+                    <select id="method-up" name="method_up" class="form-select">
                         <option{% if form.method_up.value == "GET" %} selected{% endif %}>GET</option>
                         <option{% if form.method_up.value == "POST" %} selected{% endif %}>POST</option>
                         <option{% if form.method_up.value == "PUT" %} selected{% endif %}>PUT</option>
@@ -126,33 +125,33 @@
                 </div>
 
                 {% if form.url_up.errors %}
-                <div class="help-block">
+                <div class="form-text">
                     {{ form.url_up.errors|join:" " }}
                 </div>
                 {% endif %}
             </div>
-            <div id="body-up-group" class="form-group {{ form.body_up.css_classes }}" style="display: none">
-                <label class="control-label">Request Body</label>
+            <div id="body-up-group" class="mb-3 d-none {{ form.body_up.css_classes }}">
+                <label class="form-label">Request Body</label>
                 <textarea
                     class="form-control"
                     rows="3"
                     name="body_up"
                     placeholder='{"status": "$STATUS"}'>{{ form.body_up.value|default:"" }}</textarea>
                 {% if form.post_data.errors %}
-                <div class="help-block">
+                <div class="form-text">
                     {{ form.post_data.errors|join:" " }}
                 </div>
                 {% endif %}
             </div>
 
-            <div class="form-group {{ form.headers_up.css_classes }}">
-                <label class="control-label">Request Headers</label>
+            <div class="mb-3 {{ form.headers_up.css_classes }}">
+                <label class="form-label">Request Headers</label>
                 <textarea
                     class="form-control"
                     rows="3"
                     name="headers_up"
                     placeholder="X-Sample-Header: $NAME is back up">{{ form.headers_up.value|default:"" }}</textarea>
-                <div class="help-block">
+                <div class="form-text">
                     {% if form.headers_up.errors %}
                         {{ form.headers_up.errors|join:" " }}
                     {% else %}
@@ -163,9 +162,7 @@
         </div>
         </div>
 
-        <br>
-        <br>
-        <div class="form-group text-right">
+        <div class="mt-4 mb-3 text-end">
             <button type="submit" class="btn btn-primary">
                 {% if channel %}
                 Save Changes
@@ -179,11 +176,12 @@
     </div>
 </div>
 
-<div id="reference-modal" class="modal">
-    <div class="modal-dialog">
+<div id="reference-modal" class="modal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
-                <h4>Supported Placeholders</h4>
+                <h4 class="modal-title">Supported Placeholders</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <p>
@@ -192,7 +190,7 @@
                     with the correct values.
                 </p>
 
-                <table id="webhook-variables" class="table modal-body">
+                <table id="webhook-variables" class="table">
                     <tr>
                         <th><code>$CODE</code></th>
                         <td>The UUID code of the check.</td>
@@ -262,7 +260,7 @@
                 </table>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-default" data-dismiss="modal">Got It!</button>
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Got It!</button>
             </div>
         </div>
     </div>

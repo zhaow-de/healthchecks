@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from uuid import UUID
 
 from django.conf import settings
@@ -11,7 +9,7 @@ from django.views.decorators.csrf import csrf_exempt
 
 from hc.accounts.http import AuthenticatedHttpRequest
 from hc.api.models import Channel
-from hc.front.views import _get_rw_project_for_user
+from hc.front.views import _get_project_for_user
 from hc.integrations.email import forms
 
 
@@ -20,30 +18,36 @@ def email_form(request: AuthenticatedHttpRequest, channel: Channel) -> HttpRespo
     if request.method == "POST":
         form = forms.EmailForm(request.POST)
         if form.is_valid():
-            if channel.disabled or form.cleaned_data["value"] != channel.email.value:
-                channel.disabled = False
+            changed = channel.disabled or form.cleaned_data["value"] != channel.email.value
+            verified = channel.email_verified
+            if changed:
+                # In self-hosted setting, administrator can set
+                # EMAIL_USE_VERIFICATION=False to disable email verification.
+                # If the user is adding *their own* address we skip the verification step
+                verified = not settings.EMAIL_USE_VERIFICATION or form.cleaned_data["value"] == request.user.email
 
-                if not settings.EMAIL_USE_VERIFICATION:
-                    # In self-hosted setting, administrator can set
-                    # EMAIL_USE_VERIFICATION=False to disable email verification
-                    channel.email_verified = True
-                elif form.cleaned_data["value"] == request.user.email:
-                    # If the user is adding *their own* address
-                    # we skip the verification step
-                    channel.email_verified = True
-                else:
-                    channel.email_verified = False
+            # Without mail, a new or changed address is refused, not confirmed unasked, which would alert it once SMTP is set
+            if changed and not verified and not settings.MAILERS:
+                form.add_error(
+                    "value",
+                    "This server cannot send email, so it cannot confirm this address. "
+                    "Use your account's own address, or set EMAIL_USE_VERIFICATION to False.",
+                )
+            else:
+                if changed:
+                    channel.disabled = False
+                    channel.email_verified = verified
 
-            channel.value = form.get_value()
-            channel.save()
+                channel.value = form.get_value()
+                channel.save()
 
-            if adding:
-                channel.assign_all_checks()
+                if adding:
+                    channel.assign_all_checks()
 
-            if not channel.email_verified:
-                channel.send_verify_link()
+                if not channel.email_verified and settings.MAILERS:
+                    channel.send_verify_link()
 
-            return redirect("hc-channels", channel.project.code)
+                return redirect("hc-channels", channel.project.code)
     elif adding:
         form = forms.EmailForm()
     else:
@@ -59,6 +63,7 @@ def email_form(request: AuthenticatedHttpRequest, channel: Channel) -> HttpRespo
         "page": "channels",
         "project": channel.project,
         "use_verification": settings.EMAIL_USE_VERIFICATION,
+        "can_send_email": bool(settings.MAILERS),
         "form": form,
         "is_new": adding,
     }
@@ -67,7 +72,7 @@ def email_form(request: AuthenticatedHttpRequest, channel: Channel) -> HttpRespo
 
 @login_required
 def add(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
-    project = _get_rw_project_for_user(request, code)
+    project = _get_project_for_user(request, code)
     channel = Channel(project=project, kind="email")
     return email_form(request, channel)
 
@@ -76,7 +81,7 @@ def verify(request: HttpRequest, code: UUID, token: str) -> HttpResponse:
     channel = get_object_or_404(Channel, code=code)
     if channel.make_token() == token:
         channel.email_verified = True
-        channel.save()
+        channel.save(update_fields=["email_verified"])
         return render(request, "front/verify_email_success.html")
 
     return render(request, "bad_link.html")

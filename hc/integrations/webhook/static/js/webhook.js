@@ -1,15 +1,14 @@
-$(function() {
-    $("#method-down").change(function() {
-        var method = this.value;
-        $("#body-down-group").toggle(method != "GET");
-    });
+hc.ready(function() {
+    // Show the "Request Body" field only for methods that send a body
+    ["down", "up"].forEach(function(kind) {
+        const select = document.getElementById("method-" + kind);
+        if (!select) return;
 
-    $("#method-up").change(function() {
-        var method = this.value;
-        $("#body-up-group").toggle(method != "GET");
-    });
+        function update() {
+            hc.toggle("#body-" + kind + "-group", select.value !== "GET");
+        }
 
-    // On page load, check if we need to show "request body" fields
-    $("#method-down").trigger("change");
-    $("#method-up").trigger("change");
+        select.addEventListener("change", update);
+        update();
+    });
 });

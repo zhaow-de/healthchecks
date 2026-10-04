@@ -1,5 +1,5 @@
 #api-keys .not-set {
-    color: var(--text-muted);
+    color: var(--bs-secondary-color);
     font-style: italic;
 }
 

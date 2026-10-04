@@ -27,14 +27,14 @@
 }
 
 #link-instruction {
-    color: #999;
+    color: var(--bs-tertiary-color);
     font-style: italic;
     padding: 13px 16px;
     margin-bottom: 36px;
 }
 
 #login-sep {
-    background: var(--border-color);
+    background: var(--bs-border-color);
     position: absolute;
     top: 10%;
     right: -1px;
@@ -48,29 +48,11 @@
     width: 40px;
     left: -20px;
     text-align: center;
-    background: var(--body-bg);
+    background: var(--bs-body-bg);
     font-style: italic;
-    color: #666;
+    color: var(--bs-secondary-color);
     font-size: 12px;
     padding: 8px 0;
-}
-
-#xs-login-sep {
-    text-align: center;
-    margin: 40px;
-    font-style: italic;
-    color: #666;
-    font-size: 12px;
-    height: 1px;
-    background: #ddd;
-}
-
-#xs-login-sep div {
-    position: relative;
-    margin: 0 auto;
-    width: 30px;
-    top: -9px;
-    background: var(--body-bg);
 }
 
 #login-password {

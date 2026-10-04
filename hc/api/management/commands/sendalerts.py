@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import logging
 import signal
 import time
@@ -16,7 +14,6 @@ from django.db import close_old_connections, connection
 from django.utils.timezone import now
 
 from hc.api.models import Check, Flip
-from hc.lib.statsd import statsd
 
 logger = logging.getLogger("hc")
 
@@ -36,7 +33,6 @@ def notify(flip: Flip) -> str | None:
     if not channels:
         return None
 
-    send_start = now()
     logs = [f"{check.code} goes {flip.new_status}"]
     for ch in channels:
         notify_start = time.time()
@@ -45,13 +41,9 @@ def notify(flip: Flip) -> str | None:
         code8 = str(ch.code)[:8]
         if error:
             logs.append(f"  {code8} ({ch.kind}) Error in {secs:.1f}s: {error}")
-            statsd.incr(f"hc.notifications.{ch.kind}.fail")
         else:
             logs.append(f"  {code8} ({ch.kind}) OK in {secs:.1f}s")
-            statsd.incr(f"hc.notifications.{ch.kind}.success")
 
-    statsd.timing("hc.sendalerts.dwellTime", send_start - flip.created)
-    statsd.timing("hc.sendalerts.sendTime", now() - send_start)
     return "\n".join(logs)
 
 
@@ -63,6 +55,7 @@ class Command(BaseCommand):
         self.executor = ThreadPoolExecutor(max_workers=10)
         self.seats = BoundedSemaphore(10)
         self.shutdown = False
+        self.signum: int | None = None
 
     def add_arguments(self, parser: ArgumentParser) -> None:
         parser.add_argument(
@@ -72,21 +65,14 @@ class Command(BaseCommand):
             help="The number of concurrent worker processes to use",
         )
 
-        parser.add_argument(
-            "--pool",
-            action="store_true",
-            help="Use DB connection pool (PostgreSQL-only)",
-        )
-
     def on_notify_done(self, future: Future[str | None]) -> None:
         self.seats.release()
 
         try:
             if logs := future.result():
-                self.stdout.write(logs)
+                logger.info(logs)
         except Exception as exc:
             logger.error("Exception in notify", exc_info=exc)
-            raise
 
     def process_one_flip(self) -> bool:
         """Find unprocessed flip, send notifications.
@@ -115,7 +101,6 @@ class Command(BaseCommand):
             # Nothing got updated: another sendalerts process got there first.
             return True
 
-        statsd.incr("hc.sendalerts.processFlip")
         f = self.executor.submit(notify, flip)
         f.add_done_callback(self.on_notify_done)
         return True
@@ -177,19 +162,16 @@ class Command(BaseCommand):
         return True
 
     def on_signal(self, signum: int, frame: FrameType | None) -> None:
-        desc = signal.strsignal(signum)
-        self.stdout.write(f"{desc}, finishing...\n")
+        # Log nothing here: the handler interrupts the main thread, which may be
+        # inside a query or a write to stdout, and neither the db connection
+        # nor the stream can be entered again
+        self.signum = signum
         self.shutdown = True
 
-    def handle(self, num_workers: int, pool: bool, **options: Any) -> str:
+    def handle(self, num_workers: int, **options: Any) -> None:
         db = settings.DATABASES["default"]
         if "OPTIONS" in db and "application_name" in db["OPTIONS"]:
             db["OPTIONS"]["application_name"] = "sendalerts"
-
-        if pool:
-            self.stdout.write(
-                "WARNING: The --pool argument is not supported any more and will be ignored.\n"
-            )
 
         self.seats = BoundedSemaphore(num_workers)
         self.executor = ThreadPoolExecutor(max_workers=num_workers)
@@ -197,7 +179,7 @@ class Command(BaseCommand):
         signal.signal(signal.SIGTERM, self.on_signal)
         signal.signal(signal.SIGINT, self.on_signal)
 
-        self.stdout.write("sendalerts is now running\n")
+        logger.info("sendalerts is now running")
         while not self.shutdown:
             # Create flips for any checks going down
             while self.handle_going_down() and not self.shutdown:
@@ -212,5 +194,6 @@ class Command(BaseCommand):
             if not self.shutdown:
                 time.sleep(2)
 
+        if self.signum is not None:
+            logger.info("%s, finishing...", signal.strsignal(self.signum))
         self.executor.shutdown(wait=True)
-        return "Done."

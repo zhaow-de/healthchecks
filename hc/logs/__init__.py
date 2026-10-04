@@ -1,11 +1,24 @@
-from __future__ import annotations
-
+import json
 import logging
 import socket
+from datetime import UTC, datetime
 
 from django.db import Error
 
 FORMATTER = logging.Formatter()
+
+
+class JsonFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        doc = {
+            "time": datetime.fromtimestamp(record.created, UTC).isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+        if record.exc_info:
+            doc["exception"] = self.formatException(record.exc_info)
+        return json.dumps(doc)
 
 
 class Handler(logging.Handler):
@@ -25,5 +38,5 @@ class Handler(logging.Handler):
                 message=record.getMessage(),
                 traceback=traceback,
             )
-        except Error as e:
-            print(e)
+        except Error:
+            self.handleError(record)

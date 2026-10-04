@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from hc.api.models import Check
 from hc.test import BaseTestCase
 
@@ -29,11 +27,6 @@ class StatusTestCase(BaseTestCase):
     def test_it_returns_403_for_anon_requests(self) -> None:
         r = self.client.get(self.url)
         self.assertEqual(r.status_code, 403)
-
-    def test_it_allows_cross_team_access(self) -> None:
-        self.client.login(username="bob@example.org", password="password")
-        r = self.client.get(self.url)
-        self.assertEqual(r.status_code, 200)
 
     def test_it_checks_ownership(self) -> None:
         self.client.login(username="charlie@example.org", password="password")

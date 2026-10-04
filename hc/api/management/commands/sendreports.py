@@ -1,5 +1,4 @@
-from __future__ import annotations
-
+import logging
 import signal
 import time
 from argparse import ArgumentParser
@@ -14,9 +13,11 @@ from django.utils.timezone import now
 
 from hc.accounts.models import NO_NAG, Profile
 
+logger = logging.getLogger("hc")
+
 
 class Command(BaseCommand):
-    help = "Send due monthly reports and nags"
+    help = "Send due reports and nags"
     tmpl = "Sent monthly report to %s"
 
     def pause(self) -> None:
@@ -28,7 +29,7 @@ class Command(BaseCommand):
             action="store_true",
             dest="loop",
             default=False,
-            help="Keep running indefinitely in a 300 second wait loop",
+            help="Keep running indefinitely, checking for due reports and nags every 60 seconds",
         )
 
     def handle_one_report(self) -> bool:
@@ -44,10 +45,8 @@ class Command(BaseCommand):
             return False
 
         # A sort of optimistic lock. Will try to update next_report_date,
-        # and if does get modified, we're in drivers seat:
-        qq = Profile.objects.filter(
-            id=profile.id, next_report_date=profile.next_report_date
-        )
+        # and if it does get modified, we're in the driver's seat:
+        qq = Profile.objects.filter(id=profile.id, next_report_date=profile.next_report_date)
 
         # Next report date is currently not scheduled: schedule it and move on.
         if profile.next_report_date is None:
@@ -60,7 +59,7 @@ class Command(BaseCommand):
             return True
 
         if profile.send_report():
-            self.stdout.write(self.tmpl % profile.user.email)
+            logger.info(self.tmpl, profile.user.email)
             # Pause before next report to avoid hitting sending quota
             self.pause()
 
@@ -83,30 +82,33 @@ class Command(BaseCommand):
             return True
 
         if profile.send_report(nag=True):
-            self.stdout.write(f"Sent nag to {profile.user.email}")
+            logger.info("Sent nag to %s", profile.user.email)
             # Pause before next report to avoid hitting sending quota
             self.pause()
         else:
             profile.next_nag_date = None
-            profile.save()
+            profile.save(update_fields=["next_nag_date"])
 
         return True
 
     def on_signal(self, signum: int, frame: FrameType | None) -> None:
-        desc = signal.strsignal(signum)
-        self.stdout.write(f"{desc}, finishing...\n")
+        # Log nothing here: the handler interrupts the main thread, which may be
+        # inside a query or a write to stdout, and neither the db connection
+        # nor the stream can be entered again
+        self.signum = signum
         self.shutdown = True
 
-    def handle(self, loop: bool, **options: Any) -> str:
+    def handle(self, loop: bool, **options: Any) -> None:
         db = settings.DATABASES["default"]
         if "OPTIONS" in db and "application_name" in db["OPTIONS"]:
             db["OPTIONS"]["application_name"] = "sendreports"
 
         self.shutdown = False
+        self.signum: int | None = None
         signal.signal(signal.SIGTERM, self.on_signal)
         signal.signal(signal.SIGINT, self.on_signal)
 
-        self.stdout.write("sendreports is now running")
+        logger.info("sendreports is now running")
         while not self.shutdown:
             # The db connection may have timed out,
             # make sure we have a working db connection.
@@ -114,7 +116,7 @@ class Command(BaseCommand):
             if not connection.in_atomic_block:
                 close_old_connections()
 
-            # Monthly reports
+            # Daily, weekly and monthly reports
             while not self.shutdown and self.handle_one_report():
                 pass
 
@@ -126,8 +128,9 @@ class Command(BaseCommand):
                 break
 
             # Sleep for 60 seconds before looking for more work
-            for i in range(60):
+            for _ in range(60):
                 if not self.shutdown:
                     time.sleep(1)
 
-        return "Done."
+        if self.signum is not None:
+            logger.info("%s, finishing...", signal.strsignal(self.signum))

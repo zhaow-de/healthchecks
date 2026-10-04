@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from hc.api.models import Flip, Notification
 from hc.api.transports import Transport, TransportError
 
@@ -16,6 +14,4 @@ class Group(Transport):
             if error and error != "no-op":
                 error_count += 1
         if error_count:
-            raise TransportError(
-                f"{error_count} out of {len(channels)} notifications failed"
-            )
+            raise TransportError(f"{error_count} out of {len(channels)} notifications failed")

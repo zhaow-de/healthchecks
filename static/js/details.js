@@ -1,194 +1,160 @@
-$(function () {
-    var base = document.getElementById("base-url").getAttribute("href").slice(0, -1);
-    var favicon = document.querySelector('link[rel="icon"]');
-
-    $("#edit-name").click(function() {
-        $('#update-name-modal').modal("show");
-        $("#update-name-input").focus();
+hc.ready(function () {
+    hc.on("#edit-name", "click", function() {
+        hc.showModal("#update-name-modal");
+        hc.$("#update-name-input").focus();
 
         return false;
     });
 
-    // Configure Tom-Select for entering tags
-    function toOption(tag) {
-        return {value: tag}
-    }
+    const allTags = document.getElementById("update-tags-input").dataset.allTags;
+    hc.tagSelect("#update-tags-input", allTags ? allTags.split(" ") : []);
 
-    // Use attr() instead of data() here, as data() converts attribute's string value
-    // to a JS object, but we need an unconverted string:
-    var allTags = $("#update-tags-input").attr("data-all-tags");
-    var options = allTags ? allTags.split(" ").map(toOption) : [];
-    new TomSelect("#update-tags-input", {
-        create: true,
-        createOnBlur: true,
-        delimiter: " ",
-        diacritics: false,
-        hideSelected: true,
-        highlight: false,
-        labelField: "value",
-        options: options,
-        refreshThrottle: 0,
-        render: {no_results:(data, escape) => ""},
-        searchField: ["value"],
-    });
-
-    $("#new-check-alert a").click(function() {
-        $("#" + this.dataset.target).click();
+    hc.on("#new-check-alert a", "click", function() {
+        const target = document.getElementById(this.dataset.target);
+        if (target) target.click();
         return false;
     });
 
-    $("#edit-desc").click(function() {
-        $('#update-name-modal').modal("show");
-        $("#update-desc-input").focus();
+    hc.on("#edit-desc", "click", function() {
+        hc.showModal("#update-name-modal");
+        hc.$("#update-desc-input").focus();
 
         return false;
     });
 
-    $("#current-status-text").on("click", "#resume-btn", function() {
-        $("#resume-form").submit();
+    hc.on("#current-status-text", "click", "#resume-btn", function() {
+        hc.$("#resume-form").submit();
         return false;
     });
 
-    $("#pause").click(function(e) {
-        $("#pause-form").submit();
-        return false;
-    });
-
-    $("#ping-now").click(function(e) {
-        var button = this;
-        $.post(this.dataset.url, function() {
+    hc.on("#ping-now", "click", function() {
+        const button = this;
+        hc.post(this.dataset.url).then(function() {
             button.textContent = "Success!";
-        });
+        }).catch(function() {});
     });
 
-    $("#ping-now").mouseout(function(e) {
+    hc.on("#ping-now", "mouseout", function(e) {
         setTimeout(function() {
             e.target.textContent = "Ping Now!";
         }, 300);
     });
 
-    $(".details-integrations.rw tr").click(function() {
-        var isOn = $(this).toggleClass("on").hasClass("on");
-        $(".label", this).text(isOn ? "ON" : "OFF");
-
-        var token = $('input[name=csrfmiddlewaretoken]').val();
-        $.ajax({
-            url: this.dataset.url,
-            type: "post",
-            headers: {"X-CSRFToken": token},
-            data: {"state": isOn ? "on" : "off"}
+    hc.on(".details-integrations tr", "click", function() {
+        const row = this;
+        const badge = row.querySelector(".badge");
+        const isOn = row.classList.toggle("on");
+        badge.textContent = isOn ? "ON" : "OFF";
+        hc.post(row.dataset.url, {"state": isOn ? "on" : "off"}).catch(function() {
+            // The change was not saved: show the state the server still has
+            row.classList.toggle("on", !isOn);
+            badge.textContent = isOn ? "OFF" : "ON";
         });
     });
 
-    var statusUrl = document.getElementById("events").dataset.statusUrl;
+    const statusUrl = document.getElementById("events").dataset.statusUrl;
     // Look up the active tz switch to determine the initial display timezone:
-    var initialTz = $(".active", "#tz-switcher").data("tz");
-    var dateFormatter = new DateFormatter(initialTz);
-    var lastStatusText = "";
-    var lastUpdated = "";
-    var lastStarted = false;
+    const activeTz = hc.$("#tz-switcher .active");
+    const dateFormatter = new DateFormatter(activeTz ? activeTz.dataset.tz : undefined);
+    let lastStatusText = "";
+    let lastUpdated = "";
+    let lastStarted = false;
     adaptiveSetInterval(function() {
-        $.ajax({
-            url: statusUrl + (lastUpdated ? "?u=" + lastUpdated : ""),
-            dataType: "json",
-            timeout: 2000,
-            success: function(data) {
-                if (data.status_text != lastStatusText) {
-                    lastStatusText = data.status_text;
-                    $("#current-status-icon").attr("class", "status ic-" + data.status);
-                    $("#current-status-text").html(data.status_text);
+        const url = statusUrl + (lastUpdated ? "?u=" + lastUpdated : "");
+        hc.getJSON(url, null, {timeout: 2000}).then(function(data) {
+            if (data.status_text !== lastStatusText) {
+                lastStatusText = data.status_text;
+                hc.$("#current-status-icon").className = "status ic-" + data.status;
+                hc.$("#current-status-text").innerHTML = data.status_text;
 
-                    $('#pause-btn').prop('disabled', data.status == "paused" && !data.started);
-                }
-
-                if (data.started != lastStarted) {
-                    lastStarted = data.started;
-                    $("#current-status-spinner").toggleClass("started", data.started);
-                }
-
-                if (data.events) {
-                    lastUpdated = data.updated;
-                    $("#log-container").html(data.events);
-                    formatPingDates();
-                }
-
-                if (data.downtimes) {
-                    $("#downtimes").html(data.downtimes);
-                }
-
-                if (document.title != data.title) {
-                    document.title = data.title;
-                    var downPostfix = data.status == "down" ? "_down" : "";
-                    favicon.href = `${base}/static/img/favicon${downPostfix}.svg`;
+                const pauseBtn = hc.$("#pause-btn");
+                if (pauseBtn) {
+                    pauseBtn.disabled = data.status === "paused" && !data.started;
                 }
             }
-        });
+
+            if (data.started !== lastStarted) {
+                lastStarted = data.started;
+                hc.$("#current-status-spinner").classList.toggle("started", !!data.started);
+            }
+
+            if (data.events) {
+                lastUpdated = data.updated;
+                hc.$("#log-container").innerHTML = data.events;
+                formatPingDates();
+            }
+
+            if (data.downtimes) {
+                hc.$("#downtimes").innerHTML = data.downtimes;
+            }
+
+            if (document.title !== data.title) {
+                document.title = data.title;
+                hc.setFavicon(data.status === "down");
+            }
+        }).catch(function() {});
     }, true);
 
-    $("#events").on("click", "tr.ok", function() {
-        var n = $("td", this).first().text();
-        var tmpl = $("#log").data("url").slice(0, -2);
-        loadPingDetails(tmpl + n + "/");
-        return false;
-    });
-
     function formatPingDates() {
-        document.querySelectorAll("#log tr").forEach(function(row) {
-            var dt = new Date(row.dataset.dt * 1000);
-            row.children[1].textContent = dateFormatter.formatDate(dt);
-            row.children[2].textContent = dateFormatter.formatTime(dt);
-        })
+        dateFormatter.formatRows(document.querySelectorAll("#log tr"));
 
         // The table is initially hidden to avoid flickering as we convert dates.
         // Once it's ready, set it to visible:
-        $("#log").css("visibility", "visible");
+        const log = hc.$("#log");
+        if (log) log.style.visibility = "visible";
     }
 
-
-    $("#tz-switcher").click(function(ev) {
-        dateFormatter.setTimezone(ev.target.dataset.tz);
+    hc.on("#tz-switcher", "click", "[data-tz]", function() {
+        const button = this;
+        hc.$$("#tz-switcher [data-tz]").forEach(function(el) {
+            el.classList.toggle("active", el === button);
+        });
+        dateFormatter.setTimezone(button.dataset.tz);
         formatPingDates();
     });
 
-    var transferFormLoadStarted = false;
-    $("#transfer-btn").on("mouseenter click", function() {
+    // #transfer-modal keeps a static .modal-dialog (Bootstrap caches it when the
+    // instance is created): the form loads into its .modal-content.
+    let transferFormLoadStarted = false;
+    hc.on("#transfer-btn", "mouseenter click", async function() {
         if (transferFormLoadStarted)
             return;
 
         transferFormLoadStarted = true;
-        $.get(this.dataset.url, function(data) {
-            $("#transfer-modal" ).html(data);
-        });
+        const content = hc.$("#transfer-modal .modal-content");
+        try {
+            content.innerHTML = await hc.getText(this.dataset.url);
+        } catch {
+            // Let the next hover or click try again
+            transferFormLoadStarted = false;
+            content.innerHTML = "<div class='modal-body'>Failed to load.</div>";
+        }
     });
 
-    $(".click-to-copy").tooltip({ container: "body", title: "Click to copy" });
-    $(".click-to-copy").click(function (e) {
-        if (window.getSelection().toString()) {
-            // do nothing, selection not empty
-            return;
-        }
+    hc.$$(".click-to-copy").forEach(function(el) {
+        hc.tooltip(el, {title: "Click to copy"});
+        el.addEventListener("click", function() {
+            if (window.getSelection().toString()) {
+                // do nothing, selection not empty
+                return;
+            }
 
-        navigator.clipboard.writeText(this.textContent);
-        $(".tooltip-inner").text("Copied!");
+            hc.copy(el, el.textContent, "Click to copy");
+        });
     });
 
     // Enable the submit button in transfer form when user selects
     // the target project:
-    $("#transfer-modal").on("change", "#target-project", function() {
-        $("#transfer-confirm").prop("disabled", !this.value);
+    hc.on("#transfer-modal", "change", "#target-project", function() {
+        hc.$("#transfer-confirm").disabled = !this.value;
     });
 
 
     // Enable/disable fields in the "Filtering Rules" modal
-    $("input.filter-toggle").on("change", function() {
-        var enableInputs = $("input.filter-toggle:checked").length > 0;
-        $(".filter-kw").prop("disabled", !enableInputs);
+    hc.on("input.filter-toggle", "change", function() {
+        const enableInputs = hc.$$("input.filter-toggle:checked").length > 0;
+        hc.$$(".filter-kw").forEach(function(el) {
+            el.disabled = !enableInputs;
+        });
     });
-
-    // If the URL hash is #ping-<number>,  open the "Ping Details" dialog
-    if (document.location.hash.indexOf("#ping-") === 0) {
-        var n = parseInt(document.location.hash.substr(6));
-        loadPingDetails(`../pings/${n}/`);
-    }
-
 });

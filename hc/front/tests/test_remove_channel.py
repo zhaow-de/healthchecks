@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from hc.api.models import Channel
 from hc.test import BaseTestCase
 
@@ -18,11 +16,6 @@ class RemoveChannelTestCase(BaseTestCase):
         r = self.client.post(self.url)
         self.assertRedirects(r, self.channels_url)
 
-        assert Channel.objects.count() == 0
-
-    def test_team_access_works(self) -> None:
-        self.client.login(username="bob@example.org", password="password")
-        self.client.post(self.url)
         assert Channel.objects.count() == 0
 
     def test_it_handles_bad_uuid(self) -> None:
@@ -49,11 +42,3 @@ class RemoveChannelTestCase(BaseTestCase):
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.url)
         self.assertEqual(r.status_code, 405)
-
-    def test_it_requires_rw_access(self) -> None:
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
-
-        self.client.login(username="bob@example.org", password="password")
-        r = self.client.post(self.url)
-        self.assertEqual(r.status_code, 403)

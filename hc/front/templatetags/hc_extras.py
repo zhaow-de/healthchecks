@@ -1,8 +1,6 @@
-from __future__ import annotations
-
 import re
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from urllib.parse import urlparse
 from uuid import UUID
 
@@ -14,6 +12,7 @@ from django.utils.html import escape, format_html
 from django.utils.safestring import SafeString, mark_safe
 from django.utils.timezone import now
 
+from hc.api.models import Check
 from hc.lib.date import (
     format_approx_duration,
     format_duration,
@@ -21,10 +20,6 @@ from hc.lib.date import (
     format_hms,
 )
 from hc.lib.urls import absolute_url
-
-if TYPE_CHECKING:
-    from hc.api.models import Check
-
 
 register = template.Library()
 
@@ -58,18 +53,8 @@ def site_name() -> str:
 
 
 @register.simple_tag
-def support_email() -> str | None:
-    return settings.SUPPORT_EMAIL
-
-
-@register.simple_tag
 def absolute_site_logo_url() -> str:
-    """Return absolute URL to site's logo.
-
-    Uses settings.SITE_LOGO_URL if set, uses
-    /static/img/logo.png as fallback.
-    """
-    url = settings.SITE_LOGO_URL or static("img/logo.png")
+    url = static("img/logo.png")
     if url.startswith("/"):
         url = absolute_url(url)
 
@@ -180,8 +165,7 @@ def sortbydowntime(checks: list[Check]) -> list[Check]:
 def num_down_title(num_down: int) -> str:
     if num_down:
         return f"{num_down} down – {settings.SITE_NAME}"
-    else:
-        return settings.SITE_NAME
+    return settings.SITE_NAME
 
 
 @register.filter
@@ -193,7 +177,7 @@ def down_title(check: Check) -> str:
 
     """
 
-    s = "%s – %s" % (check.name_then_code(), settings.SITE_NAME)
+    s = f"{check.name_then_code()} – {settings.SITE_NAME}"
     if check.get_status() == "down":
         s = "DOWN – " + s
 
@@ -212,7 +196,7 @@ def break_underscore(s: str) -> str:
 
 @register.filter
 def format_headers(headers: dict[str, str]) -> str:
-    return "\n".join("%s: %s" % (k, v) for k, v in headers.items())
+    return "\n".join(f"{k}: {v}" for k, v in headers.items())
 
 
 @register.simple_tag
@@ -257,9 +241,7 @@ def guess_schedule(check: Check) -> str | None:
     return None
 
 
-FORMATTED_PING_ENDPOINT_TMPL = (
-    f"""<span class="base">{settings.PING_ENDPOINT}</span>{{}}"""
-)
+FORMATTED_PING_ENDPOINT_TMPL = f"""<span class="base">{settings.PING_ENDPOINT}</span>{{}}"""
 
 
 @register.filter
@@ -287,11 +269,6 @@ def mask_ro_key(key: str) -> str:
 
 
 @register.filter
-def underline(s: str) -> str:
-    return "=" * len(str(s))
-
-
-@register.filter
 def first5(rid: UUID) -> str:
     return str(rid)[:5]
 
@@ -299,14 +276,6 @@ def first5(rid: UUID) -> str:
 @register.filter
 def add6days(dt: datetime) -> datetime:
     return dt + timedelta(days=6)
-
-
-@register.filter
-def mask_phone(phone: str) -> str:
-    if len(phone) > 7:
-        return phone[:4] + "******" + phone[-3:]
-
-    return phone
 
 
 @register.simple_tag(takes_context=True)

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 
 from django.core import mail
@@ -46,16 +44,6 @@ class AddEmailTestCase(BaseTestCase):
 
         # Make sure it calls assign_all_checks
         self.assertEqual(c.checks.count(), 1)
-
-    def test_team_access_works(self) -> None:
-        form = {"value": "bob@example.org", "down": "true", "up": "true"}
-
-        self.client.login(username="bob@example.org", password="password")
-        self.client.post(self.url, form)
-
-        ch = Channel.objects.get()
-        # Added by bob, but should belong to alice (bob has team access)
-        self.assertEqual(ch.project, self.project)
 
     def test_it_rejects_bad_email(self) -> None:
         form = {"value": "not an email address", "down": "true", "up": "true"}
@@ -120,10 +108,33 @@ class AddEmailTestCase(BaseTestCase):
         r = self.client.post(self.url, form)
         self.assertContains(r, "Please select at least one.")
 
-    def test_it_requires_rw_access(self) -> None:
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
-
-        self.client.login(username="bob@example.org", password="password")
+    def test_it_checks_ownership(self) -> None:
+        self.client.login(username="charlie@example.org", password="password")
         r = self.client.get(self.url)
-        self.assertEqual(r.status_code, 403)
+        self.assertEqual(r.status_code, 404)
+
+    @override_settings(MAILERS={})
+    def test_it_refuses_unconfirmable_address_without_smtp(self) -> None:
+        form = {"value": "dan@example.org", "down": "true", "up": "true"}
+
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.post(self.url, form)
+        self.assertContains(r, "This server cannot send email, so it cannot confirm this address.")
+        self.assertFalse(Channel.objects.exists())
+
+    @override_settings(MAILERS={})
+    def test_it_accepts_own_address_without_smtp(self) -> None:
+        form = {"value": "alice@example.org", "down": "true", "up": "true"}
+
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.post(self.url, form)
+        self.assertRedirects(r, self.channels_url)
+
+        c = Channel.objects.get()
+        self.assertTrue(c.email_verified)
+
+    @override_settings(MAILERS={})
+    def test_instructions_say_only_own_address_without_smtp(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(self.url)
+        self.assertContains(r, "only your account's own address can be added")

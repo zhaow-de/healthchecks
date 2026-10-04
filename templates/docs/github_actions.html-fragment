@@ -14,13 +14,13 @@ failure to SITE_NAME:</p>
 <span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
 <span class="w">    </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">Main-Job</span><span class="p p-Indicator">]</span>
 <span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">curl -m 10 --retry 5 ${{ secrets.ping_url }}</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">curl -fsS -m 10 --retry 5 ${{ secrets.ping_url }}</span>
 <span class="w">  </span><span class="nt">Ping-Failure</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
 <span class="w">    </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ failure() }}</span>
 <span class="w">    </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">Main-Job</span><span class="p p-Indicator">]</span>
 <span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">curl -m 10 --retry 5 ${{ secrets.ping_url }}/fail</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">curl -fsS -m 10 --retry 5 ${{ secrets.ping_url }}/fail</span>
 </code></pre></div>
 
 <p>Note how the jobs <code>Ping-Success</code> and <code>Ping-Failure</code> define <code>Main-Job</code> as
@@ -29,6 +29,15 @@ successfully, and <code>Ping-Failure</code> runs when <code>Main-Job</code> fail
 <p>To avoid exposing the ping URL, it is a good idea to define it
 as <a href="https://docs.github.com/en/actions/security-guides/encrypted-secrets">a secret</a>
 and access it via the <code>secrets</code> context.</p>
+<p>The curl calls use <code>-f</code>, so a wrong URL (a 404) fails the step and the error shows
+in the run; without it, the step succeeds and the ping is silently lost. The
+<a href="../bash/">Shell Scripts</a> page explains the other options.</p>
+<p>Give the check a cron schedule equal to the workflow's (<code>15 * * * *</code>) with the time
+zone UTC, since GitHub evaluates <code>schedule</code> in UTC, or a period of 1 hour; you can
+<a href="../api/#create-check">create such a check</a> with the Management API. Give it a grace
+time that covers GitHub's start delays: scheduled runs often start minutes late, and
+later under load. If <code>Main-Job</code> is cancelled, neither ping job runs, and the check
+goes down when the grace time ends.</p>
 <h2>Using the <code>workflow_run</code> Trigger</h2>
 <p>Alternatively, you can put the pinging logic in a separate workflow,
 and configure it to trigger every time your main workflow finishes. The main workflow:</p>
@@ -54,10 +63,10 @@ and configure it to trigger every time your main workflow finishes. The main wor
 <span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
 <span class="w">    </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ github.event.workflow_run.conclusion == &#39;success&#39; }}</span>
 <span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">curl -m 10 --retry 5 ${{ secrets.ping_url }}</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">curl -fsS -m 10 --retry 5 ${{ secrets.ping_url }}</span>
 <span class="w">  </span><span class="nt">Ping-Failure</span><span class="p">:</span>
 <span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
 <span class="w">    </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ github.event.workflow_run.conclusion == &#39;failure&#39; }}</span>
 <span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">curl -m 10 --retry 5 ${{ secrets.ping_url }}/fail</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">curl -fsS -m 10 --retry 5 ${{ secrets.ping_url }}/fail</span>
 </code></pre></div>

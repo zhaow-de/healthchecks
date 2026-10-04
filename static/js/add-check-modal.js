@@ -1,96 +1,76 @@
-$(function () {
-    var base = document.getElementById("base-url").getAttribute("href").slice(0, -1);
-    var modal = $("#add-check-modal");
-    var period = document.getElementById("add-check-period");
-    var periodUnit = document.getElementById("add-check-period-unit");
-    var cronField = document.getElementById("add-check-schedule");
-    var onCalendarField = document.getElementById("add-check-schedule-oncalendar");
-    var grace = document.getElementById("add-check-grace");
-    var graceUnit = document.getElementById("add-check-grace-unit");
+hc.ready(function () {
+    const base = hc.base();
+    const modal = document.getElementById("add-check-modal");
+    const period = document.getElementById("add-check-period");
+    const periodUnit = document.getElementById("add-check-period-unit");
+    const cronField = document.getElementById("add-check-schedule");
+    const onCalendarField = document.getElementById("add-check-schedule-oncalendar");
+    const grace = document.getElementById("add-check-grace");
+    const graceUnit = document.getElementById("add-check-grace-unit");
 
-    function divToOption() {
-        return {value: this.textContent};
+    hc.tagSelect("#add-check-tags", hc.$$("#my-checks-tags .btn").map((el) => el.textContent));
+
+    function selectedKind() {
+        return hc.$("#add-check-modal input[name=kind]:checked").value;
     }
 
-    new TomSelect("#add-check-tags", {
-        create: true,
-        createOnBlur: true,
-        delimiter: " ",
-        diacritics: false,
-        hideSelected: true,
-        highlight: false,
-        labelField: "value",
-        options: $("#my-checks-tags div").map(divToOption).get(),
-        refreshThrottle: 0,
-        render: {no_results:(data, escape) => ""},
-        searchField: ["value"],
-    });
-
     function updateScheduleExtras() {
-        var kind = $('#add-check-modal input[name=kind]:checked').val();
-        modal.removeClass("simple").removeClass("cron").removeClass("oncalendar").addClass(kind);
+        const kind = selectedKind();
+        modal.classList.remove("simple", "cron", "oncalendar");
+        modal.classList.add(kind);
         // Include cron schedule in POST data only if kind = "cron"
-        cronField.disabled = kind != "cron";
+        cronField.disabled = kind !== "cron";
         // Include OnCalendar schedule in POST data only if kind = "oncalendar"
-        onCalendarField.disabled = kind != "oncalendar";
+        onCalendarField.disabled = kind !== "oncalendar";
     }
 
     // Show and hide fields when user clicks simple/cron/oncalendar radio buttons
-    $("#add-check-modal input[type=radio][name=kind]").change(updateScheduleExtras);
+    hc.on("#add-check-modal input[type=radio][name=kind]", "change", updateScheduleExtras);
 
-    modal.on("shown.bs.modal", function() {
+    hc.on(modal, "shown.bs.modal", function() {
         updateScheduleExtras();
         validateSchedule();
-        $("#add-check-tz")[0].tomselect.setValue("UTC", true);
-        $("#add-check-name").focus();
+        document.getElementById("add-check-tz").tomselect.setValue("UTC", true);
+        document.getElementById("add-check-name").focus();
 
         // Pre-select the currently active tags
-        var selectedTags = $("#my-checks-tags .checked").map(function() { return this.textContent }).get();
-        $("#add-check-tags")[0].tomselect.setValue(selectedTags);
+        const selectedTags = hc.$$("#my-checks-tags .checked").map((el) => el.textContent);
+        document.getElementById("add-check-tags").tomselect.setValue(selectedTags);
     });
 
-    // Update the hidden field when user changes period inputs
-    $("#add-check-modal .period-input").on("keyup change", function() {
-        var secs = Math.round(period.value * periodUnit.value);
-        period.setCustomValidity(secs <= 31536000 ? "" : "Must not exceed 365 days");
+    bindDuration({value: period, unit: periodUnit, hidden: hc.$("input[name=timeout]", modal)});
+    bindDuration({value: grace, unit: graceUnit, hidden: hc.$("input[name=grace]", modal)});
 
-        if (secs >= 60) {
-            $("#add-check-modal input[name=timeout]").val(secs);
-        }
-    })
+    let currentSchedule = "";
+    async function validateSchedule() {
+        const kind = selectedKind();
+        if (kind === "simple") return;
 
-    // Update the hidden field when user changes grace inputs
-    $("#add-check-modal .grace-input").on("keyup change", function() {
-        var secs = Math.round(grace.value * graceUnit.value);
-        grace.setCustomValidity(secs <= 31536000 ? "" : "Must not exceed 365 days");
-
-        if (secs >= 60) {
-            $("#add-check-modal input[name=grace]").val(secs);
-        }
-    });
-
-    var currentSchedule = "";
-    function validateSchedule() {
-        var kind = $('#add-check-modal input[name=kind]:checked').val();
-        if (kind == "simple") return;
-
-        var field = kind == "cron" ? cronField : onCalendarField;
+        const field = kind === "cron" ? cronField : onCalendarField;
 
         // Return early if the schedule has not changed
-        if (field.value == currentSchedule)
+        if (field.value === currentSchedule)
             return;
 
-        currentSchedule = field.value;
-        var token = $('input[name=csrfmiddlewaretoken]').val();
-        var payload = {kind: kind, schedule: field.value};
-        $.getJSON(base + "/checks/validate_schedule/", payload, function(data) {
-            if (field.value != currentSchedule)
+        const schedule = field.value;
+        currentSchedule = schedule;
+        try {
+            const data = await hc.getJSON(base + "/checks/validate_schedule/", {kind: kind, schedule: schedule});
+            if (schedule !== currentSchedule)
                 return;  // ignore stale results
 
             field.setCustomValidity(data.result ? "" : "Please enter a valid expression");
-        });
+        } catch {
+            if (schedule !== currentSchedule)
+                return;
+
+            // Forget the schedule, so that the next edit retries, and leave the
+            // check to the server instead of keeping an earlier verdict
+            currentSchedule = "";
+            field.setCustomValidity("");
+        }
     }
 
-    $("#add-check-schedule").on("keyup change", validateSchedule);
-    $("#add-check-schedule-oncalendar").on("keyup change", validateSchedule);
+    hc.on("#add-check-schedule", "input", validateSchedule);
+    hc.on("#add-check-schedule-oncalendar", "input", validateSchedule);
 });

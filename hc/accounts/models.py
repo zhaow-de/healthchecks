@@ -1,13 +1,10 @@
-from __future__ import annotations
-
 import hmac
 import random
 import uuid
-from datetime import date, datetime
+from datetime import datetime
 from datetime import timedelta as td
 from secrets import token_urlsafe
 from typing import TYPE_CHECKING, Any
-from urllib.parse import quote, urlencode
 from zoneinfo import ZoneInfo
 
 from django.conf import settings
@@ -15,7 +12,7 @@ from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.models import User
 from django.core.signing import BadSignature, TimestampSigner
 from django.db import models
-from django.db.models import Q, QuerySet
+from django.db.models import QuerySet
 from django.db.models.functions import Lower
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -31,8 +28,6 @@ if TYPE_CHECKING:
     # during type checking
     from hc.api.models import Check
 
-    CheckQuerySet = QuerySet[Check]
-
 
 NO_NAG = td()
 NAG_PERIODS = (
@@ -47,15 +42,6 @@ REPORT_CHOICES = (
     ("weekly", "Weekly"),
     ("monthly", "Monthly"),
 )
-# How long an account can be over limits before it is scheduled for deletion
-OVER_LIMIT_GRACE = td(days=31)
-# When scheduling for deletion, how many days in the future to schedule
-DELETION_GRACE = td(days=31)
-
-
-def month(dt: datetime) -> date:
-    """For a given datetime, return the matching first-day-of-month date."""
-    return dt.date().replace(day=1)
 
 
 class ProfileManager(models.Manager["Profile"]):
@@ -64,12 +50,6 @@ class ProfileManager(models.Manager["Profile"]):
             return user.profile
         except Profile.DoesNotExist:
             profile = Profile(user=user)
-            if not settings.USE_PAYMENTS:
-                # If not using payments, set high limits
-                profile.check_limit = 10000
-                profile.sms_limit = 10000
-                profile.call_limit = 10000
-
             profile.save()
             return profile
 
@@ -81,29 +61,13 @@ class Profile(models.Model):
     nag_period = models.DurationField(default=NO_NAG, choices=NAG_PERIODS)
     next_nag_date = models.DateTimeField(null=True, blank=True)
     ping_log_limit = models.IntegerField(default=100)
-    check_limit = models.IntegerField(default=20)
     token = models.CharField(max_length=128, blank=True)
 
-    last_sms_date = models.DateTimeField(null=True, blank=True)
-    sms_limit = models.IntegerField(default=0)
-    sms_sent = models.IntegerField(default=0)
-
-    last_call_date = models.DateTimeField(null=True, blank=True)
-    call_limit = models.IntegerField(default=0)
-    calls_sent = models.IntegerField(default=0)
-
     sort = models.CharField(max_length=20, default="created")
-    # The date when "Inactive Account Notification" is sent
-    deletion_notice_date = models.DateTimeField(null=True, blank=True)
-    # Set manually by admin, causes an orange banner in web UI
-    deletion_scheduled_date = models.DateTimeField(null=True, blank=True)
-    # If the account is over its check limit, the date when it went over the limit
-    over_limit_date = models.DateTimeField(null=True, blank=True)
     last_active_date = models.DateTimeField(null=True, blank=True)
     tz = models.CharField(max_length=36, default="UTC")
-    theme = models.CharField(max_length=10, null=True, blank=True)
 
-    totp = models.CharField(max_length=32, null=True, blank=True)
+    totp = models.CharField(max_length=32, blank=True, default="")
     totp_created = models.DateTimeField(null=True, blank=True)
 
     objects = ProfileManager()
@@ -123,7 +87,7 @@ class Profile(models.Model):
         token = token_urlsafe(24)
         # Store a hashed transformation of the login token
         self.token = make_password(token)
-        self.save()
+        self.save(update_fields=["token"])
         # Sign the token so we can check its age later
         return TimestampSigner().sign(token)
 
@@ -135,19 +99,14 @@ class Profile(models.Model):
 
         return check_password(token, self.token)
 
-    def send_instant_login_link(
-        self, membership: Member | None = None, redirect_url: str | None = None
-    ) -> None:
+    def send_instant_login_link(self, redirect_url: str | None = None) -> None:
         token = self.prepare_token()
         query = {"next": redirect_url} if redirect_url else None
-        url = absolute_reverse(
-            "hc-check-token", args=[self.user.username, token], query=query
-        )
+        url = absolute_reverse("hc-check-token", args=[self.user.username, token], query=query)
 
         ctx = {
             "button_text": "Log In",
             "button_url": url,
-            "membership": membership,
         }
         emails.login(self.user.email, ctx)
 
@@ -166,46 +125,18 @@ class Profile(models.Model):
         }
         emails.login(new_email, ctx)
 
-    def send_transfer_request(self, project: Project) -> None:
-        token = self.prepare_token()
-        settings_path = reverse("hc-project-settings", args=[project.code])
-        url = absolute_reverse(
-            "hc-check-token",
-            args=[self.user.username, token],
-            query={"next": settings_path},
-        )
-
-        ctx = {
-            "button_text": "Project Settings",
-            "button_url": url,
-            "project": project,
-        }
-        emails.transfer_request(self.user.email, ctx)
-
-    def project_ids(self) -> QuerySet[Project, tuple[int]]:
-        """Return a queryset returning IDs of all projects we have access to."""
-        # Construct a UNION of two simple queries. This could be alternatively
-        # be done in a single query and filtering by Q(is_owner) | Q(is_member).
-        # But the single query approach has significantly worse performance
-        # on PostgreSQL.
-        owned_ids = Project.objects.filter(owner_id=self.user_id).values_list("id")
-        joined_ids = Member.objects.filter(user_id=self.user_id).values_list(
-            "project_id"
-        )
-        return owned_ids.union(joined_ids)
-
     def projects(self) -> QuerySet[Project]:
-        """Return a queryset of all projects we have access to."""
-        return Project.objects.filter(id__in=self.project_ids()).order_by(Lower("name"))
+        return Project.objects.filter(owner_id=self.user_id).order_by(Lower("name"))
 
-    def checks_from_all_projects(self) -> CheckQuerySet:
-        """Return a queryset of checks from projects we have access to."""
-
+    def checks_from_all_projects(self) -> QuerySet[Check]:
         from hc.api.models import Check
 
-        return Check.objects.filter(project__in=self.project_ids())
+        return Check.objects.filter(project__owner_id=self.user_id)
 
     def send_report(self, nag: bool = False) -> bool:
+        if not settings.MAILERS:
+            return False
+
         q = self.checks_from_all_projects()
 
         # Has there been a ping in last 6 months?
@@ -290,62 +221,18 @@ class Profile(models.Model):
 
         return True
 
-    def sms_sent_this_month(self) -> int:
-        # IF last_sms_date was never set, we have not sent any messages yet.
-        if not self.last_sms_date:
-            return 0
-
-        # If last sent date is not from this month, we've sent 0 this month.
-        if month(now()) > month(self.last_sms_date):
-            return 0
-
-        return self.sms_sent
-
-    def authorize_sms(self) -> bool:
-        """If monthly limit not exceeded, increase counter and return True"""
-
-        sent_this_month = self.sms_sent_this_month()
-        if sent_this_month >= self.sms_limit:
-            return False
-
-        self.sms_sent = sent_this_month + 1
-        self.last_sms_date = now()
-        self.save()
-        return True
-
-    def calls_sent_this_month(self) -> int:
-        # IF last_call_date was never set, we have not made any phone calls yet.
-        if not self.last_call_date:
-            return 0
-
-        # If last sent date is not from this month, we've made 0 calls this month.
-        if month(now()) > month(self.last_call_date):
-            return 0
-
-        return self.calls_sent
-
-    def authorize_call(self) -> bool:
-        """If monthly limit not exceeded, increase counter and return True"""
-
-        sent_this_month = self.calls_sent_this_month()
-        if sent_this_month >= self.call_limit:
-            return False
-
-        self.calls_sent = sent_this_month + 1
-        self.last_call_date = now()
-        self.save()
-        return True
-
     def num_checks_used(self) -> int:
         from hc.api.models import Check
 
         return Check.objects.filter(project__owner_id=self.user_id).count()
 
-    def num_checks_available(self) -> int:
-        return self.check_limit - self.num_checks_used()
-
-    def can_accept(self, project: Project) -> bool:
-        return project.check_set.count() <= self.num_checks_available()
+    def disable_reports(self) -> None:
+        """Turn reports and nags off, as an unsubscribe link or a bounced report asks."""
+        self.reports = "off"
+        self.next_report_date = None
+        self.nag_period = NO_NAG
+        self.next_nag_date = None
+        self.save(update_fields=["reports", "next_report_date", "nag_period", "next_nag_date"])
 
     def update_next_nag_date(self) -> None:
         any_down = self.checks_from_all_projects().filter(status="down").exists()
@@ -382,62 +269,25 @@ class Profile(models.Model):
             if self.reports == "weekly" and dt.weekday() == 0:
                 return dt
 
-    def is_past_over_limit_grace(self) -> bool:
-        """Return True if this profile is over limits for 31 or more days."""
-        if not self.over_limit_date:
-            return False
-
-        return now() > self.over_limit_date + OVER_LIMIT_GRACE
-
-    def schedule_for_deletion(self) -> None:
-        self.deletion_scheduled_date = now() + DELETION_GRACE
-        self.save()
-
 
 class ProjectManager(models.Manager["Project"]):
-    def for_api_key(
-        self, api_key: str, accept_rw: bool, accept_ro: bool
-    ) -> Project | None:
+    def for_api_key(self, api_key: str, accept_rw: bool, accept_ro: bool) -> Project | None:
         """Look up project by API key.
 
-        This handles both the old plain text API keys, and the new hashed API keys.
-        For the hashed API keys, it looks up project by the first 8 characters of the
-        random part of the key, then calls Project.compare_api_key().
+        It looks up projects by the first 8 characters of the random part of the key,
+        then calls Project.compare_api_key().
         """
 
-        # Hashed keys
+        # The owner comes along, so owner_profile costs one query, not two
+        q = Project.objects.select_related("owner")
         if accept_rw and api_key.startswith("hcw_"):
-            secret8 = api_key[4:12]
-            for project in Project.objects.filter(api_key__startswith=secret8):
-                if project.compare_api_key(api_key):
-                    return project
+            q = q.filter(api_key__startswith=api_key[4:12])
+        elif accept_ro and api_key.startswith("hcr_"):
+            q = q.filter(api_key_readonly__startswith=api_key[4:12])
+        else:
+            return None
 
-        if accept_ro and api_key.startswith("hcr_"):
-            secret8 = api_key[4:12]
-            for project in Project.objects.filter(api_key_readonly__startswith=secret8):
-                if project.compare_api_key(api_key):
-                    return project
-
-        # Plain text keys
-        if accept_rw and accept_ro:
-            write_key_match = Q(api_key=api_key)
-            read_key_match = Q(api_key_readonly=api_key)
-            try:
-                return Project.objects.get(write_key_match | read_key_match)
-            except Project.DoesNotExist:
-                pass
-        elif accept_rw:
-            try:
-                return Project.objects.get(api_key=api_key)
-            except Project.DoesNotExist:
-                pass
-        elif accept_ro:
-            try:
-                return Project.objects.get(api_key_readonly=api_key)
-            except Project.DoesNotExist:
-                pass
-
-        return None
+        return next((project for project in q if project.compare_api_key(api_key)), None)
 
 
 class Project(models.Model):
@@ -446,7 +296,6 @@ class Project(models.Model):
     owner = models.ForeignKey(User, models.CASCADE)
     api_key = models.CharField(max_length=128, blank=True, db_index=True)
     api_key_readonly = models.CharField(max_length=128, blank=True, db_index=True)
-    badge_key = models.CharField(max_length=150, unique=True)
     ping_key = models.CharField(max_length=128, blank=True, null=True, unique=True)
     show_slugs = models.BooleanField(default=False)
 
@@ -458,43 +307,17 @@ class Project(models.Model):
     def __str__(self) -> str:
         return self.name or self.owner.email
 
+    def get_absolute_url(self) -> str:
+        return reverse("hc-checks", args=[self.code])
+
     @property
     def owner_profile(self) -> Profile:
         return Profile.objects.for_user(self.owner)
 
-    def num_checks_available(self) -> int:
-        return self.owner_profile.num_checks_available()
-
-    def invite_suggestions(self) -> QuerySet[User]:
-        q = User.objects.filter(memberships__project__owner_id=self.owner_id)
-        q = q.exclude(memberships__project=self)
-        return q.distinct().order_by("email")
-
-    def invite(self, user: User, role: str) -> bool:
-        if Member.objects.filter(user=user, project=self).exists():
-            return False
-
-        if self.owner_id == user.id:
-            return False
-
-        m = Member.objects.create(user=user, project=self, role=role)
-        checks_url = reverse("hc-checks", args=[self.code])
-
-        if settings.MAILERS:
-            profile = Profile.objects.for_user(user)
-            profile.send_instant_login_link(membership=m, redirect_url=checks_url)
-        return True
-
     def update_next_nag_dates(self) -> None:
-        """Update next_nag_date on profiles of all members of this project."""
+        """Update next_nag_date on the owner's profile."""
 
-        # Use an UNION of two simple queries to look up project's user ids.
-        # On PostgreSQL this is much faster than using JOIN.
-        owner_id = User.objects.filter(id=self.owner_id).values_list("id")
-        member_ids = Member.objects.filter(project=self).values_list("user_id")
-        user_ids = owner_id.union(member_ids)
-
-        q = Profile.objects.filter(user_id__in=user_ids).exclude(nag_period=NO_NAG)
+        q = Profile.objects.filter(user_id=self.owner_id).exclude(nag_period=NO_NAG)
         for profile in q:
             profile.update_next_nag_date()
 
@@ -516,24 +339,11 @@ class Project(models.Model):
         # It's a problem if any integration has a logged error
         return any(errors)
 
-    def transfer_request(self) -> Member | None:
-        return self.member_set.filter(transfer_request_date__isnull=False).first()
-
-    def dashboard_url(self) -> str | None:
-        if not self.api_key_readonly:
-            return None
-
-        frag = urlencode({self.api_key_readonly: str(self)}, quote_via=quote)
-        return reverse("hc-dashboard", fragment=frag)
-
     def checks_url(self) -> str:
         return absolute_reverse("hc-checks", args=[self.code])
 
     def auth_metrics_url(self) -> str:
         return absolute_reverse("hc-auth-metrics", args=[self.code])
-
-    def get_absolute_url(self) -> str:
-        return reverse("hc-checks", args=[self.code])
 
     def _make_api_key(self, prefix: str) -> tuple[str, str]:
         """Generate an API key with specified prefix, return (key, key_hash) tuple.
@@ -570,7 +380,6 @@ class Project(models.Model):
         # - 22 characters long, consisting of [a-z0-9]
         # - no "_" or "-" characters for aesthetic reasons
         # - no uppercase characters to avoid case-sensitivity issues
-        #   in email addresses.
         # The ping key will have ~113 bits of entropy.
         while True:
             self.ping_key = token_urlsafe(16).lower()
@@ -579,10 +388,7 @@ class Project(models.Model):
         return self.ping_key
 
     def compare_api_key(self, key: str) -> bool:
-        if key.startswith("hcr_"):
-            expected = self.api_key_readonly
-        else:
-            expected = self.api_key
+        expected = self.api_key_readonly if key.startswith("hcr_") else self.api_key
 
         # Only calculate and compare digest if db key length is 8 + 64 = 72
         if "." not in expected:
@@ -592,37 +398,6 @@ class Project(models.Model):
         digest = hmac.digest(settings.SECRET_KEY.encode(), key.encode(), "sha256")
         return hmac.compare_digest(digest.hex(), key_hash)
 
-    def team_emails(self) -> list[str]:
-        q = User.objects.filter(memberships__project=self).order_by("email")
-        member_emails = list(q.values_list("email", flat=True))
-        return [self.owner.email] + member_emails
-
-
-class Member(models.Model):
-    class Role(models.TextChoices):
-        READONLY = "r", "Read-only"
-        REGULAR = "w", "Member"
-        MANAGER = "m", "Manager"
-
-    user = models.ForeignKey(User, models.CASCADE, related_name="memberships")
-    project = models.ForeignKey(Project, models.CASCADE)
-    transfer_request_date = models.DateTimeField(null=True, blank=True)
-    role = models.CharField(max_length=1, default=Role.REGULAR, choices=Role.choices)
-
-    class Meta:
-        constraints = (
-            models.UniqueConstraint(
-                fields=["user", "project"], name="accounts_member_no_duplicates"
-            ),
-        )
-
-    def can_accept(self) -> bool:
-        return self.user.profile.can_accept(self.project)
-
-    @property
-    def is_rw(self) -> bool:
-        return self.role in (Member.Role.REGULAR, Member.Role.MANAGER)
-
 
 class Credential(models.Model):
     code = models.UUIDField(default=uuid.uuid4, unique=True)
@@ -630,3 +405,6 @@ class Credential(models.Model):
     user = models.ForeignKey(User, models.CASCADE, related_name="credentials")
     created = models.DateTimeField(auto_now_add=True)
     data = models.BinaryField()
+
+    def __str__(self) -> str:
+        return self.name

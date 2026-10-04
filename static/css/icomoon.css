@@ -9,17 +9,9 @@
     font-family: "icomoon";
     base-palette: 0
 }
-@font-palette-values --palette1 {
-    font-family: "icomoon";
-    base-palette: 1
-}
 @font-palette-values --palette2 {
     font-family: "icomoon";
     base-palette: 2
-}
-@font-palette-values --palette3 {
-    font-family: "icomoon";
-    base-palette: 3
 }
 .ic, [class^="ic-"], [class*=" ic-"] {
     /* Use !important to prevent extensions from overriding this font. */

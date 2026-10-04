@@ -1,292 +1,82 @@
-$(function () {
-    var base = document.getElementById("base-url").getAttribute("href").slice(0, -1);
-    var period = document.getElementById("period-value");
-    var periodUnit = document.getElementById("period-unit");
-    var grace = document.getElementById("grace-value");
-    var graceUnit = document.getElementById("grace-unit");
-    var graceCron = document.getElementById("update-timeout-grace-cron");
-    var graceCronUnit = document.getElementById("update-timeout-grace-cron-unit");
-    var graceOncalendar = document.getElementById("update-timeout-grace-oncalendar");
-    var graceOncalendarUnit = document.getElementById("update-timeout-grace-oncalendar-unit");
+hc.ready(function () {
+    const base = hc.base();
+    const byId = (id) => document.getElementById(id);
 
-
-    $(".rw .timeout-grace").click(function() {
-        var code = $(this).closest("tr.checks-row").attr("id");
-        if (!code) {
-            code = this.dataset.code;
-        }
-
-        var url = base + "/checks/" + code + "/timeout/";
-
-        $("#update-timeout-form").attr("action", url);
-        $("#update-cron-form").attr("action", url);
-        $("#update-oncalendar-form").attr("action", url);
-
-        // Simple, period
-        var parsed = secsToUnits(this.dataset.timeout);
-        period.value = parsed.value;
-        periodUnit.value = parsed.unit;
-        periodSlider.noUiSlider.set(this.dataset.timeout);
-        $("#update-timeout-timeout").val(this.dataset.timeout);
-
-        // Simple, grace
-        var parsed = secsToUnits(this.dataset.grace);
-        grace.value = parsed.value;
-        graceUnit.value = parsed.unit;
-        graceSlider.noUiSlider.set(this.dataset.grace);
-        $("#update-timeout-grace").val(this.dataset.grace);
-
-        // Cron
-        cronPreviewHash = "";
-        $("#cron-preview").html("<p>Updating...</p>");
-        $("#schedule").val(this.dataset.kind == "cron" ? this.dataset.schedule: "* * * * *");
-        $("#tz")[0].tomselect.setValue(this.dataset.tz, true);
-        graceCron.value = parsed.value;
-        graceCronUnit.value = parsed.unit;
-        $("#update-cron-grace").val(this.dataset.grace);
-        updateCronPreview();
-
-        // OnCalendar
-        onCalendarPreviewHash = "";
-        $("#oncalendar-preview").html("<p>Updating...</p>");
-        $("#schedule-oncalendar").val(this.dataset.kind == "oncalendar" ? this.dataset.schedule: "*-*-* *:*:*");
-        $("#tz-oncalendar")[0].tomselect.setValue(this.dataset.tz, true);
-        graceOncalendar.value = parsed.value
-        graceOncalendarUnit.value = parsed.unit
-        $("#update-oncalendar-grace").val(this.dataset.grace);
-        updateOnCalendarPreview();
-
-        showPanel(this.dataset.kind);
-        $('#update-timeout-modal').modal({"show":true, "backdrop":"static"});
-        return false;
+    const setPeriod = bindDuration({
+        value: byId("period-value"),
+        unit: byId("period-unit"),
+        hidden: byId("update-timeout-timeout"),
+        slider: makeSlider(byId("period-slider")),
+    });
+    const setGrace = bindDuration({
+        value: byId("grace-value"),
+        unit: byId("grace-unit"),
+        hidden: byId("update-timeout-grace"),
+        slider: makeSlider(byId("grace-slider")),
+    });
+    const setCronGrace = bindDuration({
+        value: byId("update-timeout-grace-cron"),
+        unit: byId("update-timeout-grace-cron-unit"),
+        hidden: byId("update-cron-grace"),
+    });
+    const setOnCalendarGrace = bindDuration({
+        value: byId("update-timeout-grace-oncalendar"),
+        unit: byId("update-timeout-grace-oncalendar-unit"),
+        hidden: byId("update-oncalendar-grace"),
     });
 
-    var secsToUnits = function(secs) {
-        if (secs % 86400 == 0) {
-            return {value: secs / 86400, unit: 86400}
-        }
-        if (secs % 3600 == 0) {
-            return {value: secs / 3600, unit: 3600}
-        }
-
-        return {value: Math.round(secs / 60), unit: 60}
-    }
-
-    var pipLabels = {
-        60: "1 minute",
-        1800: "30 minutes",
-        3600: "1 hour",
-        43200: "12 hours",
-        86400: "1 day",
-        604800: "1 week",
-        2592000: "30 days",
-        31536000: "365 days"
-    }
-
-    var periodSlider = document.getElementById("period-slider");
-    noUiSlider.create(periodSlider, {
-        start: [20],
-        connect: "lower",
-        range: {
-            'min': [60, 60],
-            '30%': [3600, 3600],
-            '60%': [86400, 86400],
-            '75%': [604800, 86400],
-            '90%': [2592000, 2592000],
-            'max': 31536000
-        },
-        pips: {
-            mode: 'values',
-            values: [60, 1800, 3600, 43200, 86400, 604800, 2592000, 31536000],
-            density: 4,
-            format: {
-                to: function(v) { return pipLabels[v] },
-                from: function() {}
-            }
-        }
+    const cronPreview = schedulePreview({
+        input: byId("schedule"),
+        tz: byId("tz"),
+        url: base + "/checks/cron_preview/",
+        target: byId("cron-preview"),
+        submit: byId("update-cron-submit"),
     });
-
-    function setPeriod(secs) {
-        // Set the hidden form field
-        $("#update-timeout-timeout").val(secs);
-        // Set the visible value+units form fields
-        var parsed = secsToUnits(secs);
-        period.value = parsed.value;
-        periodUnit.value = parsed.unit;
-    }
-
-    // Update inputs and the hidden field when user slides the period slider
-    periodSlider.noUiSlider.on("slide", function(a, b, value) {
-        setPeriod(Math.round(value));
-    });
-
-    // Update slider, inputs and the hidden field when user clicks slider labels
-    $("#period-slider .noUi-value").on("click", function() {
-        periodSlider.noUiSlider.set(this.dataset.value);
-        setPeriod(this.dataset.value);
-    })
-
-    // Update the slider and the hidden field when user changes period inputs
-    $("#update-timeout-modal .period-input").on("keyup change", function() {
-        var secs = Math.round(period.value * periodUnit.value);
-        period.setCustomValidity(secs <= 31536000 ? "" : "Must not exceed 365 days");
-
-        if (secs >= 60) {
-            periodSlider.noUiSlider.set(secs);
-            $("#update-timeout-timeout").val(secs);
-        }
-    })
-
-    var graceSlider = document.getElementById("grace-slider");
-    noUiSlider.create(graceSlider, {
-        start: [20],
-        connect: "lower",
-        range: {
-            'min': [60, 60],
-            '30%': [3600, 3600],
-            '60%': [86400, 86400],
-            '75%': [604800, 86400],
-            '90%': [2592000, 2592000],
-            'max': 31536000
-        },
-        pips: {
-            mode: 'values',
-            values: [60, 1800, 3600, 43200, 86400, 604800, 2592000, 31536000],
-            density: 4,
-            format: {
-                to: function(v) { return pipLabels[v] },
-                from: function() {}
-            }
-        }
-    });
-
-    function setGrace(secs) {
-        // Set the hidden form field
-        $("#update-timeout-grace").val(secs);
-        // Set the visible value+units form fields
-        var parsed = secsToUnits(secs);
-        grace.value = parsed.value;
-        graceUnit.value = parsed.unit;
-    }
-
-    // Update inputs and the hidden field when user slides the grace slider
-    graceSlider.noUiSlider.on("slide", function(a, b, value) {
-        setGrace(Math.round(value));
-    });
-
-    // Update slider, inputs and the hidden field when user clicks slider labels
-    $("#grace-slider .noUi-value").on("click", function() {
-        graceSlider.noUiSlider.set(this.dataset.value);
-        setGrace(this.dataset.value);
-    })
-
-    // Update the slider and the hidden field when user changes grace inputs
-    $("#update-timeout-modal .grace-input").on("keyup change", function() {
-        var secs = Math.round(grace.value * graceUnit.value);
-        grace.setCustomValidity(secs <= 31536000 ? "" : "Must not exceed 365 days");
-
-        if (secs >= 60) {
-            graceSlider.noUiSlider.set(secs);
-            $("#update-timeout-grace").val(secs);
-        }
+    const onCalendarPreview = schedulePreview({
+        input: byId("schedule-oncalendar"),
+        tz: byId("tz-oncalendar"),
+        url: base + "/checks/oncalendar_preview/",
+        target: byId("oncalendar-preview"),
+        submit: byId("update-oncalendar-submit"),
     });
 
     function showPanel(kind) {
-        $("#update-timeout-form").toggle(kind == "simple");
-        $("#update-cron-form").toggle(kind == "cron");
-        $("#update-oncalendar-form").toggle(kind == "oncalendar");
+        hc.toggle("#update-timeout-form", kind === "simple");
+        hc.toggle("#update-cron-form", kind === "cron");
+        hc.toggle("#update-oncalendar-form", kind === "oncalendar");
     }
 
-    var cronPreviewHash = "";
-    function updateCronPreview() {
-        var schedule = $("#schedule").val();
-        var tz = $("#tz").val();
-        var hash = schedule + tz;
+    // A check row's period cell on the checks page, the "Change Schedule" button on
+    // the details page
+    hc.on(".timeout-grace", "click", function() {
+        const row = this.closest("tr.checks-row");
+        const code = row ? row.id : this.dataset.code;
 
-        // Don't try preview with empty values, or if values have not changed
-        if (!schedule || !tz || hash == cronPreviewHash)
-            return;
-
-        // OK, we're good
-        cronPreviewHash = hash;
-        $("#cron-preview-title").text("Updating...");
-
-        var token = $('input[name=csrfmiddlewaretoken]').val();
-        $.ajax({
-            url: base + "/checks/cron_preview/",
-            type: "post",
-            headers: {"X-CSRFToken": token},
-            data: {schedule: schedule, tz: tz},
-            success: function(data) {
-                if (hash != cronPreviewHash) {
-                    return;  // ignore stale results
-                }
-
-                $("#cron-preview" ).html(data);
-                var haveError = $("#invalid-arguments").length > 0;
-                $("#update-cron-submit").prop("disabled", haveError);
-            }
+        const url = base + "/checks/" + code + "/timeout/";
+        hc.$$("#update-timeout-form, #update-cron-form, #update-oncalendar-form").forEach(function(form) {
+            form.setAttribute("action", url);
         });
-    }
 
-    var onCalendarPreviewHash = "";
-    function updateOnCalendarPreview() {
-        var schedule = $("#schedule-oncalendar").val();
-        var tz = $("#tz-oncalendar").val();
-        var hash = schedule + tz;
+        const check = this.dataset;
+        setPeriod(check.timeout);
+        setGrace(check.grace);
+        setCronGrace(check.grace);
+        setOnCalendarGrace(check.grace);
 
-        // Don't try preview with empty values, or if values have not changed
-        if (!schedule || !tz || hash == onCalendarPreviewHash)
-            return;
+        byId("schedule").value = check.kind === "cron" ? check.schedule : "* * * * *";
+        byId("tz").tomselect.setValue(check.tz, true);
+        cronPreview.refresh();
 
-        // OK, we're good
-        onCalendarPreviewHash = hash;
-        $("#oncalendar-preview-title").text("Updating...");
+        byId("schedule-oncalendar").value = check.kind === "oncalendar" ? check.schedule : "*-*-* *:*:*";
+        byId("tz-oncalendar").tomselect.setValue(check.tz, true);
+        onCalendarPreview.refresh();
 
-        var token = $('input[name=csrfmiddlewaretoken]').val();
-        $.ajax({
-            url: base + "/checks/oncalendar_preview/",
-            type: "post",
-            headers: {"X-CSRFToken": token},
-            data: {schedule: schedule, tz: tz},
-            success: function(data) {
-                if (hash != onCalendarPreviewHash) {
-                    return;  // ignore stale results
-                }
-
-                $("#oncalendar-preview" ).html(data);
-                var haveError = $("#invalid-oncalendar-arguments").length > 0;
-                $("#update-oncalendar-submit").prop("disabled", haveError);
-            }
-        });
-    }
-
-    $("#update-timeout-modal .update-timeout-grace-cron-input").on("keyup change", function() {
-        var secs = Math.round(graceCron.value * graceCronUnit.value);
-        graceCron.setCustomValidity(secs <= 31536000 ? "" : "Must not exceed 365 days");
-
-        if (secs >= 60) {
-            $("#update-cron-grace").val(secs);
-        }
+        showPanel(check.kind);
+        hc.showModal("#update-timeout-modal");
+        return false;
     });
 
-    $("#update-timeout-modal .update-timeout-grace-oncalendar-input").on("keyup change", function() {
-        var secs = Math.round(graceOncalendar.value * graceOncalendarUnit.value);
-        graceOncalendar.setCustomValidity(secs <= 31536000 ? "" : "Must not exceed 365 days");
-
-        if (secs >= 60) {
-            $("#update-oncalendar-grace").val(secs);
-        }
-    });
-
-    // Wire up events for Timeout/Cron forms
-    $(".kind-simple").click(() => showPanel("simple"));
-    $(".kind-cron").click(() => showPanel("cron"));
-    $(".kind-oncalendar").click(() => showPanel("oncalendar"));
-
-    $("#schedule").on("keyup", updateCronPreview);
-    $("#schedule-oncalendar").on("keyup", updateOnCalendarPreview);
-    $("#tz").on("change", updateCronPreview);
-    $("#tz-oncalendar").on("change", updateOnCalendarPreview);
-
+    hc.on("#update-timeout-modal .kind-simple", "click", () => showPanel("simple"));
+    hc.on("#update-timeout-modal .kind-cron", "click", () => showPanel("cron"));
+    hc.on("#update-timeout-modal .kind-oncalendar", "click", () => showPanel("oncalendar"));
 });

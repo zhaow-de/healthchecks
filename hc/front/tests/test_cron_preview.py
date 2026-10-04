@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import time_machine
 
 from hc.test import BaseTestCase

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 from datetime import timedelta as td
 
@@ -26,9 +24,7 @@ class FlipModelTestCase(BaseTestCase):
         self.assertEqual(channels, [self.channel])
 
     def test_select_channels_handles_noop(self) -> None:
-        self.channel.value = json.dumps(
-            {"value": "alice@example.org", "up": False, "down": False}
-        )
+        self.channel.value = json.dumps({"value": "alice@example.org", "up": False, "down": False})
         self.channel.save()
 
         channels = self.flip.select_channels()
@@ -54,13 +50,9 @@ class FlipModelTestCase(BaseTestCase):
         self.assertEqual(channels, [])
 
     def test_it_sorts_channels_by_last_notify_duration(self) -> None:
-        c1 = Channel.objects.create(
-            project=self.project, kind="email", last_notify_duration=td(seconds=1)
-        )
+        c1 = Channel.objects.create(project=self.project, kind="email", last_notify_duration=td(seconds=1))
         c1.checks.add(self.check)
-        c9 = Channel.objects.create(
-            project=self.project, kind="email", last_notify_duration=td(seconds=9)
-        )
+        c9 = Channel.objects.create(project=self.project, kind="email", last_notify_duration=td(seconds=9))
         c9.checks.add(self.check)
 
         channels = self.flip.select_channels()
@@ -78,7 +70,7 @@ class FlipModelTestCase(BaseTestCase):
 
     def test_down_duration_asserts_flips_status(self) -> None:
         with self.assertRaises(AssertionError):
-            self.flip.down_duration
+            _ = self.flip.down_duration
 
     def test_down_duration_checks_prev_flips_status(self) -> None:
         self.flip.old_status = "down"
@@ -102,3 +94,16 @@ class FlipModelTestCase(BaseTestCase):
         # The check is not saved, and does not have a primary key.
         # down_duration cannot fetch its flips and should return None.
         self.assertIsNone(flip.down_duration)
+
+    def test_reason_long_works(self) -> None:
+        self.flip.reason = "timeout"
+        self.assertEqual(self.flip.reason_long(), "success signal did not arrive on time, grace time passed")
+
+        self.flip.reason = "fail"
+        self.assertEqual(self.flip.reason_long(), "received a failure signal")
+
+        self.flip.reason = ""
+        self.assertIsNone(self.flip.reason_long())
+
+    def test_str_shows_the_transition(self) -> None:
+        self.assertEqual(str(self.flip), "Flip from up to down")

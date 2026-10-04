@@ -10,7 +10,16 @@ Create a read-only API key in <strong>Project Settings › API Access</strong>.
 Make sure to use a <strong>read-only</strong> API key. Prometheus does not need
 read-write API access.
 
-![Project's API Keys](IMG_URL/prometheus_api_keys.png)
+In the "API Access" section of the project's Settings page, click "Create" in the
+"API key (read-only)" row. The new key starts with `hcr_` and is 32 characters long.
+SITE_NAME shows it once, in the "API Key Created!" dialog: copy it there, as the
+Settings page afterwards shows only its first characters. A project has at most one
+read-only key; to replace it, click "Revoke" in the same row, then "Create" again.
+
+The metrics endpoint answers a key that is not 32 characters long with
+"400 Bad Request", a read-write key (`hcw_`) or an unknown key with
+"403 Forbidden", and a URL whose project UUID is not the key's project with
+"404 Not Found".
 
 ## Update the prometheus.yml
 
@@ -27,6 +36,11 @@ Add the following scrape configuration to Prometheus:
 
 The "{your-project-uuid}" is the UUID you see in your browser's address bar
 when viewing a list of checks for a particular project.
+
+This instance's address is SITE_ROOT. When an address has a path after
+its host name, start `metrics_path` with that path: for an address of
+`https://example.org/hc`, the path is
+`/hc/projects/{your-project-uuid}/metrics/{your-readonly-api-key}`.
 
 Reload Prometheus, and your changes should be live, coming in under the `hc_` prefix.
 
@@ -107,3 +121,6 @@ requires "Bearer" authentication. Use the following settings with Grafana Cloud:
 * Scrape Job URL: `SITE_ROOT/projects/{your-project-uuid}/metrics/`
 * Authentication type: Bearer
 * Bearer token: the read-only API key
+
+This endpoint answers a request without an `Authorization: Bearer <key>` header
+with "401 Unauthorized", and checks the key as the endpoint above does.

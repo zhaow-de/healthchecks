@@ -19,17 +19,26 @@ It can detect various failure modes:</p>
 <span class="m">8</span><span class="w"> </span><span class="m">6</span><span class="w"> </span>*<span class="w"> </span>*<span class="w"> </span>*<span class="w"> </span>/home/me/backup.sh
 </code></pre></div>
 
-<p>To monitor it, first create a new Check in your SITE_NAME account:</p>
-<p><img alt="The &quot;Add Check&quot; dialog" src="IMG_URL/add_check.png" /></p>
-<p>After creating the check, copy the generated <strong>ping URL</strong> , and update the job's
-definition:</p>
+<p>To monitor it, first create a new Check in your SITE_NAME account: on the "Checks"
+page, click "Add Check". In the dialog that opens, give the check a name (for example,
+"backup-db"), select "Cron" under "Schedule", enter the job's schedule (<code>8 6 * * *</code>)
+in "Cron Expression", pick the server's time zone in "Time Zone" (it starts as UTC),
+set "Grace Time" (it starts at 1 hour), and click "Save". The dialog also has
+"Slug" and "Tags" fields; <a href="../configuring_checks/">Configuring Checks</a> describes
+every field.</p>
+<p>After creating the check, copy the generated <strong>ping URL</strong> (click it in the
+"Ping URL" column of the "Checks" page, or in the "How To Ping" section of the check's
+details page, to copy it), and update the job's definition:</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># run backup.sh, then send a success signal to SITE_NAME</span>
 <span class="m">8</span><span class="w"> </span><span class="m">6</span><span class="w"> </span>*<span class="w"> </span>*<span class="w"> </span>*<span class="w"> </span>/home/me/backup.sh<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>curl<span class="w"> </span>-fsS<span class="w"> </span>-m<span class="w"> </span><span class="m">10</span><span class="w"> </span>--retry<span class="w"> </span><span class="m">5</span><span class="w"> </span>-o<span class="w"> </span>/dev/null<span class="w"> </span>PING_URL
 </code></pre></div>
 
 <p>The extra curl call lets SITE_NAME know the cron job has run successfully.
-SITE_NAME keeps track of the received pings and notifies you as soon as a ping does
-not arrive on time.</p>
+SITE_NAME keeps track of the received pings and notifies you when a ping has not
+arrived by the expected time plus the check's Grace Time (see "Grace Time" below).
+With <code>&amp;&amp;</code>, a run that exits with a non-zero exit code sends no ping, so it too is
+caught only then; to be alerted at once, report the exit status instead (see
+<a href="../signaling_failures/">Signaling failures</a>).</p>
 <p>Note: you can alternatively add the extra <code>curl</code> call as a final line inside the
 <code>/home/me/backup.sh</code> script to keep the cron job's definition clean and short.
 You can use an HTTP client other than curl to send the HTTP request.</p>
@@ -41,7 +50,8 @@ Feel free to adjust the curl options to suit your needs.</p>
 <dt><strong>&amp;&amp;</strong></dt>
 <dd>Run curl only if <code>/home/me/backup.sh</code> exits with an exit code 0.</dd>
 <dt><strong>-f, --fail</strong></dt>
-<dd>Makes curl treat non-200 responses as errors.</dd>
+<dd>Makes curl exit with an error (exit code 22) when the server answers with an
+HTTP status of 400 or above. See <a href="../http_api/#status-codes">Status Codes</a>.</dd>
 <dt><strong>-s, --silent</strong></dt>
 <dd>Silent or quiet mode. Hides the progress meter but also hides error messages.</dd>
 <dt><strong>-S, --show-error</strong></dt>
@@ -52,7 +62,10 @@ Feel free to adjust the curl options to suit your needs.</p>
 <dd>If a transient error is returned when curl tries to perform a
 transfer, it will retry this number of times before giving up.
 Setting the number to 0 makes curl do no retries (which is the default).
-A transient error is a timeout or an HTTP 5xx response code.</dd>
+A transient error is a timeout or an HTTP 408, 429, 500, 502, 503 or 504
+response. curl does not retry other 4xx responses (such as the 404 of a wrong
+UUID or the 400 of an exit status above 255), nor a refused connection unless
+<code>--retry-connrefused</code> is added.</dd>
 <dt><strong>-o /dev/null</strong></dt>
 <dd>Redirect curl's stdout to /dev/null (error messages still go to stderr).</dd>
 </dl>
@@ -67,20 +80,22 @@ any alerts yet. If there is no ping by 14:30, it will declare the job failed and
 send alerts.</p>
 <h2>Notifications</h2>
 <p>SITE_NAME has integrations to deliver notifications over different channels: email,
-webhooks, SMS, chat messages, incident management systems, and more. You can and should
+webhooks, and Slack messages. You can and should
 set up multiple ways to get notified about job failures:</p>
 <ul>
 <li><strong>Redundancy:</strong> if one notification channel fails (e.g., an email message gets
 delivered to spam), you will still receive notifications over the other channels.</li>
 <li><strong>Use different notification methods depending on job priority</strong>. You can set up
 notifications from low-priority jobs to email only, but notifications from
-high-priority jobs to email, SMS, and team chat.</li>
+high-priority jobs to email, a webhook, and team chat.</li>
 </ul>
 <p>Additionally, to make sure no issues "slip through the cracks", in the
 <a href="../../accounts/profile/notifications/">Account Settings › Email Reports</a> page
 you can configure SITE_NAME to send repeated email notifications every hour or every
-day as long as any of the jobs is down:</p>
-<p><img alt="Email reminder options" src="IMG_URL/email_reports.png" /></p>
+day as long as any of the jobs is down: under "Ongoing reminders if any checks are
+down", pick "Remind me daily" or "Remind me hourly", and click "Save Changes". See
+<a href="../configuring_notifications/">Configuring Notifications</a> for these reminders and
+the periodic email reports.</p>
 <h2>Advanced Techniques</h2>
 <ul>
 <li>If your cron job hits an error, you can <a href="../signaling_failures/">actively signal it to SITE_NAME</a>.</li>

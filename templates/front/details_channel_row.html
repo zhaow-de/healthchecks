@@ -1,0 +1,10 @@
+<tr data-url="{% url 'hc-switch-channel' check.code channel.code %}" {% if channel in enabled_channels %}class="on"{% endif %}>
+    <th>
+        <span class="badge">
+            {% if channel in enabled_channels %}ON{% else %}OFF{% endif %}
+        </span>
+    </th>
+    <td>
+        <span class="ic">{{ channel.kind }}</span> {{ channel }}
+    </td>
+</tr>

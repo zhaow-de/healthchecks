@@ -51,7 +51,7 @@
                 <pre>
 - job_name: 'healthchecks-{{ project|slugify }}'
   scheme: {{ site_scheme }}
-  metrics_path: /projects/{{ project.code }}/metrics/<strong>YOUR-READ-ONLY-API-KEY</strong>
+  metrics_path: {{ metrics_path_prefix }}<strong>{{ key_placeholder }}</strong>
   static_configs:
   - targets: ['{% site_hostname %}']</pre>
                 <p>

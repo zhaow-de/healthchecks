@@ -1,115 +1,142 @@
 <h1>Self-Hosted Healthchecks</h1>
-<p>Healthchecks is open-source, and is licensed under the BSD 3-clause license.</p>
-<p>As an alternative to using the hosted service at
-<a href="https://healthchecks.io">https://healthchecks.io</a>, you have the option to host a
-Healthchecks instance yourself.</p>
+<p>Healthchecks is open-source. The code from the original Healthchecks project is
+licensed under the BSD 3-clause license, and this fork's changes under the MIT license.</p>
+<p>You have the option to host a Healthchecks instance yourself.</p>
 <p>The building blocks are:</p>
 <ul>
-<li>Python 3.12+</li>
-<li>Django 6.0</li>
-<li>PostgreSQL or MySQL</li>
+<li>Python 3.14</li>
+<li>Django 6.1</li>
+<li>SQLite (the default) or PostgreSQL</li>
 </ul>
-<h2>Setting Up for Development</h2>
-<p>You can set up a development environment in a Python
-<a href="https://docs.python.org/3/tutorial/venv.html">virtual environment</a>
-on your local system to develop a new feature, write a new integration
-or test a bugfix.</p>
-<p>The following instructions assume you are using a Debian-based OS.</p>
+<h2 id="setting-up-for-development">Setting Up for Development</h2>
+<p>You can set up a development environment on your local system to develop a new
+feature, write a new integration or test a bugfix. Healthchecks uses
+<a href="https://docs.astral.sh/uv/">uv</a> to manage the Python interpreter,
+the <a href="https://docs.python.org/3/tutorial/venv.html">virtual environment</a>
+and the dependencies.</p>
 <ul>
 <li>
-<p>Install dependencies:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>sudo<span class="w"> </span>apt-get<span class="w"> </span>update
-$<span class="w"> </span>sudo<span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>gcc<span class="w"> </span>python3-dev<span class="w"> </span>python3-venv
-</code></pre></div>
-
+<p>Install uv by following
+  <a href="https://docs.astral.sh/uv/getting-started/installation/">its installation instructions</a>.</p>
 </li>
 <li>
-<p>Prepare directory for project code and virtualenv. Feel free to use a
-  different location:</p>
+<p>Check out project code. Feel free to use a different location:</p>
 <div class="highlight"><pre><span></span><code>$<span class="w"> </span>mkdir<span class="w"> </span>-p<span class="w"> </span>~/webapps
 $<span class="w"> </span><span class="nb">cd</span><span class="w"> </span>~/webapps
+$<span class="w"> </span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/zhaow-de/healthchecks.git
+$<span class="w"> </span><span class="nb">cd</span><span class="w"> </span>healthchecks
 </code></pre></div>
 
 </li>
 <li>
-<p>Prepare virtual environment
-  (with virtualenv you get pip, we'll use it soon to install requirements):</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>python3<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>hc-venv
-$<span class="w"> </span><span class="nb">source</span><span class="w"> </span>hc-venv/bin/activate
+<p>Install requirements (Django, ...):</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>uv<span class="w"> </span>sync
 </code></pre></div>
 
+<p>This creates a virtual environment in <code>.venv</code> and installs the exact package
+versions listed in <code>uv.lock</code>. If you do not have Python 3.14, uv downloads it.</p>
 </li>
 <li>
-<p>Check out project code:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/healthchecks/healthchecks.git
+<p>Create database tables and the superuser account:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>./manage.py<span class="w"> </span>migrate
+$<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>./manage.py<span class="w"> </span>createsuperuser
 </code></pre></div>
 
-</li>
-<li>
-<p>Install requirements (Django, ...) into virtualenv:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>wheel
-$<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>healthchecks/requirements.txt
-</code></pre></div>
-
-</li>
-<li>
-<p>Create database tables and a superuser account:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span><span class="nb">cd</span><span class="w"> </span>~/webapps/healthchecks
-$<span class="w"> </span>./manage.py<span class="w"> </span>migrate
-$<span class="w"> </span>./manage.py<span class="w"> </span>createsuperuser
-</code></pre></div>
-
+<p>The superuser is the instance's only user: there is no sign-up, and
+<code>createsuperuser</code> refuses to run once a user exists: a second run prints
+"Error: a user already exists, and this instance has only one" and exits with
+status 2.</p>
+<p>Besides the user, <code>createsuperuser</code> creates the user's project, a check named
+"My First Check" (slug <code>my-first-check</code>), and an email integration for the
+user's address, already verified and assigned to that check. The password must
+pass Django's password validators: at least 12 characters, not too similar to
+the email address, not a common password, and not all digits. Without a
+terminal, <code>--email</code> and <code>--password</code> (see
+<a href="#admin-panel">Accessing Administration Panel</a>) are both required: a missing
+or invalid one prints an error and exits with status 2.</p>
 <p>With the default configuration, Healthchecks stores data in a SQLite file
 <code>hc.sqlite</code> in the project directory (<code>~/webapps/healthchecks/</code>).</p>
 </li>
 <li>
 <p>Run tests:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>./manage.py<span class="w"> </span><span class="nb">test</span>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>./manage.py<span class="w"> </span><span class="nb">test</span>
 </code></pre></div>
 
 </li>
 <li>
 <p>Run development server:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>./manage.py<span class="w"> </span>runserver
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>./manage.py<span class="w"> </span>runserver
 </code></pre></div>
 
 </li>
 <li>
 <p>From another shell, run the <code>sendalerts</code> management command, responsible for
-  sending out notifications:
-        $ ./manage.py sendalerts</p>
+  sending out notifications:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>./manage.py<span class="w"> </span>sendalerts
+</code></pre></div>
+
 </li>
 </ul>
 <p>At this point, the site should now be running at <code>http://localhost:8000</code>.</p>
-<h2>Accessing Administration Panel</h2>
+<p><code>uv run</code> runs a command in the project's virtual environment. Alternatively,
+activate the virtual environment with <code>source .venv/bin/activate</code>, and then
+run <code>./manage.py</code> directly. The <code>./manage.py</code> examples in the rest of this document
+assume an activated virtual environment.</p>
+<h2 id="admin-panel">Accessing Administration Panel</h2>
 <p>Healthchecks comes with Django's administration panel where you can perform
-administrative tasks: delete user accounts, change passwords, increase limits for
-specific users, inspect contents of database tables.</p>
-<p>To access the administration panel, if you haven't already, create a superuser account:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>./manage.py<span class="w"> </span>createsuperuser
+administrative tasks: change the user's password, inspect contents of
+database tables.</p>
+<p>To access the administration panel, log into the site as the superuser. In the
+setup steps above, <code>createsuperuser</code> can take its credentials as parameters
+instead of prompting:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>./manage.py<span class="w"> </span>createsuperuser<span class="w"> </span>--email<span class="w"> </span>user@example.com<span class="w"> </span>--password<span class="w"> </span>correct-horse-battery-staple
 </code></pre></div>
 
-<p>This will trigger an interactive prompt.</p>
-<p>You can also provide credentials via parameters, bypassing the interactive prompt:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>./manage.py<span class="w"> </span>createsuperuser<span class="w"> </span>--email<span class="w"> </span>user@example.com<span class="w"> </span>--password<span class="w"> </span>changeme123
-</code></pre></div>
-
-<p>Then, log into the site using the superuser credentials. Once logged in,
-click on the "Account" dropdown in top navigation, and select "Site Administration".</p>
-<h2>Sending Emails</h2>
-<p>Healthchecks must be able to send email messages, so it can send out login
-links and alerts to users. Specify your SMTP credentials using the following
-environment variables:</p>
+<p>Once logged in, click on the "Account" dropdown in top navigation, and select
+"Site Administration". The panel is at <code>SITE_ROOT/admin/</code>.</p>
+<p>The panel lists checks, pings, channels (integrations), notifications and flips
+(status changes) under "Api"; credentials (security keys), profiles and projects
+under "Accounts"; log records under "Logs"; and groups and users under
+"Authentication and Authorization". Adding a user, a profile, a security key or a
+log record there is disabled.</p>
+<p>Changing the password in the panel goes through sudo mode, which emails a
+confirmation code, so it works only with <a href="#sending-emails">email set up</a>. Without
+email, the panel shows an "Email Needed" page instead; set the password from the
+shell with <code>./manage.py changepassword</code>, which prompts for the new password twice.</p>
+<h2 id="sending-emails">Sending Emails</h2>
+<p>Email is optional. Without it, that is while <code>EMAIL_HOST</code> is unset:</p>
+<ul>
+<li>the login page offers no "Email Me a Link" login, only the password, and its
+  "Lost your password?" dialog points to <code>./manage.py changepassword</code>;</li>
+<li>sudo mode, which emails a confirmation code, cannot be entered, so Set Password,
+  Change Email, Close Account, adding or removing a two-factor method, and the
+  password change in the administration panel all show an "Email Needed" page;
+  set the password with <code>./manage.py changepassword</code> instead;</li>
+<li>email alerts, reports and reminders, and the <code>ADMINS</code> error emails are not
+  sent; an email integration records each alert it could not send with the error
+  "No SMTP configuration";</li>
+<li>while <a href="../self_hosted_configuration/#EMAIL_USE_VERIFICATION">EMAIL_USE_VERIFICATION</a>
+  is on, an email integration can be added only for the account's own address;</li>
+<li>every <code>manage.py</code> command that runs the system checks prints the warnings
+  <code>hc.api.W002</code> ("No SMTP configuration, cannot send email") and Django's
+  <code>mail.W001</code> ("Your MAILERS setting has no 'default' entry").</li>
+</ul>
+<p>Healthchecks reads the SMTP variables below from the process environment, and
+outside Docker nothing loads a <code>.env</code> file for it: export them in the shell, or the
+service definition, that runs <code>runserver</code> (or your WSGI server), <code>sendalerts</code> and
+<code>sendreports</code>, or set <code>MAILERS</code> in <code>hc/local_settings.py</code> (see
+<a href="../self_hosted_configuration/#EMAIL_HOST">EMAIL_HOST</a>). Specify your SMTP
+credentials using the following environment variables:</p>
 <ul>
 <li>Implicit TLS (<em>recommended</em>):</li>
 </ul>
-<div class="highlight"><pre><span></span><code><span class="n">DEFAULT_FROM_EMAIL</span> <span class="o">=</span> <span class="s2">&quot;valid-sender-address@example.org&quot;</span>
-<span class="n">EMAIL_HOST</span> <span class="o">=</span> <span class="s2">&quot;smtp.example.org&quot;</span>
-<span class="n">EMAIL_PORT</span> <span class="o">=</span> <span class="mi">465</span>
-<span class="n">EMAIL_HOST_USER</span> <span class="o">=</span> <span class="s2">&quot;example-username&quot;</span>
-<span class="n">EMAIL_HOST_PASSWORD</span> <span class="o">=</span> <span class="s2">&quot;example-password&quot;</span>
-<span class="n">EMAIL_USE_TLS</span> <span class="o">=</span> <span class="kc">False</span>
-<span class="n">EMAIL_USE_SSL</span> <span class="o">=</span> <span class="kc">True</span>
+<div class="highlight"><pre><span></span><code><span class="na">DEFAULT_FROM_EMAIL</span><span class="o">=</span><span class="s">valid-sender-address@example.org</span>
+<span class="na">EMAIL_HOST</span><span class="o">=</span><span class="s">smtp.example.org</span>
+<span class="na">EMAIL_PORT</span><span class="o">=</span><span class="s">465</span>
+<span class="na">EMAIL_HOST_USER</span><span class="o">=</span><span class="s">example-username</span>
+<span class="na">EMAIL_HOST_PASSWORD</span><span class="o">=</span><span class="s">example-password</span>
+<span class="na">EMAIL_USE_TLS</span><span class="o">=</span><span class="s">False</span>
+<span class="na">EMAIL_USE_SSL</span><span class="o">=</span><span class="s">True</span>
 </code></pre></div>
 
 <p>Port 465 should be the preferred method according to <a href="https://tools.ietf.org/html/rfc8314#section-3.3">RFC8314 Section 3.3: Implicit
@@ -118,32 +145,21 @@ to use a TLS certificate and not an SSL one.</p>
 <ul>
 <li>Explicit TLS:</li>
 </ul>
-<div class="highlight"><pre><span></span><code><span class="n">DEFAULT_FROM_EMAIL</span> <span class="o">=</span> <span class="s2">&quot;valid-sender-address@example.org&quot;</span>
-<span class="n">EMAIL_HOST</span> <span class="o">=</span> <span class="s2">&quot;smtp.example.org&quot;</span>
-<span class="n">EMAIL_PORT</span> <span class="o">=</span> <span class="mi">587</span>
-<span class="n">EMAIL_HOST_USER</span> <span class="o">=</span> <span class="s2">&quot;example-username&quot;</span>
-<span class="n">EMAIL_HOST_PASSWORD</span> <span class="o">=</span> <span class="s2">&quot;example-password&quot;</span>
-<span class="n">EMAIL_USE_TLS</span> <span class="o">=</span> <span class="kc">True</span>
+<div class="highlight"><pre><span></span><code><span class="na">DEFAULT_FROM_EMAIL</span><span class="o">=</span><span class="s">valid-sender-address@example.org</span>
+<span class="na">EMAIL_HOST</span><span class="o">=</span><span class="s">smtp.example.org</span>
+<span class="na">EMAIL_PORT</span><span class="o">=</span><span class="s">587</span>
+<span class="na">EMAIL_HOST_USER</span><span class="o">=</span><span class="s">example-username</span>
+<span class="na">EMAIL_HOST_PASSWORD</span><span class="o">=</span><span class="s">example-password</span>
+<span class="na">EMAIL_USE_TLS</span><span class="o">=</span><span class="s">True</span>
 </code></pre></div>
 
-<p>Healthchecks use these environment variables to construct the <code>settings.MAILERS</code>
-dictionary (a standard Django setting, <a href="https://docs.djangoproject.com/en/6.1/ref/settings/#std-setting-MAILERS">docs</a>).</p>
-<h2>Receiving Emails</h2>
-<p>Healthchecks comes with a <code>smtpd</code> management command, which starts up an
-SMTP listener service. With the command running, you can ping your
-checks by sending email messages.</p>
-<p>Start the SMTP listener on port 2525:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>./manage.py<span class="w"> </span>smtpd<span class="w"> </span>--port<span class="w"> </span><span class="m">2525</span>
-</code></pre></div>
-
-<p>Send a test email:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>curl<span class="w"> </span>--url<span class="w"> </span><span class="s1">&#39;smtp://127.0.0.1:2525&#39;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--mail-from<span class="w"> </span><span class="s1">&#39;foo@example.org&#39;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--mail-rcpt<span class="w"> </span><span class="s1">&#39;11111111-1111-1111-1111-111111111111@my-hc.example.org&#39;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>-F<span class="w"> </span><span class="s1">&#39;=&#39;</span>
-</code></pre></div>
-
-<h2>Sending Status Notifications</h2>
+<p>Healthchecks uses these environment variables to construct the <code>settings.MAILERS</code>
+dictionary (a standard Django setting, <a href="https://docs.djangoproject.com/en/6.1/ref/settings/#std-setting-MAILERS">docs</a>).
+<code>EMAIL_USE_TLS</code> defaults to <code>True</code>, so set it to <code>False</code> when you set
+<code>EMAIL_USE_SSL=True</code>: with both <code>True</code>, startup and <code>manage.py check</code> report
+nothing, but every email fails with Django's <code>InvalidMailer</code> error ("The 'use_ssl'
+and 'use_tls' OPTIONS are incompatible").</p>
+<h2 id="sending-notifications">Sending Status Notifications</h2>
 <p>The <code>sendalerts</code> management command continuously polls the database for any checks
 changing state, and sends out notifications as needed.
 When <code>sendalerts</code> is not running, the Healthchecks instance will not send out any
@@ -152,42 +168,81 @@ alerts.</p>
 <div class="highlight"><pre><span></span><code>$<span class="w"> </span>./manage.py<span class="w"> </span>sendalerts
 </code></pre></div>
 
-<p>In a production setup, make sure the <code>sendalerts</code> command can survive
-server restarts.</p>
-<h2 id="database-cleanup">Database Cleanup</h2>
-<p>Healthchecks deletes old entries from <code>api_ping</code>, <code>api_flip</code>, and <code>api_notification</code>
-tables automatically. By default, Healthchecks keeps the 100 most recent
-pings for every check. You can set the limit higher to keep a longer history:
-go to the Administration Panel, look up user's <strong>Profile</strong> and modify its
-"Ping log limit" field.</p>
-<p>Healthchecks provides management commands for cleaning up
-<code>auth_user</code> (user accounts) and <code>api_tokenbucket</code> (rate limiting records) tables,
-and for removing stale objects from external object storage.</p>
-<p>Remove user accounts that are older than 1 month and have never logged in:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>./manage.py<span class="w"> </span>pruneusers
+<p><code>sendalerts</code> takes <code>--num-workers N</code> (default 1), the number of notifications it
+sends at the same time. Several <code>sendalerts</code> processes can run at once: each check
+going down and each status change is handled by exactly one of them.</p>
+<p>The <code>sendreports</code> management command sends the monthly (or weekly or daily)
+reports and, while any check is down, the hourly or daily reminders, as each
+profile's notification settings choose. Run it as a second long-running process:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>./manage.py<span class="w"> </span>sendreports<span class="w"> </span>--loop
 </code></pre></div>
 
-<p>Remove old records from the <code>api_tokenbucket</code> table. The TokenBucket
-model is used for rate-limiting login attempts and similar operations.
-Any records older than one day can be safely removed.</p>
+<p>With <code>--loop</code> it looks for due reports and reminders every 60 seconds; without
+it, it sends what is due once and exits.</p>
+<p>In a production setup, make sure the <code>sendalerts</code> and <code>sendreports --loop</code>
+commands can survive server restarts. The Docker image runs both under uWSGI
+(see <a href="../self_hosted_docker/">Running with Docker</a>).</p>
+<p>Two more commands are for occasional use, from cron for example; nothing runs them
+by itself:</p>
+<ul>
+<li><code>./manage.py sendlogs</code> emails the <code>ADMINS</code> addresses the number of log records
+  written in the last 24 hours, with a link to them, and sends nothing when there
+  are none.</li>
+<li><code>./manage.py sendflappingnotices</code> emails the owner about each check that changed
+  status more than 200 times in the last 24 hours.</li>
+</ul>
+<h2 id="database-cleanup">Database Cleanup</h2>
+<p>Healthchecks deletes old entries from the <code>api_ping</code>, <code>api_flip</code>, and
+<code>api_notification</code> tables automatically. Each check prunes its own entries on every
+100th ping it receives:</p>
+<ul>
+<li>pings older than the newest "Ping log limit" pings are deleted (100 by default);</li>
+<li>notifications older than the oldest kept ping are deleted;</li>
+<li>status changes (flips) are deleted only when they are older than both the oldest
+  kept ping and 93 days, because the downtime statistics need about three months
+  of them.</li>
+</ul>
+<p>To keep a longer or a shorter history, go to the Administration Panel, open the
+user's <strong>Profile</strong>, and change its "Ping log limit" field. Lowering the limit
+hides the older pings at once, in the web UI and in the API, but deletes them only
+at the check's next prune. To prune every check now, run:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>./manage.py<span class="w"> </span>prunepingsslow
+</code></pre></div>
+
+<p>It prunes, one by one, every check that has received more than 100 pings. Raising
+the limit does not bring back pings that were already deleted. Whatever the limit,
+the API returns at most 1000 pings (see <a href="../api/#list-pings">List check's logged pings</a>).</p>
+<p>Log records (Site Administration › Logs › Records) are never pruned
+automatically; delete old ones in the Administration Panel.</p>
+<p>Healthchecks provides a management command for cleaning up the <code>api_tokenbucket</code>
+(rate limiting records) table. The TokenBucket model is used for rate-limiting
+login attempts and similar operations. Any records older than one day can be
+safely removed.</p>
 <div class="highlight"><pre><span></span><code>$<span class="w"> </span>./manage.py<span class="w"> </span>prunetokenbucket
 </code></pre></div>
 
-<p>Remove old objects from external object storage. When an user removes
-a check, removes a project, or closes their account, Healthchecks
-does not remove the associated objects from the external object
-storage on the fly. Instead, you should run <code>pruneobjects</code> occasionally
-(for example, once a month). This command first takes an inventory
-of all checks in the database, and then iterates over top-level
-keys in the object storage bucket, and deletes any that don't also
-exist in the database.</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>./manage.py<span class="w"> </span>pruneobjects
+<p>When you first try this command on your data, it is a good idea to
+test it on a copy of your database, not on the live database right away.
+In a production setup, you will want to run this command regularly, as well as
+have regular, automatic database backups set up.</p>
+<h2 id="login-lockout">Login Lockout</h2>
+<p>Logging in is rate limited per email address:</p>
+<ul>
+<li>password attempts: 20 per 24 hours, refilling at one attempt every 72 minutes;</li>
+<li>login link requests: 10 per hour, plus, from a browser that has not logged in
+  before, 20 per client IP address per hour.</li>
+</ul>
+<p>A browser that has completed a login keeps a device cookie for 365 days and gets
+login rate limits of its own, but a new browser shares them with everyone else, so
+a run of wrong passwords for the account's email, from anywhere, can lock it out.
+To get back in, wait for the limits to refill, use the login link sent by email if
+email is set up, or clear every rate limit record, the recent ones too:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>./manage.py<span class="w"> </span>prunetokenbucket<span class="w"> </span>--all
 </code></pre></div>
 
-<p>When you first try these commands on your data, it is a good idea to
-test them on a copy of your database, not on the live database right away.
-In a production setup, you will want to run these commands regularly, as well as
-have regular, automatic database backups set up.</p>
+<p>Changing <a href="../self_hosted_configuration/#SECRET_KEY">SECRET_KEY</a> also resets the
+per-email limits, but not the per-IP one, and has other effects, listed there.</p>
+<p>If you have forgotten the password, set a new one with <code>./manage.py changepassword</code>.</p>
 <h2>Next Steps</h2>
-<p>Get the <a href="https://github.com/healthchecks/healthchecks">source code</a>.</p>
+<p>Get the <a href="https://github.com/zhaow-de/healthchecks">source code</a>.</p>
 <p>See <a href="../self_hosted_configuration/">Configuration</a> for a list of configuration options.</p>

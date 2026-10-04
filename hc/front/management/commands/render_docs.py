@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from importlib.util import find_spec
 from pathlib import Path
 from typing import Any
@@ -16,7 +14,7 @@ class Command(BaseCommand):
             if find_spec(pkg) is None:
                 self.stdout.write(f"This command requires the {pkg} package.")
                 self.stdout.write("Please install it with:\n\n")
-                self.stdout.write(f"  pip install {pkg}\n\n")
+                self.stdout.write("  uv sync\n\n")
                 return
 
         import markdown
@@ -28,18 +26,14 @@ class Command(BaseCommand):
             "def_list",
             "attr_list",
         ]
-        extension_configs = {
-            "codehilite": {"css_class": "highlight", "startinline": True}
-        }
+        extension_configs = {"codehilite": {"css_class": "highlight"}}
 
         def process_directory(path: Path) -> None:
             for src_path in path.glob("*.md"):
                 print(f"Rendering {src_path.name}")
 
-                text = src_path.open("r", encoding="utf-8").read()
-                html = markdown.markdown(
-                    text, extensions=extensions, extension_configs=extension_configs
-                )
+                text = src_path.read_text(encoding="utf-8")
+                html = markdown.markdown(text, extensions=extensions, extension_configs=extension_configs)
 
                 dst_path = src_path.with_suffix(".html-fragment")
                 with dst_path.open("w", encoding="utf-8") as f:

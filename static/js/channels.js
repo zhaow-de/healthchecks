@@ -1,54 +1,74 @@
-$(function() {
+hc.ready(function() {
+    const cm = hc.$("#checks-modal");
 
-    $(".rw .edit-checks").click(function() {
-        $("#checks-modal").modal("show");
-        $.ajax(this.dataset.url).done(function(data) {
-            $("#checks-modal .modal-content").html(data);
+    // The URL of the form being loaded, so that a slower earlier load does not
+    // replace it
+    let loadingUrl = null;
+    hc.on(".edit-checks", "click", function() {
+        const tip = bootstrap.Tooltip.getInstance(this);
+        if (tip) tip.hide();
 
-        })
+        // Replace the previous integration's form at once: it carries that
+        // integration's code, and saving it would change that integration
+        const content = hc.$(".modal-content", cm);
+        content.innerHTML = "<div class='modal-body'>Loading&hellip;</div>";
+        hc.showModal(cm);
+
+        const url = this.dataset.url;
+        loadingUrl = url;
+        hc.getText(url).then(function(html) {
+            if (url === loadingUrl) content.innerHTML = html;
+        }).catch(function() {
+            if (url === loadingUrl) content.innerHTML = "<div class='modal-body'>Failed to load.</div>";
+        });
 
         return false;
     });
 
-    var $cm = $("#checks-modal");
     function updateNumAssigned() {
-        var numAssigned = $cm.find("input:checkbox:checked").length;
-        var numTotal = $cm.find("input:checkbox").length;
-        $cm.find("#num-assigned").text(numAssigned);
-        $cm.find("#select-all").attr("disabled", numAssigned == numTotal);
-        $cm.find("#unselect-all").attr("disabled", numAssigned == 0);
+        const boxes = hc.$$("input[type=checkbox]", cm);
+        const numAssigned = boxes.filter(function(box) { return box.checked; }).length;
+        const counter = hc.$("#num-assigned", cm);
+        if (counter) counter.textContent = numAssigned;
+
+        const selectAll = hc.$("#select-all", cm);
+        if (selectAll) selectAll.disabled = numAssigned === boxes.length;
+        const unselectAll = hc.$("#unselect-all", cm);
+        if (unselectAll) unselectAll.disabled = numAssigned === 0;
     }
-    $cm.on("click", "#select-all", function() {
-        $cm.find("input[type='checkbox']").prop("checked", true);
+
+    function setAll(checked) {
+        hc.$$("input[type=checkbox]", cm).forEach(function(box) {
+            box.checked = checked;
+        });
         updateNumAssigned();
-    });
-    $cm.on("click", "#unselect-all", function() {
-        $cm.find("input[type='checkbox']").prop("checked", false);
-        updateNumAssigned();
-    });
-    // When any checkbox changes its value, update the "(x of y)"" in the title
-    $cm.on("change", "input", updateNumAssigned);
-    // Let the user to click anywhere in the row to toggle the checkbox
-    $cm.on("click", "tr", function(ev) {
-        if (event.target.type !== 'checkbox') {
-            $(":checkbox", this).trigger('click');
+    }
+
+    hc.on(cm, "click", "#select-all", function() { setAll(true); });
+    hc.on(cm, "click", "#unselect-all", function() { setAll(false); });
+    // When any checkbox changes its value, update the "(x of y)" in the title
+    hc.on(cm, "change", "input", updateNumAssigned);
+    // Let the user click anywhere in the row to toggle the checkbox
+    hc.on(cm, "click", "tr", function(event) {
+        if (event.target.type !== "checkbox") {
+            const box = hc.$("input[type=checkbox]", this);
+            if (box) box.click();
         }
     });
 
-    $(".channel-remove").click(function() {
-        var $this = $(this);
-
-        $("#remove-channel-form").attr("action", $this.data("url"));
-        $(".remove-channel-kind").text($this.data("kind"));
-        $('#remove-channel-modal').modal("show");
+    hc.on(".channel-remove", "click", function() {
+        const btn = this;
+        hc.$("#remove-channel-form").setAttribute("action", btn.dataset.url);
+        hc.$$(".remove-channel-kind").forEach(function(el) {
+            el.textContent = btn.dataset.kind;
+        });
+        hc.showModal("#remove-channel-modal");
 
         return false;
     });
 
-    $(".channel-modal").on('shown.bs.modal', function () {
-        $(".input-name", this).focus();
-    })
-
-    $('[data-toggle="tooltip"]').tooltip();
-
+    hc.on(".channel-modal", "shown.bs.modal", function() {
+        const input = hc.$(".input-name", this);
+        if (input) input.focus();
+    });
 });

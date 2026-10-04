@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 
 from django.core import mail
@@ -16,9 +14,7 @@ class EditEmailTestCase(BaseTestCase):
         self.check = Check.objects.create(project=self.project)
 
         self.channel = Channel(project=self.project, kind="email")
-        self.channel.value = json.dumps(
-            {"value": "alerts@example.org", "up": True, "down": True}
-        )
+        self.channel.value = json.dumps({"value": "alerts@example.org", "up": True, "down": True})
         self.channel.email_verified = True
         self.channel.save()
 
@@ -65,15 +61,6 @@ class EditEmailTestCase(BaseTestCase):
 
         # The email address did not change, so we should skip verification
         self.assertEqual(len(mail.outbox), 0)
-
-    def test_team_access_works(self) -> None:
-        form = {"value": "new@example.org", "down": "true", "up": "true"}
-
-        self.client.login(username="bob@example.org", password="password")
-        self.client.post(self.url, form)
-
-        self.channel.refresh_from_db()
-        self.assertEqual(self.channel.email.value, "new@example.org")
 
     @override_settings(EMAIL_USE_VERIFICATION=False)
     def test_it_hides_confirmation_needed_notice(self) -> None:
@@ -125,10 +112,32 @@ class EditEmailTestCase(BaseTestCase):
         email = mail.outbox[0]
         self.assertTrue(email.subject.startswith("Verify email address on"))
 
-    def test_it_requires_rw_access(self) -> None:
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
+    @override_settings(MAILERS={})
+    def test_it_saves_flags_of_unconfirmed_address_without_smtp(self) -> None:
+        self.channel.email_verified = False
+        self.channel.save()
 
-        self.client.login(username="bob@example.org", password="password")
+        form = {"value": "alerts@example.org", "down": "true", "up": "false"}
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.post(self.url, form)
+        self.assertRedirects(r, self.channels_url)
+
+        self.channel.refresh_from_db()
+        self.assertFalse(self.channel.email.notify_up)
+        self.assertFalse(self.channel.email_verified)
+
+    @override_settings(MAILERS={})
+    def test_it_refuses_changed_address_without_smtp(self) -> None:
+        form = {"value": "dan@example.org", "down": "true", "up": "true"}
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.post(self.url, form)
+        self.assertContains(r, "This server cannot send email, so it cannot confirm this address.")
+
+        self.channel.refresh_from_db()
+        self.assertEqual(self.channel.email.value, "alerts@example.org")
+        self.assertTrue(self.channel.email_verified)
+
+    def test_it_checks_ownership(self) -> None:
+        self.client.login(username="charlie@example.org", password="password")
         r = self.client.get(self.url)
-        self.assertEqual(r.status_code, 403)
+        self.assertEqual(r.status_code, 404)

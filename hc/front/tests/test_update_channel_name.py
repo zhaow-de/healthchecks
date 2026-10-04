@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from hc.api.models import Channel
 from hc.test import BaseTestCase
 
@@ -22,16 +20,13 @@ class UpdateChannelNameTestCase(BaseTestCase):
         self.channel.refresh_from_db()
         self.assertEqual(self.channel.name, "My work email")
 
-    def test_team_access_works(self) -> None:
-        payload = {"name": "Bob was here"}
-
-        # Logging in as bob, not alice. Bob has team access so this
-        # should work.
-        self.client.login(username="bob@example.org", password="password")
-        self.client.post(self.url, data=payload)
+    def test_it_rejects_invalid_name(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.post(self.url, data={"name": "x" * 101})
+        self.assertEqual(r.status_code, 400)
 
         self.channel.refresh_from_db()
-        self.assertEqual(self.channel.name, "Bob was here")
+        self.assertEqual(self.channel.name, "")
 
     def test_it_checks_ownership(self) -> None:
         payload = {"name": "Charlie Sent This"}
@@ -53,13 +48,3 @@ class UpdateChannelNameTestCase(BaseTestCase):
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.url)
         self.assertEqual(r.status_code, 405)
-
-    def test_it_requires_rw_access(self) -> None:
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
-
-        payload = {"name": "My work email"}
-
-        self.client.login(username="bob@example.org", password="password")
-        r = self.client.post(self.url, data=payload)
-        self.assertEqual(r.status_code, 403)

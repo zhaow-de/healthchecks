@@ -1,7 +1,6 @@
-from __future__ import annotations
-
-from datetime import datetime, timezone
+from datetime import UTC, date, datetime
 from datetime import timedelta as td
+from zoneinfo import ZoneInfo
 
 import time_machine
 from django.conf import settings
@@ -9,10 +8,11 @@ from django.core import mail
 from django.test.utils import override_settings
 from django.utils.timezone import now
 
+from hc.accounts.models import Credential, Project
 from hc.api.models import Check, Flip
 from hc.test import BaseTestCase
 
-CURRENT_TIME = datetime(2020, 1, 13, 2, tzinfo=timezone.utc)
+CURRENT_TIME = datetime(2020, 1, 13, 2, tzinfo=UTC)
 
 EMPTY_TABLE = """
 +--------+------+-----------+-----------+
@@ -24,7 +24,7 @@ EMPTY_TABLE = """
 
 NAG_TEXT = """Hello,
 
-This is a hourly reminder sent by Mychecks.
+This is an hourly reminder sent by Mychecks.
 One check is currently DOWN:
 
 
@@ -49,13 +49,13 @@ class ProfileModelTestCase(BaseTestCase):
         super().setUp()
 
         self.check = Check(project=self.project, name="Foo")
-        self.check.created = datetime(2019, 10, 1, tzinfo=timezone.utc)
-        self.check.last_ping = datetime(2019, 12, 31, 23, tzinfo=timezone.utc)
+        self.check.created = datetime(2019, 10, 1, tzinfo=UTC)
+        self.check.last_ping = datetime(2019, 12, 31, 23, tzinfo=UTC)
         self.check.status = "down"
         self.check.save()
 
         self.flip = Flip(owner=self.check)
-        self.flip.created = datetime(2019, 12, 31, 23, tzinfo=timezone.utc)
+        self.flip.created = datetime(2019, 12, 31, 23, tzinfo=UTC)
         self.flip.old_status = "new"
         self.flip.new_status = "down"
         self.flip.save()
@@ -74,9 +74,7 @@ class ProfileModelTestCase(BaseTestCase):
         self.assertEqual(message.subject, "Monthly Report")
 
         # The summary line
-        self.assertEmailContainsHtml(
-            "In December, <strong>1 check</strong> had <strong>1 downtime event</strong>."
-        )
+        self.assertEmailContainsHtml("In December, <strong>1 check</strong> had <strong>1 downtime event</strong>.")
         self.assertEmailContainsText("In December, 1 check had 1 downtime event.")
 
         # Note, assertEmailContains tests if the fragment appears in
@@ -116,9 +114,7 @@ class ProfileModelTestCase(BaseTestCase):
         self.assertEmailContainsHtml(
             "Last week (January 6 to January 12), <strong>1 check</strong> had <strong>1 downtime event</strong>."
         )
-        self.assertEmailContainsText(
-            "Last week (January 6 to January 12), 1 check had 1 downtime event."
-        )
+        self.assertEmailContainsText("Last week (January 6 to January 12), 1 check had 1 downtime event.")
 
         email = mail.outbox[0]
         self.assertEqual(email.subject, "Weekly Report")
@@ -132,12 +128,8 @@ class ProfileModelTestCase(BaseTestCase):
         self.profile.send_report()
 
         # The summary line
-        self.assertEmailContainsHtml(
-            "Yesterday (January 12), <strong>1 check</strong> had <strong>1 downtime event</strong>."
-        )
-        self.assertEmailContainsText(
-            "Yesterday (January 12), 1 check had 1 downtime event."
-        )
+        self.assertEmailContainsHtml("Yesterday (January 12), <strong>1 check</strong> had <strong>1 downtime event</strong>.")
+        self.assertEmailContainsText("Yesterday (January 12), 1 check had 1 downtime event.")
 
         email = mail.outbox[0]
         self.assertEqual(email.subject, "Daily Report")
@@ -158,7 +150,7 @@ class ProfileModelTestCase(BaseTestCase):
 
     def test_send_report_handles_recently_created_check(self) -> None:
         self.check.status = "new"
-        self.check.created = datetime(2020, 1, 5, tzinfo=timezone.utc)
+        self.check.created = datetime(2020, 1, 5, tzinfo=UTC)
         self.check.save()
 
         self.flip.delete()
@@ -228,7 +220,7 @@ class ProfileModelTestCase(BaseTestCase):
         self.assertEqual(len(mail.outbox), 0)
 
     def test_send_report_noops_if_no_recent_pings(self) -> None:
-        self.check.last_ping = datetime(2019, 1, 1, tzinfo=timezone.utc)
+        self.check.last_ping = datetime(2019, 1, 1, tzinfo=UTC)
         self.check.save()
 
         sent = self.profile.send_report()
@@ -249,10 +241,20 @@ class ProfileModelTestCase(BaseTestCase):
 
         self.assertEqual(message.subject, "Reminder: 1 check still down")
         self.assertEqual(message.body, NAG_TEXT)
+        self.assertEmailContainsHtml("This is\nan hourly\nreminder")
         self.assertEmailContains("Foo")
 
         # Check UUIDs should not appear anywhere in the email
         self.assertEmailNotContains(str(self.check.code))
+
+    def test_send_report_sends_daily_nag(self) -> None:
+        self.profile.nag_period = td(days=1)
+        self.profile.save()
+
+        sent = self.profile.send_report(nag=True)
+        self.assertTrue(sent)
+        self.assertEmailContainsText("This is a daily reminder")
+        self.assertEmailContainsHtml("This is\na daily\nreminder")
 
     def test_send_nag_noops_if_none_down(self) -> None:
         self.check.last_ping = None
@@ -307,3 +309,33 @@ class ProfileModelTestCase(BaseTestCase):
         self.profile.next_nag_date = now()
         self.profile.update_next_nag_date()
         self.assertIsNone(self.profile.next_nag_date)
+
+    def test_choose_next_report_date_handles_daily(self) -> None:
+        self.profile.reports = "daily"
+        self.profile.tz = "Europe/Riga"
+
+        result = self.profile.choose_next_report_date()
+        assert result
+        local = result.astimezone(ZoneInfo("Europe/Riga"))
+        # CURRENT_TIME is 04:00 on Jan 13 in Riga, the next report goes out
+        # between 9AM and 11AM local time the next day
+        self.assertEqual(local.date(), date(2020, 1, 14))
+        self.assertIn(local.hour, (9, 10))
+
+    def test_choose_next_report_date_handles_off(self) -> None:
+        self.profile.reports = "off"
+        self.assertIsNone(self.profile.choose_next_report_date())
+
+    def test_projects_lists_own_projects_only(self) -> None:
+        second = Project.objects.create(owner=self.alice, name="Second Project")
+        self.assertEqual(list(self.profile.projects()), [self.project, second])
+
+    def test_checks_from_all_projects_lists_own_checks_only(self) -> None:
+        second = Project.objects.create(owner=self.alice, name="Second Project")
+        other = Check.objects.create(project=second)
+        Check.objects.create(project=self.charlies_project)
+        self.assertEqual(set(self.profile.checks_from_all_projects()), {self.check, other})
+
+    def test_credential_str_shows_the_name(self) -> None:
+        credential = Credential(user=self.alice, name="Alices Key", data=b"")
+        self.assertEqual(str(credential), "Alices Key")

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from hc.api.models import Channel, Check
 from hc.test import BaseTestCase
 
@@ -21,18 +19,9 @@ class ChannelChecksTestCase(BaseTestCase):
         self.assertContains(r, "Database Backups")
         self.assertContains(r, "Assign Checks to Integration", status_code=200)
 
-    def test_team_access_works(self) -> None:
-        url = f"/integrations/{self.channel.code}/checks/"
-
-        # Logging in as bob, not alice. Bob has team access so this
-        # should work.
-        self.client.login(username="bob@example.org", password="password")
-        r = self.client.get(url)
-        self.assertContains(r, "Assign Checks to Integration", status_code=200)
-
     def test_it_checks_owner(self) -> None:
-        # channel does not belong to mallory so this should come back
-        # with 403 Forbidden:
+        # The channel does not belong to charlie, so this should come back
+        # with 404 Not Found:
         url = f"/integrations/{self.channel.code}/checks/"
         self.client.login(username="charlie@example.org", password="password")
         r = self.client.get(url)
@@ -54,3 +43,12 @@ class ChannelChecksTestCase(BaseTestCase):
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(url)
         self.assertContains(r, "there are currently no checks", status_code=200)
+
+    def test_it_denies_a_superuser_outsider(self) -> None:
+        self.charlie.is_superuser = True
+        self.charlie.save()
+
+        url = f"/integrations/{self.channel.code}/checks/"
+        self.client.login(username="charlie@example.org", password="password")
+        r = self.client.get(url)
+        self.assertEqual(r.status_code, 404)

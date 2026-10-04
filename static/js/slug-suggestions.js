@@ -1,4 +1,4 @@
-$(function () {
+hc.ready(function () {
     function slugify(text) {
         return text
             .normalize("NFKD")
@@ -12,28 +12,28 @@ $(function () {
             .replace(/-+$/, "");
     }
 
-    $(".with-slug-suggestions").each(function() {
-        var nameInput = $("input[name='name']", this);
-        var slugInput = $("input[name='slug']", this);
-        var btn = $(".use-suggested-slug", this);
-        var help = $(".slug-help-block", this);
+    hc.$$(".with-slug-suggestions").forEach(function(modal) {
+        const nameInput = hc.$("input[name='name']", modal);
+        const slugInput = hc.$("input[name='slug']", modal);
+        const btn = hc.$(".use-suggested-slug", modal);
+        const help = hc.$(".slug-help-block", modal);
 
         function update() {
-            var suggested = slugify(nameInput.val());
+            const suggested = slugify(nameInput.value);
             if (suggested) {
-                help.html(`Suggested value: <code>${suggested}</code>`);
+                help.innerHTML = `Suggested value: <code>${suggested}</code>`;
             } else {
-                help.text("Allowed characters: a-z, 0-9, hyphens, underscores.");
+                help.textContent = "Allowed characters: a-z, 0-9, hyphens, underscores.";
             }
 
-            btn.attr("disabled", !suggested);
+            btn.disabled = !suggested;
         }
 
-        $(nameInput).on("keyup change", update);
-        $(this).on("shown.bs.modal", update);
+        hc.on(nameInput, "input", update);
+        hc.on(modal, "shown.bs.modal", update);
 
-        btn.click(function() {
-            slugInput.val(slugify(nameInput.val()));
+        hc.on(btn, "click", function() {
+            slugInput.value = slugify(nameInput.value);
         });
     });
 

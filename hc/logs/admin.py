@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import ClassVar
 
 from django.contrib import admin
@@ -54,7 +52,5 @@ class RecordsAdmin(ModelAdmin[Record]):
     def has_add_permission(self, request: HttpRequest) -> bool:
         return False
 
-    def has_change_permission(
-        self, request: HttpRequest, obj: Record | None = None
-    ) -> bool:
+    def has_change_permission(self, request: HttpRequest, obj: Record | None = None) -> bool:
         return False

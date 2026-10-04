@@ -1,17 +1,16 @@
-from __future__ import annotations
-
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from datetime import timedelta as td
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import time_machine
-from django.test.utils import override_settings
+from django.db import IntegrityError
+from django.db.models import QuerySet
 from django.utils.timezone import now
 
-from hc.api.models import Channel, Check, Flip, Notification, Ping
+from hc.api.models import MAX_DURATION, Channel, Check, Flip, Notification, Ping
 from hc.test import BaseTestCase
 
-CURRENT_TIME = datetime(2020, 1, 15, tzinfo=timezone.utc)
+CURRENT_TIME = datetime(2020, 1, 15, tzinfo=UTC)
 
 
 class CheckModelTestCase(BaseTestCase):
@@ -23,6 +22,13 @@ class CheckModelTestCase(BaseTestCase):
 
         check.tags = " "
         self.assertEqual(check.tags_list(), [])
+
+    def test_filter_any_ignores_the_email_filters(self) -> None:
+        check = Check(filter_subject=True, filter_body=True)
+        self.assertFalse(check.filter_any())
+
+        check.filter_http_body = True
+        self.assertTrue(check.filter_any())
 
     def test_get_status_handles_new_check(self) -> None:
         check = Check()
@@ -47,7 +53,7 @@ class CheckModelTestCase(BaseTestCase):
         check.kind = "cron"
         check.schedule = "0 0 * * *"
         check.status = "up"
-        check.last_ping = datetime(2000, 1, 1, tzinfo=timezone.utc)
+        check.last_ping = datetime(2000, 1, 1, tzinfo=UTC)
 
         with time_machine.travel("2000-01-01 23:59+00:00"):
             self.assertEqual(check.get_status(), "up")
@@ -64,7 +70,7 @@ class CheckModelTestCase(BaseTestCase):
         check.kind = "oncalendar"
         check.schedule = "00:00"
         check.status = "up"
-        check.last_ping = datetime(2000, 1, 1, tzinfo=timezone.utc)
+        check.last_ping = datetime(2000, 1, 1, tzinfo=UTC)
 
         with time_machine.travel("2000-01-01 23:59+00:00"):
             self.assertEqual(check.get_status(), "up")
@@ -81,7 +87,7 @@ class CheckModelTestCase(BaseTestCase):
         check.kind = "oncalendar"
         check.schedule = "2019-01-01"
         check.status = "up"
-        check.last_ping = datetime(2020, 1, 1, tzinfo=timezone.utc)
+        check.last_ping = datetime(2020, 1, 1, tzinfo=UTC)
 
         with time_machine.travel(check.last_ping + td(hours=1)):
             self.assertEqual(check.get_status(), "up")
@@ -92,7 +98,7 @@ class CheckModelTestCase(BaseTestCase):
         check.kind = "cron"
         check.schedule = "0 10 * * *"
         check.status = "up"
-        check.last_ping = datetime(2000, 1, 1, tzinfo=timezone.utc)
+        check.last_ping = datetime(2000, 1, 1, tzinfo=UTC)
         check.tz = "Australia/Brisbane"  # UTC+10
 
         with time_machine.travel("2000-01-01 23:59+00:00"):
@@ -121,15 +127,6 @@ class CheckModelTestCase(BaseTestCase):
 
         self.assertEqual(check.get_status(), "down")
 
-    def test_get_status_handles_started(self) -> None:
-        check = Check()
-        check.last_ping = now() - td(hours=2)
-        # Last start was 5 minutes ago, display status should be "started"
-        check.last_start = now() - td(minutes=5)
-        for status in ("new", "paused", "up", "down"):
-            check.status = status
-            self.assertEqual(check.get_status(with_started=True), "started")
-
     def test_get_status_handles_down_then_started_and_expired(self) -> None:
         check = Check(status="down")
         # Last ping was 2 days ago
@@ -137,7 +134,6 @@ class CheckModelTestCase(BaseTestCase):
         # Last start was 2 hours ago - the check is past its grace time
         check.last_start = now() - td(hours=2)
 
-        self.assertEqual(check.get_status(with_started=True), "down")
         self.assertEqual(check.get_status(), "down")
 
     def test_get_status_handles_up_then_started(self) -> None:
@@ -147,7 +143,6 @@ class CheckModelTestCase(BaseTestCase):
         # Last start was 5 minutes ago
         check.last_start = now() - td(minutes=5)
 
-        self.assertEqual(check.get_status(with_started=True), "started")
         # A started check still is considered "up":
         self.assertEqual(check.get_status(), "up")
 
@@ -158,7 +153,6 @@ class CheckModelTestCase(BaseTestCase):
         # Last start was 2 hours ago - the check is past its grace time
         check.last_start = now() - td(hours=2)
 
-        self.assertEqual(check.get_status(with_started=True), "down")
         self.assertEqual(check.get_status(), "down")
 
     def test_get_status_handles_paused_then_started_and_expired(self) -> None:
@@ -166,18 +160,16 @@ class CheckModelTestCase(BaseTestCase):
         # Last start was 2 hours ago - the check is past its grace time
         check.last_start = now() - td(hours=2)
 
-        self.assertEqual(check.get_status(with_started=True), "down")
         self.assertEqual(check.get_status(), "down")
 
     def test_get_status_handles_started_and_mia(self) -> None:
         check = Check()
         check.last_start = now() - td(hours=2)
 
-        self.assertEqual(check.get_status(with_started=True), "down")
         self.assertEqual(check.get_status(), "down")
 
     def test_next_ping_with_cron_syntax(self) -> None:
-        dt = datetime(2000, 1, 1, tzinfo=timezone.utc)
+        dt = datetime(2000, 1, 1, tzinfo=UTC)
         # Expect ping every round hour
         check = Check(project=self.project)
         check.kind = "cron"
@@ -193,7 +185,7 @@ class CheckModelTestCase(BaseTestCase):
     @time_machine.travel(CURRENT_TIME)
     def test_downtimes_handles_no_flips(self) -> None:
         check = Check(project=self.project)
-        check.created = datetime(2019, 1, 1, tzinfo=timezone.utc)
+        check.created = datetime(2019, 1, 1, tzinfo=UTC)
         check.save()
 
         jan, dec, nov = check.downtimes(3, "UTC")
@@ -222,7 +214,7 @@ class CheckModelTestCase(BaseTestCase):
     @time_machine.travel(CURRENT_TIME, tick=False)
     def test_downtimes_handles_currently_down_check(self) -> None:
         check = Check(project=self.project, status="down")
-        check.created = datetime(2019, 1, 1, tzinfo=timezone.utc)
+        check.created = datetime(2019, 1, 1, tzinfo=UTC)
         check.save()
 
         records = check.downtimes(10, "UTC")
@@ -238,7 +230,7 @@ class CheckModelTestCase(BaseTestCase):
     @time_machine.travel(CURRENT_TIME)
     def test_monthly_uptime_pct_handles_dst(self) -> None:
         check = Check(project=self.project, status="down")
-        check.created = datetime(2019, 1, 1, tzinfo=timezone.utc)
+        check.created = datetime(2019, 1, 1, tzinfo=UTC)
         check.save()
 
         records = check.downtimes(10, "Europe/Riga")
@@ -251,10 +243,10 @@ class CheckModelTestCase(BaseTestCase):
     @time_machine.travel(CURRENT_TIME, tick=False)
     def test_downtimes_handles_flip_one_day_ago(self) -> None:
         check = Check.objects.create(project=self.project, status="down")
-        check.created = datetime(2019, 1, 1, tzinfo=timezone.utc)
+        check.created = datetime(2019, 1, 1, tzinfo=UTC)
 
         flip = Flip(owner=check)
-        flip.created = datetime(2020, 1, 14, tzinfo=timezone.utc)
+        flip.created = datetime(2020, 1, 14, tzinfo=UTC)
         flip.old_status = "up"
         flip.new_status = "down"
         flip.save()
@@ -273,10 +265,10 @@ class CheckModelTestCase(BaseTestCase):
     @time_machine.travel(CURRENT_TIME, tick=False)
     def test_downtimes_handles_flip_two_months_ago(self) -> None:
         check = Check.objects.create(project=self.project, status="down")
-        check.created = datetime(2019, 1, 1, tzinfo=timezone.utc)
+        check.created = datetime(2019, 1, 1, tzinfo=UTC)
 
         flip = Flip(owner=check)
-        flip.created = datetime(2019, 11, 15, tzinfo=timezone.utc)
+        flip.created = datetime(2019, 11, 15, tzinfo=UTC)
         flip.old_status = "up"
         flip.new_status = "down"
         flip.save()
@@ -306,10 +298,10 @@ class CheckModelTestCase(BaseTestCase):
     @time_machine.travel(CURRENT_TIME, tick=False)
     def test_downtimes_handles_non_utc_timezone(self) -> None:
         check = Check.objects.create(project=self.project, status="down")
-        check.created = datetime(2019, 1, 1, tzinfo=timezone.utc)
+        check.created = datetime(2019, 1, 1, tzinfo=UTC)
 
         flip = Flip(owner=check)
-        flip.created = datetime(2019, 12, 31, 23, tzinfo=timezone.utc)
+        flip.created = datetime(2019, 12, 31, 23, tzinfo=UTC)
         flip.old_status = "up"
         flip.new_status = "down"
         flip.save()
@@ -337,7 +329,7 @@ class CheckModelTestCase(BaseTestCase):
     @time_machine.travel(CURRENT_TIME)
     def test_downtimes_handles_months_when_check_did_not_exist(self) -> None:
         check = Check(project=self.project)
-        check.created = datetime(2020, 1, 1, 9, tzinfo=timezone.utc)
+        check.created = datetime(2020, 1, 1, 9, tzinfo=UTC)
         check.save()
 
         jan, dec, nov = check.downtimes(3, "UTC")
@@ -351,7 +343,7 @@ class CheckModelTestCase(BaseTestCase):
         # Nov. 2019
         self.assertTrue(nov.no_data)
 
-    @override_settings(S3_BUCKET=None)
+    @time_machine.travel(CURRENT_TIME)
     def test_it_prunes(self) -> None:
         check = Check.objects.create(project=self.project, n_pings=101)
         Ping.objects.create(owner=check, created=CURRENT_TIME, n=101)
@@ -378,7 +370,6 @@ class CheckModelTestCase(BaseTestCase):
         self.assertEqual(Notification.objects.count(), 0)
         self.assertEqual(Flip.objects.count(), 0)
 
-    @override_settings(S3_BUCKET=None)
     @time_machine.travel(CURRENT_TIME)
     def test_it_does_not_prune_flips_less_than_93_days_old(self) -> None:
         check = Check.objects.create(project=self.project, n_pings=101)
@@ -395,7 +386,7 @@ class CheckModelTestCase(BaseTestCase):
 
         self.assertEqual(Flip.objects.count(), 1)
 
-    @override_settings(S3_BUCKET=None)
+    @time_machine.travel(CURRENT_TIME)
     def test_it_does_not_prune_flips_newer_than_the_earliest_ping(self) -> None:
         check = Check.objects.create(project=self.project, n_pings=101)
         Ping.objects.create(owner=check, n=101)
@@ -403,7 +394,7 @@ class CheckModelTestCase(BaseTestCase):
 
         f = Flip(owner=check)
         # older than 93 days, but not older than the earliest ping
-        f.created = CURRENT_TIME - td(days=92)
+        f.created = CURRENT_TIME - td(days=94)
         f.old_status = "new"
         f.new_status = "down"
         f.save()
@@ -412,28 +403,17 @@ class CheckModelTestCase(BaseTestCase):
 
         self.assertEqual(Flip.objects.count(), 1)
 
-    @override_settings(S3_BUCKET="test-bucket")
-    @patch("hc.api.models.remove_objects")
-    def test_it_prunes_object_storage(self, remove_objects: Mock) -> None:
-        check = Check.objects.create(project=self.project, n_pings=101)
-        Ping.objects.create(owner=check, n=101)
-        Ping.objects.create(owner=check, n=1, object_size=1000)
-
-        check.prune()
-
-        remove_objects.assert_called_once_with(str(check.code), 1, wait=False)
-
     def test_get_grace_start_returns_utc(self) -> None:
         check = Check(project=self.project)
         check.kind = "cron"
         check.schedule = "15 * * * *"
         check.tz = "Europe/Riga"
-        check.last_ping = datetime(2023, 10, 29, 0, 55, tzinfo=timezone.utc)
+        check.last_ping = datetime(2023, 10, 29, 0, 55, tzinfo=UTC)
         check.status = "up"
 
         gs = check.get_grace_start()
         assert gs
-        self.assertEqual(gs.tzinfo, timezone.utc)
+        self.assertEqual(gs.tzinfo, UTC)
 
     @time_machine.travel("2023-10-29T01:05:00")
     def test_get_status_handles_autumn_dst_transition(self) -> None:
@@ -442,7 +422,7 @@ class CheckModelTestCase(BaseTestCase):
         check.schedule = "15 * * * *"
         check.grace = td(minutes=5)
         check.tz = "Europe/Riga"
-        check.last_ping = datetime(2023, 10, 29, 0, 55, tzinfo=timezone.utc)
+        check.last_ping = datetime(2023, 10, 29, 0, 55, tzinfo=UTC)
         check.status = "up"
 
         # The next expected run time is at 2023-10-29 01:15 UTC, so the check
@@ -456,3 +436,88 @@ class CheckModelTestCase(BaseTestCase):
 
         # rename_and_delete should handle an already deleted check gracefully:
         same_check.rename_and_delete()
+
+    def test_rename_and_delete_retries_once_after_integrity_error(self) -> None:
+        check = Check.objects.create(project=self.project)
+
+        real_delete = QuerySet.delete
+        calls: list[QuerySet[Check]] = []
+
+        def flaky_delete(qs: QuerySet[Check]) -> tuple[int, dict[str, int]]:
+            calls.append(qs)
+            if len(calls) == 1:
+                # Simulate a concurrent ping inserted between rename and delete
+                raise IntegrityError("FOREIGN KEY constraint failed")
+            return real_delete(qs)
+
+        with patch.object(QuerySet, "delete", autospec=True, side_effect=flaky_delete):
+            check.rename_and_delete()
+
+        self.assertEqual(len(calls), 2)
+        self.assertFalse(Check.objects.filter(id=check.id).exists())
+
+    def test_str_uses_name_then_code(self) -> None:
+        check = Check.objects.create(project=self.project, name="Backups")
+        self.assertEqual(str(check), f"Backups ({check.id})")
+
+        unnamed = Check.objects.create(project=self.project)
+        self.assertEqual(str(unnamed), f"{unnamed.code} ({unnamed.id})")
+
+    def test_get_absolute_url_is_relative(self) -> None:
+        check = Check.objects.create(project=self.project)
+        self.assertEqual(check.get_absolute_url(), f"/checks/{check.code}/details/")
+
+    def test_clamped_last_duration_returns_short_durations(self) -> None:
+        check = Check(project=self.project)
+        self.assertIsNone(check.clamped_last_duration())
+
+        check.last_duration = td(minutes=5)
+        self.assertEqual(check.clamped_last_duration(), td(minutes=5))
+
+        check.last_duration = MAX_DURATION
+        self.assertIsNone(check.clamped_last_duration())
+
+    def test_to_dict_includes_last_duration(self) -> None:
+        check = Check.objects.create(project=self.project, last_duration=td(seconds=61, microseconds=500))
+        self.assertEqual(check.to_dict()["last_duration"], 61)
+
+        check.last_duration = None
+        self.assertNotIn("last_duration", check.to_dict())
+
+    def test_every_hundredth_ping_prunes_old_pings(self) -> None:
+        self.profile.ping_log_limit = 10
+        self.profile.save()
+
+        check = Check.objects.create(project=self.project, n_pings=99)
+        Ping.objects.create(owner=check, n=1, created=CURRENT_TIME)
+        Ping.objects.create(owner=check, n=95, created=CURRENT_TIME)
+
+        check.ping("1.2.3.4", "http", "get", "", b"", "success", None)
+
+        # Ping #100 triggers pruning: with the limit of 10, only n > 90 is kept
+        self.assertEqual(sorted(check.ping_set.values_list("n", flat=True)), [95, 100])
+
+    def test_other_pings_do_not_prune(self) -> None:
+        self.profile.ping_log_limit = 10
+        self.profile.save()
+
+        check = Check.objects.create(project=self.project, n_pings=98)
+        Ping.objects.create(owner=check, n=1, created=CURRENT_TIME)
+
+        check.ping("1.2.3.4", "http", "get", "", b"", "success", None)
+
+        self.assertEqual(sorted(check.ping_set.values_list("n", flat=True)), [1, 99])
+
+    def test_str_shows_the_name_and_the_id(self) -> None:
+        check = Check.objects.create(project=self.project, name="Foo")
+        self.assertEqual(str(check), f"Foo ({check.id})")
+
+    def test_str_handles_an_unsaved_check(self) -> None:
+        check = Check(name="Foo")
+        self.assertEqual(str(check), "Foo (None)")
+
+    def test_notification_str_shows_the_code_and_the_status(self) -> None:
+        check = Check.objects.create(project=self.project)
+        channel = Channel.objects.create(project=self.project, kind="email")
+        n = Notification.objects.create(owner=check, channel=channel, check_status="down")
+        self.assertEqual(str(n), f"Notification {n.code} (down)")

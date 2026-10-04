@@ -1,17 +1,10 @@
 {% extends "base.html" %}
-{% load compress hc_extras static %}
 
 {% block title %}Log In - {{ site_name }}{% endblock %}
 
-{% block description %}{% endblock %}
-
-{% block head %}
-    <link rel="canonical" href="{% site_root %}{% url 'hc-login' %}" />
-{% endblock %}
-
 {% block content %}
 <div class="row">
-    <div class="col-xs-10 col-xs-offset-1 col-sm-12 col-sm-offset-0 col-lg-8 col-lg-offset-2">
+    <div class="col-10 offset-1 col-sm-12 offset-sm-0 col-lg-8 offset-lg-2">
         {% if account_closed %}
         <div class="alert alert-info">
             <p>
@@ -31,7 +24,7 @@
 
         <div class="row">
             {% if use_magic_form %}
-            <div class="col-sm-6">
+            <div class="col-sm-6 position-relative">
                 <form id="magic-link-form" method="post">
                     {% csrf_token %}
 
@@ -45,7 +38,7 @@
 
                     <input
                         type="email"
-                        class="form-control input-lg"
+                        class="form-control form-control-lg"
                         name="identity"
                         value="{{ magic_form.identity.value|default:"" }}"
                         placeholder="you@example.org"
@@ -55,21 +48,15 @@
                         We will email you a magic log in link.
                     </p>
 
-                    <button type="submit" class="btn btn-lg btn-primary btn-block">
+                    <button type="submit" class="btn btn-lg btn-primary w-100">
                         Email Me a Link
                     </button>
                 </form>
-                <div id="login-sep" class="hidden-xs"><div>or</div></div>
-            </div>
-
-            <div class="col-xs-12 visible-xs-block">
-                <div id="xs-login-sep">
-                    <div>or</div>
-                </div>
+                <div id="login-sep"><div>or</div></div>
             </div>
             {% endif %}
 
-            <div class="col-sm-6{% if not use_magic_form %} col-sm-offset-3{% endif %}">
+            <div class="col-sm-6{% if not use_magic_form %} offset-sm-3{% endif %}">
                 <form id="login-form" method="post">
                     {% csrf_token %}
                     <input type="hidden" name="action" value="login" />
@@ -86,7 +73,7 @@
 
                     <input
                         type="email"
-                        class="form-control input-lg"
+                        class="form-control form-control-lg"
                         name="email"
                         value="{{ form.email.value|default:"" }}"
                         placeholder="you@example.org"
@@ -95,15 +82,15 @@
                     <input
                         id="login-password"
                         type="password"
-                        class="form-control input-lg"
+                        class="form-control form-control-lg"
                         name="password"
                         placeholder="your password">
 
                     <p id="forgot-password">
-                        <a href="#" data-toggle="modal" data-target="#lost-password-modal">Lost your password?</a>
+                        <a href="#" data-bs-toggle="modal" data-bs-target="#lost-password-modal">Lost your password?</a>
                     </p>
 
-                    <button type="submit" class="btn btn-lg btn-primary btn-block">
+                    <button type="submit" class="btn btn-lg btn-primary w-100">
                         Log In
                     </button>
                 </form>
@@ -112,18 +99,15 @@
     </div>
 </div>
 
-{% if registration_open %}
-{% include "front/signup_modal.html" %}
-{% endif %}
-
-<div id="lost-password-modal" class="modal">
+<div id="lost-password-modal" class="modal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <button type="button" class="close" data-dismiss="modal">&times;</button>
-                <h4>Lost Password?</h4>
+                <h4 class="modal-title">Lost Password?</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
+                {% if use_magic_form %}
                 <p>
                     If you need to reset your password, please do the following:
                 </p>
@@ -135,6 +119,13 @@
                         to set a new password.
                     </li>
                 </ol>
+                {% else %}
+                <p>
+                    This server cannot send email, so there is no login link.
+                    Set a new password on the server with
+                    <code>./manage.py changepassword</code>.
+                </p>
+                {% endif %}
                 {% if support_email %}
                 <p>
                     Please contact us at
@@ -144,19 +135,10 @@
                 {% endif %}
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-default" data-dismiss="modal">Got it</button>
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Got it</button>
             </div>
         </div>
     </div>
 </div>
 
-{% endblock %}
-
-{% block base_scripts %}{% endblock %}
-
-{% block scripts %}
-{% compress js %}
-<script src="{% static 'js/bootstrap-native.min.js' %}"></script>
-<script src="{% static 'js/signup.js' %}"></script>
-{% endcompress %}
 {% endblock %}

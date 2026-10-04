@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 from collections.abc import Callable
 from functools import wraps
@@ -15,19 +13,10 @@ class ApiRequest(HttpRequest):
     json: dict[Any, Any]
     project: Project
     readonly: bool
-    v: int
 
 
 def error(msg: str, status: int = 400) -> JsonResponse:
     return JsonResponse({"error": msg}, status=status)
-
-
-def _get_api_version(request: HttpRequest) -> int:
-    if request.path_info.startswith("/api/v3/"):
-        return 3
-    if request.path_info.startswith("/api/v2/"):
-        return 2
-    return 1
 
 
 def authorize(f: ViewFunc) -> ViewFunc:
@@ -62,7 +51,6 @@ def authorize(f: ViewFunc) -> ViewFunc:
 
         request.project = project
         request.readonly = False
-        request.v = _get_api_version(request)
         return f(request, *args, **kwds)
 
     return wrapper
@@ -71,10 +59,7 @@ def authorize(f: ViewFunc) -> ViewFunc:
 def authorize_read(f: ViewFunc) -> ViewFunc:
     @wraps(f)
     def wrapper(request: ApiRequest, *args: Any, **kwds: Any) -> HttpResponse:
-        if "X-Api-Key" in request.headers:
-            api_key = request.headers["X-Api-Key"]
-        else:
-            api_key = ""
+        api_key = request.headers.get("X-Api-Key", "")
 
         if len(api_key) != 32:
             return error("missing api key", 401)
@@ -84,10 +69,7 @@ def authorize_read(f: ViewFunc) -> ViewFunc:
             return error("wrong api key", 401)
 
         request.project = project
-        request.readonly = (
-            api_key.startswith("hcr_") or api_key == request.project.api_key_readonly
-        )
-        request.v = _get_api_version(request)
+        request.readonly = api_key.startswith("hcr_")
         return f(request, *args, **kwds)
 
     return wrapper

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from hc.api.models import Check
 from hc.test import BaseTestCase
 
@@ -29,6 +27,16 @@ class RemoveProjectTestCase(BaseTestCase):
         self.assertEqual(r.status_code, 405)
 
     def test_it_checks_access(self) -> None:
-        self.client.login(username="bob@example.org", password="password")
+        self.client.login(username="charlie@example.org", password="password")
         r = self.client.post(self.url)
         self.assertEqual(r.status_code, 404)
+        self.assertTrue(self.alice.project_set.exists())
+
+    def test_it_denies_a_superuser_outsider(self) -> None:
+        self.charlie.is_superuser = True
+        self.charlie.save()
+
+        self.client.login(username="charlie@example.org", password="password")
+        r = self.client.post(self.url)
+        self.assertEqual(r.status_code, 404)
+        self.assertTrue(self.alice.project_set.exists())

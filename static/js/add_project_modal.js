@@ -1,5 +1,5 @@
-$(function () {
-    $("#add-project-modal").on('shown.bs.modal', function () {
-        $("#add-project-name").focus();
-    })
+hc.ready(function () {
+    hc.on("#add-project-modal", "shown.bs.modal", function () {
+        hc.$("#add-project-name").focus();
+    });
 });

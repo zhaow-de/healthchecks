@@ -1,19 +1,18 @@
-<div id="update-name-modal" class="modal with-slug-suggestions">
+<div id="update-name-modal" class="modal with-slug-suggestions" tabindex="-1">
     <div class="modal-dialog">
         <form
             id="update-name-form"
             {% if check %}action="{% url 'hc-update-name' check.code %}"{% endif %}
-            class="form-horizontal"
             method="post">
             {% csrf_token %}
             <div class="modal-content">
                 <div class="modal-header">
-                    <button type="button" class="close" data-dismiss="modal">&times;</button>
-                    <h4>Name and Tags</h4>
+                    <h4 class="modal-title">Name and Tags</h4>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="form-group">
-                        <label for="update-name-input" class="col-sm-2 control-label">
+                    <div class="row mb-3">
+                        <label for="update-name-input" class="col-sm-2 col-form-label">
                             Name
                         </label>
                         <div class="col-sm-10">
@@ -26,15 +25,15 @@
                                 placeholder="unnamed"
                                 class="form-control" />
 
-                            <span class="help-block">
+                            <span class="form-text d-block">
                                 Give this check a human-friendly name,
                                 so you can easily recognize it later.
                             </span>
                         </div>
                     </div>
 
-                    <div class="form-group">
-                        <label for="update-slug-input" class="col-sm-2 control-label">
+                    <div class="row mb-3">
+                        <label for="update-slug-input" class="col-sm-2 col-form-label">
                             Slug
                         </label>
                         <div class="col-sm-10">
@@ -46,22 +45,17 @@
                                     maxlength="100"
                                     value="{{ check.slug }}"
                                     pattern="[a-z0-9_\-]+"
-                                    data-src-id="update-name-input"
-                                    data-btn-id="use-suggested"
-                                    data-preview-id="slug-help"
                                     class="form-control" />
-                                <span class="input-group-btn">
-                                    <button
-                                        class="btn btn-default use-suggested-slug"
-                                        type="button">Use Suggested</button>
-                                </span>
+                                <button
+                                    class="btn btn-outline-secondary use-suggested-slug"
+                                    type="button">Use Suggested</button>
                             </div>
-                            <span class="help-block slug-help-block"></span>
+                            <span class="form-text d-block slug-help-block"></span>
                         </div>
                     </div>
 
-                    <div class="form-group">
-                        <label for="update-tags-input" class="col-sm-2 control-label">
+                    <div class="row mb-3">
+                        <label for="update-tags-input" class="col-sm-2 col-form-label">
                             Tags
                         </label>
                         <div class="col-sm-10">
@@ -71,17 +65,18 @@
                                 type="text"
                                 maxlength="500"
                                 data-all-tags="{{ all_tags }}"
-                                value="{{ check.tags }}" />
+                                value="{{ check.tags }}"
+                                class="form-control" />
 
-                            <span class="help-block">
-                                Use tags for easy filtering and for status badges.
+                            <span class="form-text d-block">
+                                Use tags for easy filtering.
                                 Separate multiple tags with spaces.
                             </span>
                         </div>
                     </div>
 
-                    <div class="form-group">
-                        <label for="update-desc-input" class="col-sm-2 control-label">
+                    <div class="row mb-3">
+                        <label for="update-desc-input" class="col-sm-2 col-form-label">
                             Description
                         </label>
                         <div class="col-sm-10">
@@ -90,7 +85,7 @@
                                 class="form-control"
                                 rows="5"
                                 name="desc">{{ check.desc }}</textarea>
-                            <span class="help-block">
+                            <span class="form-text d-block">
                                 Additional notes for your own reference. Will appear
                                 in email alerts and Slack notifications.
                             </span>
@@ -98,7 +93,7 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-primary">Save</button>
                 </div>
             </div>

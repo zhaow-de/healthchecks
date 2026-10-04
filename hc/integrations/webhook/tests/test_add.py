@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from django.test.utils import override_settings
 
 from hc.api.models import Channel, Check
@@ -47,24 +45,6 @@ class AddWebhookTestCase(BaseTestCase):
         self.client.login(username="alice@example.org", password="password")
         r = self.client.post(self.url, form)
         self.assertRedirects(r, self.channels_url)
-
-        c = Channel.objects.get()
-        self.assertEqual(c.project, self.project)
-        self.assertEqual(c.down_webhook_spec.url, "http://foo.com")
-        self.assertEqual(c.up_webhook_spec.url, "https://bar.com")
-
-    def test_it_adds_webhook_using_team_access(self) -> None:
-        form = {
-            "method_down": "GET",
-            "url_down": "http://foo.com",
-            "method_up": "GET",
-            "url_up": "https://bar.com",
-        }
-
-        # Logging in as bob, not alice. Bob has team access so this
-        # should work.
-        self.client.login(username="bob@example.org", password="password")
-        self.client.post(self.url, form)
 
         c = Channel.objects.get()
         self.assertEqual(c.project, self.project)
@@ -203,6 +183,70 @@ class AddWebhookTestCase(BaseTestCase):
         c = Channel.objects.get()
         self.assertEqual(c.down_webhook_spec.headers, {"test": "123"})
 
+    def test_it_skips_blank_header_lines(self) -> None:
+        form = {
+            "method_down": "GET",
+            "url_down": "http://foo.com",
+            "headers_down": "test:123\r\n\r\n   \r\ntest2:abc\r\n",
+            "method_up": "GET",
+        }
+
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.post(self.url, form)
+        self.assertRedirects(r, self.channels_url)
+
+        c = Channel.objects.get()
+        self.assertEqual(c.down_webhook_spec.headers, {"test": "123", "test2": "abc"})
+
+    def test_it_rejects_header_with_empty_name_or_value(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        for headers in ("X-Foo:", ": bar"):
+            form = {
+                "method_down": "GET",
+                "url_down": "http://example.org",
+                "headers_down": headers,
+                "method_up": "GET",
+            }
+
+            r = self.client.post(self.url, form)
+            self.assertContains(r, "Use &quot;Header-Name: value&quot; pairs, one per line.")
+
+        self.assertEqual(Channel.objects.count(), 0)
+
+    def test_it_rejects_long_header(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        samples = [
+            "X-Foo: " + "a" * 1001,
+            "X-" + "a" * 999 + ": bar",
+        ]
+        for headers in samples:
+            form = {
+                "method_down": "GET",
+                "url_down": "http://example.org",
+                "headers_down": headers,
+                "method_up": "GET",
+            }
+
+            r = self.client.post(self.url, form)
+            self.assertContains(r, "Value too long")
+
+        self.assertEqual(Channel.objects.count(), 0)
+
+    def test_it_accepts_header_at_length_limit(self) -> None:
+        form = {
+            "method_down": "GET",
+            "url_down": "http://example.org",
+            "headers_down": "X-Foo: " + "a" * 1000,
+            "method_up": "GET",
+        }
+
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.post(self.url, form)
+        self.assertRedirects(r, self.channels_url)
+
+        c = Channel.objects.get()
+        self.assertEqual(c.down_webhook_spec.headers, {"X-Foo": "a" * 1000})
+
     def test_it_rejects_both_empty(self) -> None:
         self.client.login(username="alice@example.org", password="password")
         form = {
@@ -217,13 +261,10 @@ class AddWebhookTestCase(BaseTestCase):
 
         self.assertEqual(Channel.objects.count(), 0)
 
-    def test_it_requires_rw_access(self) -> None:
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
-
-        self.client.login(username="bob@example.org", password="password")
+    def test_it_checks_ownership(self) -> None:
+        self.client.login(username="charlie@example.org", password="password")
         r = self.client.get(self.url)
-        self.assertEqual(r.status_code, 403)
+        self.assertEqual(r.status_code, 404)
 
     @override_settings(WEBHOOKS_ENABLED=False)
     def test_it_handles_disabled_integration(self) -> None:

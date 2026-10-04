@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from hc.api.models import Check
 from hc.test import BaseTestCase
 
@@ -15,14 +13,6 @@ class RemoveCheckTestCase(BaseTestCase):
         self.client.login(username="alice@example.org", password="password")
         r = self.client.post(self.remove_url)
         self.assertRedirects(r, self.redirect_url)
-
-        self.assertEqual(Check.objects.count(), 0)
-
-    def test_team_access_works(self) -> None:
-        # Logging in as bob, not alice. Bob has team access so this
-        # should work.
-        self.client.login(username="bob@example.org", password="password")
-        self.client.post(self.remove_url)
 
         self.assertEqual(Check.objects.count(), 0)
 
@@ -48,11 +38,3 @@ class RemoveCheckTestCase(BaseTestCase):
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.remove_url)
         self.assertEqual(r.status_code, 405)
-
-    def test_it_requires_rw_access(self) -> None:
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
-
-        self.client.login(username="bob@example.org", password="password")
-        r = self.client.post(self.remove_url)
-        self.assertEqual(r.status_code, 403)

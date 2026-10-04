@@ -1,18 +1,21 @@
-from __future__ import annotations
-
-from datetime import date, datetime, timezone
+import signal
+from datetime import UTC, date, datetime
 from datetime import timedelta as td
-from unittest.mock import Mock, patch
+from io import StringIO
+from types import SimpleNamespace
+from unittest.mock import Mock, call, patch
 
 import time_machine
 from django.core import mail
+from django.core.management import call_command
+from django.test.utils import override_settings
 from django.utils.timezone import now
 
 from hc.api.management.commands.sendreports import Command
 from hc.api.models import Check, Flip
-from hc.test import BaseTestCase
+from hc.test import BaseTestCase, updated_concurrently
 
-CURRENT_TIME = datetime(2020, 1, 13, 2, tzinfo=timezone.utc)
+CURRENT_TIME = datetime(2020, 1, 13, 2, tzinfo=UTC)
 MOCK_SLEEP = Mock()
 
 
@@ -29,22 +32,19 @@ class SendReportsTestCase(BaseTestCase):
         self.profile.next_nag_date = CURRENT_TIME - td(seconds=10)
         self.profile.save()
 
-        # Disable bob's and charlie's monthly reports so they don't interfere
-        self.bobs_profile.reports = "off"
-        self.bobs_profile.save()
-
+        # Disable charlie's monthly report so it doesn't interfere
         self.charlies_profile.reports = "off"
         self.charlies_profile.save()
 
         # And it needs at least one check that has been pinged.
         self.check = Check(project=self.project, last_ping=now())
-        self.check.created = datetime(2019, 10, 1, tzinfo=timezone.utc)
+        self.check.created = datetime(2019, 10, 1, tzinfo=UTC)
         self.check.name = "Foo"
         self.check.status = "down"
         self.check.save()
 
         self.flip = Flip(owner=self.check)
-        self.flip.created = datetime(2019, 12, 31, 23, tzinfo=timezone.utc)
+        self.flip.created = datetime(2019, 12, 31, 23, tzinfo=UTC)
         self.flip.old_status = "new"
         self.flip.new_status = "down"
         self.flip.save()
@@ -153,3 +153,112 @@ class SendReportsTestCase(BaseTestCase):
         # next_nag_date should now be unset
         self.profile.refresh_from_db()
         self.assertIsNone(self.profile.next_nag_date)
+
+    @override_settings(MAILERS={})
+    def test_it_sends_nothing_without_smtp(self) -> None:
+        cmd = Command(stdout=Mock())
+        self.assertTrue(cmd.handle_one_report())
+        self.assertTrue(cmd.handle_one_nag())
+        self.assertEqual(len(mail.outbox), 0)
+
+        # The report date moves on and the nag date is cleared, so the
+        # loop does not pick the same profile again
+        self.profile.refresh_from_db()
+        assert self.profile.next_report_date
+        self.assertEqual(self.profile.next_report_date.date(), date(2020, 2, 1))
+        self.assertIsNone(self.profile.next_nag_date)
+
+    def test_it_skips_report_sent_by_another_process(self) -> None:
+        other_date = CURRENT_TIME + td(days=19)
+        with updated_concurrently(next_report_date=other_date):
+            found = Command(stdout=Mock()).handle_one_report()
+
+        # It should continue right away to look for the next profile
+        self.assertTrue(found)
+        self.assertEqual(len(mail.outbox), 0)
+        # The other process's schedule should stay intact
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.next_report_date, other_date)
+
+    def test_it_skips_nag_sent_by_another_process(self) -> None:
+        other_date = CURRENT_TIME + td(minutes=59)
+        with updated_concurrently(next_nag_date=other_date):
+            found = Command(stdout=Mock()).handle_one_nag()
+
+        # It should continue right away to look for the next profile
+        self.assertTrue(found)
+        self.assertEqual(len(mail.outbox), 0)
+        # The other process's schedule should stay intact
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.next_nag_date, other_date)
+
+    @patch("hc.api.management.commands.sendreports.close_old_connections")
+    @patch("hc.api.management.commands.sendreports.connection")
+    @patch("hc.api.management.commands.sendreports.signal.signal")
+    def test_handle_sends_due_reports_and_nags_once(self, set_handler: Mock, connection: Mock, close_old_connections: Mock) -> None:
+        connection.in_atomic_block = False
+
+        cmd = Command()
+        out = StringIO()
+        with self.assertLogs("hc", level="INFO") as logs:
+            call_command(cmd, stdout=out)
+
+        self.assertEqual(
+            logs.output,
+            [
+                "INFO:hc:sendreports is now running",
+                "INFO:hc:Sent monthly report to alice@example.org",
+                "INFO:hc:Sent nag to alice@example.org",
+            ],
+        )
+        # Everything should go to the log, nothing straight to stdout
+        self.assertEqual(out.getvalue(), "")
+        self.assertEqual([m.subject for m in mail.outbox], ["Monthly Report", "Reminder: 1 check still down"])
+
+        # Outside of a transaction it should drop timed-out db connections
+        close_old_connections.assert_called_once_with()
+        self.assertEqual(
+            set_handler.mock_calls,
+            [call(signal.SIGTERM, cmd.on_signal), call(signal.SIGINT, cmd.on_signal)],
+        )
+
+    @patch("hc.api.management.commands.sendreports.signal.signal")
+    def test_handle_loops_until_signalled(self, set_handler: Mock) -> None:
+        cmd = Command()
+        out = StringIO()
+
+        def sleep(secs: float) -> None:
+            # Deliver SIGTERM during the wait between rounds
+            if secs == 1:
+                cmd.on_signal(signal.SIGTERM, None)
+
+        with (
+            patch("hc.api.management.commands.sendreports.time.sleep", side_effect=sleep) as mock_sleep,
+            self.assertLogs("hc", level="INFO") as logs,
+        ):
+            call_command(cmd, "--loop", stdout=out)
+
+        # Two 3-second pauses after sending, then the wait loop should stop
+        # at its first 1-second step once the signal arrives
+        self.assertEqual(mock_sleep.mock_calls, [call(3), call(3), call(1)])
+        self.assertEqual(len(mail.outbox), 2)
+
+        desc = signal.strsignal(signal.SIGTERM)
+        self.assertEqual(logs.output[-1], f"INFO:hc:{desc}, finishing...")
+        self.assertEqual(out.getvalue(), "")
+
+    def test_on_signal_only_sets_the_shutdown_flag(self) -> None:
+        cmd = Command()
+        with self.assertNoLogs("hc"):
+            cmd.on_signal(signal.SIGTERM, None)
+
+        self.assertTrue(cmd.shutdown)
+        self.assertEqual(cmd.signum, signal.SIGTERM)
+
+    @patch("hc.api.management.commands.sendreports.signal.signal")
+    def test_handle_names_the_postgres_connection(self, set_handler: Mock) -> None:
+        databases = {"default": {"OPTIONS": {"application_name": "hc"}}}
+        with patch("hc.api.management.commands.sendreports.settings", SimpleNamespace(DATABASES=databases)):
+            call_command(Command(), stdout=StringIO())
+
+        self.assertEqual(databases["default"]["OPTIONS"]["application_name"], "sendreports")

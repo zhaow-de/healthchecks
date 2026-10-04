@@ -1,9 +1,6 @@
-from __future__ import annotations
-
-import json
-import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from datetime import timedelta as td
+from typing import Any
 
 from django import forms
 
@@ -29,9 +26,30 @@ class LaxURLField(forms.URLField):
     default_validators = [WebhookValidator()]
 
 
+class SecondsDurationField(forms.IntegerField):
+    """A number of seconds, from a minute to a year, cleaned to a timedelta."""
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(min_value=60, max_value=31536000, **kwargs)
+
+    def clean(self, value: Any) -> td:
+        return td(seconds=super().clean(value))
+
+
+class TimezoneField(forms.CharField):
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(max_length=36, validators=[TimezoneValidator()], **kwargs)
+
+
 class NameTagsForm(forms.Form):
     name = forms.CharField(max_length=100, required=False)
-    slug = forms.SlugField(max_length=100, required=False)
+    # The characters a slug ping URL accepts (ping_by_slug refuses uppercase)
+    slug = forms.RegexField(
+        regex=r"^[a-z0-9_-]+$",
+        max_length=100,
+        required=False,
+        error_messages={"invalid": "Use lowercase letters, digits, dashes and underscores only."},
+    )
     tags = forms.CharField(max_length=500, required=False)
     desc = forms.CharField(required=False)
 
@@ -48,16 +66,10 @@ class NameTagsForm(forms.Form):
 
 class AddCheckForm(NameTagsForm):
     kind = forms.ChoiceField(choices=_choices("simple,cron,oncalendar"))
-    timeout = forms.IntegerField(min_value=60, max_value=31536000)
+    timeout = SecondsDurationField()
     schedule = forms.CharField(required=False, max_length=100)
-    tz = forms.CharField(max_length=36, validators=[TimezoneValidator()])
-    grace = forms.IntegerField(min_value=60, max_value=31536000)
-
-    def clean_timeout(self) -> td:
-        return td(seconds=self.cleaned_data["timeout"])
-
-    def clean_grace(self) -> td:
-        return td(seconds=self.cleaned_data["grace"])
+    tz = TimezoneField()
+    grace = SecondsDurationField()
 
     def clean_schedule(self) -> str:
         kind = self.cleaned_data.get("kind")
@@ -77,8 +89,6 @@ class AddCheckForm(NameTagsForm):
 
 
 class FilteringRulesForm(forms.Form):
-    filter_subject = forms.BooleanField(required=False)
-    filter_body = forms.BooleanField(required=False)
     filter_http_body = forms.BooleanField(required=False)
     filter_default_fail = forms.BooleanField(required=False)
     start_kw = forms.CharField(required=False, max_length=200)
@@ -89,85 +99,28 @@ class FilteringRulesForm(forms.Form):
 
 
 class TimeoutForm(forms.Form):
-    timeout = forms.IntegerField(min_value=60, max_value=31536000)
-    grace = forms.IntegerField(min_value=60, max_value=31536000)
-
-    def clean_timeout(self) -> td:
-        return td(seconds=self.cleaned_data["timeout"])
-
-    def clean_grace(self) -> td:
-        return td(seconds=self.cleaned_data["grace"])
+    timeout = SecondsDurationField()
+    grace = SecondsDurationField()
 
 
 class CronPreviewForm(forms.Form):
     schedule = forms.CharField(max_length=100, validators=[CronValidator()])
-    tz = forms.CharField(max_length=36, validators=[TimezoneValidator()])
+    tz = TimezoneField()
 
 
-class CronForm(forms.Form):
-    schedule = forms.CharField(max_length=100, validators=[CronValidator()])
-    tz = forms.CharField(max_length=36, validators=[TimezoneValidator()])
-    grace = forms.IntegerField(min_value=60, max_value=31536000)
-
-    def clean_grace(self) -> td:
-        return td(seconds=self.cleaned_data["grace"])
+class CronForm(CronPreviewForm):
+    grace = SecondsDurationField()
 
 
 class OnCalendarForm(forms.Form):
     schedule = forms.CharField(max_length=100, validators=[OnCalendarValidator()])
-    tz = forms.CharField(max_length=36, validators=[TimezoneValidator()])
-    grace = forms.IntegerField(min_value=60, max_value=31536000)
-
-    def clean_grace(self) -> td:
-        return td(seconds=self.cleaned_data["grace"])
+    tz = TimezoneField()
+    grace = SecondsDurationField()
 
 
 class AddUrlForm(forms.Form):
     error_css_class = "has-error"
     value = LaxURLField(max_length=1000, assume_scheme="https")
-
-
-class PhoneNumberForm(forms.Form):
-    error_css_class = "has-error"
-    label = forms.CharField(max_length=100, required=False)
-    phone = forms.CharField()
-
-    def clean_phone(self) -> str:
-        v = self.cleaned_data["phone"]
-        assert isinstance(v, str)
-
-        stripped = v.encode("ascii", "ignore").decode("ascii")
-        stripped = stripped.replace(" ", "").replace("-", "")
-        if not re.match(r"^\+\d{5,15}$", stripped):
-            raise forms.ValidationError("Invalid phone number format.")
-
-        return stripped
-
-    def get_json(self) -> str:
-        return json.dumps({"value": self.cleaned_data["phone"]})
-
-
-class PhoneUpDownForm(PhoneNumberForm):
-    up = forms.BooleanField(required=False, initial=True)
-    down = forms.BooleanField(required=False, initial=True)
-
-    def clean(self) -> None:
-        super().clean()
-
-        down = self.cleaned_data.get("down")
-        up = self.cleaned_data.get("up")
-
-        if not down and not up:
-            self.add_error("down", "Please select at least one.")
-
-    def get_json(self) -> str:
-        return json.dumps(
-            {
-                "value": self.cleaned_data["phone"],
-                "up": self.cleaned_data["up"],
-                "down": self.cleaned_data["down"],
-            }
-        )
 
 
 class ChannelNameForm(forms.Form):
@@ -179,9 +132,9 @@ class SearchForm(forms.Form):
 
 
 class LogFiltersForm(forms.Form):
-    # min_value is 2010-01-01, max_value is 2030-01-01
-    u = forms.FloatField(min_value=1262296800, max_value=1893448800, required=False)
-    end = forms.FloatField(min_value=1262296800, max_value=1893448800, required=False)
+    # min_value is 2009-12-31T22:00Z, max_value is 2100-01-01T00:00Z
+    u = forms.FloatField(min_value=1262296800, max_value=4102444800, required=False)
+    end = forms.FloatField(min_value=1262296800, max_value=4102444800, required=False)
     success = forms.BooleanField(required=False)
     fail = forms.BooleanField(required=False)
     start = forms.BooleanField(required=False)
@@ -192,12 +145,12 @@ class LogFiltersForm(forms.Form):
 
     def clean_u(self) -> datetime | None:
         if self.cleaned_data["u"]:
-            return datetime.fromtimestamp(self.cleaned_data["u"], tz=timezone.utc)
+            return datetime.fromtimestamp(self.cleaned_data["u"], tz=UTC)
         return None
 
     def clean_end(self) -> datetime | None:
         if self.cleaned_data["end"]:
-            return datetime.fromtimestamp(self.cleaned_data["end"], tz=timezone.utc)
+            return datetime.fromtimestamp(self.cleaned_data["end"], tz=UTC)
         return None
 
     def kinds(self) -> tuple[str, ...]:
@@ -207,11 +160,3 @@ class LogFiltersForm(forms.Form):
 
 class TransferForm(forms.Form):
     project = forms.UUIDField()
-
-
-class BadgeSettingsForm(forms.Form):
-    target = forms.ChoiceField(choices=_choices("all,tag,check"))
-    tag = forms.CharField(max_length=100, required=False)
-    check = forms.UUIDField(required=False)
-    fmt = forms.ChoiceField(choices=_choices("svg,json,shields"))
-    states = forms.ChoiceField(choices=_choices("2,3"))

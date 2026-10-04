@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import logging
 from secrets import token_urlsafe
 from urllib.parse import urlencode
@@ -15,7 +13,7 @@ from hc.accounts.http import AuthenticatedHttpRequest
 from hc.api.models import Channel
 from hc.front import forms
 from hc.front.decorators import require_setting
-from hc.front.views import _get_rw_project_for_user
+from hc.front.views import _get_project_for_user
 from hc.lib import curl
 
 logger = logging.getLogger(__name__)
@@ -24,7 +22,7 @@ logger = logging.getLogger(__name__)
 @require_setting("SLACK_ENABLED")
 @login_required
 def add(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
-    project = _get_rw_project_for_user(request, code)
+    project = _get_project_for_user(request, code)
 
     if request.method == "POST":
         form = forms.AddUrlForm(request.POST)
@@ -57,7 +55,7 @@ def slack_help(request: HttpRequest) -> HttpResponse:
 @require_setting("SLACK_CLIENT_ID")
 @login_required
 def add_btn(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
-    project = _get_rw_project_for_user(request, code)
+    project = _get_project_for_user(request, code)
 
     state = token_urlsafe()
     authorize_url = "https://slack.com/oauth/v2/authorize?" + urlencode(
@@ -87,7 +85,7 @@ def add_complete(request: AuthenticatedHttpRequest) -> HttpResponse:
 
     state, code_str = request.session.pop("add_slack")
     code = UUID(code_str)
-    project = _get_rw_project_for_user(request, code)
+    project = _get_project_for_user(request, code)
     if request.GET.get("error") == "access_denied":
         messages.warning(request, "Slack setup was cancelled.")
         return redirect("hc-channels", project.code)
@@ -100,15 +98,20 @@ def add_complete(request: AuthenticatedHttpRequest) -> HttpResponse:
         "client_secret": settings.SLACK_CLIENT_SECRET,
         "code": request.GET.get("code"),
     }
-    result = curl.post("https://slack.com/api/oauth.v2.access", data)
+    try:
+        result = curl.post("https://slack.com/api/oauth.v2.access", data)
+        doc = result.json()
+        response: object = result.content
+    except (curl.CurlError, ValueError) as e:
+        # ValueError covers a body that is not JSON or not UTF-8
+        doc, response = None, e
 
-    doc = result.json()
     if not isinstance(doc, dict) or not doc.get("ok"):
         messages.warning(
             request,
             "Received an unexpected response from Slack. Integration not added.",
         )
-        logger.warning("Unexpected Slack OAuth response: %s", result.content)
+        logger.warning("Unexpected Slack OAuth response: %s", response)
         return redirect("hc-channels", project.code)
 
     channel = Channel(kind="slack", project=project)

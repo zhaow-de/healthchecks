@@ -1,29 +1,26 @@
-from __future__ import annotations
-
 import hashlib
 import hmac
 import json
-import socket
+import logging
 import uuid
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from datetime import timedelta as td
-from importlib import import_module
-from typing import Any, NotRequired, TypedDict
+from functools import cache, cached_property
+from typing import NotRequired, Self, TypedDict
 from zoneinfo import ZoneInfo
 
 from cronsim import CronSim
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.humanize.templatetags.humanize import naturaltime
-from django.core.mail import mail_admins
 from django.core.signing import TimestampSigner
 from django.db import IntegrityError, models, transaction
 from django.db.models import F, QuerySet
 from django.http import HttpRequest
 from django.urls import reverse
-from django.utils.functional import cached_property
+from django.utils.module_loading import import_string
 from django.utils.timezone import now
 from oncalendar import OnCalendar
 from pydantic import BaseModel, Field
@@ -32,81 +29,35 @@ from hc.accounts.models import Project
 from hc.api import transports
 from hc.lib import emails
 from hc.lib.date import month_boundaries, seconds_in_month
-from hc.lib.s3 import GetObjectError, get_object, put_object, remove_objects
+from hc.lib.ip import client_ip
 from hc.lib.urls import absolute_reverse
+
+logger = logging.getLogger(__name__)
 
 STATUSES = (("up", "Up"), ("down", "Down"), ("new", "New"), ("paused", "Paused"))
 DEFAULT_TIMEOUT = td(days=1)
 DEFAULT_GRACE = td(hours=1)
-NEVER = datetime(3000, 1, 1, tzinfo=timezone.utc)
+NEVER = datetime(3000, 1, 1, tzinfo=UTC)
 CHECK_KINDS = (("simple", "Simple"), ("cron", "Cron"), ("oncalendar", "OnCalendar"))
 # max time between start and ping where we will consider both events related:
 MAX_DURATION = td(hours=72)
 REASONS = (("", "Unknown"), ("timeout", "Timeout"), ("fail", "Fail signal"))
 
 
-TRANSPORTS: dict[str, tuple[str, type[transports.Transport] | str]] = {
-    "apprise": ("Apprise", "hc.integrations.apprise.transport.Apprise"),
-    "call": ("Phone Call", "hc.integrations.call.transport.Call"),
-    "discord": ("Discord", "hc.integrations.discord.transport.Discord"),
+TRANSPORTS: dict[str, tuple[str, str]] = {
     "email": ("Email", "hc.integrations.email.transport.Email"),
-    "github": ("GitHub", "hc.integrations.github.transport.GitHub"),
-    "googlechat": ("Google Chat", "hc.integrations.googlechat.transport.GoogleChat"),
-    "gotify": ("Gotify", "hc.integrations.gotify.transport.Gotify"),
     "group": ("Group", "hc.integrations.group.transport.Group"),
-    "matrix": ("Matrix", "hc.integrations.matrix.transport.Matrix"),
-    "mattermost": ("Mattermost", "hc.integrations.mattermost.transport.Mattermost"),
-    "msteamsw": (
-        "Microsoft Teams",
-        "hc.integrations.msteamsw.transport.MsTeamsWorkflow",
-    ),
-    "ntfy": ("ntfy", "hc.integrations.ntfy.transport.Ntfy"),
-    "opsgenie": ("Opsgenie", "hc.integrations.opsgenie.transport.Opsgenie"),
-    "pagertree": ("PagerTree", "hc.integrations.pagertree.transport.PagerTree"),
-    "pd": ("PagerDuty", "hc.integrations.pd.transport.PagerDuty"),
-    "po": ("Pushover", "hc.integrations.po.transport.Pushover"),
-    "pushbullet": ("Pushbullet", "hc.integrations.pushbullet.transport.Pushbullet"),
-    "rocketchat": ("Rocket.Chat", "hc.integrations.rocketchat.transport.RocketChat"),
-    "shell": ("Shell Command", "hc.integrations.shell.transport.Shell"),
-    "signal": ("Signal", "hc.integrations.signal.transport.Signal"),
     "slack": ("Slack", "hc.integrations.slack.transport.Slack"),
-    "sms": ("SMS", "hc.integrations.sms.transport.Sms"),
-    "spike": ("Spike", "hc.integrations.spike.transport.Spike"),
-    "telegram": ("Telegram", "hc.integrations.telegram.transport.Telegram"),
-    "trello": ("Trello", "hc.integrations.trello.transport.Trello"),
-    "victorops": ("Splunk On-Call", "hc.integrations.victorops.transport.VictorOps"),
     "webhook": ("Webhook", "hc.integrations.webhook.transport.Webhook"),
-    "whatsapp": ("WhatsApp", "hc.integrations.whatsapp.transport.WhatsApp"),
-    "zulip": ("Zulip", "hc.integrations.zulip.transport.Zulip"),
 }
 
 
-CHANNEL_KINDS = [(kind, label_cls[0]) for kind, label_cls in TRANSPORTS.items()]
+CHANNEL_KINDS = [(kind, label) for kind, (label, _) in TRANSPORTS.items()]
 
-PO_PRIORITIES = {
-    -3: "disabled",
-    -2: "lowest",
-    -1: "low",
-    0: "normal",
-    1: "high",
-    2: "emergency",
-}
 
-NTFY_PRIORITIES = {
-    5: "max priority",
-    4: "high priority",
-    3: "default priority",
-    2: "low priority",
-    1: "min priority",
-    0: "disabled",
-}
-
-GOTIFY_PRIORITIES = {
-    0: "disabled",
-    2: "low priority",
-    5: "normal priority",
-    9: "high priority",
-}
+@cache
+def _transport_class(path: str) -> type[transports.Transport]:
+    return import_string(path)
 
 
 def isostring(dt: datetime | None) -> str | None:
@@ -137,7 +88,6 @@ class CheckDict(TypedDict):
     filter_body: bool
     filter_http_body: bool
     filter_default_fail: bool
-    badge_url: str
     last_duration: NotRequired[int]
     unique_key: NotRequired[str]
     ping_url: NotRequired[str]
@@ -150,13 +100,13 @@ class CheckDict(TypedDict):
     tz: NotRequired[str]
 
 
-@dataclass
+@dataclass(slots=True)
 class DowntimeRecord:
     boundary: datetime  # The start of this time interval (timezone-aware)
     tz: str  # For calculating total seconds in a month
     no_data: bool  # True if the check did not yet exist in this time interval
-    duration: td  # Total downtime in this time interval
-    count: int  # The number of downtime events in this time interval
+    duration: td = td()  # Total downtime in this time interval
+    count: int = 0  # The number of downtime events in this time interval
 
     def monthly_uptime(self) -> float:
         # NB: this method assumes monthly boundaries.
@@ -178,7 +128,7 @@ class DowntimeRecorder:
             # If the check was created *after* the start of the previous time
             # interval then the check did not yet exist during this time interval:
             no_data = prev_boundary is not None and created > prev_boundary
-            self.records.append(DowntimeRecord(b, tz, no_data, td(), 0))
+            self.records.append(DowntimeRecord(b, tz, no_data))
             prev_boundary = b
 
     def add(self, when: datetime, duration: td) -> None:
@@ -202,6 +152,9 @@ class Check(models.Model):
     grace = models.DurationField(default=DEFAULT_GRACE)
     schedule = models.CharField(max_length=100, default="* * * * *")
     tz = models.CharField(max_length=36, default="UTC")
+    # filter_subject and filter_body are inert, kept for compatibility with the original
+    # Healthchecks API v3: this instance takes no email pings, so the API only stores
+    # and returns them.
     filter_subject = models.BooleanField(default=False)
     filter_body = models.BooleanField(default=False)
     filter_http_body = models.BooleanField(default=False)
@@ -211,7 +164,6 @@ class Check(models.Model):
     failure_kw = models.CharField(max_length=200, blank=True)
     methods = models.CharField(max_length=30, blank=True)
     manual_resume = models.BooleanField(default=False)
-    badge_key = models.UUIDField(default=uuid.uuid4, unique=True)
 
     n_pings = models.IntegerField(default=0)
     last_ping = models.DateTimeField(null=True, blank=True)
@@ -238,7 +190,10 @@ class Check(models.Model):
         )
 
     def __str__(self) -> str:
-        return "%s (%d)" % (self.name or self.code, self.id)
+        return f"{self.name or self.code} ({self.id})"
+
+    def get_absolute_url(self) -> str:
+        return reverse("hc-details", args=[self.code])
 
     def name_then_code(self) -> str:
         if self.name:
@@ -264,33 +219,8 @@ class Check(models.Model):
 
         return settings.PING_ENDPOINT + str(self.code)
 
-    def details_url(self, full: bool = True) -> str:
-        if not full:
-            return reverse("hc-details", args=[self.code])
-        return absolute_reverse("hc-details", args=[self.code])
-
-    def get_absolute_url(self) -> str:
-        return self.details_url(full=False)
-
     def cloaked_url(self) -> str:
         return absolute_reverse("hc-uncloak", args=[self.unique_key])
-
-    def email(self) -> str | None:
-        """Return check's ping email address in user's preferred style.
-
-        Note: this method reads self.project. If project is not loaded already,
-        this causes a SQL query.
-
-        """
-        if self.project_id and self.project.show_slugs:
-            if not self.slug:
-                return None
-
-            # If ping_key is not set, use dummy placeholder
-            key = self.project.ping_key or "{ping_key}"
-            return f"{key}+{self.slug}@{settings.PING_EMAIL_DOMAIN}"
-
-        return f"{self.code}@{settings.PING_EMAIL_DOMAIN}"
 
     def clamped_last_duration(self) -> td | None:
         if self.last_duration and self.last_duration < MAX_DURATION:
@@ -320,14 +250,14 @@ class Check(models.Model):
             # If the result is kept in the local timezone, adding
             # a timedelta to it later (in `going_down_after` and in `get_status`)
             # may yield incorrect results during DST transitions.
-            result = result.astimezone(timezone.utc)
+            result = result.astimezone(UTC)
         elif self.kind == "oncalendar" and self.status == "up":
             assert self.last_ping is not None
             last_local = self.last_ping.astimezone(ZoneInfo(self.tz))
             try:
                 result = next(OnCalendar(self.schedule, last_local))
                 # Same as for cron, convert back to UTC:
-                result = result.astimezone(timezone.utc)
+                result = result.astimezone(UTC)
             except StopIteration:
                 result = NEVER
 
@@ -352,15 +282,12 @@ class Check(models.Model):
     def cached_status(self) -> str:
         return self.get_status()
 
-    def get_status(self, *, with_started: bool = False) -> str:
+    def get_status(self) -> str:
         """Return current status for display."""
         frozen_now = now()
 
-        if self.last_start:
-            if frozen_now >= self.last_start + self.grace:
-                return "down"
-            elif with_started:
-                return "started"
+        if self.last_start and frozen_now >= self.last_start + self.grace:
+            return "down"
 
         if self.status in ("new", "paused", "down"):
             return self.status
@@ -434,10 +361,9 @@ class Check(models.Model):
         return hashlib.sha1(code_half.encode()).hexdigest()
 
     def filter_any(self) -> bool:
-        return self.filter_subject or self.filter_body or self.filter_http_body
+        return self.filter_http_body
 
-    def to_dict(self, *, readonly: bool = False, v: int = 3) -> CheckDict:
-        with_started = v == 1
+    def to_dict(self, *, readonly: bool = False) -> CheckDict:
         result: CheckDict = {
             "name": self.name,
             "slug": self.slug,
@@ -445,7 +371,7 @@ class Check(models.Model):
             "desc": self.desc,
             "grace": int(self.grace.total_seconds()),
             "n_pings": self.n_pings,
-            "status": self.get_status(with_started=with_started),
+            "status": self.get_status(),
             "started": self.last_start is not None,
             "last_ping": isostring(self.last_ping),
             "next_ping": isostring(self.get_grace_start()),
@@ -460,9 +386,6 @@ class Check(models.Model):
             "filter_body": self.filter_body,
             "filter_http_body": self.filter_http_body,
             "filter_default_fail": self.filter_default_fail,
-            # Optimization: construct badge URLs manually instead of using reverse().
-            # This is significantly quicker when returning hundreds of checks.
-            "badge_url": f"{settings.SITE_ROOT}/b/2/{self.badge_key}.svg",
         }
 
         if self.last_duration:
@@ -476,7 +399,7 @@ class Check(models.Model):
 
             # Optimization: construct API URLs manually instead of using reverse().
             # This is significantly quicker when returning hundreds of checks.
-            update_url = f"{settings.SITE_ROOT}/api/v{v}/checks/{self.code}"
+            update_url = f"{settings.SITE_ROOT}/api/v3/checks/{self.code}"
             result["update_url"] = update_url
             result["pause_url"] = update_url + "/pause"
             result["resume_url"] = update_url + "/resume"
@@ -506,8 +429,8 @@ class Check(models.Model):
         # the updated Check object before the Ping object is created.
         # To avoid this, put both operations inside a transaction:
         with transaction.atomic():
-            # Acquire a lock. Without locking, on MariaDB, concurrent pings can
-            # lead to a deadlock
+            # Lock the check's row, so concurrent pings to the same check apply
+            # one after another, each to the state the previous one left
             self = Check.objects.select_for_update().get(id=self.id)
             frozen_now = now()
 
@@ -555,31 +478,19 @@ class Check(models.Model):
             ping.method = method
             # If User-Agent is longer than 200 characters, truncate it:
             ping.ua = ua[:200]
-            if len(body) > 100 and settings.S3_BUCKET:
-                ping.object_size = len(body)
-            else:
-                ping.body_raw = body
+            ping.body_raw = body
             ping.rid = rid
             ping.exitstatus = exitstatus
             ping.save()
-
-        # Upload ping body to S3 outside the DB transaction, because this operation
-        # can potentially take a long time:
-        if ping.object_size:
-            put_object(self.code, ping.n, body)
 
         # Every 100 received pings, prune old pings and notifications:
         if self.n_pings % 100 == 0:
             self.prune()
 
-    def prune(self, wait: bool = False) -> None:
+    def prune(self) -> None:
         """Remove old pings and notifications."""
 
         threshold = self.n_pings - self.project.owner_profile.ping_log_limit
-
-        # Remove ping bodies from object storage
-        if settings.S3_BUCKET:
-            remove_objects(str(self.code), threshold, wait=wait)
 
         # Remove ping objects from db
         self.ping_set.filter(n__lte=threshold).delete()
@@ -609,9 +520,7 @@ class Check(models.Model):
         threshold = self.n_pings - self.project.owner_profile.ping_log_limit
         return self.ping_set.filter(n__gt=threshold)
 
-    def downtimes_by_boundary(
-        self, boundaries: list[datetime], tz: str
-    ) -> list[DowntimeRecord]:
+    def downtimes_by_boundary(self, boundaries: list[datetime], tz: str) -> list[DowntimeRecord]:
         """Calculate downtime counts and durations for the given time intervals.
 
         Returns a list of DowntimeRecord instances in descending datetime order.
@@ -636,7 +545,7 @@ class Check(models.Model):
             if status == "down":
                 # Before subtracting datetimes convert them to UTC.
                 # Otherwise we will get incorrect results around DST transitions:
-                delta = dt.astimezone(timezone.utc) - prev_dt.astimezone(timezone.utc)
+                delta = dt.astimezone(UTC) - prev_dt.astimezone(UTC)
                 summary.add(prev_dt, delta)
 
             dt = prev_dt
@@ -649,14 +558,12 @@ class Check(models.Model):
         boundaries = month_boundaries(months, tz)
         return self.downtimes_by_boundary(boundaries, tz)
 
-    def create_flip(
-        self, new_status: str, reason: str = "", mark_as_processed: bool = False
-    ) -> None:
+    def create_flip(self, new_status: str, reason: str = "", mark_as_processed: bool = False) -> None:
         """Create a Flip object for this check.
 
         Flip objects record check status changes, and have two uses:
         - for sending notifications asynchronously (create a flip object in
-          wwww process, a separate "sendalerts" process picks it up and processes it)
+          www process, a separate "sendalerts" process picks it up and processes it)
         - for downtime statistics calculation. The Check.downtimes() method
           analyzes the flips and calculates downtime counts and durations per
           month.
@@ -670,6 +577,41 @@ class Check(models.Model):
         flip.new_status = new_status
         flip.reason = reason
         flip.save()
+
+    def pause(self) -> None:
+        """Pause the check, unless it is paused already."""
+        if self.status == "paused":
+            return
+
+        # Track the status change for correct downtime calculation in Check.downtimes()
+        self.create_flip("paused", mark_as_processed=True)
+
+        self.status = "paused"
+        self.last_start = None
+        self.alert_after = None
+        self.save(update_fields=("status", "last_start", "alert_after"))
+
+        # After pausing a check we must check if all checks are up,
+        # and Profile.next_nag_date needs to be cleared out:
+        self.project.update_next_nag_dates()
+
+    def resume(self) -> bool:
+        """Resume a paused check as new; return False if it is not paused."""
+        if self.status != "paused":
+            return False
+
+        self.create_flip("new", mark_as_processed=True)
+
+        self.status = "new"
+        self.last_start = None
+        self.last_ping = None
+        self.alert_after = None
+        self.save(update_fields=("status", "last_start", "last_ping", "alert_after"))
+        return True
+
+
+def find_by_unique_key(checks: Iterable[Check], unique_key: str) -> Check | None:
+    return next((check for check in checks if check.unique_key == unique_key), None)
 
 
 class PingDict(TypedDict):
@@ -690,29 +632,24 @@ class Ping(models.Model):
     n = models.IntegerField(null=True)
     owner = models.ForeignKey(Check, models.CASCADE)
     created = models.DateTimeField(default=now)
-    kind = models.CharField(max_length=6, blank=True, null=True)
+    # NULL is a success ping: Check.ping leaves kind unset for one, and the readers
+    # compare with None.
+    kind = models.CharField(max_length=6, blank=True, null=True)  # noqa: DJ001
     scheme = models.CharField(max_length=10, default="http")
     remote_addr = models.GenericIPAddressField(blank=True, null=True)
     method = models.CharField(max_length=10, blank=True)
     ua = models.CharField(max_length=200, blank=True)
     body_raw = models.BinaryField(null=True)
-    object_size = models.IntegerField(null=True)
     exitstatus = models.SmallIntegerField(null=True)
     rid = models.UUIDField(null=True)
 
-    class GetBodyError(Exception):
-        pass
+    def __str__(self) -> str:
+        return f"Ping #{self.n} ({self.kind or 'success'})"
 
-    def to_dict(self, owner_code: uuid.UUID, v: int) -> PingDict:
-        if self.has_body():
-            # Optimization: construct API URLs manually instead of using reverse().
-            # This is significantly quicker when returning hundreds of pings.
-            body_url = (
-                f"{settings.SITE_ROOT}/api/v{v}/checks/{owner_code}/pings/{self.n}/body"
-            )
-
-        else:
-            body_url = None
+    def to_dict(self, owner_code: uuid.UUID) -> PingDict:
+        # Optimization: construct API URLs manually instead of using reverse().
+        # This is significantly quicker when returning hundreds of pings.
+        body_url = f"{settings.SITE_ROOT}/api/v3/checks/{owner_code}/pings/{self.n}/body" if self.has_body() else None
 
         result: PingDict = {
             "type": self.kind or "success",
@@ -735,10 +672,6 @@ class Ping(models.Model):
         return result
 
     def has_body(self) -> bool:
-        # Non-zero object size tells us there should be ping body in object store
-        if self.object_size:
-            return True
-
         # If the ping instance has "body_raw_length" attribute,
         # use that instead of body_raw itself. This enables a defer("body_raw")
         # optimization in the "Get Pings" API call.
@@ -748,44 +681,10 @@ class Ping(models.Model):
         return bool(self.body_raw)
 
     def get_body_bytes(self) -> bytes | None:
-        if self.object_size and self.n:
-            # Do not attemt to touch S3 if we have recorded more than 3
-            # errors (503 responses, request timeouts) in the last minute
-            # when accessing S3.
-            # If we don't do this, a S3 outage can clog our requests handlers and
-            # cause a bigger issue.
-            if not TokenBucket.s3_is_healthy():
-                raise self.GetBodyError()
-
-            try:
-                return get_object(str(self.owner.code), self.n)
-            except GetObjectError:
-                # If S3 access resulted in error, record this fact:
-                TokenBucket.record_s3_get_object_error()
-                raise self.GetBodyError()
-
         if self.body_raw:
             return bytes(self.body_raw)
 
         return None
-
-    def get_body(self) -> str | None:
-        try:
-            body_bytes = self.get_body_bytes()
-        except self.GetBodyError:
-            return None
-
-        if body_bytes:
-            return body_bytes.decode(errors="replace")
-
-        return None
-
-    def get_body_size(self) -> int:
-        if self.body_raw:
-            return len(self.body_raw)
-        if self.object_size:
-            return self.object_size
-        return 0
 
     def get_kind_display(self) -> str:
         if self.kind == "ign":
@@ -820,7 +719,7 @@ class Ping(models.Model):
         for ping in pings.order_by("-id").only("created", "kind", "rid"):
             if ping.kind == "start" and ping.rid == self.rid:
                 return self.created - ping.created
-            elif ping.kind in (None, "fail") and ping.rid == self.rid:
+            if ping.kind in (None, "fail") and ping.rid == self.rid:
                 return None
 
         return None
@@ -890,129 +789,18 @@ class WebhookSpec(BaseModel):
     headers: dict[str, str]
 
 
-class TelegramConf(BaseModel):
-    id: int
-    thread_id: int | None = None
-    type: str | None = None
-    name: str | None = None
-
-
-class ShellConf(BaseModel):
-    cmd_down: str
-    cmd_up: str
-
-
-class PdConf(BaseModel):
-    service_key: str
-    account: str | None = None
-
-    @classmethod
-    def load(cls, data: Any) -> PdConf:
-        # Is it plain service_key value?
-        if not data.startswith("{"):
-            return cls.model_validate({"service_key": data})
-
-        return super().model_validate_json(data)
-
-
-class PhoneConf(BaseModel):
-    value: str
-    notify_up: bool | None = Field(None, alias="up")
-    notify_down: bool | None = Field(None, alias="down")
-
-
 class EmailConf(BaseModel):
     value: str
     notify_up: bool = Field(alias="up")
     notify_down: bool = Field(alias="down")
 
     @classmethod
-    def load(cls, data: Any) -> EmailConf:
+    def load(cls, data: str) -> Self:
         # Is it a plain email address?
         if not data.startswith("{"):
             return cls.model_validate({"value": data, "up": True, "down": True})
 
-        return super().model_validate_json(data)
-
-
-class OpsgenieConf(BaseModel):
-    key: str
-    region: str
-
-
-class ZulipConf(BaseModel):
-    bot_email: str
-    api_key: str
-    mtype: str
-    to: str
-    site: str = ""
-    topic: str = ""
-
-    def model_post_init(self, context: Any) -> None:
-        if self.site == "":
-            # Fallback if we don't have the site value:
-            # derive it from bot's email
-            _, domain = self.bot_email.split("@")
-            self.site = f"https://{domain}"
-
-    def formatted_to(self) -> str:
-        # If we are sending a direct message to a user specified by id,
-        # Zulip expects a list of integers (formatted as JSON), not a bare integer:
-        if self.mtype == "private" and self.to.isdigit():
-            return f"[{self.to}]"
-        return self.to
-
-
-class NtfyConf(BaseModel):
-    topic: str
-    url: str
-    priority: int
-    priority_up: int
-    token: str = ""
-
-    @property
-    def priority_display(self) -> str:
-        parts = []
-        if self.priority in NTFY_PRIORITIES:
-            s = NTFY_PRIORITIES[self.priority]
-            parts.append(f"down: {s}")
-        if self.priority_up in NTFY_PRIORITIES:
-            s = NTFY_PRIORITIES[self.priority_up]
-            parts.append(f"up: {s}")
-
-        return ", ".join(parts)
-
-
-class TrelloConf(BaseModel):
-    token: str
-    list_id: str
-    board_name: str
-    list_name: str
-
-
-class GitHubConf(BaseModel):
-    installation_id: int
-    repo: str
-    labels: list[str]
-
-
-class GotifyConf(BaseModel):
-    url: str
-    token: str
-    priority: int | None = Field(None, ge=0, le=9)
-    priority_up: int | None = Field(None, ge=0, le=9)
-
-    @property
-    def priority_display(self) -> str:
-        parts = []
-        if self.priority in GOTIFY_PRIORITIES:
-            s = GOTIFY_PRIORITIES[self.priority]
-            parts.append(f"down: {s}")
-        if self.priority_up in GOTIFY_PRIORITIES:
-            s = GOTIFY_PRIORITIES[self.priority_up]
-            parts.append(f"up: {s}")
-
-        return ", ".join(parts)
+        return cls.model_validate_json(data)
 
 
 class Channel(models.Model):
@@ -1034,17 +822,8 @@ class Channel(models.Model):
             return self.name
         if self.kind == "email":
             return f"Email to {self.email.value}"
-        elif self.kind == "sms":
-            return f"SMS to {self.phone.value}"
-        elif self.kind == "slack":
+        if self.kind == "slack":
             return f"Slack {self.slack_channel}"
-        elif self.kind == "telegram":
-            return f"Telegram {self.telegram.name}"
-        elif self.kind == "zulip":
-            if self.zulip.mtype == "stream":
-                return f"Zulip stream {self.zulip.to}"
-            if self.zulip.mtype == "private":
-                return f"Zulip user {self.zulip.to}"
 
         return self.get_kind_display()
 
@@ -1055,12 +834,7 @@ class Channel(models.Model):
         return self.kind in (
             "email",
             "webhook",
-            "sms",
-            "signal",
-            "whatsapp",
-            "ntfy",
             "group",
-            "gotify",
         )
 
     def assign_all_checks(self) -> None:
@@ -1084,73 +858,24 @@ class Channel(models.Model):
         args = [self.code, signed_token]
         return absolute_reverse("hc-unsubscribe-alerts", args=args)
 
-    def send_signal_captcha_alert(self, challenge: str, raw: str) -> None:
-        subject = "Signal CAPTCHA proof required"
-        message = f"Challenge token: {challenge}"
-        hostname = socket.gethostname()
-        submit_url = absolute_reverse(
-            "hc-signal-captcha", query={"host": hostname, "challenge": challenge}
-        )
-        html_message = f"""
-            On host <b>{hostname}</b>, run:<br>
-            <pre>manage.py submitchallenge {challenge} CAPTCHA-SOLUTION-HERE</pre><br>
-            <br>
-            Alternatively, <a href="{submit_url}">submit CAPTCHA solution here</a>.<br>
-            <br>
-            Message from Signal:<br>
-            <pre>{raw}</pre>
-        """
-        mail_admins(subject, message, html_message=html_message)
-
-    def send_signal_rate_limited_notice(self, message: str, plaintext: str) -> None:
-        email = self.project.owner.email
-        ctx = {
-            "recipient": self.phone.value,
-            "subject": plaintext.split("\n")[0],
-            "message": message,
-            "plaintext": plaintext,
-        }
-        emails.signal_rate_limited(email, ctx)
-
-    def send_call_limit_notice(self, message: str) -> None:
-        profile = self.project.owner_profile
-        ctx: dict[str, Any] = {
-            "recipient": self.phone.value,
-            "owner_email": self.project.owner.email,
-            "limit": profile.call_limit,
-            "message": message,
-        }
-
-        emails.call_limit(self.project.team_emails(), ctx)
-
-    def send_sms_limit_notice(self, transport: str, message: str) -> None:
-        profile = self.project.owner_profile
-        ctx = {
-            "recipient": self.phone.value,
-            "owner_email": self.project.owner.email,
-            "transport": transport,
-            "limit": profile.sms_limit,
-            "message": message,
-        }
-        emails.sms_limit(self.project.team_emails(), ctx)
-
     @property
     def transport(self) -> transports.Transport:
         if self.kind not in TRANSPORTS:
             raise NotImplementedError(f"Unknown channel kind: {self.kind}")
 
-        label, cls = TRANSPORTS[self.kind]
-        # import transport classes on first use, and cache in TRANSPORTS
-        if isinstance(cls, str):
-            modulename, classname = cls.rsplit(".", maxsplit=1)
-            cls = getattr(import_module(modulename), classname)
-            TRANSPORTS[self.kind] = (label, cls)
-
-        return cls(self)
+        _, path = TRANSPORTS[self.kind]
+        return _transport_class(path)(self)
 
     def notify(self, flip: Flip, is_test: bool = False) -> str:
-        if self.transport.is_noop(flip.new_status):
-            return "no-op"
+        try:
+            transport = self.transport
+            if transport.is_noop(flip.new_status):
+                return "no-op"
+        except Exception:
+            # An unknown kind, or a stored value its transport cannot parse
+            logger.exception("Unexpected error in %s transport", self.kind)
+            Channel.objects.filter(id=self.id).update(last_error="Unexpected error")
+            return "Unexpected error"
 
         n = Notification(channel=self)
         if is_test:
@@ -1169,11 +894,16 @@ class Channel(models.Model):
 
         start, error, disabled = now(), "", self.disabled
         try:
-            self.transport.notify(flip, notification=n)
+            transport.notify(flip, notification=n)
 
         except transports.TransportError as e:
             disabled = True if e.permanent else disabled
             error = e.message
+        except Exception:
+            # A bug in one transport must not stop the flip's other channels,
+            # a group's members, or the Test button
+            logger.exception("Unexpected error in %s transport", self.kind)
+            error = "Unexpected error"
 
         Notification.objects.filter(id=n.id).update(error=error)
         Channel.objects.filter(id=self.id).update(
@@ -1187,17 +917,6 @@ class Channel(models.Model):
 
     def icon_path(self) -> str:
         return f"img/{self.kind}.png"
-
-    @property
-    def json(self) -> Any:
-        return json.loads(self.value)
-
-    @property
-    def po_priority(self) -> str:
-        assert self.kind == "po"
-        parts = self.value.split("|")
-        prio = int(parts[1])
-        return PO_PRIORITIES[prio]
 
     def webhook_spec(self, status: str) -> WebhookSpec:
         assert self.kind == "webhook"
@@ -1218,11 +937,6 @@ class Channel(models.Model):
     @property
     def up_webhook_spec(self) -> WebhookSpec:
         return self.webhook_spec("up")
-
-    @property
-    def shell(self) -> ShellConf:
-        assert self.kind == "shell"
-        return ShellConf.model_validate_json(self.value)
 
     @property
     def slack_team(self) -> str | None:
@@ -1254,7 +968,7 @@ class Channel(models.Model):
 
     @property
     def slack_webhook_url(self) -> str:
-        assert self.kind in ("slack", "mattermost")
+        assert self.kind == "slack"
         if not self.value.startswith("{"):
             return self.value
 
@@ -1264,75 +978,13 @@ class Channel(models.Model):
         return v
 
     @property
-    def discord_webhook_url(self) -> str:
-        assert self.kind == "discord"
-        url = self.json["webhook"]["url"]
-        assert isinstance(url, str)
-        # Discord migrated to discord.com,
-        # and is dropping support for discordapp.com on 7 November 2020
-        if url.startswith("https://discordapp.com/"):
-            url = "https://discord.com/" + url[23:]
-
-        return url
-
-    @property
-    def telegram(self) -> TelegramConf:
-        assert self.kind == "telegram"
-        return TelegramConf.model_validate_json(self.value)
-
-    def update_telegram_id(self, new_chat_id: int) -> None:
-        doc = json.loads(self.value)
-        doc["id"] = new_chat_id
-        self.value = json.dumps(doc)
-        self.save()
-
-    @property
-    def pd(self) -> PdConf:
-        assert self.kind == "pd"
-        return PdConf.load(self.value)
-
-    @property
-    def phone(self) -> PhoneConf:
-        assert self.kind in ("call", "sms", "whatsapp", "signal")
-        return PhoneConf.model_validate_json(self.value)
-
-    @property
-    def trello(self) -> TrelloConf:
-        assert self.kind == "trello"
-        return TrelloConf.model_validate_json(self.value, strict=True)
-
-    @property
     def email(self) -> EmailConf:
         return EmailConf.load(self.value)
 
     @property
-    def opsgenie(self) -> OpsgenieConf:
-        return OpsgenieConf.model_validate_json(self.value)
-
-    @property
-    def zulip(self) -> ZulipConf:
-        return ZulipConf.model_validate_json(self.value)
-
-    @property
-    def github(self) -> GitHubConf:
-        return GitHubConf.model_validate_json(self.value)
-
-    @property
-    def gotify(self) -> GotifyConf:
-        assert self.kind == "gotify"
-        return GotifyConf.model_validate_json(self.value, strict=True)
-
-    @property
     def group_channels(self) -> QuerySet[Channel]:
         assert self.kind == "group"
-        return Channel.objects.filter(
-            project=self.project, code__in=self.value.split(",")
-        )
-
-    @property
-    def ntfy(self) -> NtfyConf:
-        assert self.kind == "ntfy"
-        return NtfyConf.model_validate_json(self.value, strict=True)
+        return Channel.objects.filter(project=self.project, code__in=self.value.split(","))
 
 
 class Notification(models.Model):
@@ -1348,8 +1000,8 @@ class Notification(models.Model):
     class Meta:
         get_latest_by = "created"
 
-    def status_url(self) -> str:
-        return absolute_reverse("hc-api-notification-status", args=[self.code])
+    def __str__(self) -> str:
+        return f"Notification {self.code} ({self.check_status})"
 
 
 class FlipDict(TypedDict):
@@ -1381,6 +1033,9 @@ class Flip(models.Model):
             ),
         )
 
+    def __str__(self) -> str:
+        return f"Flip from {self.old_status} to {self.new_status}"
+
     def to_dict(self) -> FlipDict:
         return {
             "timestamp": self.created.replace(microsecond=0).isoformat(),
@@ -1403,9 +1058,15 @@ class Flip(models.Model):
         if self.new_status not in ("up", "down"):
             raise NotImplementedError(f"Unexpected status: {self.new_status}")
 
+        def is_noop(ch: Channel) -> bool:
+            try:
+                return ch.transport.is_noop(self.new_status)
+            except Exception:  # noqa: BLE001
+                return False  # Channel.notify() logs the error and records it
+
         q = self.owner.channel_set.exclude(disabled=True)
         q = q.order_by(F("last_notify_duration").asc(nulls_last=True))
-        return [ch for ch in q if not ch.transport.is_noop(self.new_status)]
+        return [ch for ch in q if not is_noop(ch)]
 
     def reason_long(self) -> str | None:
         if self.reason == "timeout":
@@ -1438,47 +1099,45 @@ class TokenBucket(models.Model):
     tokens = models.FloatField(default=1.0)
     updated = models.DateTimeField(default=now)
 
+    def __str__(self) -> str:
+        return self.value
+
     @staticmethod
-    def authorize(
-        value: str, capacity: int, refill_time_secs: int, force: bool = False
-    ) -> bool:
-        frozen_now = now()
-        obj, created = TokenBucket.objects.get_or_create(value=value)
+    def authorize(value: str, capacity: int, refill_time_secs: int) -> bool:
+        # The row lock (PostgreSQL) or the IMMEDIATE transaction (SQLite)
+        # makes concurrent calls on one key wait for each other, so none
+        # overwrites another's deduction.
+        with transaction.atomic():
+            q = TokenBucket.objects.select_for_update()
+            obj, created = q.get_or_create(value=value)
+            # Read the clock after the lock: a call that waited must not
+            # see a negative top-up.
+            frozen_now = now()
 
-        if not created:
-            # Top up the bucket:
-            duration_secs = (frozen_now - obj.updated).total_seconds()
-            obj.tokens = min(1.0, obj.tokens + duration_secs / refill_time_secs)
+            if not created:
+                # Top up the bucket:
+                duration_secs = (frozen_now - obj.updated).total_seconds()
+                obj.tokens = min(1.0, obj.tokens + duration_secs / refill_time_secs)
 
-        obj.tokens -= 1.0 / capacity
-        if obj.tokens < 0 and not force:
-            # Not enough tokens
-            return False
+            obj.tokens -= 1.0 / capacity
+            if obj.tokens < 0:
+                # Not enough tokens
+                return False
 
-        # Race condition: two concurrent authorize calls can overwrite each
-        # other's changes. It's OK to be a little inexact here for the sake
-        # of simplicity.
-        obj.updated = frozen_now
-        obj.save()
+            obj.updated = frozen_now
+            obj.save()
 
         return True
 
     @staticmethod
     def authorize_auth_ip(request: HttpRequest) -> bool:
-        headers = request.META
-        remote_addr = headers.get("HTTP_X_FORWARDED_FOR", headers["REMOTE_ADDR"])
-        remote_addr = remote_addr.split(",")[0]
-        if "." in remote_addr and ":" in remote_addr:
-            # If remote_addr is in a ipv4address:port format
-            # (like in Azure App Service), remove the port:
-            remote_addr = remote_addr.split(":")[0]
-
-        value = f"auth-ip-{remote_addr}"
-        # 20 signup/login attempts for a single IP per hour:
+        value = f"auth-ip-{client_ip(request)}"
+        # 20 login attempts for a single IP per hour:
         return TokenBucket.authorize(value, 20, 3600)
 
     @staticmethod
-    def authorize_login_email(email: str) -> bool:
+    def authorize_login_email(email: str, device: str = "") -> bool:
+        """Charge a login link request; `device` is a trusted device's nonce."""
         # remove dots and alias:
         mailbox, domain = email.split("@")
         mailbox = mailbox.replace(".", "")
@@ -1486,61 +1145,23 @@ class TokenBucket(models.Model):
         email = mailbox + "@" + domain
 
         salted_encoded = (email + settings.SECRET_KEY).encode()
-        hashed = hashlib.sha1(salted_encoded).hexdigest()
+        value = "em-" + hashlib.sha1(salted_encoded).hexdigest()
+        if device:
+            value += "-" + device
 
         # 10 login attempts for a single email per hour:
-        return TokenBucket.authorize(f"em-{hashed}", 10, 3600)
+        return TokenBucket.authorize(value, 10, 3600)
 
     @staticmethod
-    def authorize_invite(user: User) -> bool:
-        value = f"invite-{user.id}"
-
-        # 20 invites per day
-        return TokenBucket.authorize(value, 20, 3600 * 24)
-
-    @staticmethod
-    def authorize_login_password(email: str) -> bool:
+    def authorize_login_password(email: str, device: str = "") -> bool:
+        """Charge a password attempt; `device` is a trusted device's nonce."""
         salted_encoded = (email + settings.SECRET_KEY).encode()
-        hashed = hashlib.sha1(salted_encoded).hexdigest()
+        value = "pw-" + hashlib.sha1(salted_encoded).hexdigest()
+        if device:
+            value += "-" + device
 
         # 20 password attempts per day
-        return TokenBucket.authorize(f"pw-{hashed}", 20, 3600 * 24)
-
-    @staticmethod
-    def authorize_telegram(telegram_id: int) -> bool:
-        # 6 messages for a single chat per minute:
-        return TokenBucket.authorize(f"tg-{telegram_id}", 6, 60)
-
-    @staticmethod
-    def authorize_signal(phone: str) -> bool:
-        salted_encoded = (phone + settings.SECRET_KEY).encode()
-        hashed = hashlib.sha1(salted_encoded).hexdigest()
-
-        # 6 messages for a single recipient per minute:
-        return TokenBucket.authorize(f"signal-{hashed}", 6, 60)
-
-    @staticmethod
-    def authorize_signal_verification(user: User) -> bool:
-        value = f"signal-verify-{user.id}"
-
-        # 50 signal recipient verifications per day
-        return TokenBucket.authorize(value, 50, 3600 * 24)
-
-    @staticmethod
-    def authorize_pushover(user_key: str) -> bool:
-        salted_encoded = (user_key + settings.SECRET_KEY).encode()
-        hashed = hashlib.sha1(salted_encoded).hexdigest()
-
-        # 6 messages for a single user key per minute:
-        return TokenBucket.authorize(f"po-{hashed}", 6, 60)
-
-    @staticmethod
-    def authorize_ntfy(server: str, topic: str) -> bool:
-        salted_encoded = f"{server}-{topic}-{settings.SECRET_KEY}".encode()
-        hashed = hashlib.sha1(salted_encoded).hexdigest()
-
-        # 6 messages for a single topic per minute:
-        return TokenBucket.authorize(f"ntfy-{hashed}", 6, 60)
+        return TokenBucket.authorize(value, 20, 3600 * 24)
 
     @staticmethod
     def authorize_sudo_code(user: User) -> bool:
@@ -1565,22 +1186,3 @@ class TokenBucket(models.Model):
         # During that period, allow the code to only be used once,
         # so an eavesdropping attacker cannot reuse a code.
         return TokenBucket.authorize(value, 1, 90)
-
-    @staticmethod
-    def s3_is_healthy() -> bool:
-        """Return True if fewer than 3 GetObject errors in the last minute."""
-        try:
-            obj = TokenBucket.objects.get(value="s3_get_object_error")
-        except TokenBucket.DoesNotExist:
-            return True
-
-        duration_secs = (now() - obj.updated).total_seconds()
-        # How many tokens we would have after top-up:
-        tokens = min(1.0, obj.tokens + duration_secs / 60)
-        return tokens >= 1.0 / 3
-
-    @staticmethod
-    def record_s3_get_object_error() -> None:
-        # Use force=True, we are recording the S3 error after the error already
-        # happened, and want to record it even if the tokens field would go negative.
-        TokenBucket.authorize("s3_get_object_error", 3, 60, force=True)

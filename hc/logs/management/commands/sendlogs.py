@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from datetime import timedelta as td
 from typing import Any
 
@@ -9,8 +7,6 @@ from django.utils.timezone import now
 
 from hc.lib.urls import absolute_reverse
 from hc.logs.models import Record
-
-YEAR_AGO = now() - td(days=365)
 
 
 class Command(BaseCommand):

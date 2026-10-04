@@ -1,29 +1,31 @@
 volumes:
-    db-data:
+  db-data: {}
 
 services:
   db:
-    image: postgres:16
+    image: postgres:18
     volumes:
-      - db-data:/var/lib/postgresql/data
+      - db-data:/var/lib/postgresql
     environment:
       - POSTGRES_DB=$DB_NAME
       - POSTGRES_PASSWORD=$DB_PASSWORD
+    healthcheck:
+      # Over TCP: while initdb runs, the server listens on its Unix socket alone
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres"]
+      start_period: 60s
+      start_interval: 1s
+      interval: 60s
   web:
     build:
-        context: ..
-        dockerfile: docker/Dockerfile
+      context: ..
+      dockerfile: docker/Dockerfile
     # To use a pre-built image, remove the above "build" section
-    # and uncomment the following line:
-    # image: healthchecks/healthchecks:latest
+    # and uncomment the following line (`latest` is the newest build of main):
+    # image: ghcr.io/zhaow-de/healthchecks:latest
     env_file:
-        - .env
+      - .env
     ports:
-        - "8000:8000"
-        # To enable SMTP on port 2525, set SMTPD_PORT=2525 in .env
-        # and uncomment the following line:
-        # - "2525:2525"
+      - "8000:8000"
     depends_on:
-        - db
-    command: bash -c 'while !</dev/tcp/db/5432; do sleep 1; done; uwsgi /opt/healthchecks/docker/uwsgi.ini'
-
+      db:
+        condition: service_healthy

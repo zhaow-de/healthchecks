@@ -1,45 +1,45 @@
-FROM python:3.14.7-slim-trixie AS builder
+# python:3.14-alpine is left unpinned on purpose: each build takes the newest Python 3.14
+# on the newest Alpine
+FROM python:3.14-alpine AS builder
 
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+SHELL ["/bin/sh", "-o", "pipefail", "-c"]
 
-COPY requirements.txt /tmp
-# build-essential is required to build uswsi, psycopg, mysqlclient
-# libffi-dev is required to build cffi (a dependency of minio and cryptography)
-# libpq-dev is required to build psycopg[c]
-# libmaria-dev is required to build mysqlclient
-# libcurl4-openssl-dev is required to build pycurl
-# pkg-config is required to build mysqlclient
-RUN \
-    apt-get update && \
-    apt-get install -y build-essential libffi-dev libpq-dev libmariadb-dev libcurl4-openssl-dev pkg-config
-RUN pip wheel --wheel-dir /wheels apprise uwsgi mysqlclient minio==7.2.20 "psycopg[c]" -r /tmp/requirements.txt
+COPY --from=ghcr.io/astral-sh/uv:0.12.19@sha256:04d046b13e60d6bcec73cbc5e1cad25d680dea90c8573340950a0ac2d1aef424 /uv /bin/uv
 
-COPY . /opt/healthchecks/
-RUN \
-    rm -rf /opt/healthchecks/.git && \
-    rm -rf /opt/healthchecks/stuff
+# PyPI has no musllinux wheels for pycurl, psycopg-c and uwsgi, so they compile here:
+# gcc and musl-dev for all three, curl-dev for pycurl, libpq-dev for psycopg[c],
+# linux-headers for uwsgi
+RUN apk add --no-cache gcc musl-dev curl-dev libpq-dev linux-headers
 
-FROM python:3.14.7-slim-trixie
+# Use the Python interpreter of the base image, never download one
+ENV UV_PYTHON_DOWNLOADS=never
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv
+ENV UV_COMPILE_BYTECODE=1
+ENV UV_NO_CACHE=1
 
-RUN useradd --system hc
+WORKDIR /opt/healthchecks
+RUN --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    uv sync --locked --no-dev --all-extras
+
+FROM python:3.14-alpine
+
+RUN addgroup -S hc && adduser -S -D -H -G hc hc
 ENV PYTHONUNBUFFERED=1
 WORKDIR /opt/healthchecks
 
-RUN \
-    apt-get update && \
-    apt-get install -y libcurl4t64 libpq5 libmariadb3 && \
-    rm -rf /var/apt/cache && \
-    rm -rf /var/lib/apt/lists
+# The libraries the packages compiled in the builder link against:
+# libcurl for pycurl, libpq for psycopg[c]
+RUN apk add --no-cache libcurl libpq
 
-RUN --mount=type=bind,target=/wheels,source=/wheels,from=builder \
-    pip install --upgrade pip && \
-    pip install --no-cache /wheels/*
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
-COPY --from=builder /opt/healthchecks/ /opt/healthchecks/
+# See .dockerignore for the files that are left out of the image
+COPY . /opt/healthchecks/
 COPY docker/fetchstatus.py /opt/healthchecks/
 
 RUN \
-    rm -f /opt/healthchecks/hc/local_settings.py && \
     DEBUG=False SECRET_KEY=build-key ./manage.py collectstatic --noinput && \
     DEBUG=False SECRET_KEY=build-key ./manage.py compress
 

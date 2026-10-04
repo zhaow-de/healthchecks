@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from datetime import timedelta as td
 
 from hc.api.models import Check
@@ -35,7 +33,7 @@ class CopyCheckTestCase(BaseTestCase):
     def test_it_works(self) -> None:
         self.client.login(username="alice@example.org", password="password")
         r = self.client.post(self.copy_url, follow=True)
-        self.assertContains(r, "This is a brand new check")
+        self.assertContains(r, "This is a brand-new check")
 
         copy = Check.objects.get(name="Foo (copy)")
         self.assertEqual(copy.slug, "custom-slug-copy")
@@ -56,21 +54,19 @@ class CopyCheckTestCase(BaseTestCase):
         self.assertEqual(copy.methods, "POST")
         self.assertTrue(copy.manual_resume)
 
-    def test_it_obeys_limit(self) -> None:
-        self.profile.check_limit = 0
-        self.profile.save()
+    def test_it_has_no_check_limit(self) -> None:
+        Check.objects.bulk_create([Check(project=self.project) for _ in range(25)])
 
         self.client.login(username="alice@example.org", password="password")
         r = self.client.post(self.copy_url)
-        self.assertEqual(r.status_code, 400)
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(Check.objects.count(), 27)
 
-    def test_it_requires_rw_access(self) -> None:
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
-
-        self.client.login(username="bob@example.org", password="password")
+    def test_it_checks_ownership(self) -> None:
+        self.client.login(username="charlie@example.org", password="password")
         r = self.client.post(self.copy_url)
-        self.assertEqual(r.status_code, 403)
+        self.assertEqual(r.status_code, 404)
+        self.assertEqual(Check.objects.count(), 1)
 
     def test_it_handles_long_check_name(self) -> None:
         self.check.name = "A" * 100
@@ -81,3 +77,23 @@ class CopyCheckTestCase(BaseTestCase):
 
         q = Check.objects.filter(name="A" * 90 + "... (copy)")
         self.assertTrue(q.exists())
+
+    def test_it_clears_too_long_slug(self) -> None:
+        self.check.slug = "a" * 100
+        self.check.save()
+
+        self.client.login(username="alice@example.org", password="password")
+        self.client.post(self.copy_url)
+
+        copy = Check.objects.get(name="Foo (copy)")
+        self.assertEqual(copy.slug, "")
+
+    def test_it_keeps_empty_slug_empty(self) -> None:
+        self.check.slug = ""
+        self.check.save()
+
+        self.client.login(username="alice@example.org", password="password")
+        self.client.post(self.copy_url)
+
+        copy = Check.objects.get(name="Foo (copy)")
+        self.assertEqual(copy.slug, "")

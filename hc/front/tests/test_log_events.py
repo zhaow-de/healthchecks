@@ -1,9 +1,9 @@
-from __future__ import annotations
-
 import json
+from datetime import UTC, datetime
 from datetime import timedelta as td
 from urllib.parse import urlencode
 
+import time_machine
 from django.utils.timezone import now
 
 from hc.api.models import Channel, Check, Flip, Notification, Ping
@@ -35,8 +35,7 @@ class LogTestCase(BaseTestCase):
 
         self.ping = Ping.objects.create(owner=self.check, n=1)
         self.ping.body_raw = b"hello world"
-        # Older MySQL versions don't store microseconds. This makes sure
-        # the ping is older than any notifications we may create later:
+        # Make sure the ping is older than any notifications we may create later:
         self.ping.created = "2000-01-01T00:00:00+00:00"
         self.ping.save()
 
@@ -60,13 +59,6 @@ class LogTestCase(BaseTestCase):
     def test_it_returns_403_for_anon_requests(self) -> None:
         r = self.client.get(self.url())
         self.assertEqual(r.status_code, 403)
-
-    def test_team_access_works(self) -> None:
-        # Logging in as bob, not alice. Bob has team access so this
-        # should work.
-        self.client.login(username="bob@example.org", password="password")
-        r = self.client.get(self.url())
-        self.assertEqual(r.status_code, 200)
 
     def test_it_handles_bad_uuid(self) -> None:
         url = "/checks/not-uuid/log_events/"
@@ -94,12 +86,28 @@ class LogTestCase(BaseTestCase):
         r = self.client.get(self.url(u=ts))
         self.assertNotContains(r, "hello world")
 
+    def test_it_accepts_end_parameter(self) -> None:
+        # The flip and the notification are one hour old, the ping is from 2000
+        end = str((now() - td(hours=2)).timestamp())
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(self.url() + "&" + urlencode({"end": end}))
+        self.assertContains(r, "hello world", status_code=200)
+        self.assertNotContains(r, "Sent an email to alice@example.org")
+        self.assertNotContains(r, "new ➔ down")
+
     def test_it_rejects_bad_u_parameter(self) -> None:
         self.client.login(username="alice@example.org", password="password")
 
         for sample in ["surprise", "100000000000000000"]:
             r = self.client.get(self.url(u=sample))
             self.assertEqual(r.status_code, 400)
+
+    @time_machine.travel(datetime(2031, 6, 1, tzinfo=UTC))
+    def test_it_accepts_timestamps_after_2030(self) -> None:
+        ts = str(now().timestamp())
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(self.url(u=ts) + "&" + urlencode({"end": ts}))
+        self.assertEqual(r.status_code, 200)
 
     def test_it_does_not_show_too_old_notifications(self) -> None:
         # This moves ping #1 outside the 100 most recent pings:
@@ -155,15 +163,6 @@ class LogTestCase(BaseTestCase):
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.url())
         self.assertContains(r, "Sent an email to alice@example.org", status_code=200)
-
-    def test_it_shows_pushover_notification(self) -> None:
-        ch = Channel.objects.create(kind="po", project=self.project)
-
-        Notification(owner=self.check, channel=ch, check_status="down").save()
-
-        self.client.login(username="alice@example.org", password="password")
-        r = self.client.get(self.url())
-        self.assertContains(r, "Sent a Pushover notification", status_code=200)
 
     def test_it_shows_webhook_notification(self) -> None:
         ch = Channel(kind="webhook", project=self.project)

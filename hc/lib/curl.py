@@ -1,9 +1,8 @@
 """requests-like interface for PycURL."""
 
-from __future__ import annotations
-
 import ipaddress
 import socket
+from dataclasses import dataclass
 from io import BytesIO
 from json import dumps, loads
 from typing import Any, cast
@@ -14,25 +13,24 @@ from django.conf import settings
 
 from hc.lib.typealias import JSONValue
 
-CurlSockAddr = tuple[int, int, int, tuple[str, int]]
+type CurlSockAddr = tuple[int, int, int, tuple[str, int]]
 
 # Type aliases for the arguments of the request function
-Data = dict[str, Any] | str | bytes | None
-Headers = dict[str, str] | None
-Timeout = int | None
-Params = dict[str, str] | None
-Auth = tuple[str, str] | None
+type Data = dict[str, Any] | str | bytes | None
+type Headers = dict[str, str] | None
+type Timeout = int | None
 
 
 class CurlError(Exception):
     def __init__(self, message: str) -> None:
+        super().__init__(message)
         self.message = message
 
 
+@dataclass(frozen=True, slots=True)
 class Response:
-    def __init__(self, status_code: int, content: bytes) -> None:
-        self.status_code = status_code
-        self.content = content
+    status_code: int
+    content: bytes
 
     def json(self) -> JSONValue:
         return cast(JSONValue, loads(self.content.decode()))
@@ -56,14 +54,12 @@ def request(
     method: str,
     url: str,
     *,
-    params: Params = None,
     data: Data = None,
     json: Any = None,
     headers: Headers = None,
-    auth: Auth = None,
     timeout: Timeout = None,
 ) -> Response:
-    """Make a HTTP request using pycurl, return a Response object.
+    """Make an HTTP request using pycurl, return a Response object.
 
     The `method` argument specifies the HTTP verb, and must be
     one of: "get", "post", "put".
@@ -97,28 +93,18 @@ def request(
     >>> request("post", "http://example.org", json={"foo": [1, 2, 3]})
 
     `timeout` specifies the time limit in seconds for completing the
-    entire request. If timeout is exceeded, this function will raise CurlException.
+    entire request. If timeout is exceeded, this function will raise CurlError.
     Example:
 
     >>> request("get", "http://example.org", timeout=5)
 
-    `params` is a dictionary of query string parameters. If specified, the parameters
-    will urlencoded and appended to the target URL. Example:
-
-    >>> request("get", "http://example.org", params={"foo": bar})
-
-    The resulting URL in this case would be http://example.org?foo=bar
-
-    `auth` is a (username, password) tuple for Basic authentication. Example:
-    >>> request("get", "http://example.org", auth=("jsmith", "hunter2"))
-
     Notes:
 
     If the caller does not specify the User-Agent header, this function
-    uses a default "healthchecks.io" value.
+    uses a default "zcrypto-hc.zhaow.me" value.
 
     If `INTEGRATIONS_ALLOW_PRIVATE_IPS` is set to `False` in Django settings,
-    this function will raise CurlException if the target IP address is from
+    this function will raise CurlError if the target IP address is from
     a private IP range (127.0.0.1, 192.168.x.x, fe80::, ...).
 
     This function follows up to three HTTP 302 redirects.
@@ -136,88 +122,71 @@ def request(
         return socket.socket(family, socktype, protocol)
 
     c = pycurl.Curl()
-    c.setopt(pycurl.NOSIGNAL, 1)
-    c.setopt(pycurl.PROTOCOLS, pycurl.PROTO_HTTP | pycurl.PROTO_HTTPS)
-    c.setopt(pycurl.OPENSOCKETFUNCTION, opensocket)
-    c.setopt(pycurl.FOLLOWLOCATION, True)  # Allow redirects
-    c.setopt(pycurl.MAXREDIRS, 3)
-    if timeout is not None:
-        c.setopt(pycurl.TIMEOUT, timeout)
-
-    if params is not None:
-        url += "?" + urlencode(params)
-    c.setopt(pycurl.URL, url.encode())
-
-    if auth is not None:
-        c.setopt(pycurl.USERPWD, "%s:%s" % auth)
-
-    if headers is None:
-        headers = {}
-
-    if json is not None:
-        data = dumps(json)
-        headers["Content-Type"] = "application/json"
-
-    if "User-Agent" not in headers:
-        headers["User-Agent"] = "healthchecks.io"
-
-    headers_list = [_makeheader(k, v) for k, v in headers.items()]
-    c.setopt(pycurl.HTTPHEADER, headers_list)
-
-    if method in ("post", "put"):
-        if isinstance(data, dict):
-            c.setopt(pycurl.POSTFIELDS, urlencode(data))
-
-        if isinstance(data, str):
-            data = data.encode()
-
-        if isinstance(data, bytes):
-            c.setopt(pycurl.UPLOAD, 1)
-            c.setopt(pycurl.INFILESIZE, len(data))
-            c.setopt(pycurl.READDATA, BytesIO(data))
-
-        c.setopt(pycurl.CUSTOMREQUEST, method.upper())
-
-    buffer = BytesIO()
-    c.setopt(pycurl.WRITEDATA, buffer)
-
     try:
-        c.perform()
-    except pycurl.error as e:
-        errcode = e.args[0]
-        if errcode == pycurl.E_OPERATION_TIMEDOUT:
-            raise CurlError("Connection timed out")
-        elif errcode == pycurl.E_COULDNT_RESOLVE_HOST:
-            raise CurlError("Could not resolve host")
-        elif errcode == pycurl.E_COULDNT_CONNECT:
-            if opensocket_rejected_ips:
-                raise CurlError("Connections to private IP addresses are not allowed")
-            raise CurlError("Connection failed")
-        elif errcode == pycurl.E_TOO_MANY_REDIRECTS:
-            raise CurlError("Too many redirects")
-        elif errcode in (pycurl.E_SSL_CONNECT_ERROR, pycurl.E_PEER_FAILED_VERIFICATION):
-            raise CurlError("TLS handshake failed")
+        c.setopt(pycurl.NOSIGNAL, 1)
+        c.setopt(pycurl.PROTOCOLS, pycurl.PROTO_HTTP | pycurl.PROTO_HTTPS)
+        c.setopt(pycurl.OPENSOCKETFUNCTION, opensocket)
+        c.setopt(pycurl.FOLLOWLOCATION, True)  # Allow redirects
+        c.setopt(pycurl.MAXREDIRS, 3)
+        if timeout is not None:
+            c.setopt(pycurl.TIMEOUT, timeout)
 
-        raise CurlError(f"HTTP request failed, code: {errcode}")
+        c.setopt(pycurl.URL, url.encode())
 
-    status = c.getinfo(pycurl.RESPONSE_CODE)
-    c.close()
+        if headers is None:
+            headers = {}
+
+        if json is not None:
+            data = dumps(json)
+            headers["Content-Type"] = "application/json"
+
+        if "User-Agent" not in headers:
+            headers["User-Agent"] = "zcrypto-hc.zhaow.me"
+
+        headers_list = [_makeheader(k, v) for k, v in headers.items()]
+        c.setopt(pycurl.HTTPHEADER, headers_list)
+
+        if method in ("post", "put"):
+            if isinstance(data, dict):
+                c.setopt(pycurl.POSTFIELDS, urlencode(data))
+
+            if isinstance(data, str):
+                data = data.encode()
+
+            if isinstance(data, bytes):
+                c.setopt(pycurl.UPLOAD, 1)
+                c.setopt(pycurl.INFILESIZE, len(data))
+                c.setopt(pycurl.READDATA, BytesIO(data))
+
+            c.setopt(pycurl.CUSTOMREQUEST, method.upper())
+
+        buffer = BytesIO()
+        c.setopt(pycurl.WRITEDATA, buffer)
+
+        try:
+            c.perform()
+        except pycurl.error as e:
+            errcode = e.args[0]
+            if errcode == pycurl.E_OPERATION_TIMEDOUT:
+                raise CurlError("Connection timed out") from e
+            if errcode == pycurl.E_COULDNT_RESOLVE_HOST:
+                raise CurlError("Could not resolve host") from e
+            if errcode == pycurl.E_COULDNT_CONNECT:
+                if opensocket_rejected_ips:
+                    raise CurlError("Connections to private IP addresses are not allowed") from e
+                raise CurlError("Connection failed") from e
+            if errcode == pycurl.E_TOO_MANY_REDIRECTS:
+                raise CurlError("Too many redirects") from e
+            if errcode in (pycurl.E_SSL_CONNECT_ERROR, pycurl.E_PEER_FAILED_VERIFICATION):
+                raise CurlError("TLS handshake failed") from e
+
+            raise CurlError(f"HTTP request failed, code: {errcode}") from e
+
+        status = c.getinfo(pycurl.RESPONSE_CODE)
+    finally:
+        c.close()
 
     return Response(status, buffer.getvalue())
-
-
-# Convenience wrapper around request for making "GET" requests
-def get(
-    url: str,
-    params: Params = None,
-    *,
-    headers: Headers = None,
-    auth: Auth = None,
-    timeout: Timeout = None,
-) -> Response:
-    return request(
-        "get", url, params=params, headers=headers, auth=auth, timeout=timeout
-    )
 
 
 # Convenience wrapper around request for making "POST" requests
@@ -225,19 +194,15 @@ def post(
     url: str,
     data: Data = None,
     *,
-    params: Params = None,
     json: Any = None,
     headers: Headers = None,
-    auth: Auth = None,
     timeout: Timeout = None,
 ) -> Response:
     return request(
         "post",
         url,
-        params=params,
         data=data,
         json=json,
         headers=headers,
-        auth=auth,
         timeout=timeout,
     )

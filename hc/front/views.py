@@ -1,17 +1,13 @@
-from __future__ import annotations
-
-import email
-import logging
-import os
 import re
 import sqlite3
 from collections import Counter, defaultdict
 from collections.abc import Iterable
+from contextlib import closing
 from datetime import datetime
 from datetime import timedelta as td
 from itertools import islice
 from typing import TypedDict, cast
-from urllib.parse import urlencode, urlparse
+from urllib.parse import urlparse
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
@@ -19,7 +15,7 @@ from cronsim import CronSim
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.exceptions import ValidationError
 from django.db.models import BinaryField, Case, Count, F, Q, When
 from django.db.models.functions import Substr
 from django.http import (
@@ -40,7 +36,7 @@ from django_stubs_ext import WithAnnotations
 from oncalendar import OnCalendar, OnCalendarError
 
 from hc.accounts.http import AuthenticatedHttpRequest
-from hc.accounts.models import Member, Profile, Project
+from hc.accounts.models import Profile, Project
 from hc.api.models import (
     DEFAULT_GRACE,
     DEFAULT_TIMEOUT,
@@ -49,9 +45,11 @@ from hc.api.models import (
     Flip,
     Notification,
     Ping,
+    find_by_unique_key,
     prepare_durations,
 )
 from hc.front import forms
+from hc.front.decorators import deny_anonymous
 from hc.front.templatetags.hc_extras import (
     down_title,
     num_down_title,
@@ -59,14 +57,19 @@ from hc.front.templatetags.hc_extras import (
     sortchecks,
 )
 from hc.front.validators import CronValidator, OnCalendarValidator
-from hc.lib.badges import get_badge_url
 from hc.lib.string import is_valid_uuid_string
 from hc.lib.tz import all_timezones
-from hc.lib.urls import absolute_reverse
-
-logger = logging.getLogger(__name__)
 
 VALID_SORT_VALUES = ("name", "-name", "last_ping", "-last_ping", "created")
+# The checks list's status filters: (value, label, status icon)
+STATUS_FILTERS = (
+    ("new", "New", "new"),
+    ("paused", "Paused", "paused"),
+    ("started", "Started", "dots"),
+    ("up", "Up", "up"),
+    ("grace", "Late", "grace"),
+    ("down", "Down", "down"),
+)
 STATUS_TEXT_TMPL = get_template("front/log_status_text.html")
 LAST_PING_TMPL = get_template("front/last_ping_cell.html")
 EVENTS_TMPL = get_template("front/details_events.html")
@@ -108,14 +111,12 @@ def _common_timezones(checks: Iterable[Check]) -> list[str]:
     return [tz for tz, _ in counter.most_common(3)]
 
 
-def _get_check_for_user(
-    request: HttpRequest, code: UUID, preload_owner_profile: bool = False
-) -> tuple[Check, bool]:
-    """Return specified check if current user has access to it.
+def _get_check_for_user(request: AuthenticatedHttpRequest, code: UUID, preload_owner_profile: bool = False) -> Check:
+    """Return specified check if current user owns its project.
 
     If `preload_owner_profile` is `True`, the returned check's
     project.owner.profile will be already loaded. This helps avoid extra SQL queries
-    if the caller later looks up the project owner's check_limit or ping_log_limit.
+    if the caller later looks up the project owner's ping_log_limit.
 
     """
 
@@ -125,72 +126,24 @@ def _get_check_for_user(
     if preload_owner_profile:
         q = q.select_related("project__owner__profile")
 
-    check = get_object_or_404(q, code=code)
-    if request.user.is_superuser:
-        return check, True
-
-    if request.user.id == check.project.owner_id:
-        return check, True
-
-    membership = get_object_or_404(Member, project=check.project, user=request.user)
-    return check, membership.is_rw
+    return get_object_or_404(q, code=code, project__owner_id=request.user.id)
 
 
-def _get_rw_check_for_user(request: HttpRequest, code: UUID) -> Check:
-    check, rw = _get_check_for_user(request, code)
-    if not rw:
-        raise PermissionDenied
-
-    return check
-
-
-def _get_channel_for_user(request: HttpRequest, code: UUID) -> tuple[Channel, bool]:
-    """Return specified channel if current user has access to it."""
+def _get_channel_for_user(request: AuthenticatedHttpRequest, code: UUID) -> Channel:
+    """Return specified channel if current user owns its project."""
 
     assert request.user.is_authenticated
 
-    channel = get_object_or_404(Channel.objects.select_related("project"), code=code)
-    if request.user.is_superuser:
-        return channel, True
-
-    if request.user.id == channel.project.owner_id:
-        return channel, True
-
-    membership = get_object_or_404(Member, project=channel.project, user=request.user)
-    return channel, membership.is_rw
+    q = Channel.objects.select_related("project")
+    return get_object_or_404(q, code=code, project__owner_id=request.user.id)
 
 
-def _get_rw_channel_for_user(request: HttpRequest, code: UUID) -> Channel:
-    channel, rw = _get_channel_for_user(request, code)
-    if not rw:
-        raise PermissionDenied
+def _get_project_for_user(request: AuthenticatedHttpRequest, code: UUID) -> Project:
+    """Return specified project if current user owns it."""
 
-    return channel
+    assert request.user.is_authenticated
 
-
-def _get_project_for_user(request: HttpRequest, code: UUID) -> tuple[Project, bool]:
-    """Check access, return (project, rw) tuple."""
-
-    project = get_object_or_404(Project, code=code)
-    if request.user.is_superuser:
-        return project, True
-
-    if request.user.id == project.owner_id:
-        return project, True
-
-    membership = get_object_or_404(Member, project=project, user=request.user)
-
-    return project, membership.is_rw
-
-
-def _get_rw_project_for_user(request: HttpRequest, code: UUID) -> Project:
-    """Check access, return (project, rw) tuple."""
-
-    project, rw = _get_project_for_user(request, code)
-    if not rw:
-        raise PermissionDenied
-
-    return project
+    return get_object_or_404(Project, code=code, owner_id=request.user.id)
 
 
 def _refresh_last_active_date(request: AuthenticatedHttpRequest) -> None:
@@ -199,7 +152,7 @@ def _refresh_last_active_date(request: AuthenticatedHttpRequest) -> None:
     profile = request.profile
     if profile.last_active_date is None or (now() - profile.last_active_date).days > 0:
         profile.last_active_date = now()
-        profile.save()
+        profile.save(update_fields=["last_active_date"])
 
         # Also modify session to trigger session cookie refresh
         # and push forward its expiry date:
@@ -213,6 +166,16 @@ def _get_referer_qs(request: HttpRequest) -> str:
     return ""
 
 
+def _redirect_back(request: HttpRequest, check: Check) -> HttpResponse:
+    """Redirect to the details page the request came from, else to the checks list."""
+    if "/details/" in request.headers.get("Referer", ""):
+        return redirect("hc-details", check.code)
+
+    url = reverse("hc-checks", args=[check.project.code])
+    url += _get_referer_qs(request)  # Preserve selected tags and search
+    return redirect(url)
+
+
 def _status_match(check: Check, statuses: set[str]) -> bool:
     if "started" in statuses and check.last_start:
         return True
@@ -222,15 +185,15 @@ def _status_match(check: Check, statuses: set[str]) -> bool:
 @login_required
 def checks(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
     _refresh_last_active_date(request)
-    project, rw = _get_project_for_user(request, code)
+    project = _get_project_for_user(request, code)
 
     if request.GET.get("sort") in VALID_SORT_VALUES:
         request.profile.sort = request.GET["sort"]
-        request.profile.save()
+        request.profile.save(update_fields=["sort"])
 
-    if request.GET.get("urls") in ("uuid", "slug") and rw:
+    if request.GET.get("urls") in ("uuid", "slug"):
         project.show_slugs = request.GET["urls"] == "slug"
-        project.save()
+        project.save(update_fields=["show_slugs"])
 
     if request.session.get("last_project_id") != project.id:
         request.session["last_project_id"] = project.id
@@ -289,19 +252,17 @@ def checks(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
 
     ctx = {
         "page": "checks",
-        "rw": rw,
         "checks": checks,
         "channels": channels,
         "num_down": num_down,
         "tags": tags_counts,
-        "ping_endpoint": settings.PING_ENDPOINT,
         "common_timezones": _common_timezones(checks),
         "timezones": all_timezones,
         "project": project,
-        "num_available": project.num_checks_available(),
         "sort": request.profile.sort,
         "selected_tags": selected_tags,
         "selected_statuses": selected_statuses,
+        "status_filters": STATUS_FILTERS,
         "search": search,
         "hidden_checks": hidden_checks,
         "num_visible": len(checks) - len(hidden_checks),
@@ -313,11 +274,9 @@ def checks(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
     return render(request, "front/checks.html", ctx)
 
 
-def status(request: HttpRequest, code: UUID) -> HttpResponse:
-    if not request.user.is_authenticated:
-        return HttpResponseForbidden()
-
-    project, _rw = _get_project_for_user(request, code)
+@deny_anonymous
+def status(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
+    project = _get_project_for_user(request, code)
     checks = list(Check.objects.filter(project=project))
 
     details = []
@@ -334,17 +293,13 @@ def status(request: HttpRequest, code: UUID) -> HttpResponse:
 
     tags_counts, num_down = _tags_counts(checks)
     tags = {tag: (status, tooltip) for tag, status, tooltip in tags_counts}
-    return JsonResponse(
-        {"details": details, "tags": tags, "title": num_down_title(num_down)}
-    )
+    return JsonResponse({"details": details, "tags": tags, "title": num_down_title(num_down)})
 
 
 @login_required
 @require_POST
-def switch_channel(
-    request: AuthenticatedHttpRequest, code: UUID, channel_code: UUID
-) -> HttpResponse:
-    check = _get_rw_check_for_user(request, code)
+def switch_channel(request: AuthenticatedHttpRequest, code: UUID, channel_code: UUID) -> HttpResponse:
+    check = _get_check_for_user(request, code)
 
     channel = get_object_or_404(Channel, code=channel_code)
     if channel.project_id != check.project_id:
@@ -364,9 +319,7 @@ class ProjectStatus(TypedDict):
 
 
 def _get_project_summary(profile: Profile) -> dict[UUID, ProjectStatus]:
-    statuses: dict[UUID, ProjectStatus] = defaultdict(
-        lambda: {"status": "up", "started": False}
-    )
+    statuses: dict[UUID, ProjectStatus] = defaultdict(lambda: {"status": "up", "started": False})
     q = profile.checks_from_all_projects()
     q = q.annotate(project_code=F("project__code"))
     for check in q:
@@ -396,7 +349,6 @@ def index(request: HttpRequest) -> HttpResponse:
     q = request.profile.projects()
     q = q.annotate(n_checks=Count("check", distinct=True))
     q = q.annotate(n_channels=Count("channel", distinct=True))
-    q = q.annotate(owner_email=F("owner__email"))
     projects = list(q)
     any_down = False
     for project in projects:
@@ -422,17 +374,9 @@ def index(request: HttpRequest) -> HttpResponse:
 @login_required
 def projects_menu(request: AuthenticatedHttpRequest) -> HttpResponse:
     projects = list(request.profile.projects())
-
-    statuses: dict[int, str] = defaultdict(lambda: "up")
-    for check in Check.objects.filter(project__in=projects):
-        old_status = statuses[check.project_id]
-        if old_status != "down":
-            status = check.get_status()
-            if status == "down" or (status == "grace" and old_status == "up"):
-                statuses[check.project_id] = status
-
+    summary = _get_project_summary(request.profile)
     for p in projects:
-        p.overall_status = statuses[p.id]
+        p.overall_status = summary[p.code]["status"]
 
     return render(request, "front/projects_menu.html", {"projects": projects})
 
@@ -445,11 +389,11 @@ def _replace_placeholders(doc: str, html: str) -> str:
     if doc.startswith("self_hosted"):
         return html
 
-    limit = settings.PING_BODY_LIMIT or 100
-    if limit % 1000 == 0:
-        limit_fmt = f"{limit // 1000} kB"
-    else:
-        limit_fmt = f"{limit} bytes"
+    limit = settings.PING_BODY_LIMIT
+    if limit is None:
+        # With no body limit, Django's DATA_UPLOAD_MAX_MEMORY_SIZE is the most a ping can store
+        limit = settings.DATA_UPLOAD_MAX_MEMORY_SIZE or 2621440
+    limit_fmt = f"{limit // 1000} kB" if limit % 1000 == 0 else f"{limit} bytes"
 
     replaces = {
         "{{ default_timeout }}": str(int(DEFAULT_TIMEOUT.total_seconds())),
@@ -462,7 +406,8 @@ def _replace_placeholders(doc: str, html: str) -> str:
         "PING_URL": settings.PING_ENDPOINT + "your-uuid-here",
         "PING_BODY_LIMIT_FORMATTED": limit_fmt,
         "PING_BODY_LIMIT": str(limit),
-        "IMG_URL": os.path.join(settings.STATIC_URL, "img/docs"),
+        # Django's system checks require STATIC_URL to end in a slash
+        "IMG_URL": f"{settings.STATIC_URL}img/docs",
     }
 
     for placeholder, value in replaces.items():
@@ -481,10 +426,7 @@ def serve_doc(request: HttpRequest, doc: str = "introduction") -> HttpResponse:
     if not path.exists():
         raise Http404("not found")
 
-    with path.open("r", encoding="utf-8") as f:
-        content = f.read()
-
-    content = _replace_placeholders(doc, content)
+    content = _replace_placeholders(doc, path.read_text(encoding="utf-8"))
     ctx = {
         "page": "docs",
         "section": doc,
@@ -511,12 +453,10 @@ def docs_search(request: HttpRequest) -> HttpResponse:
 
     # Wrap the query in double quotes to get a valid FTS string
     # https://www.sqlite.org/fts5.html#full_text_query_syntax
-    q = '"%s"' % form.cleaned_data["q"]
-    con = sqlite3.connect(settings.BASE_DIR / "search.db")
-    cur = con.cursor()
-    res = cur.execute(query, (q,))
+    q = f'"{form.cleaned_data["q"]}"'
+    with closing(sqlite3.connect(settings.BASE_DIR / "search.db")) as con:
+        ctx = {"results": con.execute(query, (q,)).fetchall()}
 
-    ctx = {"results": res.fetchall()}
     return render(request, "front/docs_search.html", ctx)
 
 
@@ -527,10 +467,7 @@ def docs_cron(request: HttpRequest) -> HttpResponse:
 @require_POST
 @login_required
 def add_check(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
-    project = _get_rw_project_for_user(request, code)
-    if project.num_checks_available() <= 0:
-        return HttpResponseBadRequest()
-
+    project = _get_project_for_user(request, code)
     form = forms.AddCheckForm(request.POST)
     if not form.is_valid():
         return HttpResponseBadRequest()
@@ -556,45 +493,39 @@ def add_check(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
 @require_POST
 @login_required
 def update_name(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
-    check = _get_rw_check_for_user(request, code)
+    check = _get_check_for_user(request, code)
 
     form = forms.NameTagsForm(request.POST)
-    if form.is_valid():
-        check.name = form.cleaned_data["name"]
-        check.slug = form.cleaned_data["slug"]
-        check.tags = form.cleaned_data["tags"]
-        check.desc = form.cleaned_data["desc"]
-        check.save(update_fields=("name", "slug", "tags", "desc"))
+    if not form.is_valid():
+        return HttpResponseBadRequest()
 
-    if "/details/" in request.headers.get("Referer", ""):
-        return redirect("hc-details", code)
+    check.name = form.cleaned_data["name"]
+    check.slug = form.cleaned_data["slug"]
+    check.tags = form.cleaned_data["tags"]
+    check.desc = form.cleaned_data["desc"]
+    check.save(update_fields=("name", "slug", "tags", "desc"))
 
-    url = reverse("hc-checks", args=[check.project.code])
-    url += _get_referer_qs(request)  # Preserve selected tags and search
-    return redirect(url)
+    return _redirect_back(request, check)
 
 
 @require_POST
 @login_required
 def filtering_rules(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
-    check = _get_rw_check_for_user(request, code)
+    check = _get_check_for_user(request, code)
 
     form = forms.FilteringRulesForm(request.POST)
-    if form.is_valid():
-        update_fields = (
-            "filter_subject",
-            "filter_body",
-            "filter_http_body",
-            "filter_default_fail",
-            "start_kw",
-            "success_kw",
-            "failure_kw",
-            "methods",
-            "manual_resume",
-        )
-        for field in update_fields:
-            setattr(check, field, form.cleaned_data[field])
-        check.save(update_fields=update_fields)
+    if not form.is_valid():
+        return HttpResponseBadRequest()
+
+    update_fields = ["filter_http_body", "methods", "manual_resume"]
+    # The dialog disables the keyword inputs while HTTP body filtering is off, so they
+    # arrive empty. Clear the stored keywords then only if the inert API v3 email flags
+    # do not keep them: an API client may have set the keywords along with those flags.
+    if form.cleaned_data["filter_http_body"] or not (check.filter_subject or check.filter_body):
+        update_fields += ["filter_default_fail", "start_kw", "success_kw", "failure_kw"]
+    for field in update_fields:
+        setattr(check, field, form.cleaned_data[field])
+    check.save(update_fields=update_fields)
 
     return redirect("hc-details", code)
 
@@ -602,36 +533,38 @@ def filtering_rules(request: AuthenticatedHttpRequest, code: UUID) -> HttpRespon
 @require_POST
 @login_required
 def update_timeout(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
-    check = _get_rw_check_for_user(request, code)
+    check = _get_check_for_user(request, code)
     fields = ("kind", "timeout", "grace", "schedule", "tz", "alert_after")
 
-    kind = request.POST.get("kind")
-    if kind == "simple":
-        simple_form = forms.TimeoutForm(request.POST)
-        if not simple_form.is_valid():
-            return HttpResponseBadRequest()
+    match request.POST.get("kind"):
+        case "simple":
+            simple_form = forms.TimeoutForm(request.POST)
+            if not simple_form.is_valid():
+                return HttpResponseBadRequest()
 
-        check.kind = "simple"
-        check.timeout = simple_form.cleaned_data["timeout"]
-        check.grace = simple_form.cleaned_data["grace"]
-    elif kind == "cron":
-        cron_form = forms.CronForm(request.POST)
-        if not cron_form.is_valid():
-            return HttpResponseBadRequest()
+            check.kind = "simple"
+            check.timeout = simple_form.cleaned_data["timeout"]
+            check.grace = simple_form.cleaned_data["grace"]
+        case "cron":
+            cron_form = forms.CronForm(request.POST)
+            if not cron_form.is_valid():
+                return HttpResponseBadRequest()
 
-        check.kind = "cron"
-        check.schedule = cron_form.cleaned_data["schedule"]
-        check.tz = cron_form.cleaned_data["tz"]
-        check.grace = cron_form.cleaned_data["grace"]
-    elif kind == "oncalendar":
-        oncalendar_form = forms.OnCalendarForm(request.POST)
-        if not oncalendar_form.is_valid():
-            return HttpResponseBadRequest()
+            check.kind = "cron"
+            check.schedule = cron_form.cleaned_data["schedule"]
+            check.tz = cron_form.cleaned_data["tz"]
+            check.grace = cron_form.cleaned_data["grace"]
+        case "oncalendar":
+            oncalendar_form = forms.OnCalendarForm(request.POST)
+            if not oncalendar_form.is_valid():
+                return HttpResponseBadRequest()
 
-        check.kind = "oncalendar"
-        check.schedule = oncalendar_form.cleaned_data["schedule"]
-        check.tz = oncalendar_form.cleaned_data["tz"]
-        check.grace = oncalendar_form.cleaned_data["grace"]
+            check.kind = "oncalendar"
+            check.schedule = oncalendar_form.cleaned_data["schedule"]
+            check.tz = oncalendar_form.cleaned_data["tz"]
+            check.grace = oncalendar_form.cleaned_data["grace"]
+        case _:
+            return HttpResponseBadRequest()
 
     check.alert_after = check.going_down_after()
     check_saved = False
@@ -655,19 +588,14 @@ def update_timeout(request: AuthenticatedHttpRequest, code: UUID) -> HttpRespons
             # Kick off nags. This would normally happen in the sendalerts management
             # command while processing a flip, but we have already marked the flip
             # as processed
-            check.save(update_fields=fields + ("status",))
+            check.save(update_fields=(*fields, "status"))
             check_saved = True
             check.project.update_next_nag_dates()
 
     if not check_saved:
         check.save(update_fields=fields)
 
-    if "/details/" in request.headers.get("Referer", ""):
-        return redirect("hc-details", code)
-
-    url = reverse("hc-checks", args=[check.project.code])
-    url += _get_referer_qs(request)  # Preserve selected tags and search
-    return redirect(url)
+    return _redirect_back(request, check)
 
 
 @require_POST
@@ -713,15 +641,14 @@ def oncalendar_preview(request: HttpRequest) -> HttpResponse:
 
 
 def validate_schedule(request: HttpRequest) -> HttpResponse:
-    kind = request.GET.get("kind", "")
-
     validator: CronValidator | OnCalendarValidator
-    if kind == "cron":
-        validator = CronValidator()
-    elif kind == "oncalendar":
-        validator = OnCalendarValidator()
-    else:
-        return HttpResponseBadRequest()
+    match request.GET.get("kind", ""):
+        case "cron":
+            validator = CronValidator()
+        case "oncalendar":
+            validator = OnCalendarValidator()
+        case _:
+            return HttpResponseBadRequest()
 
     schedule = request.GET.get("schedule", "")
     try:
@@ -732,16 +659,14 @@ def validate_schedule(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
-def ping_details(
-    request: AuthenticatedHttpRequest, code: UUID, n: int | None = None
-) -> HttpResponse:
-    # This view makes two non-obvious SQL queries:
-    # * it calls ping.get_body(), which reads self.owner.code, triggering a query
-    # * the template calls ping.duration() which queries past "/start" events
+def ping_details(request: AuthenticatedHttpRequest, code: UUID, n: int | None = None) -> HttpResponse:
+    # This view makes a non-obvious SQL query: the template calls ping.duration(),
+    # which queries past "/start" events
 
-    check, _rw = _get_check_for_user(request, code)
+    check = _get_check_for_user(request, code)
     q = Ping.objects.filter(owner=check)
-    if n:
+    # An if/else rather than a ternary: the comment belongs to the else branch
+    if n:  # noqa: SIM108
         q = q.filter(n=n)
     else:
         # When n is not specified, look up the most recent success or failure,
@@ -753,61 +678,24 @@ def ping_details(
     except Ping.DoesNotExist:
         return render(request, "front/ping_details_not_found.html")
 
-    try:
-        body_bytes = ping.get_body_bytes()
-    except Ping.GetBodyError:
-        body_bytes = None
+    body_bytes = ping.get_body_bytes()
 
     ctx = {
         "check": check,
         "ping": ping,
         "body": body_bytes.decode(errors="replace") if body_bytes else None,
-        "plain": None,
-        "html": None,
-        "active": None,
         "tz_switches": _tz_switches(request.profile, check),
     }
-
-    if ping.scheme == "email" and body_bytes:
-        # Don't use message_from_string here, it seems to mangle
-        # UTF8 in message body.
-        parsed = email.message_from_bytes(body_bytes, policy=email.policy.SMTP)
-        ctx["subject"] = parsed.get("subject", "")
-
-        # The "active" tab is set to show the value that's successfully parsed last.
-        # Per the current implementation, this means that if both plain text and HTML
-        # content are present, the ping details dialog will initially display the HTML
-        # content, otherwise - only one content type exists, and we default to that
-        # (either plain text or HTML, at least one of them should exist in a
-        # valid email).
-        #
-        # NOTE: If both plain text and html have not been parsed successfully the
-        # "active" tab is not set at all, but currently this is not an issue since in
-        # this case the "ping details" template does not render any tabs.
-
-        plain_mime_part = parsed.get_body(("plain",))
-        if plain_mime_part:
-            ctx["plain"] = plain_mime_part.get_content()
-            ctx["active"] = "plain"
-
-        html_mime_part = parsed.get_body(("html",))
-        if html_mime_part:
-            ctx["html"] = html_mime_part.get_content()
-            ctx["active"] = "html"
 
     return render(request, "front/ping_details.html", ctx)
 
 
 @login_required
 def ping_body(request: AuthenticatedHttpRequest, code: UUID, n: int) -> HttpResponse:
-    check, _rw = _get_check_for_user(request, code)
+    check = _get_check_for_user(request, code)
     ping = get_object_or_404(Ping, owner=check, n=n)
 
-    try:
-        body = ping.get_body_bytes()
-    except Ping.GetBodyError:
-        return HttpResponse(status=503)
-
+    body = ping.get_body_bytes()
     if not body:
         raise Http404("not found")
 
@@ -820,23 +708,8 @@ def ping_body(request: AuthenticatedHttpRequest, code: UUID, n: int) -> HttpResp
 @require_POST
 @login_required
 def pause(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
-    check = _get_rw_check_for_user(request, code)
-
-    # Return early, without creating a flip object, if the check is already paused
-    if check.status == "paused":
-        return redirect("hc-details", code)
-
-    # Track the status change for correct downtime calculation in Check.downtimes()
-    check.create_flip("paused", mark_as_processed=True)
-
-    check.status = "paused"
-    check.last_start = None
-    check.alert_after = None
-    check.save(update_fields=("status", "last_start", "alert_after"))
-
-    # After pausing a check we must check if all checks are up,
-    # and Profile.next_nag_date needs to be cleared out:
-    check.project.update_next_nag_dates()
+    check = _get_check_for_user(request, code)
+    check.pause()
 
     # Don't redirect after an AJAX request:
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
@@ -848,17 +721,9 @@ def pause(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
 @require_POST
 @login_required
 def resume(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
-    check = _get_rw_check_for_user(request, code)
-    if check.status != "paused":
+    check = _get_check_for_user(request, code)
+    if not check.resume():
         return HttpResponseBadRequest()
-
-    check.create_flip("new", mark_as_processed=True)
-
-    check.status = "new"
-    check.last_start = None
-    check.last_ping = None
-    check.alert_after = None
-    check.save(update_fields=("status", "last_start", "last_ping", "alert_after"))
 
     return redirect("hc-details", code)
 
@@ -866,7 +731,7 @@ def resume(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
 @require_POST
 @login_required
 def remove_check(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
-    check = _get_rw_check_for_user(request, code)
+    check = _get_check_for_user(request, code)
 
     project = check.project
     check.rename_and_delete()
@@ -876,7 +741,7 @@ def remove_check(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
 @require_POST
 @login_required
 def clear_events(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
-    check = _get_rw_check_for_user(request, code)
+    check = _get_check_for_user(request, code)
 
     check.status = "new"
     check.last_ping = None
@@ -929,9 +794,7 @@ def _get_events(
     # as "body_raw_preview". This reduces both network I/O to database, and disk I/O
     # on the database host if the database contains large request bodies.
     pq = pq.defer("body_raw")
-    pq = pq.annotate(
-        body_raw_preview=Substr("body_raw", 1, 151, output_field=BinaryField())
-    )
+    pq = pq.annotate(body_raw_preview=Substr("body_raw", 1, 151, output_field=BinaryField()))
     pings = list(pq[:page_limit])
     prepare_durations(pings)
 
@@ -957,7 +820,7 @@ def _get_events(
 
 @login_required
 def log(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
-    check, _rw = _get_check_for_user(request, code, preload_owner_profile=True)
+    check = _get_check_for_user(request, code, preload_owner_profile=True)
 
     smin = check.created
     smax = now()
@@ -998,11 +861,11 @@ def _tz_switches(profile: Profile, check: Check) -> list[str]:
 @login_required
 def details(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
     _refresh_last_active_date(request)
-    check, rw = _get_check_for_user(request, code, preload_owner_profile=True)
+    check = _get_check_for_user(request, code, preload_owner_profile=True)
 
-    if request.GET.get("urls") in ("uuid", "slug") and rw:
+    if request.GET.get("urls") in ("uuid", "slug"):
         check.project.show_slugs = request.GET["urls"] == "slug"
-        check.project.save()
+        check.project.save(update_fields=["show_slugs"])
 
     all_channels = check.project.channel_set.order_by("created")
     regular_channels: list[Channel] = []
@@ -1021,7 +884,6 @@ def details(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
         "page": "details",
         "project": check.project,
         "check": check,
-        "rw": rw,
         "channels": regular_channels,
         "group_channels": group_channels,
         "enabled_channels": list(check.channel_set.all()),
@@ -1039,27 +901,23 @@ def details(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
 
 @login_required
 def uncloak(request: AuthenticatedHttpRequest, unique_key: str) -> HttpResponse:
-    for check in request.profile.checks_from_all_projects().only("code"):
-        if check.unique_key == unique_key:
-            return redirect("hc-details", check.code)
+    check = find_by_unique_key(request.profile.checks_from_all_projects().only("code"), unique_key)
+    if check is None:
+        raise Http404("not found")
 
-    raise Http404("not found")
+    return redirect("hc-details", check.code)
 
 
 @login_required
 def transfer(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
-    check = _get_rw_check_for_user(request, code)
+    check = _get_check_for_user(request, code)
 
     if request.method == "POST":
         form = forms.TransferForm(request.POST)
         if not form.is_valid():
             return HttpResponseBadRequest()
 
-        target_project = _get_rw_project_for_user(request, form.cleaned_data["project"])
-        if target_project.owner_id != check.project.owner_id:
-            if target_project.num_checks_available() <= 0:
-                return HttpResponseBadRequest()
-
+        target_project = _get_project_for_user(request, form.cleaned_data["project"])
         check.project = target_project
         check.save(update_fields=("project",))
         check.assign_all_channels()
@@ -1074,17 +932,14 @@ def transfer(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
 @require_POST
 @login_required
 def copy(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
-    check = _get_rw_check_for_user(request, code)
-
-    if check.project.num_checks_available() <= 0:
-        return HttpResponseBadRequest()
+    check = _get_check_for_user(request, code)
 
     new_name = check.name + " (copy)"
     # Make sure we don't exceed the 100 character db field limit:
     if len(new_name) > 100:
         new_name = check.name[:90] + "... (copy)"
 
-    new_slug = check.slug + "-copy"
+    new_slug = check.slug + "-copy" if check.slug else ""
     if len(new_slug) > 100:
         new_slug = ""
 
@@ -1115,13 +970,9 @@ def copy(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
     return redirect(url)
 
 
-def status_single(request: HttpRequest, code: UUID) -> HttpResponse:
-    if not request.user.is_authenticated:
-        return HttpResponseForbidden()
-
-    # We now know user is logged, tell the type checker request.profile exists-
-    request = cast(AuthenticatedHttpRequest, request)
-    check, rw = _get_check_for_user(request, code, preload_owner_profile=True)
+@deny_anonymous
+def status_single(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
+    check = _get_check_for_user(request, code, preload_owner_profile=True)
 
     status = check.get_status()
     events = _get_events(check, 30, start=check.created, end=now())
@@ -1131,7 +982,7 @@ def status_single(request: HttpRequest, code: UUID) -> HttpResponse:
 
     doc = {
         "status": status,
-        "status_text": STATUS_TEXT_TMPL.render({"check": check, "rw": rw}),
+        "status_text": STATUS_TEXT_TMPL.render({"check": check}),
         "title": down_title(check),
         "updated": updated,
         "started": check.last_start is not None,
@@ -1140,71 +991,16 @@ def status_single(request: HttpRequest, code: UUID) -> HttpResponse:
     if updated != request.GET.get("u"):
         doc["events"] = EVENTS_TMPL.render({"check": check, "events": events})
         downtimes = check.downtimes(3, request.profile.tz)
-        doc["downtimes"] = DOWNTIMES_TMPL.render(
-            {"downtimes": downtimes, "tz": request.profile.tz}
-        )
+        doc["downtimes"] = DOWNTIMES_TMPL.render({"downtimes": downtimes, "tz": request.profile.tz})
 
     return JsonResponse(doc)
 
 
 @login_required
-def badges(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
-    project, _rw = _get_project_for_user(request, code)
-
-    if request.method == "POST":
-        form = forms.BadgeSettingsForm(request.POST)
-        if not form.is_valid():
-            return HttpResponseBadRequest()
-
-        fmt = form.cleaned_data["fmt"]
-        states = form.cleaned_data["states"]
-        with_late = states == "3"
-        if form.cleaned_data["target"] == "all":
-            label = settings.MASTER_BADGE_LABEL
-            url = get_badge_url(project.badge_key, "*", fmt, with_late)
-        elif form.cleaned_data["target"] == "tag":
-            label = form.cleaned_data["tag"]
-            url = get_badge_url(project.badge_key, label, fmt, with_late)
-        elif form.cleaned_data["target"] == "check":
-            check = project.check_set.get(code=form.cleaned_data["check"])
-            url = absolute_reverse(
-                "hc-badge-check", args=[states, check.badge_key, fmt]
-            )
-            label = check.name_then_code()
-
-        if fmt == "shields":
-            url = "https://img.shields.io/endpoint?" + urlencode({"url": url})
-
-        ctx = {"fmt": fmt, "label": label, "url": url}
-        return render(request, "front/badges_preview.html", ctx)
-
-    checks = list(project.check_set.order_by("name"))
-    tags = set()
-    for check in checks:
-        tags.update(check.tags_list())
-
-    sorted_tags = sorted(tags, key=lambda s: s.lower())
-
-    ctx = {
-        "project": project,
-        "page": "badges",
-        "checks": checks,
-        "tags": sorted_tags,
-        "fmt": "svg",
-        "label": settings.MASTER_BADGE_LABEL,
-        "url": get_badge_url(project.badge_key, "*"),
-    }
-    return render(request, "front/badges.html", ctx)
-
-
-@login_required
 def channels(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
-    project, rw = _get_project_for_user(request, code)
+    project = _get_project_for_user(request, code)
 
     if request.method == "POST":
-        if not rw:
-            return HttpResponseForbidden()
-
         channel_code = request.POST.get("channel", "")
         if not is_valid_uuid_string(channel_code):
             return HttpResponseBadRequest()
@@ -1236,38 +1032,13 @@ def channels(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
 
     ctx = {
         "page": "channels",
-        "rw": rw,
         "project": project,
-        "profile": project.owner_profile,
         "channels": channels,
         "num_checks": project.check_set.count(),
-        "enable_apprise": settings.APPRISE_ENABLED is True,
-        "enable_call": bool(settings.TWILIO_AUTH),
-        "enable_discord": bool(settings.DISCORD_CLIENT_ID),
-        "enable_github": bool(settings.GITHUB_CLIENT_ID),
-        "enable_matrix": bool(settings.MATRIX_ACCESS_TOKEN),
-        "enable_mattermost": settings.MATTERMOST_ENABLED is True,
-        "enable_msteams": settings.MSTEAMS_ENABLED is True,
-        "enable_opsgenie": settings.OPSGENIE_ENABLED is True,
-        "enable_pagertree": settings.PAGERTREE_ENABLED is True,
-        "enable_pd": settings.PD_ENABLED is True,
         "enable_prometheus": settings.PROMETHEUS_ENABLED is True,
-        "enable_pushbullet": bool(settings.PUSHBULLET_CLIENT_ID),
-        "enable_pushover": bool(settings.PUSHOVER_API_TOKEN),
-        "enable_rocketchat": settings.ROCKETCHAT_ENABLED is True,
-        "enable_shell": settings.SHELL_ENABLED is True,
-        "enable_signal": bool(settings.SIGNAL_CLI_SOCKET),
         "enable_slack": settings.SLACK_ENABLED is True,
         "enable_slack_btn": bool(settings.SLACK_CLIENT_ID),
-        "enable_sms": bool(settings.TWILIO_AUTH),
-        "enable_spike": settings.SPIKE_ENABLED is True,
-        "enable_telegram": bool(settings.TELEGRAM_TOKEN),
-        "enable_trello": bool(settings.TRELLO_APP_KEY),
-        "enable_victorops": settings.VICTOROPS_ENABLED is True,
         "enable_webhooks": settings.WEBHOOKS_ENABLED is True,
-        "enable_whatsapp": settings.TWILIO_USE_WHATSAPP,
-        "enable_zulip": settings.ZULIP_ENABLED is True,
-        "use_payments": settings.USE_PAYMENTS,
     }
 
     return render(request, "front/channels.html", ctx)
@@ -1275,7 +1046,7 @@ def channels(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
 
 @login_required
 def channel_checks(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
-    channel = _get_rw_channel_for_user(request, code)
+    channel = _get_channel_for_user(request, code)
 
     assigned = set(channel.checks.values_list("code", flat=True).distinct())
     checks = list(channel.project.check_set.order_by("created"))
@@ -1287,22 +1058,22 @@ def channel_checks(request: AuthenticatedHttpRequest, code: UUID) -> HttpRespons
 @require_POST
 @login_required
 def update_channel_name(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
-    channel = _get_rw_channel_for_user(request, code)
+    channel = _get_channel_for_user(request, code)
 
     form = forms.ChannelNameForm(request.POST)
-    if form.is_valid():
-        channel.name = form.cleaned_data["name"]
-        channel.save()
+    if not form.is_valid():
+        return HttpResponseBadRequest()
+
+    channel.name = form.cleaned_data["name"]
+    channel.save(update_fields=["name"])
 
     return redirect("hc-channels", channel.project.code)
 
 
 @require_POST
 @login_required
-def send_test_notification(
-    request: AuthenticatedHttpRequest, code: UUID
-) -> HttpResponse:
-    channel, _rw = _get_channel_for_user(request, code)
+def send_test_notification(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
+    channel = _get_channel_for_user(request, code)
 
     dummy = Check(name="TEST", status="down", project=channel.project)
     dummy.last_ping = now() - td(days=1)
@@ -1337,7 +1108,7 @@ def send_test_notification(
 @require_POST
 @login_required
 def remove_channel(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
-    channel = _get_rw_channel_for_user(request, code)
+    channel = _get_channel_for_user(request, code)
     project = channel.project
     channel.delete()
 
@@ -1346,48 +1117,26 @@ def remove_channel(request: AuthenticatedHttpRequest, code: UUID) -> HttpRespons
 
 @login_required
 def edit_channel(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
-    channel = _get_rw_channel_for_user(request, code)
+    channel = _get_channel_for_user(request, code)
     if channel.kind == "email":
         from hc.integrations.email.views import email_form
 
         return email_form(request, channel)
-    elif channel.kind == "webhook":
+    if channel.kind == "webhook":
         from hc.integrations.webhook.views import webhook_form
 
         return webhook_form(request, channel)
-    elif channel.kind == "sms":
-        from hc.integrations.sms.views import sms_form
-
-        return sms_form(request, channel)
-    elif channel.kind == "signal":
-        from hc.integrations.signal.views import signal_form
-
-        return signal_form(request, channel)
-    elif channel.kind == "whatsapp":
-        from hc.integrations.whatsapp.views import whatsapp_form
-
-        return whatsapp_form(request, channel)
-    elif channel.kind == "ntfy":
-        from hc.integrations.ntfy.views import ntfy_form
-
-        return ntfy_form(request, channel)
-    elif channel.kind == "group":
+    if channel.kind == "group":
         from hc.integrations.group.views import group_form
 
         return group_form(request, channel)
-    elif channel.kind == "gotify":
-        from hc.integrations.gotify.views import gotify_form
-
-        return gotify_form(request, channel)
 
     return HttpResponseBadRequest()
 
 
-def log_events(request: HttpRequest, code: UUID) -> HttpResponse:
-    if not request.user.is_authenticated:
-        return HttpResponseForbidden()
-
-    check, _rw = _get_check_for_user(request, code, preload_owner_profile=True)
+@deny_anonymous
+def log_events(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
+    check = _get_check_for_user(request, code, preload_owner_profile=True)
     form = forms.LogFiltersForm(request.GET)
     if not form.is_valid():
         return HttpResponseBadRequest()
@@ -1415,16 +1164,6 @@ def log_events(request: HttpRequest, code: UUID) -> HttpResponse:
         # to specify "return any events after *this* point".
         response["X-Last-Event-Timestamp"] = str(events[0].created.timestamp())
     return response
-
-
-def contact_vcf(request: HttpRequest) -> HttpResponse:
-    ctx = {
-        "email": settings.DEFAULT_FROM_EMAIL,
-        "site_name": settings.SITE_NAME,
-        "tel": settings.TWILIO_FROM,
-        "site_root": settings.SITE_ROOT,
-    }
-    return render(request, "contact.vcf", ctx, content_type="text/vcard")
 
 
 # Forks: add custom views after this line

@@ -1,5 +1,5 @@
-$(function() {
-    var tzTom = new TomSelect("select[name=tz]", {
+hc.ready(function() {
+    const tzTom = new TomSelect("select[name=tz]", {
         diacritics: false,
         maxOptions: null,
         placeholder: "Type to search",
@@ -7,23 +7,12 @@ $(function() {
         refreshThrottle: 0,
     });
 
-    $(".leave-project").click(function() {
-        $("#leave-project-name").text(this.dataset.name);
-        $("#leave-project-code").val(this.dataset.code);
-        $('#leave-project-modal').modal("show");
-        return false;
-    });
-
-    var browserTz = null;
-    try {
-        var browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    } catch(err) {};
-
-    if (browserTz && $("#tz").val() != browserTz) {
-        $("#browser-tz-hint b").text(browserTz);
-        $("#browser-tz-hint").removeClass("hide");
+    const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (document.getElementById("tz").value !== browserTz) {
+        hc.$("#browser-tz-hint b").textContent = browserTz;
+        hc.show("#browser-tz-hint");
     }
-    $("#browser-tz-hint a").click(function() {
+    hc.on("#browser-tz-hint a", "click", function() {
         tzTom.setValue(browserTz, true);
         return false;
     });

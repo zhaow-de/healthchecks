@@ -3,20 +3,16 @@
 }
 
 #checks-table .checks-row:hover {
-    background-color: var(--table-bg-hover);
+    background-color: var(--bs-tertiary-bg);
 }
 
 .my-checks-name.unnamed, #checks-table span.unavailable {
-    color: var(--text-muted);
+    color: var(--bs-secondary-color);
     font-style: italic;
 }
 
 #checks-table tr.checks-row td:first-child {
     text-align: center;
-}
-
-#checks-table th {
-    border-top: 0;
 }
 
 #checks-table th .ic-asc,
@@ -26,7 +22,7 @@
 }
 
 #checks-table a.default {
-    color: var(--text-color);
+    color: var(--bs-body-color);
 }
 
 #checks-table tr:hover a.default {
@@ -35,7 +31,6 @@
 
 #checks-table td {
     vertical-align: middle;
-    border-top: 1px solid var(--border-muted);
 }
 
 #checks-table .my-checks-name,
@@ -46,18 +41,18 @@
     padding: 6px;
 }
 
-#checks-table.rw tr:hover .my-checks-name,
-#checks-table.rw tr:hover .integrations,
-#checks-table.rw tr:hover .timeout-grace,
+#checks-table tr:hover .my-checks-name,
+#checks-table tr:hover .integrations,
+#checks-table tr:hover .timeout-grace,
 #checks-table tr:hover .last-ping {
-    border: 1px dotted #AAA;
+    border: 1px dotted var(--bs-gray-500);
     cursor: pointer;
 }
 
-#checks-table > tbody > tr > th.th-name,
-#checks-table > tbody > tr > th.th-integrations,
-#checks-table > tbody > tr > th.th-period,
-#checks-table > tbody > tr > th.th-last-ping {
+#checks-table th.th-name,
+#checks-table th.th-integrations,
+#checks-table th.th-period,
+#checks-table th.th-last-ping {
     padding-left: 15px;
 }
 
@@ -73,16 +68,8 @@
     width: 24px;
 }
 
-body.dark .ic {
-    font-palette: --palette1;
-}
-
 #checks-table .integrations span.off {
     font-palette: --palette2;
-}
-
-body.dark #checks-table .integrations span.off {
-    font-palette: --palette3;
 }
 
 .timeout-grace .cron-expression {
@@ -93,13 +80,12 @@ body.dark #checks-table .integrations span.off {
 }
 
 .checks-subline {
-    color: var(--text-muted);
+    color: var(--bs-secondary-color);
     white-space: nowrap;
 }
 
 /* Name cell  */
 #checks-table td:nth-child(2) {
-    word-wrap: break-word;
     overflow-wrap: anywhere;
 }
 
@@ -113,13 +99,12 @@ body.dark #checks-table .integrations span.off {
     font-family: "Lucida Console", Monaco, monospace;
     font-size: 11.7px;
     position: relative;
-    overflow-wrap: anywhere;
-    word-wrap: break-word;
+    overflow-wrap: break-word;
     padding: 4px 0; /* eliminate gaps between lines */
 }
 
 .my-checks-url .base {
-    color: var(--text-muted);
+    color: var(--bs-secondary-color);
 }
 
 #checks-table .actions {
@@ -130,18 +115,18 @@ body.dark #checks-table .integrations span.off {
     border-color: transparent;
     background-color: transparent;
     font-size: 20px;
-    color: #999;
+    color: var(--bs-tertiary-color);
 }
 
 #checks-table tr:hover .btn {
-    color: #666;
+    color: var(--bs-secondary-color);
     background: transparent;
     opacity: 1;
 }
 
 #checks-table tr:hover .btn:hover {
-    background: var(--btn-active-bg);
-    color: var(--btn-default-color);
+    background: var(--bs-secondary-bg);
+    color: var(--bs-body-color);
 }
 
 #checks-table .pause {
@@ -149,13 +134,13 @@ body.dark #checks-table .integrations span.off {
 }
 
 #checks-table tr:hover .pause.confirm:hover {
-    background: #0091ea;
+    background: var(--link-color);
     color: #FFF;
     outline: none;
 }
 
 #url-style-switcher a {
-    color:  var(--text-muted);
+    color: var(--bs-secondary-color);
 }
 
 #url-style-switcher a.active {

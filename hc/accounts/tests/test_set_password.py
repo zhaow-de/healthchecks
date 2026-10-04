@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from hc.test import BaseTestCase
 
 
@@ -36,6 +34,25 @@ class SetPasswordTestCase(BaseTestCase):
         payload = {"password": "abc"}
         r = self.client.post("/accounts/set_password/", payload)
         self.assertEqual(r.status_code, 200)
+
+        old_password = self.alice.password
+        self.alice.refresh_from_db()
+        self.assertEqual(self.alice.password, old_password)
+
+    def test_it_runs_the_password_validators(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        self.set_sudo_flag()
+
+        cases = [
+            ("Correct-H9", "This password is too short."),
+            ("1qaz2wsx3edc", "This password is too common."),
+            ("123456789012", "This password is entirely numeric."),
+            ("alice@example.org1", "too similar to the email address"),
+        ]
+        for password, message in cases:
+            with self.subTest(password=password):
+                r = self.client.post("/accounts/set_password/", {"password": password})
+                self.assertContains(r, message)
 
         old_password = self.alice.password
         self.alice.refresh_from_db()

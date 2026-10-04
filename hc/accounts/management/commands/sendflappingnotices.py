@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import time
 from datetime import timedelta as td
 from typing import Any
@@ -22,6 +20,9 @@ class Command(BaseCommand):
         time.sleep(1)
 
     def handle(self, **options: Any) -> str:
+        if not settings.MAILERS:
+            return "No SMTP configuration, no notices sent\n"
+
         q = Check.objects.only("name")
         q = q.filter(flip__created__gt=now() - td(hours=24))
         q = q.annotate(num_flips=Count("flip"))
@@ -30,21 +31,18 @@ class Command(BaseCommand):
 
         sent = 0
         for check in q:
-            for email in check.project.team_emails():
-                self.stdout.write(
-                    f"[{check.num_flips}] Sending notice to {email} about '{check.name}'"
-                )
+            email = check.project.owner.email
+            self.stdout.write(f"[{check.num_flips}] Sending notice to {email} about '{check.name}'")
 
-                ctx = {
-                    "email": email,
-                    "check": check,
-                    "num_flips": check.num_flips,
-                    "support_email": settings.SUPPORT_EMAIL,
-                }
-                emails.flapping_notice(email, ctx)
-                sent += 1
+            ctx = {
+                "check": check,
+                "num_flips": check.num_flips,
+                "support_email": settings.SUPPORT_EMAIL,
+            }
+            emails.flapping_notice(email, ctx)
+            sent += 1
 
-                # Throttle so we don't send too many emails at once:
-                self.pause()
+            # Throttle so we don't send too many emails at once:
+            self.pause()
 
         return f"Done! Notices sent: {sent}\n"

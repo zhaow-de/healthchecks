@@ -1,9 +1,17 @@
 {% extends "base.html" %}
 
+{% block title %}Confirmation Code - {{ site_name }}{% endblock %}
+
 {% block content %}
 <div class="row">
-    <div class="col-sm-6 col-sm-offset-3">
+    <div class="col-sm-6 offset-sm-3">
         <div class="hc-dialog">
+            {% if no_mail %}
+            <h1>Email Needed</h1>
+            <br />
+            <p>This page needs a confirmation code sent by email, and this server cannot send email.</p>
+            <p>To set a new password without it, run <code>manage.py changepassword</code> from the shell.</p>
+            {% else %}
             <h1>Enter a Confirmation Code</h1>
             <br />
             <p>
@@ -14,29 +22,30 @@
             <form method="POST">
                 {% csrf_token %}
 
-                <div class="form-group {% if wrong_code %}has-error{% endif %}">
+                <div class="mb-3 {% if wrong_code %}has-error{% endif %}">
                     <input
                         id="sudo-code"
                         type="text"
-                        class="form-control input-lg"
+                        class="form-control form-control-lg"
                         maxlength="6"
                         name="sudo_code"
                         autofocus />
 
                     {% if wrong_code %}
-                    <div class="help-block">
+                    <div class="form-text">
                         Not a valid code. Did you type it in correctly?
                     </div>
                     {% endif %}
                 </div>
 
                 <button
-                    class="btn btn-lg btn-primary btn-block"
+                    class="btn btn-lg btn-primary w-100"
                     type="submit">
                     Continue
                 </button>
 
             </form>
+            {% endif %}
 
         </div>
     </div>

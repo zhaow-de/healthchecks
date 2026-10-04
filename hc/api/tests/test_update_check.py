@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import uuid
 from datetime import timedelta as td
 from typing import Any
@@ -21,12 +19,11 @@ class UpdateCheckTestCase(BaseTestCase):
         self,
         code: uuid.UUID | str,
         data: JSONDict,
-        v: int = 1,
-        api_key: str = "X" * 32,
+        api_key: str | None = None,
     ) -> TestHttpResponse:
-        url = f"/api/v{v}/checks/{code}"
+        url = f"/api/v3/checks/{code}"
         return self.csrf_client.post(
-            url, data, content_type="application/json", HTTP_X_API_KEY=api_key
+            url, data, content_type="application/json", HTTP_X_API_KEY=self.api_key if api_key is None else api_key
         )
 
     def test_it_works(self) -> None:
@@ -53,7 +50,7 @@ class UpdateCheckTestCase(BaseTestCase):
         doc = r.json()
         assert "ping_url" in doc
         self.assertEqual(doc["name"], "Foo")
-        self.assertEqual(doc["slug"], "foo")
+        self.assertEqual(doc["slug"], "")
         self.assertEqual(doc["tags"], "bar,baz")
         self.assertEqual(doc["desc"], "My description")
         self.assertEqual(doc["n_pings"], 0)
@@ -65,7 +62,7 @@ class UpdateCheckTestCase(BaseTestCase):
 
         self.check.refresh_from_db()
         self.assertEqual(self.check.name, "Foo")
-        self.assertEqual(self.check.slug, "foo")
+        self.assertEqual(self.check.slug, "")
         self.assertEqual(self.check.tags, "bar,baz")
         self.assertEqual(self.check.timeout.total_seconds(), 3600)
         self.assertEqual(self.check.grace.total_seconds(), 60)
@@ -77,7 +74,7 @@ class UpdateCheckTestCase(BaseTestCase):
         self.assertEqual(self.check.alert_after, expected_aa)
 
     def test_it_handles_options(self) -> None:
-        r = self.client.options(f"/api/v1/checks/{self.check.code}")
+        r = self.client.options(f"/api/v3/checks/{self.check.code}")
         self.assertEqual(r.status_code, 204)
         self.assertIn("POST", r["Access-Control-Allow-Methods"])
 
@@ -101,7 +98,7 @@ class UpdateCheckTestCase(BaseTestCase):
         self.assertEqual(r.status_code, 404)
 
     def test_it_validates_ownership(self) -> None:
-        check = Check.objects.create(project=self.bobs_project, status="up")
+        check = Check.objects.create(project=self.charlies_project, status="up")
 
         r = self.post(check.code, {})
         self.assertEqual(r.status_code, 403)
@@ -296,10 +293,10 @@ class UpdateCheckTestCase(BaseTestCase):
         self.assertEqual(self.check.schedule, "5 * * * *")
 
     def test_it_rejects_readonly_key(self) -> None:
-        self.project.api_key_readonly = "R" * 32
+        ro_key = self.project.set_api_key_readonly()
         self.project.save()
 
-        r = self.post(self.check.code, {"name": "Foo"}, api_key="R" * 32)
+        r = self.post(self.check.code, {"name": "Foo"}, api_key=ro_key)
         self.assertEqual(r.status_code, 401)
 
     def test_it_sets_manual_resume_to_true(self) -> None:
@@ -399,36 +396,27 @@ class UpdateCheckTestCase(BaseTestCase):
         self.assertFalse(self.check.filter_subject)
         self.assertEqual(self.check.success_kw, "SUCCESS")
 
-    def test_v1_reports_status_started(self) -> None:
+    def test_it_reports_started_separately(self) -> None:
         self.check.last_start = now()
         self.check.save()
 
         r = self.post(self.check.code, {})
         doc = r.json()
-        self.assertEqual(doc["status"], "started")
-        self.assertTrue(doc["started"])
-
-    def test_v2_reports_started_separately(self) -> None:
-        self.check.last_start = now()
-        self.check.save()
-
-        r = self.post(self.check.code, {}, v=2)
-        doc = r.json()
         self.assertEqual(doc["status"], "new")
         self.assertTrue(doc["started"])
 
-    def test_v3_saves_slug(self) -> None:
-        r = self.post(self.check.code, {"slug": "updated-slug"}, v=3)
+    def test_it_saves_slug(self) -> None:
+        r = self.post(self.check.code, {"slug": "updated-slug"})
         self.assertEqual(r.status_code, 200)
 
         self.check.refresh_from_db()
         self.assertEqual(self.check.slug, "updated-slug")
 
-    def test_v3_does_not_autogenerate_slug(self) -> None:
+    def test_it_does_not_autogenerate_slug(self) -> None:
         self.check.slug = "foo"
         self.check.save()
 
-        r = self.post(self.check.code, {"name": "Bar"}, v=3)
+        r = self.post(self.check.code, {"name": "Bar"})
         self.assertEqual(r.status_code, 200)
 
         self.check.refresh_from_db()

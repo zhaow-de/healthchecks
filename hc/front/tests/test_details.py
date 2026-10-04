@@ -1,12 +1,10 @@
-from __future__ import annotations
-
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from datetime import timedelta as td
 
 import time_machine
 from django.test.utils import override_settings
 
-from hc.api.models import Check, Flip, Ping
+from hc.api.models import Channel, Check, Flip, Ping
 from hc.test import BaseTestCase
 
 
@@ -21,8 +19,7 @@ class DetailsTestCase(BaseTestCase):
 
         ping = Ping.objects.create(owner=self.check)
 
-        # Older MySQL versions don't store microseconds. This makes sure
-        # the ping is older than any notifications we may create later:
+        # Make sure the ping is older than any notifications we may create later:
         ping.created = "2000-01-01T00:00:00+00:00"
         ping.save()
 
@@ -49,6 +46,46 @@ class DetailsTestCase(BaseTestCase):
         self.assertContains(r, "Europe/Riga")
         self.assertContains(r, "Europe/Berlin")
 
+    def test_it_gives_the_ping_dialog_the_check_s_ping_url(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(self.url)
+        # ping_details.js opens a ping from #log and from a #ping-<n> hash with this URL
+        self.assertContains(r, f'data-url="/checks/{self.check.code}/pings/0/"')
+
+    @override_settings(PING_ENDPOINT="http://ping.example.org/")
+    def test_it_shows_no_ping_email_address(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(self.url)
+        self.assertContains(r, f"http://ping.example.org/{self.check.code}", status_code=200)
+        self.assertNotContains(r, f"{self.check.code}@")
+        self.assertNotContains(r, "sending email")
+        self.assertNotContains(r, 'href="#email"')
+
+    def test_it_disables_keywords_for_email_filters_alone(self) -> None:
+        self.check.filter_subject = True
+        self.check.filter_body = True
+        self.check.save()
+
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(self.url)
+        self.assertNotContains(r, "email messages", status_code=200)
+        self.assertNotContains(r, 'name="filter_subject"')
+        self.assertNotContains(r, 'name="filter_body"')
+        self.assertContains(r, 'name="filter_http_body"')
+        # filter_any() ignores the inert email filters, so the keyword inputs
+        # stay disabled
+        html = r.content.decode()
+        for kw in ("start_kw", "success_kw", "failure_kw"):
+            tag = html[html.index(f'id="{kw}"') :]
+            self.assertIn("disabled", tag[: tag.index("/>")])
+
+        self.check.filter_http_body = True
+        self.check.save()
+        r = self.client.get(self.url)
+        html = r.content.decode()
+        tag = html[html.index('id="start_kw"') :]
+        self.assertNotIn("disabled", tag[: tag.index("/>")])
+
     def test_it_suggests_tags_from_other_checks(self) -> None:
         self.check.tags = "foo bar"
         self.check.save()
@@ -64,6 +101,13 @@ class DetailsTestCase(BaseTestCase):
         r = self.client.get(self.url)
         self.assertEqual(r.status_code, 404)
 
+    def test_it_shows_copy_button(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(self.url)
+        self.assertContains(r, "Create a Copy&hellip;")
+        self.assertContains(r, 'data-bs-target="#clear-events-modal"')
+        self.assertContains(r, 'data-bs-target="#remove-check-modal"')
+
     def test_it_shows_cron_expression(self) -> None:
         self.check.kind = "cron"
         self.check.save()
@@ -72,39 +116,41 @@ class DetailsTestCase(BaseTestCase):
         r = self.client.get(self.url)
         self.assertContains(r, "Cron Expression", status_code=200)
 
-    def test_it_allows_cross_team_access(self) -> None:
-        self.client.login(username="bob@example.org", password="password")
-        r = self.client.get(self.url)
-        self.assertEqual(r.status_code, 200)
+    def test_it_shows_actions_to_the_owner(self) -> None:
+        Channel.objects.create(project=self.project, kind="email")
 
-    def test_it_hides_actions_from_readonly_users(self) -> None:
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
-
-        self.client.login(username="bob@example.org", password="password")
+        self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.url)
 
-        self.assertNotContains(r, "edit-name", status_code=200)
-        self.assertNotContains(r, "edit-desc")
-        self.assertNotContains(r, "Filtering Rules")
-        self.assertNotContains(r, "pause-btn")
-        self.assertNotContains(r, "Change Schedule")
-        self.assertNotContains(r, "Create a Copy&hellip;")
-        self.assertNotContains(r, "transfer-btn")
-        self.assertNotContains(r, "btn-remove")
+        self.assertContains(r, 'id="edit-name"', status_code=200)
+        self.assertContains(r, 'id="edit-desc"')
+        self.assertContains(r, 'href="?urls=slug"')
+        self.assertContains(r, "Filtering Rules")
+        self.assertContains(r, 'id="pause-btn"')
+        self.assertContains(r, "Change Schedule")
+        self.assertContains(r, "btn btn-sm btn-outline-secondary timeout-grace")
+        self.assertContains(r, 'class="details-integrations table table-hover"')
+        self.assertContains(r, "Create a Copy&hellip;")
+        self.assertContains(r, 'id="transfer-btn"')
+        self.assertContains(r, 'data-bs-target="#clear-events-modal"')
+        self.assertContains(r, 'data-bs-target="#remove-check-modal"')
 
-    def test_it_hides_resume_action_from_readonly_users(self) -> None:
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
+        # The schedule dialog's Save buttons are enabled
+        html = r.content.decode()
+        self.assertRegex(html, r'id="update-cron-submit"')
+        self.assertNotRegex(html, r'id="update-cron-submit"[^>]*disabled')
+        self.assertRegex(html, r'id="update-oncalendar-submit"')
+        self.assertNotRegex(html, r'id="update-oncalendar-submit"[^>]*disabled')
 
+    def test_it_shows_resume_action_to_the_owner(self) -> None:
         self.check.status = "paused"
         self.check.manual_resume = True
         self.check.save()
 
-        self.client.login(username="bob@example.org", password="password")
+        self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.url)
 
-        self.assertNotContains(r, "resume-btn", status_code=200)
+        self.assertContains(r, 'id="resume-btn"', status_code=200)
 
     def test_crontab_example_guesses_schedules(self) -> None:
         self.client.login(username="alice@example.org", password="password")
@@ -137,19 +183,19 @@ class DetailsTestCase(BaseTestCase):
 
     @time_machine.travel("2020-02-01 00:00+00:00")
     def test_it_calculates_downtime_summary(self) -> None:
-        self.check.created = datetime(2019, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+        self.check.created = datetime(2019, 1, 1, 0, 0, 0, tzinfo=UTC)
         self.check.save()
 
         # going down on Jan 15, at 12:00
         f1 = Flip(owner=self.check)
-        f1.created = datetime(2020, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+        f1.created = datetime(2020, 1, 15, 12, 0, 0, tzinfo=UTC)
         f1.old_status = "up"
         f1.new_status = "down"
         f1.save()
 
         # back up on Jan 15, at 13:00
         f2 = Flip(owner=self.check)
-        f2.created = datetime(2020, 1, 15, 13, 0, 0, tzinfo=timezone.utc)
+        f2.created = datetime(2020, 1, 15, 13, 0, 0, tzinfo=UTC)
         f2.old_status = "down"
         f2.new_status = "up"
         f2.save()
@@ -166,19 +212,19 @@ class DetailsTestCase(BaseTestCase):
 
     @time_machine.travel("2020-02-01 00:00+00:00")
     def test_it_downtime_summary_handles_plural(self) -> None:
-        self.check.created = datetime(2019, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+        self.check.created = datetime(2019, 1, 1, 0, 0, 0, tzinfo=UTC)
         self.check.save()
 
         # going down on Jan 15, at 12:00
         f1 = Flip(owner=self.check)
-        f1.created = datetime(2020, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+        f1.created = datetime(2020, 1, 15, 12, 0, 0, tzinfo=UTC)
         f1.old_status = "up"
         f1.new_status = "down"
         f1.save()
 
         # back up 2 hours later
         f2 = Flip(owner=self.check)
-        f2.created = datetime(2020, 1, 15, 14, 0, 0, tzinfo=timezone.utc)
+        f2.created = datetime(2020, 1, 15, 14, 0, 0, tzinfo=UTC)
         f2.old_status = "down"
         f2.new_status = "up"
         f2.save()
@@ -194,7 +240,7 @@ class DetailsTestCase(BaseTestCase):
         self.profile.tz = "America/New_York"
         self.profile.save()
 
-        self.check.created = datetime(2019, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+        self.check.created = datetime(2019, 1, 1, 0, 0, 0, tzinfo=UTC)
         self.check.save()
 
         self.client.login(username="alice@example.org", password="password")
@@ -210,7 +256,7 @@ class DetailsTestCase(BaseTestCase):
         self.profile.tz = "Europe/Riga"
         self.profile.save()
 
-        self.check.created = datetime(2019, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+        self.check.created = datetime(2019, 1, 1, 0, 0, 0, tzinfo=UTC)
         self.check.save()
 
         self.client.login(username="alice@example.org", password="password")
@@ -222,7 +268,7 @@ class DetailsTestCase(BaseTestCase):
 
     @time_machine.travel("2020-02-01 00:00+00:00")
     def test_it_handles_months_when_check_did_not_exist(self) -> None:
-        self.check.created = datetime(2020, 1, 10, 0, 0, 0, tzinfo=timezone.utc)
+        self.check.created = datetime(2020, 1, 10, 0, 0, 0, tzinfo=UTC)
         self.check.save()
 
         self.client.login(username="alice@example.org", password="password")
@@ -245,25 +291,9 @@ class DetailsTestCase(BaseTestCase):
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.url)
         self.assertContains(r, "Ping Key Required", status_code=200)
+        self.assertContains(r, 'data-bs-target="#no-ping-key-modal"')
         self.assertNotContains(r, "ping-now")
         self.assertContains(r, "The ping key is currently not set")
-
-    def test_it_handles_no_ping_key_for_readonly_user(self) -> None:
-        self.project.show_slugs = True
-        self.project.ping_key = None
-        self.project.save()
-
-        self.check.slug = "foo"
-        self.check.save()
-
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
-        self.client.login(username="bob@example.org", password="password")
-
-        r = self.client.get(self.url)
-        self.assertNotContains(r, "Ping Key Required", status_code=200)
-        self.assertNotContains(r, "ping-now")
-        self.assertNotContains(r, "The ping key is currently not set")
 
     def test_it_handles_empty_slug(self) -> None:
         self.project.show_slugs = True
@@ -272,7 +302,7 @@ class DetailsTestCase(BaseTestCase):
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.url)
         self.assertContains(r, "(unavailable, set slug first)", status_code=200)
-        self.assertNotContains(r, "Copy URL")
+        self.assertNotContains(r, "click-to-copy")
         self.assertNotContains(r, "ping-now")
         self.assertNotContains(r, "The ping key is currently not set")
 
@@ -303,3 +333,38 @@ class DetailsTestCase(BaseTestCase):
         r = self.client.get(self.url)
         self.assertContains(r, "DOWN – Foo – Mychecks", status_code=200)
         self.assertContains(r, "favicon_down.svg")
+
+    def test_it_lists_group_channels_separately(self) -> None:
+        email = Channel.objects.create(project=self.project, kind="email", name="Alice's Inbox")
+        group = Channel.objects.create(project=self.project, kind="group", name="On-call Group")
+        group.value = str(email.code)
+        group.save()
+        group.checks.add(self.check)
+
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(self.url)
+        self.assertContains(r, "Notification Groups", status_code=200)
+        self.assertContains(r, "On-call Group")
+        self.assertContains(r, "Alice&#x27;s Inbox")
+
+        # The group channel is listed before the regular channel heading,
+        # the regular channel after it
+        html = r.content.decode()
+        groups_pos = html.index("Notification Groups")
+        methods_pos = html.index("Notification Methods")
+        self.assertLess(groups_pos, html.index("On-call Group"))
+        self.assertLess(html.index("On-call Group"), methods_pos)
+        self.assertLess(methods_pos, html.index("Alice&#x27;s Inbox"))
+
+    def test_it_omits_notification_groups_heading_without_groups(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(self.url)
+        self.assertNotContains(r, "Notification Groups", status_code=200)
+
+    def test_it_denies_a_superuser_outsider(self) -> None:
+        self.charlie.is_superuser = True
+        self.charlie.save()
+
+        self.client.login(username="charlie@example.org", password="password")
+        r = self.client.get(self.url)
+        self.assertEqual(r.status_code, 404)

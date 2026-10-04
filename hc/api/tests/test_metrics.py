@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from django.test.utils import override_settings
 from django.utils.timezone import now
 
@@ -9,7 +7,7 @@ from hc.test import BaseTestCase
 
 @override_settings(METRICS_KEY="foo")
 class MetricsTestCase(BaseTestCase):
-    url = "/api/v1/metrics/"
+    url = "/api/v3/metrics/"
 
     def test_it_returns_num_unprocessed_flips(self) -> None:
         check = Check.objects.create(project=self.project, status="down")
@@ -38,9 +36,7 @@ class MetricsTestCase(BaseTestCase):
     def test_it_returns_max_notification_id(self) -> None:
         check = Check.objects.create(project=self.project, status="down")
         channel = Channel.objects.create(project=self.project, kind="email")
-        n = Notification.objects.create(
-            owner=check, channel=channel, check_status="down"
-        )
+        n = Notification.objects.create(owner=check, channel=channel, check_status="down")
 
         r = self.client.get(self.url, HTTP_X_METRICS_KEY="foo")
         self.assertEqual(r.status_code, 200)

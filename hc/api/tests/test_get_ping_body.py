@@ -1,11 +1,4 @@
-from __future__ import annotations
-
-from unittest.mock import Mock, patch
-
-from django.utils.timezone import now
-
-from hc.api.models import Check, Ping, TokenBucket
-from hc.lib.s3 import GetObjectError
+from hc.api.models import Check, Ping
 from hc.test import BaseTestCase
 
 
@@ -23,10 +16,10 @@ class GetPingBodyTestCase(BaseTestCase):
         self.ping.body_raw = b"Foo\nBar\nBaz"
         self.ping.save()
 
-        self.url = f"/api/v1/checks/{self.check.code}/pings/1/body"
+        self.url = f"/api/v3/checks/{self.check.code}/pings/1/body"
 
     def test_it_works(self) -> None:
-        r = self.client.get(self.url, HTTP_X_API_KEY="X" * 32)
+        r = self.client.get(self.url, HTTP_X_API_KEY=self.api_key)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.headers["Content-Type"], "text/plain")
         self.assertEqual(r.content, b"Foo\nBar\nBaz")
@@ -36,21 +29,21 @@ class GetPingBodyTestCase(BaseTestCase):
         self.assertContains(r, "missing api key", status_code=401)
 
     def test_readonly_key_is_not_allowed(self) -> None:
-        self.project.api_key_readonly = "R" * 32
+        ro_key = self.project.set_api_key_readonly()
         self.project.save()
 
-        r = self.client.get(self.url, HTTP_X_API_KEY="R" * 32)
+        r = self.client.get(self.url, HTTP_X_API_KEY=ro_key)
         self.assertEqual(r.status_code, 401)
 
     def test_it_rejects_post(self) -> None:
-        r = self.client.post(self.url, HTTP_X_API_KEY=self.project.api_key)
+        r = self.client.post(self.url, HTTP_X_API_KEY=self.api_key)
         self.assertEqual(r.status_code, 405)
 
     def test_it_rejects_charlies_key(self) -> None:
-        self.charlies_project.api_key = "C" * 32
+        charlies_key = self.charlies_project.set_api_key()
         self.charlies_project.save()
 
-        r = self.client.get(self.url, HTTP_X_API_KEY="C" * 32)
+        r = self.client.get(self.url, HTTP_X_API_KEY=charlies_key)
         self.assertEqual(r.status_code, 403)
 
     def test_it_checks_n_threshold(self) -> None:
@@ -58,42 +51,21 @@ class GetPingBodyTestCase(BaseTestCase):
         self.check.save()
 
         # The default ping log limit is 100, so the ping #1 is now outside the limit
-        r = self.client.get(self.url, HTTP_X_API_KEY="X" * 32)
+        r = self.client.get(self.url, HTTP_X_API_KEY=self.api_key)
         self.assertEqual(r.status_code, 404)
 
     def test_it_handles_no_body(self) -> None:
         self.ping.body_raw = None
         self.ping.save()
 
-        r = self.client.get(self.url, HTTP_X_API_KEY="X" * 32)
+        r = self.client.get(self.url, HTTP_X_API_KEY=self.api_key)
         self.assertEqual(r.status_code, 404)
 
     def test_it_returns_original_bytes(self) -> None:
         self.ping.body_raw = b"Hello\x01\x99World"
         self.ping.save()
 
-        r = self.client.get(self.url, HTTP_X_API_KEY="X" * 32)
+        r = self.client.get(self.url, HTTP_X_API_KEY=self.api_key)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.headers["Content-Type"], "text/plain")
         self.assertEqual(r.content, b"Hello\x01\x99World")
-
-    def test_it_handles_unhealthy_s3(self) -> None:
-        self.ping.object_size = 123
-        self.ping.save()
-
-        obj = TokenBucket(value="s3_get_object_error")
-        obj.tokens = 0.0
-        obj.updated = now()
-        obj.save()
-
-        r = self.client.get(self.url, HTTP_X_API_KEY="X" * 32)
-        self.assertEqual(r.status_code, 503)
-
-    def test_it_handles_s3_error(self) -> None:
-        self.ping.object_size = 123
-        self.ping.save()
-
-        with patch("hc.api.models.get_object", Mock(side_effect=GetObjectError)):
-            r = self.client.get(self.url, HTTP_X_API_KEY="X" * 32)
-
-        self.assertEqual(r.status_code, 503)

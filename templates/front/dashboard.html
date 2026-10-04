@@ -115,7 +115,7 @@
         #panel {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-            grid-gap: 8px;
+            gap: 8px;
             padding: 8px;
         }
 
@@ -137,7 +137,7 @@
             overflow: hidden;
         }
 
-        #panel > div .lp, 
+        #panel > div .lp,
         #panel > div .ld {
             position: absolute;
             font-size: 13px;
@@ -159,33 +159,26 @@
             top: 2px;
         }
 
-
-        .check-template {
-            display: none;
-        }
-
-        body > svg {
-            display: none;
-        }
     </style>
 </head>
 <body class="theme-light">
     <div id="panel"></div>
 
-    <div class="check-template">
-        <div class="spinner"></div>
-        <div class="name"></div>
-        <div class="lp"></div>
-        <div class="ld">
-            <svg width="13" height="13" viewBox="0 0 768 768">
-                <use href="#timer" />
-            </svg>
-            <span></span>
+    <template id="check-template">
+        <div>
+            <div class="spinner"></div>
+            <div class="name"></div>
+            <div class="lp"></div>
+            <div class="ld">
+                <svg width="13" height="13" viewBox="0 0 768 768">
+                    <use href="#timer" />
+                </svg>
+                <span></span>
+            </div>
         </div>
-    </div>
+    </template>
 
-
-    <svg>
+    <svg display="none">
     <defs>
         <symbol id="timer">
             <path d="M384 640.5c124.5 0 223.5-100.5 223.5-225s-99-223.5-223.5-223.5-223.5 99-223.5 223.5 99 225 223.5 225zM609 237c39 49.5 63 111 63 178.5 0 159-129 288-288 288s-288-129-288-288 129-288 288-288c67.5 0 130.5 25.5 180 64.5l45-46.5c16.5 13.5 31.5 28.5 45 45zM352.5 448.5v-192h63v192h-63zM480 31.5v64.5h-192v-64.5h192z"></path>
@@ -194,18 +187,13 @@
     </svg>
 
     <script>
-        function fetch(key, callback) {
-            var httpRequest = new XMLHttpRequest();
-            httpRequest.onreadystatechange = function() {
-                if (httpRequest.readyState === 4) {
-                    if (httpRequest.status === 200) {
-                        callback(JSON.parse(httpRequest.responseText));
-                    }
-                }
-            };
-            httpRequest.open("GET", "/api/v3/checks/");
-            httpRequest.setRequestHeader("X-Api-Key", key);
-            httpRequest.send();
+        // The checks that a read-only API key can see, as the API returns them
+        async function loadChecks(key) {
+            const r = await fetch("{% url 'hc-api-checks' %}", {headers: {"X-Api-Key": key}});
+            if (!r.ok) {
+                throw new Error("HTTP " + r.status);
+            }
+            return r.json();
         }
 
         function duration(v) {
@@ -224,63 +212,70 @@
             }
 
             v = Math.floor(v / 24); // v is now days
-            return v + " day" + (v == 1 ? "" : "s");
-         };
+            return v + " day" + (v === 1 ? "" : "s");
+        }
 
         function timeSince(date) {
-            var v = Math.floor((new Date() - date) / 1000);
+            const v = Math.floor((new Date() - date) / 1000);
             return duration(v);
-         };
+        }
 
-        var template = document.querySelector(".check-template");
-        function updatePanel(node) {
-            fetch(node.dataset.readonlyKey, function(doc) {
-                var tag = "TAG_" + node.dataset.readonlyKey.substr(0, 6);
+        const template = document.getElementById("check-template");
+        async function updatePanel(node) {
+            let doc;
+            try {
+                doc = await loadChecks(node.dataset.readonlyKey);
+            } catch {
+                // A wrong key or a failed request: keep the tiles shown so far
+                return;
+            }
 
-                // Sort returned checks by name:
-                var sorted = doc.checks.sort(function(a, b) {
-                    return a.name.localeCompare(b.name)
-                });
+            const tag = "TAG_" + node.dataset.readonlyKey.slice(0, 6);
 
-                var fragment = document.createDocumentFragment();
-                sorted.forEach(function(item) {
-                    var div = template.cloneNode(true);
-                    div.setAttribute("class", tag + " status-" + item.status + (item.started ? " status-started" : ""));
-                    div.querySelector(".name").textContent = item.name || "unnamed";
-                    if (item.last_ping) {
-                        var s = timeSince(Date.parse(item.last_ping)) + " ago";
-                        div.querySelector(".lp").textContent = s;
-                    }
-                    if (item.last_duration) {
-                        var svg = '<svg width="13" height="13" viewBox="0 0 768 768"><use href="#timer" /></svg> ';
-                        div.querySelector(".ld span").textContent = duration(item.last_duration);
-                    } else {
-                        div.querySelector(".ld").textContent = "";
-                    }
-                    fragment.appendChild(div);
-                });
-
-
-                document.querySelectorAll('.' + tag).forEach(function(element) {
-                    element.remove();
-                });
-
-                node.parentNode.insertBefore(fragment, node.nextSibling);
+            // Sort returned checks by name:
+            const sorted = doc.checks.sort(function(a, b) {
+                return a.name.localeCompare(b.name)
             });
+
+            const fragment = document.createDocumentFragment();
+            sorted.forEach(function(item) {
+                const div = template.content.firstElementChild.cloneNode(true);
+                div.setAttribute("class", tag + " status-" + item.status + (item.started ? " status-started" : ""));
+                div.querySelector(".name").textContent = item.name || "unnamed";
+                if (item.last_ping) {
+                    div.querySelector(".lp").textContent = timeSince(Date.parse(item.last_ping)) + " ago";
+                }
+                if (item.last_duration) {
+                    div.querySelector(".ld span").textContent = duration(item.last_duration);
+                } else {
+                    div.querySelector(".ld").textContent = "";
+                }
+                fragment.appendChild(div);
+            });
+
+            document.querySelectorAll('.' + tag).forEach(function(element) {
+                element.remove();
+            });
+
+            node.parentNode.insertBefore(fragment, node.nextSibling);
         }
 
         if (window.location.hash) {
-            var panel;
+            let panel;
 
-            var pairs = window.location.hash.substr(1).split("&");
-            for (var i=0, pair; pair=pairs[i]; i++) {
-                if (pair.indexOf("theme=") != -1) {
+            const pairs = window.location.hash.slice(1).split("&");
+            for (const pair of pairs) {
+                if (!pair) {
+                    continue;
+                }
+
+                if (pair.indexOf("theme=") !== -1) {
                     document.body.setAttribute("class", pair.replace("=", "-"));
                     continue;
                 }
 
-                var parts = pair.split("=");
-                var h1 = document.createElement("H1");
+                const parts = pair.split("=");
+                const h1 = document.createElement("H1");
                 h1.dataset.readonlyKey = parts[0];
                 if (parts[1]) {
                     h1.innerText = decodeURIComponent(parts[1]);

@@ -1,0 +1,23 @@
+version: 2
+
+# One entry per ecosystem, deliberately ungrouped: every update gets a pull request of
+# its own. target-branch is develop on every entry, because develop is the integration
+# branch and main only receives releases.
+updates:
+  - package-ecosystem: "uv"
+    directory: "/"
+    target-branch: "develop"
+    schedule:
+      interval: "daily"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    target-branch: "develop"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "pre-commit"
+    directory: "/"
+    target-branch: "develop"
+    schedule:
+      interval: "weekly"

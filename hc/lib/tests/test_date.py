@@ -1,6 +1,4 @@
-from __future__ import annotations
-
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from datetime import timedelta as td
 from unittest import TestCase
 
@@ -16,7 +14,7 @@ from hc.lib.date import (
     week_boundaries,
 )
 
-CURRENT_TIME = datetime(2020, 1, 15, tzinfo=timezone.utc)
+CURRENT_TIME = datetime(2020, 1, 15, tzinfo=UTC)
 
 
 class DateFormattingTestCase(TestCase):

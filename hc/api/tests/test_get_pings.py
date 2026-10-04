@@ -1,6 +1,4 @@
-from __future__ import annotations
-
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from datetime import timedelta as td
 from uuid import uuid4
 
@@ -9,7 +7,7 @@ from django.test.utils import override_settings
 from hc.api.models import Check, Ping
 from hc.test import BaseTestCase, TestHttpResponse
 
-EPOCH = datetime(2020, 1, 1, tzinfo=timezone.utc)
+EPOCH = datetime(2020, 1, 1, tzinfo=UTC)
 
 
 class GetPingsTestCase(BaseTestCase):
@@ -35,8 +33,8 @@ class GetPingsTestCase(BaseTestCase):
 
         self.url = f"/api/v3/checks/{self.a1.code}/pings/"
 
-    def get(self, api_key: str = "X" * 32) -> TestHttpResponse:
-        return self.csrf_client.get(self.url, HTTP_X_API_KEY=api_key)
+    def get(self, api_key: str | None = None) -> TestHttpResponse:
+        return self.csrf_client.get(self.url, HTTP_X_API_KEY=self.api_key if api_key is None else api_key)
 
     def test_it_works(self) -> None:
         r = self.get()
@@ -52,18 +50,25 @@ class GetPingsTestCase(BaseTestCase):
         self.assertEqual(ping["scheme"], "https")
         self.assertEqual(ping["method"], "get")
         self.assertEqual(ping["ua"], "foo-agent")
-        # body_raw is null, object_size is null, body_url should be None
+        # body_raw is null
         self.assertIsNone(ping["body_url"])
 
+    def test_it_creates_a_missing_owner_profile(self) -> None:
+        self.profile.delete()
+
+        r = self.get()
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(len(r.json()["pings"]), 1)
+
     def test_readonly_key_is_not_allowed(self) -> None:
-        self.project.api_key_readonly = "R" * 32
+        ro_key = self.project.set_api_key_readonly()
         self.project.save()
 
-        r = self.get(api_key=self.project.api_key_readonly)
+        r = self.get(api_key=ro_key)
         self.assertEqual(r.status_code, 401)
 
     def test_it_rejects_post(self) -> None:
-        r = self.csrf_client.post(self.url, HTTP_X_API_KEY="X" * 32)
+        r = self.csrf_client.post(self.url, HTTP_X_API_KEY=self.api_key)
         self.assertEqual(r.status_code, 405)
 
     def test_it_handles_missing_api_key(self) -> None:
@@ -87,7 +92,7 @@ class GetPingsTestCase(BaseTestCase):
 
     def test_it_disables_duration_calculation(self) -> None:
         self.ping.delete()
-        # Set up a worst case scenario where each success ping has an unique rid,
+        # Set up a worst case scenario where each success ping has a unique rid,
         # and there are no "start" pings:
         for i in range(1, 12):
             self.a1.ping_set.create(n=i, rid=uuid4(), created=EPOCH + td(minutes=i))
@@ -114,14 +119,6 @@ class GetPingsTestCase(BaseTestCase):
         ping = doc["pings"][0]
         self.assertIsNone(ping["body_url"])
 
-    def test_it_handles_zero_object_size(self) -> None:
-        self.ping.object_size = 0
-        self.ping.save()
-
-        doc = self.get().json()
-        ping = doc["pings"][0]
-        self.assertIsNone(ping["body_url"])
-
     @override_settings(SITE_ROOT="http://testserver")
     def test_it_handles_nonempty_body_raw(self) -> None:
         self.ping.body_raw = b"this is ping body"
@@ -134,14 +131,9 @@ class GetPingsTestCase(BaseTestCase):
             f"http://testserver/api/v3/checks/{self.a1.code}/pings/1/body",
         )
 
-    @override_settings(SITE_ROOT="http://testserver")
-    def test_it_handles_nonempty_object_size(self) -> None:
-        self.ping.object_size = 123
-        self.ping.save()
+    def test_it_rejects_check_from_another_project(self) -> None:
+        charlies_check = Check.objects.create(project=self.charlies_project)
 
-        doc = self.get().json()
-        ping = doc["pings"][0]
-        self.assertEqual(
-            ping["body_url"],
-            f"http://testserver/api/v3/checks/{self.a1.code}/pings/1/body",
-        )
+        self.url = f"/api/v3/checks/{charlies_check.code}/pings/"
+        r = self.get()
+        self.assertEqual(r.status_code, 403)

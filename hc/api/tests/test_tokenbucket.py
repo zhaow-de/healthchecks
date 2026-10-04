@@ -1,14 +1,16 @@
-from __future__ import annotations
-
+from datetime import datetime
 from datetime import timedelta as td
+from unittest import skipUnless
+from unittest.mock import patch
 
-from django.test.utils import override_settings
+from django.db import connection
+from django.test.utils import CaptureQueriesContext, override_settings
 from django.utils.timezone import now
 
 from hc.api.models import TokenBucket
 from hc.test import BaseTestCase
 
-# This is sha1("alice@example.org" + "test-secred")
+# The SHA-1 of alice@example.org followed by test-secret
 ALICE_HASH = "d60db3b2343e713a4de3e92d4eb417e4f05f06ab"
 
 
@@ -40,6 +42,38 @@ class TokenBucketTestCase(BaseTestCase):
         obj.refresh_from_db()
         self.assertAlmostEqual(obj.tokens, 0.4, places=4)
 
+    @skipUnless(connection.features.has_select_for_update, "no row locks")
+    def test_it_locks_the_row(self) -> None:
+        with CaptureQueriesContext(connection) as ctx:
+            TokenBucket.authorize_login_email("alice@example.org")
+
+        sqls = [q["sql"] for q in ctx.captured_queries]
+        self.assertTrue(any(sql.endswith(" FOR UPDATE") for sql in sqls))
+
+    def test_it_reads_and_writes_in_one_atomic_block(self) -> None:
+        # TestCase wraps each test in a transaction, so the block shows as a savepoint.
+        # Without it select_for_update raises TransactionManagementError on PostgreSQL.
+        TokenBucket.objects.create(value="em-" + ALICE_HASH)
+        with CaptureQueriesContext(connection) as ctx:
+            TokenBucket.authorize_login_email("alice@example.org")
+
+        verbs = [q["sql"].split()[0] for q in ctx.captured_queries]
+        self.assertEqual(verbs, ["SAVEPOINT", "SELECT", "UPDATE", "RELEASE"])
+
+    def test_it_reads_the_clock_after_the_bucket(self) -> None:
+        TokenBucket.objects.create(value="em-" + ALICE_HASH)
+        reads: list[int] = []
+
+        def clock() -> datetime:
+            reads.append(len(ctx.captured_queries))
+            return now()
+
+        with CaptureQueriesContext(connection) as ctx, patch("hc.api.models.now", clock):
+            TokenBucket.authorize_login_email("alice@example.org")
+
+        # Once, after SAVEPOINT and SELECT
+        self.assertEqual(reads, [2])
+
     def test_it_normalizes_email(self) -> None:
         emails = ("alice+alias@example.org", "a.li.ce@example.org")
 
@@ -48,26 +82,20 @@ class TokenBucketTestCase(BaseTestCase):
 
         self.assertEqual(TokenBucket.objects.count(), 1)
 
-    def test_s3_get_object_healthy_works(self) -> None:
-        obj = TokenBucket(value="s3_get_object_error")
-        obj.tokens = 0.34  # above 1/3
-        obj.updated = now()
-        obj.save()
-        self.assertTrue(TokenBucket.s3_is_healthy())
+    def test_it_keys_a_trusted_device_apart(self) -> None:
+        nonce = "a" * 32
+        TokenBucket.authorize_login_password("alice@example.org", nonce)
+        TokenBucket.authorize_login_email("alice@example.org", nonce)
 
-    def test_s3_get_object_healthy_negative_works(self) -> None:
-        obj = TokenBucket(value="s3_get_object_error")
-        obj.tokens = 0.1  # below 1/3
-        obj.updated = now()
-        obj.save()
-        self.assertFalse(TokenBucket.s3_is_healthy())
+        values = sorted(TokenBucket.objects.values_list("value", flat=True))
+        self.assertEqual(values, [f"em-{ALICE_HASH}-{nonce}", f"pw-{ALICE_HASH}-{nonce}"])
+        self.assertTrue(all(len(v) <= 80 for v in values))
 
-    def test_record_s3_get_object_error_works(self) -> None:
-        obj = TokenBucket(value="s3_get_object_error")
-        obj.tokens = 0.0
-        obj.updated = now()
-        obj.save()
+    def test_other_emails_leave_the_password_bucket_alone(self) -> None:
+        for i in range(200):
+            self.assertTrue(TokenBucket.authorize_login_password(f"user{i}@example.org"))
 
-        TokenBucket.record_s3_get_object_error()
-        obj.refresh_from_db()
-        self.assertTrue(obj.tokens < 0)
+        self.assertTrue(TokenBucket.authorize_login_password("alice@example.org"))
+
+    def test_str_shows_the_value(self) -> None:
+        self.assertEqual(str(TokenBucket(value="em-" + ALICE_HASH)), "em-" + ALICE_HASH)

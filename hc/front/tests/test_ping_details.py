@@ -1,16 +1,11 @@
-from __future__ import annotations
-
 from datetime import timedelta as td
-from unittest.mock import Mock, patch
 
-from django.test.utils import override_settings
 from django.utils.timezone import now
 
 from hc.api.models import Check, Ping
-from hc.lib.s3 import GetObjectError
 from hc.test import BaseTestCase
 
-PLAINTEXT_EMAIL = b"""Content-Type: multipart/alternative; boundary=bbb
+MIME_BODY = b"""Content-Type: multipart/alternative; boundary=bbb
 
 --bbb
 Content-Type: text/plain;charset=utf-8
@@ -20,34 +15,6 @@ aGVsbG8gd29ybGQ=
 
 --bbb
 """
-
-BAD_BASE64_EMAIL = b"""Content-Type: multipart/alternative; boundary=bbb
-
---bbb
-Content-Type: text/plain;charset=utf-8
-Content-Transfer-Encoding: base64
-
-!!!
-
---bbb
-"""
-
-HTML_EMAIL = b"""Content-Type: multipart/alternative; boundary=bbb
-
---bbb
-Content-Type: text/html;charset=utf-8
-Content-Transfer-Encoding: base64
-
-PGI+aGVsbG88L2I+
-
---bbb
-"""
-
-PLAINTEXT_UTF8_EMAIL = """Content-Type: text/plain; charset=UTF-8; format=flowed
-Content-Transfer-Encoding: 8bit
-
-glāžšķūņu rūķīši
-""".encode()
 
 
 class PingDetailsTestCase(BaseTestCase):
@@ -74,6 +41,15 @@ class PingDetailsTestCase(BaseTestCase):
         # in the "Time received" field
         self.assertContains(r, "Europe/Riga")
         self.assertContains(r, "Europe/Berlin")
+
+    def test_it_keeps_divs_out_of_paragraphs(self) -> None:
+        Ping.objects.create(owner=self.check, n=1, body_raw=b"this is body")
+
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(self.url)
+        # A browser closes an open <p> at a <div>, and turns the </p> that
+        # follows into an extra empty paragraph
+        self.assertNotRegex(r.content.decode(), r"(?s)<p\b[^>]*>(?:(?!</p>).)*<div")
 
     def test_it_displays_duration(self) -> None:
         expected_duration = td(minutes=5)
@@ -127,12 +103,8 @@ class PingDetailsTestCase(BaseTestCase):
 
     def test_it_accepts_n(self) -> None:
         # remote_addr, scheme, method, ua, body, action, rid:
-        self.check.ping(
-            "1.2.3.4", "http", "post", "tester", b"foo-123", "success", None
-        )
-        self.check.ping(
-            "1.2.3.4", "http", "post", "tester", b"bar-456", "success", None
-        )
+        self.check.ping("1.2.3.4", "http", "post", "tester", b"foo-123", "success", None)
+        self.check.ping("1.2.3.4", "http", "post", "tester", b"bar-456", "success", None)
 
         self.client.login(username="alice@example.org", password="password")
 
@@ -142,12 +114,12 @@ class PingDetailsTestCase(BaseTestCase):
         r = self.client.get(f"/checks/{self.check.code}/pings/2/")
         self.assertContains(r, "bar-456", status_code=200)
 
-    def test_it_allows_cross_team_access(self) -> None:
+    def test_it_checks_ownership(self) -> None:
         Ping.objects.create(owner=self.check, n=1)
 
-        self.client.login(username="bob@example.org", password="password")
+        self.client.login(username="charlie@example.org", password="password")
         r = self.client.get(self.url)
-        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.status_code, 404)
 
     def test_it_handles_missing_ping(self) -> None:
         self.client.login(username="alice@example.org", password="password")
@@ -168,133 +140,25 @@ class PingDetailsTestCase(BaseTestCase):
         r = self.client.get(self.url)
         self.assertContains(r, "(exit status 0)", status_code=200)
 
-    def test_it_decodes_plaintext_email_body(self) -> None:
-        Ping.objects.create(
-            owner=self.check, n=1, scheme="email", body_raw=PLAINTEXT_EMAIL
-        )
+    def test_it_shows_mime_body_verbatim(self) -> None:
+        # An email-scheme row: its body is shown raw, not parsed as MIME
+        Ping.objects.create(owner=self.check, n=1, scheme="email", body_raw=MIME_BODY)
 
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.url)
 
-        self.assertContains(r, "email-body-plain", status_code=200)
-        self.assertNotContains(r, "email-body-html")
+        # aGVsbG8gd29ybGQ= is base64("hello world"): no MIME decoding happens
+        self.assertContains(r, "aGVsbG8gd29ybGQ=", status_code=200)
+        self.assertNotContains(r, "hello world")
+        self.assertNotContains(r, "email-body-")
 
-        # aGVsbG8gd29ybGQ= is base64("hello world")
-        self.assertContains(r, "aGVsbG8gd29ybGQ=")
-        self.assertContains(r, "hello world")
-
-    def test_it_handles_utf8_encoded_plaintext(self) -> None:
-        Ping.objects.create(
-            owner=self.check, n=1, scheme="email", body_raw=PLAINTEXT_UTF8_EMAIL
-        )
+    def test_it_handles_utf8_body(self) -> None:
+        Ping.objects.create(owner=self.check, n=1, body_raw="glāžšķūņu rūķīši".encode())
 
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.url)
 
-        self.assertContains(r, "<pre>glāžšķūņu rūķīši")
-
-    def test_it_handles_bad_base64_in_email_body(self) -> None:
-        Ping.objects.create(
-            owner=self.check, n=1, scheme="email", body_raw=BAD_BASE64_EMAIL
-        )
-
-        self.client.login(username="alice@example.org", password="password")
-        r = self.client.get(self.url)
-
-        self.assertContains(r, "!!!", status_code=200)
-        self.assertNotContains(r, "email-body-plain")
-        self.assertNotContains(r, "email-body-html")
-
-    def test_it_decodes_html_email_body(self) -> None:
-        Ping.objects.create(owner=self.check, n=1, scheme="email", body_raw=HTML_EMAIL)
-
-        self.client.login(username="alice@example.org", password="password")
-        r = self.client.get(self.url)
-
-        self.assertNotContains(r, "email-body-plain", status_code=200)
-        fragment = """<div id="email-body-html" class="tab-pane active">"""
-        self.assertContains(r, fragment)
-
-        # PGI+aGVsbG88L2I+ is base64("<b>hello</b>")
-        self.assertContains(r, "PGI+aGVsbG88L2I+")
-        self.assertContains(r, "&lt;b&gt;hello&lt;/b&gt;")
-
-    def test_it_decodes_email_subject(self) -> None:
-        Ping.objects.create(
-            owner=self.check,
-            n=1,
-            scheme="email",
-            body_raw=b"Subject: =?UTF-8?B?aGVsbG8gd29ybGQ=?=",
-        )
-
-        self.client.login(username="alice@example.org", password="password")
-        r = self.client.get(self.url)
-
-        # aGVsbG8gd29ybGQ= is base64("hello world")
-        self.assertContains(r, "hello world", status_code=200)
-
-    @override_settings(S3_BUCKET="test-bucket")
-    @patch("hc.api.models.get_object")
-    def test_it_loads_body_from_object_storage(self, get_object: Mock) -> None:
-        Ping.objects.create(owner=self.check, n=1, object_size=1000)
-        get_object.return_value = b"dummy body from object storage"
-
-        self.client.login(username="alice@example.org", password="password")
-        r = self.client.get(self.url)
-        self.assertContains(r, "dummy body from object storage", status_code=200)
-
-        code, n = get_object.call_args.args
-        self.assertEqual(code, str(self.check.code))
-        self.assertEqual(n, 1)
-
-    @override_settings(S3_BUCKET="test-bucket")
-    @patch("hc.api.models.get_object")
-    def test_it_decodes_plaintext_email_from_object_storage(
-        self, get_object: Mock
-    ) -> None:
-        Ping.objects.create(owner=self.check, n=1, scheme="email", object_size=1000)
-        get_object.return_value = PLAINTEXT_EMAIL
-
-        self.client.login(username="alice@example.org", password="password")
-        r = self.client.get(self.url)
-
-        # It should call get_object only once
-        self.assertEqual(get_object.call_count, 1)
-
-        self.assertContains(r, "email-body-plain", status_code=200)
-        self.assertNotContains(r, "email-body-html")
-
-        # aGVsbG8gd29ybGQ= is base64("hello world")
-        self.assertContains(r, "aGVsbG8gd29ybGQ=")
-        self.assertContains(r, "hello world")
-
-    @override_settings(S3_BUCKET="test-bucket")
-    @patch("hc.api.models.get_object")
-    def test_it_handles_missing_object(self, get_object: Mock) -> None:
-        Ping.objects.create(owner=self.check, n=1, object_size=1000)
-        get_object.return_value = None
-
-        self.client.login(username="alice@example.org", password="password")
-        r = self.client.get(self.url)
-        self.assertContains(r, "please check back later", status_code=200)
-
-    @override_settings(S3_BUCKET="test-bucket")
-    @patch("hc.api.models.get_object")
-    def test_it_handles_missing_object_email(self, get_object: Mock) -> None:
-        Ping.objects.create(owner=self.check, n=1, scheme="email", object_size=1000)
-        get_object.return_value = None
-
-        self.client.login(username="alice@example.org", password="password")
-        r = self.client.get(self.url)
-        self.assertContains(r, "please check back later", status_code=200)
-
-    @override_settings(S3_BUCKET=None)
-    def test_it_handles_missing_s3_credentials(self) -> None:
-        Ping.objects.create(owner=self.check, n=1, object_size=1000)
-
-        self.client.login(username="alice@example.org", password="password")
-        r = self.client.get(self.url)
-        self.assertContains(r, "please check back later", status_code=200)
+        self.assertContains(r, "<pre>glāžšķūņu rūķīši", status_code=200)
 
     def test_it_shows_ignored_nonzero_exitstatus(self) -> None:
         Ping.objects.create(owner=self.check, n=1, kind="ign", exitstatus=42)
@@ -302,12 +166,3 @@ class PingDetailsTestCase(BaseTestCase):
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(f"/checks/{self.check.code}/pings/1/")
         self.assertContains(r, "(ignored)", status_code=200)
-
-    @override_settings(S3_BUCKET="test-bucket")
-    def test_it_handles_s3_outage(self) -> None:
-        Ping.objects.create(owner=self.check, n=1, object_size=1000)
-
-        self.client.login(username="alice@example.org", password="password")
-        with patch("hc.api.models.get_object", Mock(side_effect=GetObjectError)):
-            r = self.client.get(self.url)
-        self.assertContains(r, "please check back later", status_code=200)

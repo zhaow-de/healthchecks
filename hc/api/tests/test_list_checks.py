@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from datetime import timedelta as td
 
 from django.conf import settings
@@ -36,8 +34,14 @@ class ListChecksTestCase(BaseTestCase):
         self.c1 = Channel.objects.create(project=self.project)
         self.a1.channel_set.add(self.c1)
 
-    def get(self, v: int = 1) -> TestHttpResponse:
-        return self.client.get(f"/api/v{v}/checks/", HTTP_X_API_KEY="X" * 32)
+    def get(self) -> TestHttpResponse:
+        return self.client.get("/api/v3/checks/", HTTP_X_API_KEY=self.api_key)
+
+    def test_it_does_not_serve_api_v1_or_v2(self) -> None:
+        for prefix in ("/api/v1/", "/api/v2/"):
+            with self.subTest(prefix=prefix):
+                r = self.client.get(prefix + "checks/", HTTP_X_API_KEY=self.api_key)
+                self.assertEqual(r.status_code, 404)
 
     def test_it_works(self) -> None:
         # Expect 3 queries:
@@ -69,10 +73,10 @@ class ListChecksTestCase(BaseTestCase):
         self.assertEqual(a1["channels"], str(self.c1.code))
         self.assertEqual(a1["desc"], "This is description")
 
-        update_url = settings.SITE_ROOT + f"/api/v1/checks/{self.a1.code}"
-        pause_url = update_url + "/pause"
+        update_url = settings.SITE_ROOT + f"/api/v3/checks/{self.a1.code}"
         self.assertEqual(a1["update_url"], update_url)
-        self.assertEqual(a1["pause_url"], pause_url)
+        self.assertEqual(a1["pause_url"], update_url + "/pause")
+        self.assertEqual(a1["resume_url"], update_url + "/resume")
 
         self.assertEqual(a1["next_ping"], None)
 
@@ -87,21 +91,21 @@ class ListChecksTestCase(BaseTestCase):
         self.assertEqual(a2["next_ping"], next_ping.isoformat())
 
     def test_it_handles_options(self) -> None:
-        r = self.client.options("/api/v1/checks/")
+        r = self.client.options("/api/v3/checks/")
         self.assertEqual(r.status_code, 204)
         self.assertIn("GET", r["Access-Control-Allow-Methods"])
 
     def test_it_shows_only_users_checks(self) -> None:
-        Check.objects.create(project=self.bobs_project, name="Bob 1")
+        Check.objects.create(project=self.charlies_project, name="Charlie 1")
 
         r = self.get()
         data = r.json()
         self.assertEqual(len(data["checks"]), 2)
         for check in data["checks"]:
-            self.assertNotEqual(check["name"], "Bob 1")
+            self.assertNotEqual(check["name"], "Charlie 1")
 
     def test_it_works_with_tags_param(self) -> None:
-        r = self.client.get("/api/v1/checks/?tag=a2-tag", HTTP_X_API_KEY="X" * 32)
+        r = self.client.get("/api/v3/checks/?tag=a2-tag", HTTP_X_API_KEY=self.api_key)
         self.assertEqual(r.status_code, 200)
 
         doc = r.json()
@@ -114,9 +118,7 @@ class ListChecksTestCase(BaseTestCase):
         self.assertEqual(check["tags"], "a2-tag")
 
     def test_it_filters_with_multiple_tags_param(self) -> None:
-        r = self.client.get(
-            "/api/v1/checks/?tag=a1-tag&tag=a1-additional-tag", HTTP_X_API_KEY="X" * 32
-        )
+        r = self.client.get("/api/v3/checks/?tag=a1-tag&tag=a1-additional-tag", HTTP_X_API_KEY=self.api_key)
         self.assertEqual(r.status_code, 200)
 
         doc = r.json()
@@ -129,7 +131,7 @@ class ListChecksTestCase(BaseTestCase):
         self.assertEqual(check["tags"], "a1-tag a1-additional-tag")
 
     def test_it_does_not_match_tag_partially(self) -> None:
-        r = self.client.get("/api/v1/checks/?tag=tag", HTTP_X_API_KEY="X" * 32)
+        r = self.client.get("/api/v3/checks/?tag=tag", HTTP_X_API_KEY=self.api_key)
         self.assertEqual(r.status_code, 200)
 
         doc = r.json()
@@ -138,8 +140,8 @@ class ListChecksTestCase(BaseTestCase):
 
     def test_non_existing_tags_filter_returns_empty_result(self) -> None:
         r = self.client.get(
-            "/api/v1/checks/?tag=non_existing_tag_with_no_checks",
-            HTTP_X_API_KEY="X" * 32,
+            "/api/v3/checks/?tag=non_existing_tag_with_no_checks",
+            HTTP_X_API_KEY=self.api_key,
         )
         self.assertEqual(r.status_code, 200)
 
@@ -148,43 +150,31 @@ class ListChecksTestCase(BaseTestCase):
         self.assertEqual(len(doc["checks"]), 0)
 
     def test_readonly_key_works(self) -> None:
-        self.project.api_key_readonly = "R" * 32
+        ro_key = self.project.set_api_key_readonly()
         self.project.save()
 
         # Expect a query to check the API key, and a query to retrieve checks
         with self.assertNumQueries(2):
-            r = self.client.get("/api/v1/checks/", HTTP_X_API_KEY="R" * 32)
+            r = self.client.get("/api/v3/checks/", HTTP_X_API_KEY=ro_key)
 
         self.assertEqual(r.status_code, 200)
 
         # When using readonly keys, the ping URLs should not be exposed:
         self.assertNotContains(r, str(self.a1.code))
 
-    def test_v1_reports_status_started(self) -> None:
+    def test_it_reports_started_separately(self) -> None:
         self.a1.last_start = now()
         self.a1.save()
         self.a2.delete()
 
         r = self.get()
-        self.assertEqual(r.status_code, 200)
-
-        a1 = r.json()["checks"][0]
-        self.assertEqual(a1["status"], "started")
-        self.assertTrue(a1["started"])
-
-    def test_v2_reports_started_separately(self) -> None:
-        self.a1.last_start = now()
-        self.a1.save()
-        self.a2.delete()
-
-        r = self.get(v=2)
 
         a1 = r.json()["checks"][0]
         self.assertEqual(a1["status"], "new")
         self.assertTrue(a1["started"])
 
     def test_it_works_with_slug_param(self) -> None:
-        r = self.client.get("/api/v1/checks/?slug=alice-1", HTTP_X_API_KEY="X" * 32)
+        r = self.client.get("/api/v3/checks/?slug=alice-1", HTTP_X_API_KEY=self.api_key)
         self.assertEqual(r.status_code, 200)
 
         doc = r.json()

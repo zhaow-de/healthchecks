@@ -3,15 +3,11 @@
 
 {% block title %}{% site_name %} Integration for Slack{% endblock %}
 
-{% block description %}
-    <meta name="description" content="Use {% site_name %} with Slack: configure {% site_name %} to post status updates directly to a Slack channel.">
-{% endblock %}
-
 {% block content %}
 <div class="row">
 <div class="col-sm-12">
 
-    <div class="jumbotron">
+    <div class="p-5 mb-4 bg-body-tertiary rounded-3">
         {% if request.user.is_authenticated %}
         <p>If your team uses <a href="https://slack.com/">Slack</a>, you can set
         up {% site_name %} to post status updates directly to an appropriate
@@ -31,7 +27,7 @@
         {% else %}
         <p>
         {% site_name %} is a <strong>free</strong> and
-        <a href="https://github.com/healthchecks/healthchecks">open source</a>
+        <a href="https://github.com/zhaow-de/healthchecks">open source</a>
         service for monitoring your cron jobs, background processes and
         scheduled tasks. To set up a {% site_name %} integration for Slack, please
         log into {% site_name %}:</p>

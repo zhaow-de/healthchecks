@@ -1,9 +1,6 @@
-from __future__ import annotations
-
 from django.contrib.auth.models import User
 
 from hc.api.models import Check
-from hc.payments.models import Subscription
 from hc.test import BaseTestCase
 
 
@@ -25,9 +22,6 @@ class CloseAccountTestCase(BaseTestCase):
 
     def test_it_works(self) -> None:
         Check.objects.create(project=self.project, tags="foo a-B_1  baz@")
-        Subscription.objects.create(
-            user=self.alice, subscription_id="123", customer_id="fake-customer-id"
-        )
 
         self.client.login(username="alice@example.org", password="password")
         self.set_sudo_flag()
@@ -44,9 +38,6 @@ class CloseAccountTestCase(BaseTestCase):
         # Check should be gone
         self.assertFalse(Check.objects.exists())
 
-        # Subscription should be gone
-        self.assertFalse(Subscription.objects.exists())
-
     def test_it_requires_confirmation(self) -> None:
         self.client.login(username="alice@example.org", password="password")
         self.set_sudo_flag()
@@ -59,18 +50,3 @@ class CloseAccountTestCase(BaseTestCase):
         # Alice should be still present
         self.alice.refresh_from_db()
         self.profile.refresh_from_db()
-
-    def test_partner_removal_works(self) -> None:
-        self.client.login(username="bob@example.org", password="password")
-        self.set_sudo_flag()
-
-        payload = {"confirmation": "bob@example.org"}
-        self.client.post("/accounts/close/", payload)
-
-        # Alice should be still present
-        self.alice.refresh_from_db()
-        self.profile.refresh_from_db()
-
-        # Bob should be gone
-        bobs = User.objects.filter(username="bob")
-        self.assertFalse(bobs.exists())

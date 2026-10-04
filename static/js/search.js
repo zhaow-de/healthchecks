@@ -1,27 +1,25 @@
-$(function() {
-    var base = document.getElementById("base-url").getAttribute("href").slice(0, -1);
-    var input = $("#docs-search");
+hc.ready(function() {
+    const base = hc.base();
+    const input = document.getElementById("docs-search");
+    const results = document.getElementById("search-results");
+    const nav = document.getElementById("docs-nav");
 
-    input.on("keyup focus", function() {
-        var q = this.value;
+    hc.on(input, "input focus", function() {
+        const q = this.value;
         if (q.length < 3) {
-            $("#search-results").removeClass("on");
-            $("#docs-nav").removeClass("off");
+            results.classList.remove("on");
+            nav.classList.remove("off");
             return
         }
 
-        $.ajax({
-            url: base + "/docs/search/",
-            type: "get",
-            data: {q: q},
-            success: function(data) {
-                if (q != input.val()) {
-                    return;  // ignore stale results
-                }
-
-                $("#search-results").html(data).addClass("on");
-                $("#docs-nav").addClass("off");
+        hc.getText(base + "/docs/search/", {q: q}).then(function(data) {
+            if (q !== input.value) {
+                return;  // ignore stale results
             }
-        });
+
+            results.innerHTML = data;
+            results.classList.add("on");
+            nav.classList.add("off");
+        }).catch(function() {});
     });
 });

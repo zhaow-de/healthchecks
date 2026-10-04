@@ -1,18 +1,16 @@
-from __future__ import annotations
-
 from uuid import UUID
 
 from django.contrib.auth.decorators import login_required
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpResponse
 from django.shortcuts import redirect, render
 
 from hc.accounts.http import AuthenticatedHttpRequest
 from hc.api.models import Channel
-from hc.front.views import _get_rw_project_for_user
+from hc.front.views import _get_project_for_user
 from hc.integrations.group.forms import GroupForm
 
 
-def group_form(request: HttpRequest, channel: Channel) -> HttpResponse:
+def group_form(request: AuthenticatedHttpRequest, channel: Channel) -> HttpResponse:
     adding = channel._state.adding
     if request.method == "POST":
         form = GroupForm(request.POST, project=channel.project)
@@ -29,9 +27,7 @@ def group_form(request: HttpRequest, channel: Channel) -> HttpResponse:
     else:
         # Filter out unavailable channels
         channels = list(channel.group_channels.values_list("code", flat=True))
-        form = GroupForm(
-            {"channels": channels, "label": channel.name}, project=channel.project
-        )
+        form = GroupForm({"channels": channels, "label": channel.name}, project=channel.project)
 
     ctx = {"page": "channels", "project": channel.project, "form": form}
     return render(request, "group_form.html", ctx)
@@ -39,6 +35,6 @@ def group_form(request: HttpRequest, channel: Channel) -> HttpResponse:
 
 @login_required
 def add(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
-    project = _get_rw_project_for_user(request, code)
+    project = _get_project_for_user(request, code)
     channel = Channel(project=project, kind="group")
     return group_form(request, channel)

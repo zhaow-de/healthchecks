@@ -5,37 +5,11 @@
 
 
 {% block content %}
-<div class="row">
-    <div class="col-sm-12">
-        <h1 class="settings-title">
-            Settings
-            <small>{{ request.user.email }}</small>
-        </h1>
-    </div>
-    {% if messages %}
-    <div class="col-sm-12">
-        {% for message in messages %}
-            <p class="alert alert-{{ message.tags }}">{{ message }}</p>
-        {% endfor %}
-    </div>
-    {% endif %}
-</div>
-
-<div class="row">
-    <div class="col-sm-3">
-        <ul class="nav nav-pills nav-stacked">
-            <li class="active"><a href="{% url 'hc-profile' %}">Account</a></li>
-            <li><a href="{% url 'hc-appearance' %}">Appearance</a></li>
-            {% if show_pricing %}
-            <li><a href="{% url 'hc-billing' %}">Billing</a></li>
-            {% endif %}
-            <li><a href="{% url 'hc-notifications' %}">Email Reports</a></li>
-        </ul>
-    </div>
+{% include "accounts/settings_nav.html" with active="account" %}
 
     <div class="col-sm-9 col-md-6">
-        <div class="panel panel-{{ email_password_status|default:'default' }}">
-            <div class="panel-body settings-block">
+        <div class="card mb-4 border-{{ email_password_status|default:'default' }}">
+            <div class="card-body settings-block">
                 <form method="post">
                     {% csrf_token %}
                     <h2>Email and Password</h2>
@@ -45,7 +19,7 @@
 
                         <a
                             href="{% url 'hc-change-email' %}"
-                            class="btn btn-default pull-right">Change Email</a>
+                            class="btn btn-outline-secondary float-end">Change Email</a>
                     </p>
                     <p class="clearfix"></p>
                     {% if request.user.has_usable_password %}
@@ -53,32 +27,32 @@
                         Password authentication is enabled.
                         <a
                             href="{% url 'hc-set-password' %}"
-                            class="btn btn-default pull-right">Change Password</a>
+                            class="btn btn-outline-secondary float-end">Change Password</a>
                     </p>
                     {% else %}
                     <p class="settings-bar">
                         Attach a password to your {{ site_name }} account.
                         <a
                             href="{% url 'hc-set-password' %}"
-                            class="btn btn-default pull-right">Set Password</a>
+                            class="btn btn-outline-secondary float-end">Set Password</a>
                     </p>
                     {% endif %}
                 </form>
             </div>
             {% if changed_password %}
-            <div class="panel-footer">
+            <div class="card-footer">
                 Your new password has been set!
             </div>
             {% endif %}
         </div>
 
-        <div class="panel panel-{{ 2fa_status }}">
-            <div class="panel-body settings-block">
+        <div class="card mb-4 border-{{ 2fa_status }}">
+            <div class="card-body settings-block">
                 <form method="post">
                     {% csrf_token %}
                     <h2>Two-factor Authentication</h2>
 
-                    <table id="my-keys" class="table">
+                    <table id="my-keys" class="table align-middle">
                         {% if use_webauthn %}
                         <tr>
                             <th>Security keys</th>
@@ -88,11 +62,11 @@
                         <tr>
                             <td>
                                 {{ credential.name|default:"unnamed" }}
-                                <span class="text-muted">
+                                <span class="text-body-secondary">
                                 – registered on {{ credential.created|date:"M j, Y" }}
                                 </span>
                             </td>
-                            <td class="text-right">
+                            <td class="text-end">
                                 <a href="{% url 'hc-remove-credential' credential.code  %}">Remove</a>
                             </td>
                         </tr>
@@ -111,11 +85,11 @@
                         <tr>
                             <td>
                                 Enabled
-                                <span class="text-muted">
+                                <span class="text-body-secondary">
                                 – configured on {{ profile.totp_created|date:"M j, Y" }}
                                 </span>
                             </td>
-                            <td class="text-right">
+                            <td class="text-end">
                                 <a href="{% url 'hc-remove-totp' %}">Remove</a>
                             </td>
                         </tr>
@@ -162,18 +136,18 @@
                     </p>
                     {% endif %}
 
-                    <div class="pull-right">
+                    <div class="text-end">
                         {% if not profile.totp %}
                         <a
                             href="{% url 'hc-add-totp' %}"
-                            class="btn btn-default">
+                            class="btn btn-outline-secondary">
                             Set Up Authenticator App
                         </a>
                         {% endif %}
                         {% if use_webauthn %}
                         <a
                             href="{% url 'hc-add-webauthn' %}"
-                            class="btn btn-default">
+                            class="btn btn-outline-secondary">
                             Add Security Key
                         </a>
                         {% endif %}
@@ -182,105 +156,74 @@
             </div>
 
             {% if added_credential_name %}
-            <div class="panel-footer">
+            <div class="card-footer">
                 Added security key <strong>{{ added_credential_name }}</strong>.
             </div>
             {% endif %}
 
             {% if removed_credential_name %}
-            <div class="panel-footer">
+            <div class="card-footer">
                 Removed security key <strong>{{ removed_credential_name }}</strong>.
             </div>
             {% endif %}
 
             {% if enabled_totp %}
-            <div class="panel-footer">
+            <div class="card-footer">
                 Successfully set up the Authenticator app.
             </div>
             {% endif %}
 
             {% if disabled_totp %}
-            <div class="panel-footer">
+            <div class="card-footer">
                 Disabled the authenticator app.
             </div>
             {% endif %}
         </div>
 
-        <div class="panel panel-{{ my_projects_status }}">
-            <div class="panel-body settings-block">
-                    {% csrf_token %}
-                    <h2>My Projects</h2>
+        <div class="card mb-4">
+            <div class="card-body settings-block">
+                <h2>My Projects</h2>
 
-                    {% if ownerships or memberships %}
-                    <table id="my-projects" class="table">
-                        <tr>
-                            <th>Project</th>
-                            <th>My role</th>
-                            <th></th>
-                        </tr>
-                        {% for project in ownerships %}
-                        <tr>
-                            <td>
-                                <div class="name">
-                                    <a href="{% url 'hc-checks' project.code %}">
-                                        {{ project }}
-                                    </a>
-                                </div>
-                            </td>
-                            <td>Owner</td>
-                            <td>
-                                <a
-                                    href="{% url 'hc-project-settings' project.code %}"
-                                    class="pull-right">Settings</a>
-                            </td>
-                        </tr>
-                        {% endfor %}
+                {% if ownerships %}
+                <table id="my-projects" class="table align-middle">
+                    <tr>
+                        <th>Project</th>
+                        <th></th>
+                    </tr>
+                    {% for project in ownerships %}
+                    <tr>
+                        <td>
+                            <div class="name">
+                                <a href="{% url 'hc-checks' project.code %}">
+                                    {{ project }}
+                                </a>
+                            </div>
+                        </td>
+                        <td class="text-end">
+                            <a href="{% url 'hc-project-settings' project.code %}">Settings</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </table>
+                {% else %}
+                    <p>You do not have any projects. Create one!</p>
+                {% endif %}
 
-                        {% for m in memberships %}
-                        <tr>
-                            <td>
-                                <div class="name">
-                                    <a href="{% url 'hc-checks' m.project.code %}">
-                                        {{ m.project }}
-                                    </a>
-                                </div>
-                            </td>
-                            <td>{{ m.get_role_display }}</td>
-                            <td>
-                                <a
-                                    href="#"
-                                    data-name="{{ m.project }}"
-                                    data-code="{{ m.project.code }}"
-                                    class="pull-right leave-project">Leave</a>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </table>
-                    {% else %}
-                        <p>You do not have any projects. Create one!</p>
-                    {% endif %}
-
-                    <a
-                        id="create-project"
-                        href="#"
-                        class="btn btn-default pull-right"
-                        data-toggle="modal"
-                        data-target="#add-project-modal">Create a New Project</a>
+                <button
+                    id="create-project"
+                    type="button"
+                    class="btn btn-outline-secondary float-end"
+                    data-bs-toggle="modal"
+                    data-bs-target="#add-project-modal">Create a New Project</button>
             </div>
-
-            {% if left_project %}
-            <div class="panel-footer">
-                Left project <strong>{{ left_project }}</strong>.
-            </div>
-            {% endif %}
         </div>
 
-        <div class="panel panel-{{ tz_status }}">
-            <div id="tz-settings" class="panel-body settings-block">
+        <div class="card mb-4 border-{{ tz_status }}">
+            <div id="tz-settings" class="card-body settings-block">
                 <form method="post">
                     {% csrf_token %}
                     <h2>Preferred Time Zone</h2>
-                    <select id="tz" name="tz" class="form-control" value="{{ profile.tz }}">
+                    <select id="tz" name="tz" class="form-select">
                         <option{% if profile.tz == "UTC" %} selected{% endif %}>UTC</option>
                         {% for tz in timezones %}
                         {% if tz != "UTC" %}
@@ -290,7 +233,7 @@
                     </select>
 
                     <br />
-                    <p id="browser-tz-hint" class="hide">
+                    <p id="browser-tz-hint" class="d-none">
                         Tip: your browser's time zone is <b>FIXME</b>.
                         <a href="#">Use it instead?</a>
                     </p>
@@ -300,62 +243,30 @@
                         <li>Format dates and times here in the web interface.</li>
                         <li>Format dates and times in monitoring alerts.</li>
                         <li>
-                            Deliver <a href="{% url 'hc-profile' %}">email reports</a>
+                            Deliver <a href="{% url 'hc-notifications' %}">email reports</a>
                             (if enabled) between 9:00 and 11:00 local time.
                         </li>
                     </ul>
                     <br />
-                    <button type="submit" class="btn btn-default pull-right">Save Changes</button>
+                    <button type="submit" class="btn btn-outline-secondary float-end">Save Changes</button>
                 </form>
             </div>
             {% if tz_updated %}
-            <div class="panel-footer">
+            <div class="card-footer">
                 Time zone updated!
             </div>
             {% endif %}
         </div>
 
-        <div class="panel panel-default">
-            <div class="panel-body settings-block">
+        <div class="card mb-4">
+            <div class="card-body settings-block">
                 <h2>Close Account</h2>
                 <p>This will permanently remove your {{ site_name }} account.</p>
-                <div class="text-right">
-                    <a href="{% url 'hc-close' %}" class="btn btn-remove">Close Account</a>
+                <div class="text-end">
+                    <a href="{% url 'hc-close' %}" class="btn btn-outline-danger">Close Account</a>
                 </div>
             </div>
         </div>
-    </div>
-</div>
-
-<div id="leave-project-modal" class="modal">
-    <div class="modal-dialog">
-        <form id="leave-project-form" method="post">
-            {% csrf_token %}
-            <div class="modal-content">
-                <div class="modal-header">
-                    <button type="button" class="close" data-dismiss="modal">&times;</button>
-                    <h4>Leave This Project?</h4>
-                </div>
-                <div class="modal-body">
-                    <p>
-                        You are about to leave the project <strong id="leave-project-name"></strong>.
-                        You will lose access to its checks and integrations.
-                    </p>
-                    <p>Are you sure?</p>
-                    <input
-                        type="hidden"
-                        name="code"
-                        id="leave-project-code" />
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
-                    <button
-                        type="submit"
-                        name="leave_project"
-                        class="btn btn-danger">Leave Project</button>
-                </div>
-            </div>
-        </form>
     </div>
 </div>
 
@@ -365,7 +276,7 @@
 
 {% block scripts %}
 {% compress js %}
-<script src="{% static 'js/tom-select.popular.min.js' %}"></script>
+<script src="{% static 'vendor/tom-select/tom-select.popular.min.js' %}"></script>
 <script src="{% static 'js/add_project_modal.js' %}"></script>
 <script src="{% static 'js/profile.js' %}"></script>
 {% endcompress %}

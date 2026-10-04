@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from django.test.utils import override_settings
 
 from hc.api.models import Channel
@@ -35,13 +33,10 @@ class AddSlackTestCase(BaseTestCase):
         r = self.client.post(self.url, form)
         self.assertContains(r, "Enter a valid URL")
 
-    def test_it_requires_rw_access(self) -> None:
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
-
-        self.client.login(username="bob@example.org", password="password")
+    def test_it_checks_ownership(self) -> None:
+        self.client.login(username="charlie@example.org", password="password")
         r = self.client.get(self.url)
-        self.assertEqual(r.status_code, 403)
+        self.assertEqual(r.status_code, 404)
 
     @override_settings(SLACK_ENABLED=False)
     def test_it_handles_disabled_integration(self) -> None:

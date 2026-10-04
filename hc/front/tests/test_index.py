@@ -1,4 +1,4 @@
-from __future__ import annotations
+from django.utils.timezone import now
 
 from hc.api.models import Check
 from hc.test import BaseTestCase
@@ -16,6 +16,7 @@ class IndexTestCase(BaseTestCase):
         r = self.client.get("/")
 
         self.assertContains(r, "Alices Project")
+        self.assertNotContains(r, str(self.charlies_project.code))
         self.assertContains(r, "3 checks")
         self.assertContains(r, "status ic-up")
         self.assertContains(r, "favicon.svg")
@@ -28,3 +29,24 @@ class IndexTestCase(BaseTestCase):
         r = self.client.get("/")
         self.assertContains(r, "status ic-down")
         self.assertContains(r, "favicon_down.svg")
+
+    def test_it_shows_started_spinner(self) -> None:
+        self.c1.last_start = now()
+        self.c1.save()
+
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get("/")
+        self.assertContains(r, 'class="spinner started"')
+
+    def test_refresh_returns_project_statuses(self) -> None:
+        self.c1.status = "down"
+        self.c1.save()
+        self.c2.last_start = now()
+        self.c2.save()
+        # Alice has no access to Charlie's project, so its check must not be summarized
+        Check.objects.create(project=self.charlies_project, status="down")
+
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get("/?refresh=1")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json(), {str(self.project.code): {"status": "down", "started": True}})

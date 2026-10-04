@@ -1,8 +1,8 @@
-from __future__ import annotations
-
 from django.contrib.auth.hashers import make_password
+from django.core import signing
 from django.core.signing import TimestampSigner
 
+from hc.accounts import device
 from hc.accounts.models import Credential
 from hc.test import BaseTestCase
 
@@ -25,16 +25,16 @@ class CheckTokenTestCase(BaseTestCase):
         r = self.client.post(self.url)
 
         self.assertRedirects(r, self.checks_url)
+        payload = signing.loads(r.cookies[device.COOKIE_NAME].value, salt=device.SALT)
+        self.assertEqual(payload["u"], self.alice.id)
 
         # After login, token should be blank
         self.profile.refresh_from_db()
         self.assertEqual(self.profile.token, "")
 
     def test_it_handles_email_in_username(self) -> None:
-        # Healthchecks will generate usernames that look like UUIDs. But custom
-        # authentication backends like django-auth-ldap can also create User objects
-        # with non-UUID usernames. In this testcase we check if check_token works
-        # with an username that looks like an email address.
+        # createsuperuser makes UUID-like usernames, but the Django admin can set one
+        # that looks like an email address
         self.alice.username = "alice@example.org"
         self.alice.save()
         r = self.client.post(self.url.replace("alice", "alice@example.org"))
@@ -75,13 +75,12 @@ class CheckTokenTestCase(BaseTestCase):
         Credential.objects.create(user=self.alice, name="Alices Key")
 
         r = self.client.post(self.url)
-        self.assertRedirects(
-            r, "/accounts/login/two_factor/", fetch_redirect_response=False
-        )
+        self.assertRedirects(r, "/accounts/login/two_factor/", fetch_redirect_response=False)
+        self.assertNotIn(device.COOKIE_NAME, r.cookies)
 
         # It should not log the user in yet
         self.assertNotIn("_auth_user_id", self.client.session)
 
-        # Instead, it should set 2fa_user_id in the session
+        # Instead, it should set 2fa_user in the session
         user_id, _email, _valid_until = self.client.session["2fa_user"]
         self.assertEqual(user_id, self.alice.id)

@@ -1,6 +1,4 @@
-from __future__ import annotations
-
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from hc.api.models import Check, Flip
 from hc.test import BaseTestCase
@@ -12,9 +10,9 @@ class ResumeTestCase(BaseTestCase):
         self.check = Check.objects.create(
             project=self.project,
             status="paused",
-            last_start=datetime(2020, 1, 1, tzinfo=timezone.utc),
-            last_ping=datetime(2020, 1, 1, tzinfo=timezone.utc),
-            alert_after=datetime(2020, 1, 1, 1, tzinfo=timezone.utc),
+            last_start=datetime(2020, 1, 1, tzinfo=UTC),
+            last_ping=datetime(2020, 1, 1, tzinfo=UTC),
+            alert_after=datetime(2020, 1, 1, 1, tzinfo=UTC),
         )
         self.url = f"/checks/{self.check.code}/resume/"
         self.redirect_url = f"/checks/{self.check.code}/details/"
@@ -56,15 +54,11 @@ class ResumeTestCase(BaseTestCase):
         r = self.client.get(self.url)
         self.assertEqual(r.status_code, 405)
 
-    def test_it_allows_cross_team_access(self) -> None:
-        self.client.login(username="bob@example.org", password="password")
+    def test_it_checks_ownership(self) -> None:
+        self.client.login(username="charlie@example.org", password="password")
         r = self.client.post(self.url)
-        self.assertRedirects(r, self.redirect_url)
+        self.assertEqual(r.status_code, 404)
 
-    def test_it_requires_rw_access(self) -> None:
-        self.bobs_membership.role = "r"
-        self.bobs_membership.save()
-
-        self.client.login(username="bob@example.org", password="password")
-        r = self.client.post(self.url)
-        self.assertEqual(r.status_code, 403)
+        self.check.refresh_from_db()
+        self.assertEqual(self.check.status, "paused")
+        self.assertFalse(Flip.objects.exists())

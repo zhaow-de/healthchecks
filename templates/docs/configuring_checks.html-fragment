@@ -1,35 +1,62 @@
 <h1>Configuring Checks</h1>
 <p>In SITE_NAME, a <strong>Check</strong> represents a single service you want to
 monitor. For example, when monitoring cron jobs, you would create a separate check for
-each cron job you wish to monitor. SITE_NAME pricing plans are structured primarily
-around how many checks you can have in your account. You can create checks
+each cron job you wish to monitor. You can create checks
 in the SITE_NAME web interface or via <a href="../api/">Management API</a>.</p>
+<h2 id="adding-a-check">Adding a Check</h2>
+<p>On the "Checks" page, click <strong>Add Check</strong>. The "Add Check" dialog has these fields:</p>
+<ul>
+<li><strong>Name</strong>, <strong>Slug</strong> (with a "Use Suggested" button) and <strong>Tags</strong>, described in the
+next section.</li>
+<li><strong>Schedule</strong>: <strong>Simple</strong>, <strong>Cron</strong> or <strong>OnCalendar</strong>, described below.</li>
+<li><strong>Period</strong> (Simple only), 1 day by default; or <strong>Cron Expression</strong> (Cron only),
+<code>* * * * *</code> by default; or <strong>OnCalendar Expression(s)</strong> (OnCalendar only),
+<code>*-*-* *:*:*</code> by default.</li>
+<li><strong>Time Zone</strong> (Cron and OnCalendar only), UTC by default.</li>
+<li><strong>Grace Time</strong>, 1 hour by default.</li>
+</ul>
+<p>Click <strong>Save</strong> to create the check. The new check starts in the "New" state and is
+assigned every integration of the project. You can add a description afterwards in
+the "Name and Tags" dialog. A check created through the Management API gets only the
+integrations its <a href="../api/#field-channels"><code>channels</code></a> field names.</p>
 <h2>Name, Tags, Description</h2>
-<p>Describe each check using an optional name, slug, tags, and description fields.</p>
-<p><img alt="Editing name, tags and description" src="IMG_URL/edit_name.png" /></p>
+<p>Describe each check using an optional name, slug, tags, and description fields.
+To edit them, click the check's name on the "Checks" page, or the "(edit…)" link
+after the name in the heading of the check's details page; "Add description…" (or
+"Edit Description…") in the details page's "Description" section opens the same
+dialog. It is the "Name and Tags" dialog, with these four fields:</p>
 <ul>
 <li><strong>Name</strong>: names are optional, but setting them is a good idea.
 Good naming becomes especially important as you add more checks to the
 account. SITE_NAME will display check names in the web interface, email reports,
-and notifications.</li>
+and notifications. A name can be up to 100 characters long.</li>
 <li><strong>Slug</strong>: URL-friendly identifier used in <a href="../http_api/#success-slug">slug-based ping URLs</a>
 (an alternative to the default UUID-based ping URLs). The slug should only contain the
 following characters: <code>a-z</code>, <code>0-9</code>, hyphens, and underscores. If you don't plan to use
-slug-based ping URLs, you can leave the slug field empty.</li>
+slug-based ping URLs, you can leave the slug field empty. The "Use Suggested" button
+beside the field fills in a slug derived from the name. A slug can be up to 100
+characters long.</li>
 <li><strong>Tags</strong>: a space-separated list of optional labels. Use tags to organize and group
 checks within a project. You can tag checks by the environment
 (<code>prod</code>, <code>staging</code>, <code>dev</code>, etc.), by role (<code>www</code>, <code>db</code>, <code>worker</code>, etc.), or by using
-any other system.</li>
-<li><strong>Description</strong>: a free-form text field with any related information for your team
-or your future self. Describe the cron job's role, who set it up, what to do in
-case of failures, and where to look for additional information.</li>
+any other system. The tags together can be up to 500 characters long.</li>
+<li><strong>Description</strong>: a free-form text field with any related information for your
+future self. Describe the cron job's role, who set it up, what to do in
+case of failures, and where to look for additional information. It has no length
+limit, and email and Slack alerts include it.</li>
 </ul>
 <h2>Simple Schedules</h2>
 <p>SITE_NAME supports three types of schedules: <strong>Simple</strong>, <strong>Cron</strong>, and <strong>OnCalendar</strong>.
 Use Simple schedules for monitoring processes that you expect to run at relatively
 regular intervals: once an hour, once a day, once a week, etc.</p>
-<p><img alt="Editing the period and grace time" src="IMG_URL/edit_simple_schedule.png" /></p>
-<p>For the simple schedules, you can configure two parameters, Period and Grace Time.</p>
+<p>To change a check's schedule, click its entry in the "Period" column of the "Checks"
+page, or the "Change Schedule…" button on the check's details page. The "Simple", "Cron"
+and "OnCalendar" buttons at the bottom left of the dialog switch between the three
+schedule types.</p>
+<p>For the simple schedules, you can configure two parameters, Period and Grace Time.
+Set each with a number and a unit (minutes, hours, or days), or drag its slider.
+Each must be between 1 minute and 365 days, whether typed or set with the slider;
+the dialog refuses a larger value with "Must not exceed 365 days".</p>
 <ul>
 <li><strong>Period</strong> is the expected time between pings.</li>
 <li><strong>Grace Time</strong> is the additional time to wait before sending an alert when a check
@@ -48,7 +75,6 @@ the correct time intervals.</p>
 <p>See <a href="../cron/">Cron syntax cheatsheet</a> for cron expression syntax examples.
 See <a href="https://www.man7.org/linux/man-pages/man5/crontab.5.html">crontab(5) man page</a>
 for complete cron syntax reference.</p>
-<p><img alt="Editing cron schedule" src="IMG_URL/edit_cron_schedule.png" /></p>
 <p>You will need to specify Cron Expression, Server's Time Zone, and Grace Time.</p>
 <ul>
 <li><strong>Cron Expression</strong> is the cron expression you specified in the crontab.</li>
@@ -56,8 +82,12 @@ for complete cron syntax reference.</p>
 the system's local time. If the machine does not use the UTC timezone, specify its
 timezone here.</li>
 <li><strong>Grace Time</strong>, same as for simple schedules, is how long to wait before sending an
-alert for a late check.</li>
+alert for a late check. It has the same limits, 1 minute to 365 days, but no slider.</li>
 </ul>
+<p>The cron expression can be up to 100 characters long. As you type, the dialog
+describes the cron expression in words and lists the next six dates when SITE_NAME
+expects a ping; while the expression or the time zone is invalid, it shows an error
+and the Save button stays disabled.</p>
 <h2>OnCalendar Schedules</h2>
 <p>Use "OnCalendar" schedules to monitor systemd timers that use <code>OnCalendar=</code> schedules.
 Same as with systemd timers, you can specify more than one <code>OnCalendar</code> expression
@@ -65,36 +95,63 @@ Same as with systemd timers, you can specify more than one <code>OnCalendar</cod
 whenever any schedule matches.</p>
 <p>See <a href="https://www.man7.org/linux/man-pages/man7/systemd.time.7.html#CALENDAR_EVENTS">systemd.time(7) man page</a>
 for complete OnCalendar syntax reference.</p>
-<p><img alt="Editing cron schedule" src="IMG_URL/edit_oncalendar_schedule.png" /></p>
+<p>With "OnCalendar" selected, the schedule dialog has the same three fields as with
+"Cron": <strong>OnCalendar Expression(s)</strong>, <strong>Server's Time Zone</strong>, and <strong>Grace Time</strong>.
+All the expression lines together can be up to 100 characters long. Beside the fields,
+the dialog lists the next dates when SITE_NAME expects a ping: the next 6 when the
+time zone is UTC, the next 4 otherwise. While an expression is invalid, the Save
+button stays disabled.</p>
+<h2 id="schedule-changes">Schedule Changes</h2>
+<p>A new schedule applies from the check's last "success" or "failure" signal. If the
+new schedule makes an "up" check already overdue (past its grace time), saving it
+in the web interface marks the check "down" at once and sends no alerts; the check
+alerts again when it comes back up. If ongoing reminders are on (see
+<a href="../configuring_notifications/#repeated-notifications">Repeated Notifications</a>),
+they start from then.</p>
 <h2 id="filtering-rules">Filtering Rules</h2>
 <p>In the "Filtering Rules" dialog, you can control several advanced aspects of
-how SITE_NAME handles incoming pings for a particular check.</p>
+how SITE_NAME handles incoming pings for a particular check. Open it with the
+"Filtering Rules…" button in the "How To Ping" section of the check's details page.</p>
 <p><img alt="Setting filtering rules" src="IMG_URL/filtering_rules.png" /></p>
 <ul>
 <li><strong>Allowed HTTP Request Methods</strong>. You can require the ping
 requests to use HTTP POST. Use the "Only POST" option if you run into issues of
-preview bots hitting the ping URLs when you send them in email or post them in chat.</li>
+preview bots hitting the ping URLs when you send them in email or post them in chat.
+With "Only POST" selected, a ping that uses another method still gets "200 OK", is
+recorded as "Ignored" in the event log, and does not change the check's status (see
+<a href="../http_api/#interpreting-pings">How SITE_NAME Interprets a Ping</a>).
+The default option, labelled "HEAD, GET, POST, PUT", counts pings sent with any
+HTTP method, not only those four.</li>
 <li><strong>Content Filtering</strong>. You can instruct SITE_NAME to look for specific keywords
-in the subject line or the message body of email pings, and in the HTTP request body
-of HTTP pings.</li>
-<li><strong>Pinging a Paused Check</strong>. Normally, when you ping a paused check, it leaves the
-paused state and goes into the "up" state (or the "down" state
-in case of <a href="../signaling_failures/">a failure signal</a>).
-You can change this behavior by selecting the "Ignore the ping, stay in
-the paused state" option. With this option selected, the paused state becomes "sticky":
-SITE_NAME will ignore all incoming pings until you explicitly <em>resume</em> the check.</li>
+in the HTTP request body of HTTP pings.</li>
+<li><strong>Pinging a Paused Check</strong>. Normally (option "Leave the paused state (default)"),
+a "success" ping takes a paused check out of the paused state and into the "up"
+state, and a "failure" ping into the "down" state (see
+<a href="../signaling_failures/">signaling failures</a>); a "start" or "log" ping does not
+unpause it. You can change this behavior by selecting the "Ignore the ping, stay in
+the paused state" option. With this option selected, the paused state becomes
+"sticky": SITE_NAME records every incoming ping as "Ignored" until you click
+"(Resume Now)" in the "Current Status" section of the check's details page, or call
+the Management API's <a href="../api/#resume-check">resume</a>. Resuming puts the check in the
+"new" state.</li>
 </ul>
 <h3>Content Filtering</h3>
 <p>If the <strong>Request body of HTTP requests</strong> option is checked, SITE_NAME will classify
 the HTTP pings as start, success, or failure signals by looking for keywords in
 the first PING_BODY_LIMIT_FORMATTED of the request body.</p>
-<p>If either the <strong>Subject line of email messages</strong> or the <strong>Message body of email
-messages</strong> option is checked, SITE_NAME will classify email pings as start, success, or
-failure signals by looking for keywords in the subject line and/or message body.
-SITE_NAME supports HTML emails: when looking for keywords in message body, it checks
-both plain text and HTML versions of the email.</p>
+<p>The keywords decide what every ping counts as, overriding the URL: pings to <code>/start</code>,
+<code>/fail</code>, <code>/log</code> and <code>/&lt;exit-status&gt;</code> are classified by their body as well. The body
+is read as UTF-8, with bytes that are not valid UTF-8 matching no keyword.
+See <a href="../http_api/#interpreting-pings">How SITE_NAME Interprets a Ping</a> for the full
+order of rules. Saving the dialog with the option unchecked clears the keyword fields
+(unless the check's inert <code>filter_subject</code> or <code>filter_body</code> flag, described next,
+is set).</p>
+<p>SITE_NAME does not accept email pings: the email-only fields <code>filter_subject</code> and
+<code>filter_body</code> that the <a href="../api/">Management API</a> still accepts and returns are inert,
+kept for compatibility with the original Healthchecks API v3 only.</p>
 <p>You can specify multiple keywords in each of the <strong>Start Keywords</strong>,
-<strong>Success Keywords</strong>, and <strong>Failure Keywords</strong> fields by separating them with commas.
+<strong>Success Keywords</strong>, and <strong>Failure Keywords</strong> fields by separating them with commas;
+each field can be up to 200 characters long.
 The keyword matching is case-sensitive (for example, "error" and "ERROR" are different
 keywords).</p>
 <p>SITE_NAME looks for keywords in a specific order:</p>
@@ -121,12 +178,12 @@ follows:</p>
 <li>Enable the <strong>Request body of HTTP requests</strong> – enables content filtering for
   HTTP pings.</li>
 <li>In the <strong>Success keywords</strong> field enter "Backup successful" – if this string is found
-  in the request body of a HTTP ping, SITE_NAME will classify the ping as a success
+  in the request body of an HTTP ping, SITE_NAME will classify the ping as a success
   signal.</li>
 <li>Select the <strong>If no keywords match: Classify the ping as failure</strong> option – SITE_NAME
   will classify all other HTTP requests as failure signals.</li>
 </ul>
-<p>With these settings, SITE_NAME will classify a HTTP ping as a success signal
+<p>With these settings, SITE_NAME will classify an HTTP ping as a success signal
 if and only if the request body contains text "Backup successful". If the request
 body does not contain this string (or the request body is absent altogether),
 it will classify the ping as a failure signal.</p>

@@ -1,51 +1,15 @@
-from __future__ import annotations
-
-import logging
-import time
 from typing import TYPE_CHECKING, Any, NoReturn
 
-from django.template.loader import render_to_string
-
-from hc.front.templatetags.hc_extras import sortchecks
 from hc.lib import curl
 
 if TYPE_CHECKING:
-    from hc.api.models import Channel, Check, Flip, Notification, Ping
-
-
-logger = logging.getLogger(__name__)
-
-
-def get_ping_body_bytes(ping: Ping | None) -> bytes | None:
-    """Return ping body as bytes for a given Ping object.
-
-    If body has not been uploaded to object storage yet, wait 5 seconds
-    and try to fetch it again.
-    """
-    from hc.api.models import Ping
-
-    if ping and ping.has_body():
-        try:
-            if result := ping.get_body_bytes():
-                return result
-
-            if ping.object_size:
-                # If the ping object has an object size but get_body_bytes returns
-                # None then body is not uploaded to the object storage yet.
-                # When sending notifications we can afford to wait a little
-                # bit and retry.
-                time.sleep(5)
-                return ping.get_body_bytes()
-        except Ping.GetBodyError:
-            pass
-
-    return None
+    from hc.api.models import Channel, Flip, Notification, Ping
 
 
 def get_ping_body(ping: Ping | None, maxlen: int | None = None) -> str | None:
     """Return ping body for a given Ping object."""
     body = None
-    if body_bytes := get_ping_body_bytes(ping):
+    if ping and (body_bytes := ping.get_body_bytes()):
         body = body_bytes.decode(errors="replace")
         if maxlen and len(body) > maxlen:
             body = body[:maxlen] + "\n[truncated]"
@@ -55,12 +19,13 @@ def get_ping_body(ping: Ping | None, maxlen: int | None = None) -> str | None:
 
 class TransportError(Exception):
     def __init__(self, message: str, permanent: bool = False) -> None:
+        super().__init__(message)
         self.message = message
         self.permanent = permanent
 
 
 class Transport:
-    def __init__(self, channel: Channel):
+    def __init__(self, channel: Channel) -> None:
         self.channel = channel
 
     def notify(self, flip: Flip, notification: Notification) -> None:
@@ -84,24 +49,6 @@ class Transport:
 
         return False
 
-    def down_checks(self, check: Check) -> list[Check] | None:
-        """Return a sorted list of other checks in the same project that are down.
-
-        If there are no other hecks in the project, return None instead of empty list.
-        Templates can check for None to decide whether to show or not show the
-        "All other checks are up" note.
-
-        """
-
-        siblings = self.channel.project.check_set.exclude(id=check.id)
-        if not siblings.exists():
-            return None
-
-        down_siblings = list(siblings.filter(status="down"))
-        sortchecks(down_siblings, "name")
-
-        return down_siblings
-
     def last_ping(self, flip: Flip) -> Ping | None:
         """Return the last Ping object received before this flip."""
 
@@ -116,18 +63,6 @@ class Transport:
 
         return q.last()
 
-    def tmpl(self, template_name: str, **ctx: Any) -> str:
-        # \xa0 is non-breaking space. It causes SMS messages to use UCS2 encoding
-        # and cost twice the money.
-        return render_to_string(template_name, ctx).strip().replace("\xa0", " ")
-
-
-class RemovedTransport(Transport):
-    """Dummy transport class for obsolete integrations."""
-
-    def is_noop(self, status: str) -> bool:
-        return True
-
 
 class HttpTransport(Transport):
     @classmethod
@@ -141,27 +76,23 @@ class HttpTransport(Transport):
         method: str,
         url: str,
         *,
-        params: curl.Params,
         data: curl.Data,
         json: Any,
         headers: curl.Headers,
-        auth: curl.Auth,
     ) -> None:
         try:
             r = curl.request(
                 method,
                 url,
-                params=params,
                 data=data,
                 json=json,
                 headers=headers,
-                auth=auth,
                 timeout=30,
             )
             if r.status_code not in (200, 201, 202, 204):
                 cls.raise_for_response(r)
         except curl.CurlError as e:
-            raise TransportError(e.message)
+            raise TransportError(e.message) from e
 
     @classmethod
     def request(
@@ -170,24 +101,21 @@ class HttpTransport(Transport):
         url: str,
         *,
         retry: bool,
-        params: curl.Params = None,
         data: curl.Data = None,
         json: Any = None,
         headers: curl.Headers = None,
-        auth: curl.Auth = None,
     ) -> None:
         tries_left = 3 if retry else 1
         while True:
             try:
-                return cls._request(
+                cls._request(
                     method,
                     url,
-                    params=params,
                     data=data,
                     json=json,
                     headers=headers,
-                    auth=auth,
                 )
+                return
             except TransportError as e:
                 tries_left = 0 if e.permanent else tries_left - 1
                 # If we have no tries left then abort the retry loop by re-raising
@@ -197,48 +125,5 @@ class HttpTransport(Transport):
 
     # Convenience wrapper around self.request for making "POST" requests
     @classmethod
-    def post(
-        cls,
-        url: str,
-        retry: bool = True,
-        *,
-        params: curl.Params = None,
-        data: curl.Data = None,
-        json: Any = None,
-        headers: curl.Headers = None,
-        auth: curl.Auth = None,
-    ) -> None:
-        cls.request(
-            "post",
-            url,
-            retry=retry,
-            params=params,
-            data=data,
-            json=json,
-            headers=headers,
-            auth=auth,
-        )
-
-    # Convenience wrapper around self.request for making "PUT" requests
-    @classmethod
-    def put(
-        cls,
-        url: str,
-        retry: bool = True,
-        *,
-        params: curl.Params = None,
-        data: curl.Data = None,
-        json: Any = None,
-        headers: curl.Headers = None,
-        auth: curl.Auth = None,
-    ) -> None:
-        cls.request(
-            "put",
-            url,
-            retry=retry,
-            params=params,
-            data=data,
-            json=json,
-            headers=headers,
-            auth=auth,
-        )
+    def post(cls, url: str, retry: bool = True, *, json: Any = None) -> None:
+        cls.request("post", url, retry=retry, json=json)

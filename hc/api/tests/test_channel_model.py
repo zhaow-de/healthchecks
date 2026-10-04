@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 
 from hc.api.models import Channel, WebhookSpec
@@ -42,8 +40,21 @@ class ChannelModelTestCase(BaseTestCase):
             ),
         )
 
-    def test_it_handles_json_opsgenie_value(self) -> None:
-        c = Channel(kind="opsgenie")
-        c.value = json.dumps({"key": "abc", "region": "eu"})
-        self.assertEqual(c.opsgenie.key, "abc")
-        self.assertEqual(c.opsgenie.region, "eu")
+    def test_slack_team_reads_team_name(self) -> None:
+        c = Channel(kind="slack")
+        c.value = json.dumps({"team_name": "Foo Team", "incoming_webhook": {}})
+        self.assertEqual(c.slack_team, "Foo Team")
+
+    def test_slack_team_reads_nested_team(self) -> None:
+        c = Channel(kind="slack")
+        c.value = json.dumps({"team": {"name": "Bar Team"}, "incoming_webhook": {}})
+        self.assertEqual(c.slack_team, "Bar Team")
+
+    def test_slack_team_handles_missing_team(self) -> None:
+        c = Channel(kind="slack")
+        c.value = json.dumps({"incoming_webhook": {"channel": "#foo"}})
+        self.assertIsNone(c.slack_team)
+
+    def test_slack_team_handles_plain_url_value(self) -> None:
+        c = Channel(kind="slack", value="https://hooks.slack.com/services/foo")
+        self.assertIsNone(c.slack_team)

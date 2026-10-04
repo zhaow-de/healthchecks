@@ -1,10 +1,6 @@
-from __future__ import annotations
-
 import re
 
-uuid_match_regex = re.compile(
-    "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE
-)
+uuid_match_regex = re.compile("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE)
 
 
 def replace(template: str, ctx: dict[str, str]) -> str:

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 
 from django import forms
@@ -37,9 +35,7 @@ class HeadersField(forms.Field):
                 raise ValidationError(message=self.message)
 
             if not _is_latin1(n):
-                raise ValidationError(
-                    message="Header names must not contain special characters"
-                )
+                raise ValidationError(message="Header names must not contain special characters")
 
             headers[n] = v
 
@@ -72,9 +68,8 @@ class WebhookForm(forms.Form):
         url_down = self.cleaned_data.get("url_down")
         url_up = self.cleaned_data.get("url_up")
 
-        if not url_down and not url_up:
-            if not self.has_error("url_down"):
-                self.add_error("url_down", "Enter a valid URL.")
+        if not url_down and not url_up and not self.has_error("url_down"):
+            self.add_error("url_down", "Enter a valid URL.")
 
     def get_value(self) -> str:
         return json.dumps(dict(self.cleaned_data), sort_keys=True)

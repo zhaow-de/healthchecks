@@ -1,26 +1,16 @@
-#tz-switcher-container:before {
-    content: " ";
-}
-
 #log {
     visibility: hidden;
     font-size: 13px;
 }
 
-#log tbody {
-    border: 0;
-}
-
 #log td {
     position: relative;
-    border: 0;
-    border-bottom: 1px solid var(--border-muted);
     white-space: nowrap;
 }
 
 #log tbody.new td {
-    background: var(--log-new-row-bg);
-    border-bottom: 1px solid var(--log-new-row-border);
+    background: var(--bs-info-bg-subtle);
+    border-bottom: 1px solid var(--bs-info-border-subtle);
 }
 
 #log .duration {
@@ -29,9 +19,9 @@
     padding-left: 20px;
 }
 
-#log .label.rid {
-    background: var(--tag-bg);
-    color: var(--tag-color);
+#log .badge.rid {
+    background: var(--bs-secondary-bg);
+    color: var(--bs-secondary-color);
     margin-right: 8px;
 }
 
@@ -50,7 +40,7 @@
 }
 
 #log tr.ok:hover td {
-    background-color: var(--table-bg-hover);
+    background-color: var(--bs-tertiary-bg);
 }
 
 #log tr.ok td:first-child {
@@ -59,7 +49,7 @@
 
 #log tr.ok td:first-child::before {
     content:  "#";
-    color: #aaa;
+    color: var(--bs-tertiary-color);
 }
 
 #log tr.ok td:nth-child(4) {
@@ -78,11 +68,11 @@
 #log td:nth-child(5) code {
     font-family: "Lucida Console", Monaco, monospace;
     font-size: 11.7px;
-    color: var(--text-muted);
+    color: var(--bs-secondary-color);
 }
 
 #log tr.flip {
-    background: var(--log-flip-bg);
+    background: var(--bs-secondary-bg);
 }
 
 #log tr.missing td {
@@ -105,8 +95,4 @@
 #end-help {
     font-size: 12px;
     line-height: 1;
-}
-
-#filters hr {
-    margin: 10px;
 }

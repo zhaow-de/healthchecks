@@ -1,0 +1,31 @@
+name: uv cache
+
+on:
+  # Seeds setup-uv's cache on develop, the one ref every pull request can restore from (its merge ref, its base and the
+  # default branch). The schedule keeps the key inside GitHub's seven-day eviction through a week with no pull request.
+  push:
+    branches: [develop]
+    paths: [uv.lock, .github/workflows/uv-cache.yml]
+  schedule:
+    - cron: "17 3 * * 1,4"
+  workflow_dispatch: {}
+
+jobs:
+  warm:
+    name: uv cache
+    # Mirrors tests.yml; tests/test_ci_uv_cache.py holds the two to one cache key.
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.2.0
+        with:
+          version: "0.12.19"
+          cache-dependency-glob: uv.lock
+      - name: Set up Python
+        # Installs the version specified in .python-version, as tests.yml does.
+        run: uv python install
+      - name: Install Dependencies
+        run: uv sync --locked

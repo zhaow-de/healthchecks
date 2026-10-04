@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from datetime import timedelta as td
 
 from django.utils.timezone import now
@@ -10,19 +8,17 @@ from hc.test import BaseTestCase, TestHttpResponse
 
 
 class CreateCheckTestCase(BaseTestCase):
-    URL = "/api/v1/checks/"
+    URL = "/api/v3/checks/"
 
     def post(
         self,
         data: JSONDict,
         expect_fragment: str | None = None,
-        v: int = 1,
     ) -> TestHttpResponse:
         if "api_key" not in data:
-            data["api_key"] = "X" * 32
+            data["api_key"] = self.api_key
 
-        url = f"/api/v{v}/checks/"
-        r = self.csrf_client.post(url, data, content_type="application/json")
+        r = self.csrf_client.post(self.URL, data, content_type="application/json")
         if expect_fragment:
             self.assertEqual(r.status_code, 400)
             self.assertIn(expect_fragment, r.json()["error"])
@@ -52,7 +48,7 @@ class CreateCheckTestCase(BaseTestCase):
         doc = r.json()
         assert "ping_url" in doc
         self.assertEqual(doc["name"], "Foo")
-        self.assertEqual(doc["slug"], "foo")
+        self.assertEqual(doc["slug"], "")
         self.assertEqual(doc["tags"], "bar,baz")
         self.assertEqual(doc["desc"], "description goes here")
         self.assertEqual(doc["last_ping"], None)
@@ -71,7 +67,7 @@ class CreateCheckTestCase(BaseTestCase):
 
         check = Check.objects.get()
         self.assertEqual(check.name, "Foo")
-        self.assertEqual(check.slug, "foo")
+        self.assertEqual(check.slug, "")
         self.assertEqual(check.tags, "bar,baz")
         self.assertEqual(check.desc, "description goes here")
         self.assertEqual(check.methods, "")
@@ -112,9 +108,7 @@ class CreateCheckTestCase(BaseTestCase):
 
     def test_it_accepts_api_key_in_header(self) -> None:
         payload = {"name": "Foo"}
-        r = self.client.post(
-            self.URL, payload, content_type="application/json", HTTP_X_API_KEY="X" * 32
-        )
+        r = self.client.post(self.URL, payload, content_type="application/json", HTTP_X_API_KEY=self.api_key)
 
         self.assertEqual(r.status_code, 201)
 
@@ -261,9 +255,7 @@ class CreateCheckTestCase(BaseTestCase):
         self.assertEqual(r.json()["error"], "missing api key")
 
     def test_it_handles_invalid_json(self) -> None:
-        r = self.client.post(
-            self.URL, "this is not json", content_type="application/json"
-        )
+        r = self.client.post(self.URL, "this is not json", content_type="application/json")
         self.assertEqual(r.status_code, 400)
         self.assertEqual(r.json()["error"], "could not parse request body")
 
@@ -338,6 +330,19 @@ class CreateCheckTestCase(BaseTestCase):
         )
         self.assertEqual(r.status_code, 400)
 
+    def test_it_accepts_any_zone_zoneinfo_loads(self) -> None:
+        # America/Coyhaique entered the tz database in 2025
+        r = self.post({"schedule": "* * * * *", "tz": "America/Coyhaique", "grace": 60})
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(r.json()["tz"], "America/Coyhaique")
+
+    def test_it_rejects_the_factory_zone(self) -> None:
+        r = self.post(
+            {"schedule": "* * * * *", "tz": "Factory", "grace": 60},
+            expect_fragment="tz is not a valid timezone",
+        )
+        self.assertEqual(r.status_code, 400)
+
     def test_it_converts_legacy_timezone(self) -> None:
         for old, new in [
             ("Europe/Kiev", "Europe/Kyiv"),
@@ -375,18 +380,18 @@ class CreateCheckTestCase(BaseTestCase):
         doc = r.json()
         self.assertEqual(doc["timeout"], 86400)
 
-    def test_it_obeys_check_limit(self) -> None:
-        self.profile.check_limit = 0
-        self.profile.save()
+    def test_it_has_no_check_limit(self) -> None:
+        Check.objects.bulk_create([Check(project=self.project) for _ in range(25)])
 
         r = self.post({})
-        self.assertEqual(r.status_code, 403)
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(Check.objects.count(), 26)
 
     def test_it_rejects_readonly_key(self) -> None:
-        self.project.api_key_readonly = "R" * 32
+        ro_key = self.project.set_api_key_readonly()
         self.project.save()
 
-        r = self.post({"api_key": "R" * 32, "name": "Foo"})
+        r = self.post({"api_key": ro_key, "name": "Foo"})
         self.assertEqual(r.status_code, 401)
 
     def test_it_sets_manual_resume(self) -> None:
@@ -415,9 +420,7 @@ class CreateCheckTestCase(BaseTestCase):
         self.assertEqual(check.methods, "POST")
 
     def test_it_rejects_bad_methods_value(self) -> None:
-        self.post(
-            {"methods": "bad-value"}, expect_fragment="methods has unexpected value"
-        )
+        self.post({"methods": "bad-value"}, expect_fragment="methods has unexpected value")
 
     def test_it_rejects_long_filtering_keywords(self) -> None:
         for s in ("subject", "subject_fail", "start_kw", "success_kw", "failure_kw"):
@@ -444,10 +447,10 @@ class CreateCheckTestCase(BaseTestCase):
         msg = "subject_fail is not a string"
         self.post({"subject_fail": False}, expect_fragment=msg)
 
-    def test_v2_reports_started_separately(self) -> None:
+    def test_it_reports_started_separately(self) -> None:
         Check.objects.create(project=self.project, name="X", last_start=now())
 
-        r = self.post({"name": "X", "unique": ["name"]}, v=2)
+        r = self.post({"name": "X", "unique": ["name"]})
         # Expect 200 instead of 201
         self.assertEqual(r.status_code, 200)
 
@@ -455,16 +458,16 @@ class CreateCheckTestCase(BaseTestCase):
         self.assertEqual(doc["status"], "new")
         self.assertTrue(doc["started"])
 
-    def test_v3_saves_slug(self) -> None:
-        r = self.post({"name": "Foo", "slug": "custom-slug"}, v=3)
+    def test_it_saves_slug(self) -> None:
+        r = self.post({"name": "Foo", "slug": "custom-slug"})
         self.assertEqual(r.status_code, 201)
 
         check = Check.objects.get()
         self.assertEqual(check.name, "Foo")
         self.assertEqual(check.slug, "custom-slug")
 
-    def test_v3_does_not_autogenerate_slug(self) -> None:
-        r = self.post({"name": "Foo"}, v=3)
+    def test_it_does_not_autogenerate_slug(self) -> None:
+        r = self.post({"name": "Foo"})
         self.assertEqual(r.status_code, 201)
 
         check = Check.objects.get()
@@ -472,13 +475,9 @@ class CreateCheckTestCase(BaseTestCase):
 
     def test_it_handles_invalid_slug(self) -> None:
         for slug in ["Uppercase", "special!", "look spaces"]:
-            r = self.post({"name": "Foo", "slug": slug}, v=3)
+            r = self.post({"name": "Foo", "slug": slug})
             self.assertEqual(r.status_code, 400)
-            self.assertEqual(
-                r.json()["error"], "json validation error: slug does not match pattern"
-            )
+            self.assertEqual(r.json()["error"], "json validation error: slug does not match pattern")
 
     def test_it_rejects_long_slug(self) -> None:
-        self.post(
-            {"name": "Foo", "slug": "a" * 101}, v=3, expect_fragment="slug is too long"
-        )
+        self.post({"name": "Foo", "slug": "a" * 101}, expect_fragment="slug is too long")
