@@ -5,7 +5,7 @@ from unittest import skipUnless
 
 from django.db import connection
 from django.db.backends.sqlite3.base import DatabaseWrapper
-from django.test import SimpleTestCase
+from django.test import TestCase
 
 
 def change_counter(path: Path) -> int:
@@ -13,8 +13,10 @@ def change_counter(path: Path) -> int:
     return int.from_bytes(path.read_bytes()[24:28], "big")
 
 
+# A TestCase, not a SimpleTestCase: pytest-django blocks every database connection,
+# this file's own included, outside a test case that uses the database
 @skipUnless(connection.vendor == "sqlite", "reads SQLite's auto_vacuum")
-class AutoVacuumTestCase(SimpleTestCase):
+class AutoVacuumTestCase(TestCase):
     def setUp(self) -> None:
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
