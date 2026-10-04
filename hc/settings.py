@@ -327,9 +327,10 @@ SLACK_ENABLED = envbool("SLACK_ENABLED", "True")
 WEBHOOKS_ENABLED = envbool("WEBHOOKS_ENABLED", "True")
 INTEGRATIONS_ALLOW_PRIVATE_IPS = envbool("INTEGRATIONS_ALLOW_PRIVATE_IPS", "False")
 
-# Read additional configuration from hc/local_settings.py if it exists
+# Read additional configuration from hc/local_settings.py if it exists. The star import
+# is the override: every name it defines replaces the one above.
 if (BASE_DIR / "hc/local_settings.py").exists():
-    from .local_settings import *
+    from .local_settings import *  # noqa: F403
 
 # Overrides for testing
 if sys.argv[1:2] == ["test"] or "pytest" in sys.modules:

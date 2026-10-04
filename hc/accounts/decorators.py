@@ -50,7 +50,7 @@ def require_sudo_mode(f: ViewFunc) -> ViewFunc:
                 return redirect(request.path)
 
         if not _session_unsign(request, "sudo_code", 900):
-            code = "%06d" % secrets.randbelow(1000000)
+            code = f"{secrets.randbelow(1000000):06d}"
             request.session["sudo_code"] = TimestampSigner().sign(code)
             emails.sudo_code(request.user.email, {"sudo_code": code})
 

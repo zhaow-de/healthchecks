@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from datetime import timedelta as td
 from unittest.mock import Mock, patch
 from uuid import uuid4
@@ -8,7 +8,7 @@ from uuid import uuid4
 from hc.api.models import MAX_DURATION, Check, Ping, prepare_durations
 from hc.test import BaseTestCase
 
-EPOCH = datetime(2020, 1, 1, tzinfo=timezone.utc)
+EPOCH = datetime(2020, 1, 1, tzinfo=UTC)
 
 
 class PingModelTestCase(BaseTestCase):
@@ -57,11 +57,11 @@ class PrepareDurationsTestCase(BaseTestCase):
         self.assertEqual(p2.duration, td(seconds=1))
 
     def test_it_matches_start_event_by_rid(self) -> None:
-        A = "63832bb7-ddd5-4f2d-bf0a-cac885212963"
-        B = "beecf8af-7bff-4cbe-b179-49693c15413b"
-        p1 = Ping(id=1, created=EPOCH, kind="start", rid=A)
-        p2 = Ping(id=2, created=EPOCH + td(seconds=1), kind="start", rid=B)
-        p3 = Ping(id=3, created=EPOCH + td(seconds=2), rid=A)
+        rid_a = "63832bb7-ddd5-4f2d-bf0a-cac885212963"
+        rid_b = "beecf8af-7bff-4cbe-b179-49693c15413b"
+        p1 = Ping(id=1, created=EPOCH, kind="start", rid=rid_a)
+        p2 = Ping(id=2, created=EPOCH + td(seconds=1), kind="start", rid=rid_b)
+        p3 = Ping(id=3, created=EPOCH + td(seconds=2), rid=rid_a)
         prepare_durations([p3, p2, p1])
         self.assertEqual(p3.duration, td(seconds=2))
 
@@ -81,16 +81,16 @@ class PrepareDurationsTestCase(BaseTestCase):
         self.assertIsNone(p3.duration)
 
     def test_it_caps_misses(self) -> None:
-        l: list[Ping] = []
+        pings: list[Ping] = []
         for i in range(15):
-            l.insert(0, Ping(id=i, created=EPOCH + td(seconds=i), rid=uuid4()))
+            pings.insert(0, Ping(id=i, created=EPOCH + td(seconds=i), rid=uuid4()))
 
-        prepare_durations(l)
+        prepare_durations(pings)
 
         # All pings have unique rid values, and there are no matching start events.
         # prepare_durations should fill all duration fields with None values
         # to avoid many expensive calls to Ping.duration()
-        for ping in l:
+        for ping in pings:
             self.assertIsNone(ping.duration)
 
     def test_it_applies_max_duration(self) -> None:

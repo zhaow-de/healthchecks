@@ -70,9 +70,8 @@ class WebhookForm(forms.Form):
         url_down = self.cleaned_data.get("url_down")
         url_up = self.cleaned_data.get("url_up")
 
-        if not url_down and not url_up:
-            if not self.has_error("url_down"):
-                self.add_error("url_down", "Enter a valid URL.")
+        if not url_down and not url_up and not self.has_error("url_down"):
+            self.add_error("url_down", "Enter a valid URL.")
 
     def get_value(self) -> str:
         return json.dumps(dict(self.cleaned_data), sort_keys=True)

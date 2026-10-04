@@ -128,7 +128,7 @@ def test_an_unmatched_path_is_refused_only_when_it_claims_a_top_level_directory(
 def test_a_citation_of_the_other_side_of_the_commit_stands():
     """A message describes the move from HEAD to the index: the line a commit takes away, and the file it deletes, resolve at HEAD."""
     head = FakeTree({**FILES, "hc/x.py": PY + "extra\n" * 5, "hc/old.py": "def gone():\n    pass\n"}, label="at HEAD")
-    staged = FakeTree({p: t for p, t in FILES.items()})
+    staged = FakeTree(dict(FILES))
     n = guard._line_count(PY.encode())
     assert _judge(f"hc/x.py:{n + 5} said so, and hc/old.py:1 with hc/old.py::gone is gone\n", staged, head) == []
     assert _judge(f"hc/x.py:{n + 6}\n", staged, head) == [

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from itertools import zip_longest
 
 from django import template
@@ -33,7 +35,7 @@ class Table:
         result = [separator]
         for i, row in enumerate(self.rows):
             for subrow in zip_longest(*row, fillvalue=""):
-                padded = [s.ljust(w) for w, s in zip(widths, subrow)]
+                padded = [s.ljust(w) for w, s in zip(widths, subrow, strict=False)]
                 joined = " | ".join(padded)
                 result.append(f"| {joined} |")
             result.append(separator.replace("-", "=") if i == 0 else separator)

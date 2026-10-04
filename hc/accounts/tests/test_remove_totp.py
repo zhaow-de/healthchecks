@@ -44,5 +44,5 @@ class RemoveCredentialTestCase(BaseTestCase):
         self.assertContains(r, "Disabled the authenticator app.")
 
         self.profile.refresh_from_db()
-        self.assertIsNone(self.profile.totp)
+        self.assertEqual(self.profile.totp, "")
         self.assertIsNone(self.profile.totp_created)

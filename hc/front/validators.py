@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from urllib.parse import urlsplit, urlunsplit
 
 from cronsim import CronSim, CronSimError
@@ -44,11 +44,11 @@ class CronValidator:
 
         try:
             # Does cronsim accept the schedule?
-            it = CronSim(value, datetime(2000, 1, 1))
+            it = CronSim(value, datetime(2000, 1, 1, tzinfo=UTC))
             # Can it calculate the next datetime?
             next(it)
         except CronSimError, StopIteration:
-            raise ValidationError(message=self.message)
+            raise ValidationError(message=self.message) from None
 
 
 class OnCalendarValidator:
@@ -62,11 +62,11 @@ class OnCalendarValidator:
 
         try:
             # Does oncalendar accept the schedule?
-            it = OnCalendar(value, datetime(2000, 1, 1, tzinfo=timezone.utc))
+            it = OnCalendar(value, datetime(2000, 1, 1, tzinfo=UTC))
             # Can it calculate the next datetime?
             next(it)
         except OnCalendarError, StopIteration:
-            raise ValidationError(message=self.message)
+            raise ValidationError(message=self.message) from None
 
 
 class TimezoneValidator:

@@ -129,7 +129,7 @@ def run(argv: list[str]) -> int:
     get = sub.add_parser("read")
     get.add_argument("report_dir", type=pathlib.Path)
     get.add_argument("--tip", required=True, type=_sha)
-    get.add_argument("--repo", type=pathlib.Path, default=pathlib.Path("."))
+    get.add_argument("--repo", type=pathlib.Path, default=pathlib.Path())
     args = parser.parse_args(argv)
 
     try:

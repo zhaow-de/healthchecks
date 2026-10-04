@@ -167,19 +167,19 @@ def request(
     except pycurl.error as e:
         errcode = e.args[0]
         if errcode == pycurl.E_OPERATION_TIMEDOUT:
-            raise CurlError("Connection timed out")
-        elif errcode == pycurl.E_COULDNT_RESOLVE_HOST:
-            raise CurlError("Could not resolve host")
-        elif errcode == pycurl.E_COULDNT_CONNECT:
+            raise CurlError("Connection timed out") from e
+        if errcode == pycurl.E_COULDNT_RESOLVE_HOST:
+            raise CurlError("Could not resolve host") from e
+        if errcode == pycurl.E_COULDNT_CONNECT:
             if opensocket_rejected_ips:
-                raise CurlError("Connections to private IP addresses are not allowed")
-            raise CurlError("Connection failed")
-        elif errcode == pycurl.E_TOO_MANY_REDIRECTS:
-            raise CurlError("Too many redirects")
-        elif errcode in (pycurl.E_SSL_CONNECT_ERROR, pycurl.E_PEER_FAILED_VERIFICATION):
-            raise CurlError("TLS handshake failed")
+                raise CurlError("Connections to private IP addresses are not allowed") from e
+            raise CurlError("Connection failed") from e
+        if errcode == pycurl.E_TOO_MANY_REDIRECTS:
+            raise CurlError("Too many redirects") from e
+        if errcode in (pycurl.E_SSL_CONNECT_ERROR, pycurl.E_PEER_FAILED_VERIFICATION):
+            raise CurlError("TLS handshake failed") from e
 
-        raise CurlError(f"HTTP request failed, code: {errcode}")
+        raise CurlError(f"HTTP request failed, code: {errcode}") from e
 
     status = c.getinfo(pycurl.RESPONSE_CODE)
     c.close()

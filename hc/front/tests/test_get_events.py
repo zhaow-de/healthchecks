@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from datetime import timedelta as td
 from uuid import uuid4
 
@@ -8,7 +8,7 @@ from hc.api.models import Check, Ping
 from hc.front.views import _get_events
 from hc.test import BaseTestCase
 
-EPOCH = datetime(2020, 1, 1, tzinfo=timezone.utc)
+EPOCH = datetime(2020, 1, 1, tzinfo=UTC)
 
 
 class GetEventsTestCase(BaseTestCase):

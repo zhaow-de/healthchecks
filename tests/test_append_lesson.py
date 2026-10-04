@@ -1,5 +1,7 @@
 """The lesson-append helper: it refuses before it writes, and it writes to the main checkout's inbox."""
 
+from __future__ import annotations
+
 import importlib.util
 import json
 import pathlib
@@ -24,7 +26,7 @@ def _load(path: pathlib.Path, name: str):
 
 al = _load(_SCRIPT, "append_lesson")
 NOW = "2026-09-07T09:00:00Z"
-OK = dict(session="main", branch="fix/x", kind="self-correction", what="a thing", why="a reason")
+OK = {"session": "main", "branch": "fix/x", "kind": "self-correction", "what": "a thing", "why": "a reason"}
 
 
 def _argv(**over) -> list[str]:
@@ -214,7 +216,15 @@ class TestASubstitutedFieldIsRefused:
         """The arm has to hold when `check()` reads a record it did not write, carrying the newline
         escaped inside one physical line as a JSON-serialising writer stores it."""
         stored = tmp_path / "main.jsonl"
-        rec = dict(ts="2026-09-08T00:00:00Z", session="main", branch="fix/x", kind="miscount", cites=[], what="a\nb", why="fine")
+        rec = {
+            "ts": "2026-09-08T00:00:00Z",
+            "session": "main",
+            "branch": "fix/x",
+            "kind": "miscount",
+            "cites": [],
+            "what": "a\nb",
+            "why": "fine",
+        }
         stored.write_text(json.dumps(rec) + "\n")
         chk = _load(_CHECKER, "chk_harvest")
         assert chk.check(str(stored)) == 1

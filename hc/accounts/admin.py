@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from datetime import date, datetime
-from typing import ClassVar, TypedDict
+from typing import ClassVar, TypedDict, override
 
 from django.contrib import admin
 from django.contrib.admin import ModelAdmin
@@ -139,9 +139,7 @@ class ProfileAdmin(ModelAdmin[Profile]):
         subquery = (
             Check.objects.filter(project__owner=OuterRef("user_id")).annotate(count=Func("id", function="COUNT")).values("count")
         )
-        qs = qs.annotate(num_checks=Subquery(subquery))
-
-        return qs
+        return qs.annotate(num_checks=Subquery(subquery))
 
     def email(self, obj: WithAnnotations[Profile, ProfileAnnotations]) -> str:
         return obj.user.email
@@ -193,8 +191,7 @@ class ProjectAdmin(ModelAdmin[Project]):
     def get_queryset(self, request: HttpRequest) -> QuerySet[Project]:
         qs = super().get_queryset(request)
         qs = qs.annotate(num_channels=Count("channel", distinct=True))
-        qs = qs.annotate(num_checks=Count("check", distinct=True))
-        return qs
+        return qs.annotate(num_checks=Count("check", distinct=True))
 
     def name_(self, obj: Project) -> str:
         if obj.name:
@@ -256,6 +253,7 @@ class HcUserAdmin(UserAdmin[User]):
         # The instance has one user, created by the createsuperuser command
         return False
 
+    @override
     @method_decorator(sensitive_post_parameters())
     @method_decorator(require_sudo_mode)
     def user_change_password(self, request: HttpRequest, id: str, form_url: str = "") -> HttpResponse:
@@ -265,9 +263,7 @@ class HcUserAdmin(UserAdmin[User]):
         qs = super().get_queryset(request)
         qs = qs.annotate(num_checks=Count("project__check", distinct=True))
         qs = qs.annotate(num_channels=Count("project__channel", distinct=True))
-        qs = qs.annotate(last_active_date=F("profile__last_active_date"))
-
-        return qs
+        return qs.annotate(last_active_date=F("profile__last_active_date"))
 
     def last_active(self, user: WithAnnotations[User, UserAnnotations]) -> datetime | None:
         return user.last_active_date

@@ -71,7 +71,7 @@ class Profile(models.Model):
     last_active_date = models.DateTimeField(null=True, blank=True)
     tz = models.CharField(max_length=36, default="UTC")
 
-    totp = models.CharField(max_length=32, null=True, blank=True)
+    totp = models.CharField(max_length=32, blank=True, default="")
     totp_created = models.DateTimeField(null=True, blank=True)
 
     objects = ProfileManager()
@@ -324,6 +324,9 @@ class Project(models.Model):
     def __str__(self) -> str:
         return self.name or self.owner.email
 
+    def get_absolute_url(self) -> str:
+        return reverse("hc-checks", args=[self.code])
+
     @property
     def owner_profile(self) -> Profile:
         return Profile.objects.for_user(self.owner)
@@ -358,9 +361,6 @@ class Project(models.Model):
 
     def auth_metrics_url(self) -> str:
         return absolute_reverse("hc-auth-metrics", args=[self.code])
-
-    def get_absolute_url(self) -> str:
-        return reverse("hc-checks", args=[self.code])
 
     def _make_api_key(self, prefix: str) -> tuple[str, str]:
         """Generate an API key with specified prefix, return (key, key_hash) tuple.
@@ -405,10 +405,7 @@ class Project(models.Model):
         return self.ping_key
 
     def compare_api_key(self, key: str) -> bool:
-        if key.startswith("hcr_"):
-            expected = self.api_key_readonly
-        else:
-            expected = self.api_key
+        expected = self.api_key_readonly if key.startswith("hcr_") else self.api_key
 
         # Only calculate and compare digest if db key length is 8 + 64 = 72
         if "." not in expected:
@@ -425,3 +422,6 @@ class Credential(models.Model):
     user = models.ForeignKey(User, models.CASCADE, related_name="credentials")
     created = models.DateTimeField(auto_now_add=True)
     data = models.BinaryField()
+
+    def __str__(self) -> str:
+        return self.name

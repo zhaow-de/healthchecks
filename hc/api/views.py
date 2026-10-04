@@ -3,7 +3,7 @@ from __future__ import annotations
 import email.policy
 import time
 from collections.abc import Iterable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from datetime import timedelta as td
 from email import message_from_bytes
 from ipaddress import ip_address
@@ -42,7 +42,7 @@ from hc.lib.string import is_valid_uuid_string, match_keywords
 from hc.lib.tz import all_timezones, legacy_timezones
 
 
-class BadChannelException(Exception):
+class BadChannelError(Exception):
     def __init__(self, message: str):
         self.message = message
 
@@ -114,17 +114,17 @@ class Spec(BaseModel):
         if guess_kind(v) == "cron":
             try:
                 # Test if cronsim accepts it and can calculate the next datetime
-                it = CronSim(v, datetime(2000, 1, 1))
+                it = CronSim(v, datetime(2000, 1, 1, tzinfo=UTC))
                 next(it)
             except CronSimError, StopIteration:
-                raise PydanticCustomError("cron_syntax", "not a valid cron expression")
+                raise PydanticCustomError("cron_syntax", "not a valid cron expression") from None
         else:
             try:
                 # Test if oncalendar accepts it, and can calculate the next datetime
-                oncalendar_it = OnCalendar(v, datetime(2000, 1, 1, tzinfo=timezone.utc))
+                oncalendar_it = OnCalendar(v, datetime(2000, 1, 1, tzinfo=UTC))
                 next(oncalendar_it)
             except OnCalendarError, StopIteration:
-                raise PydanticCustomError("cron_syntax", "not a valid expression")
+                raise PydanticCustomError("cron_syntax", "not a valid expression") from None
 
         return v
 
@@ -306,13 +306,13 @@ def _update(check: Check, spec: Spec) -> None:
 
         for s in spec.channels.split(","):
             if s == "":
-                raise BadChannelException("empty channel identifier")
+                raise BadChannelError("empty channel identifier")
 
             matches = [c for c in available if str(c.code) == s or c.name == s]
             if len(matches) == 0:
-                raise BadChannelException(f"invalid channel identifier: {s}")
-            elif len(matches) > 1:
-                raise BadChannelException(f"non-unique channel identifier: {s}")
+                raise BadChannelError(f"invalid channel identifier: {s}")
+            if len(matches) > 1:
+                raise BadChannelError(f"non-unique channel identifier: {s}")
 
             new_channels.add(matches[0])
 
@@ -397,11 +397,8 @@ def get_checks(request: ApiRequest) -> JsonResponse:
     if slug := request.GET.get("slug"):
         q = q.filter(slug=slug)
 
-    checks = []
-    for check in q:
-        # precise, final filtering
-        if not tags or check.matches_tag_set(tags):
-            checks.append(check.to_dict(readonly=request.readonly))
+    # precise, final filtering
+    checks = [check.to_dict(readonly=request.readonly) for check in q if not tags or check.matches_tag_set(tags)]
 
     return JsonResponse({"checks": checks})
 
@@ -421,7 +418,7 @@ def create_check(request: ApiRequest) -> HttpResponse:
 
     try:
         _update(check, spec)
-    except BadChannelException as e:
+    except BadChannelError as e:
         return JsonResponse({"error": e.message}, status=400)
 
     return JsonResponse(check.to_dict(), status=201 if created else 200)
@@ -477,7 +474,7 @@ def update_check(request: ApiRequest, code: UUID) -> HttpResponse:
 
     try:
         _update(check, spec)
-    except BadChannelException as e:
+    except BadChannelError as e:
         return JsonResponse({"error": e.message}, status=400)
     except Check.NotUpdated:
         return HttpResponseNotFound()
@@ -606,8 +603,7 @@ def ping_body(request: ApiRequest, code: UUID, n: int) -> HttpResponse:
     if not body:
         raise Http404()
 
-    response = HttpResponse(body, content_type="text/plain")
-    return response
+    return HttpResponse(body, content_type="text/plain")
 
 
 def flips(request: ApiRequest, check: Check) -> HttpResponse:
@@ -716,10 +712,8 @@ def bounces(request: HttpRequest) -> HttpResponse:
         except Notification.DoesNotExist:
             return HttpResponse("OK (notification not found)")
 
-        if diagnostic:
-            error = f"Delivery failed ({diagnostic})"[:200]
-        else:
-            error = f"Delivery failed (SMTP status code: {status})"[:200]
+        reason = diagnostic or f"SMTP status code: {status}"
+        error = f"Delivery failed ({reason})"[:200]
 
         n.error = error
         n.save(update_fields=["error"])

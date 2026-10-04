@@ -215,8 +215,7 @@ def range_fails(base: str, head: str) -> list[str]:
         sides = [Tree(commit, f"at {commit[:8]}")]
         if _git("rev-parse", "--verify", "-q", f"{commit}^").returncode == 0:
             sides.append(Tree(f"{commit}^", "at its parent"))
-        for fail in judge(message, sides):
-            out.append(f"{commit[:8]} {subject}: {fail}")
+        out.extend(f"{commit[:8]} {subject}: {fail}" for fail in judge(message, sides))
     return out
 
 

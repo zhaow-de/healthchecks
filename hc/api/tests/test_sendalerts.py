@@ -4,7 +4,7 @@ import signal
 from collections.abc import Iterator
 from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from datetime import timedelta as td
 from io import StringIO
 from threading import BoundedSemaphore, Event
@@ -22,7 +22,7 @@ from hc.api.models import Channel, Check, Flip
 from hc.api.transports import TransportError
 from hc.test import BaseTestCase
 
-CURRENT_TIME = datetime(2020, 1, 13, 2, tzinfo=timezone.utc)
+CURRENT_TIME = datetime(2020, 1, 13, 2, tzinfo=UTC)
 
 
 @contextmanager
@@ -212,11 +212,11 @@ class SendAlertsTestCase(BaseTestCase):
         channel = Channel.objects.create(project=self.project, kind="webhook")
         channel.checks.add(check)
 
-        with patch("hc.api.models.Channel.transport") as Webhook:
-            Webhook.is_noop.return_value = False
+        with patch("hc.api.models.Channel.transport") as mock_transport:
+            mock_transport.is_noop.return_value = False
             notify(flip)
 
-            args = Webhook.notify.call_args.args
+            args = mock_transport.notify.call_args.args
             # Before sending a notification, we used to set flip.owner.status value
             # to "IF_YOU_SEE_THIS_WE_HAVE_A_BUG". The idea was to use it as 0xDEADBEEF:
             # if it surfaces anywhere in notification contents we know we have a bug.
@@ -238,8 +238,8 @@ class SendAlertsTestCase(BaseTestCase):
         channel = Channel.objects.create(project=self.project, kind="webhook")
         channel.checks.add(check)
 
-        with patch("hc.api.models.Channel.transport") as Webhook:
-            Webhook.is_noop.return_value = False
+        with patch("hc.api.models.Channel.transport") as mock_transport:
+            mock_transport.is_noop.return_value = False
             log = notify(flip)
 
         assert log is not None
@@ -258,9 +258,9 @@ class SendAlertsTestCase(BaseTestCase):
         channel = Channel.objects.create(project=self.project, kind="webhook")
         channel.checks.add(check)
 
-        with patch("hc.api.models.Channel.transport") as Webhook:
-            Webhook.is_noop.return_value = False
-            Webhook.notify.side_effect = TransportError("Test error message")
+        with patch("hc.api.models.Channel.transport") as mock_transport:
+            mock_transport.is_noop.return_value = False
+            mock_transport.notify.side_effect = TransportError("Test error message")
             log = notify(flip)
 
         assert log is not None
@@ -289,9 +289,8 @@ class SendAlertsTestCase(BaseTestCase):
         future: Future[str | None] = Future()
         future.set_exception(ValueError("boom"))
 
-        with self.assertLogs("hc", "ERROR") as logs:
-            with self.assertRaisesRegex(ValueError, "boom"):
-                cmd.on_notify_done(future)
+        with self.assertLogs("hc", "ERROR") as logs, self.assertRaisesRegex(ValueError, "boom"):
+            cmd.on_notify_done(future)
 
         [record] = logs.records
         self.assertEqual(record.getMessage(), "Exception in notify")
@@ -352,9 +351,11 @@ class SendAlertsTestCase(BaseTestCase):
         check.alert_after = check.last_ping + td(days=1, hours=1)
         check.save()
 
-        with patch.object(Check, "get_status", side_effect=ValueError("bad schedule")):
-            with self.assertRaisesRegex(ValueError, "bad schedule"):
-                Command().handle_going_down()
+        with (
+            patch.object(Check, "get_status", side_effect=ValueError("bad schedule")),
+            self.assertRaisesRegex(ValueError, "bad schedule"),
+        ):
+            Command().handle_going_down()
 
         check.refresh_from_db()
         self.assertEqual(check.alert_after, CURRENT_TIME + td(hours=1))

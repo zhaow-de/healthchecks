@@ -6,7 +6,7 @@ import json
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from datetime import timedelta as td
 from importlib import import_module
 from typing import Any, NotRequired, TypedDict
@@ -35,7 +35,7 @@ from hc.lib.urls import absolute_reverse
 STATUSES = (("up", "Up"), ("down", "Down"), ("new", "New"), ("paused", "Paused"))
 DEFAULT_TIMEOUT = td(days=1)
 DEFAULT_GRACE = td(hours=1)
-NEVER = datetime(3000, 1, 1, tzinfo=timezone.utc)
+NEVER = datetime(3000, 1, 1, tzinfo=UTC)
 CHECK_KINDS = (("simple", "Simple"), ("cron", "Cron"), ("oncalendar", "OnCalendar"))
 # max time between start and ping where we will consider both events related:
 MAX_DURATION = td(hours=72)
@@ -183,7 +183,10 @@ class Check(models.Model):
         )
 
     def __str__(self) -> str:
-        return "%s (%d)" % (self.name or self.code, self.id)
+        return f"{self.name or self.code} ({self.id})"
+
+    def get_absolute_url(self) -> str:
+        return reverse("hc-details", args=[self.code])
 
     def name_then_code(self) -> str:
         if self.name:
@@ -208,9 +211,6 @@ class Check(models.Model):
             return settings.PING_ENDPOINT + key + "/" + self.slug
 
         return settings.PING_ENDPOINT + str(self.code)
-
-    def get_absolute_url(self) -> str:
-        return reverse("hc-details", args=[self.code])
 
     def cloaked_url(self) -> str:
         return absolute_reverse("hc-uncloak", args=[self.unique_key])
@@ -243,14 +243,14 @@ class Check(models.Model):
             # If the result is kept in the local timezone, adding
             # a timedelta to it later (in `going_down_after` and in `get_status`)
             # may yield incorrect results during DST transitions.
-            result = result.astimezone(timezone.utc)
+            result = result.astimezone(UTC)
         elif self.kind == "oncalendar" and self.status == "up":
             assert self.last_ping is not None
             last_local = self.last_ping.astimezone(ZoneInfo(self.tz))
             try:
                 result = next(OnCalendar(self.schedule, last_local))
                 # Same as for cron, convert back to UTC:
-                result = result.astimezone(timezone.utc)
+                result = result.astimezone(UTC)
             except StopIteration:
                 result = NEVER
 
@@ -538,7 +538,7 @@ class Check(models.Model):
             if status == "down":
                 # Before subtracting datetimes convert them to UTC.
                 # Otherwise we will get incorrect results around DST transitions:
-                delta = dt.astimezone(timezone.utc) - prev_dt.astimezone(timezone.utc)
+                delta = dt.astimezone(UTC) - prev_dt.astimezone(UTC)
                 summary.add(prev_dt, delta)
 
             dt = prev_dt
@@ -590,7 +590,9 @@ class Ping(models.Model):
     n = models.IntegerField(null=True)
     owner = models.ForeignKey(Check, models.CASCADE)
     created = models.DateTimeField(default=now)
-    kind = models.CharField(max_length=6, blank=True, null=True)
+    # NULL is a success ping: Check.ping leaves kind unset for one, and the readers
+    # compare with None.
+    kind = models.CharField(max_length=6, blank=True, null=True)  # noqa: DJ001
     scheme = models.CharField(max_length=10, default="http")
     remote_addr = models.GenericIPAddressField(blank=True, null=True)
     method = models.CharField(max_length=10, blank=True)
@@ -599,14 +601,13 @@ class Ping(models.Model):
     exitstatus = models.SmallIntegerField(null=True)
     rid = models.UUIDField(null=True)
 
-    def to_dict(self, owner_code: uuid.UUID) -> PingDict:
-        if self.has_body():
-            # Optimization: construct API URLs manually instead of using reverse().
-            # This is significantly quicker when returning hundreds of pings.
-            body_url = f"{settings.SITE_ROOT}/api/v3/checks/{owner_code}/pings/{self.n}/body"
+    def __str__(self) -> str:
+        return f"Ping #{self.n} ({self.kind or 'success'})"
 
-        else:
-            body_url = None
+    def to_dict(self, owner_code: uuid.UUID) -> PingDict:
+        # Optimization: construct API URLs manually instead of using reverse().
+        # This is significantly quicker when returning hundreds of pings.
+        body_url = f"{settings.SITE_ROOT}/api/v3/checks/{owner_code}/pings/{self.n}/body" if self.has_body() else None
 
         result: PingDict = {
             "type": self.kind or "success",
@@ -676,7 +677,7 @@ class Ping(models.Model):
         for ping in pings.order_by("-id").only("created", "kind", "rid"):
             if ping.kind == "start" and ping.rid == self.rid:
                 return self.created - ping.created
-            elif ping.kind in (None, "fail") and ping.rid == self.rid:
+            if ping.kind in (None, "fail") and ping.rid == self.rid:
                 return None
 
         return None
@@ -779,7 +780,7 @@ class Channel(models.Model):
             return self.name
         if self.kind == "email":
             return f"Email to {self.email.value}"
-        elif self.kind == "slack":
+        if self.kind == "slack":
             return f"Slack {self.slack_channel}"
 
         return self.get_kind_display()
@@ -951,6 +952,9 @@ class Notification(models.Model):
     class Meta:
         get_latest_by = "created"
 
+    def __str__(self) -> str:
+        return f"Notification {self.code} ({self.check_status})"
+
 
 class FlipDict(TypedDict):
     timestamp: str
@@ -980,6 +984,9 @@ class Flip(models.Model):
                 name="api_flip_owner_created",
             ),
         )
+
+    def __str__(self) -> str:
+        return f"Flip from {self.old_status} to {self.new_status}"
 
     def to_dict(self) -> FlipDict:
         return {
@@ -1037,6 +1044,9 @@ class TokenBucket(models.Model):
     value = models.CharField(max_length=80, unique=True)
     tokens = models.FloatField(default=1.0)
     updated = models.DateTimeField(default=now)
+
+    def __str__(self) -> str:
+        return self.value
 
     @staticmethod
     def authorize(value: str, capacity: int, refill_time_secs: int) -> bool:

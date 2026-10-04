@@ -46,9 +46,11 @@ class HandlerTestCase(BaseTestCase):
 
     def test_it_prints_database_error(self) -> None:
         stdout = io.StringIO()
-        with patch.object(Record.objects, "create", side_effect=DatabaseError("database is locked")):
-            with redirect_stdout(stdout):
-                Handler().emit(self.make_record())
+        with (
+            patch.object(Record.objects, "create", side_effect=DatabaseError("database is locked")),
+            redirect_stdout(stdout),
+        ):
+            Handler().emit(self.make_record())
 
         self.assertEqual(stdout.getvalue(), "database is locked\n")
         self.assertFalse(Record.objects.filter(name="hc.test").exists())

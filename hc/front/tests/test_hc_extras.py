@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from datetime import timedelta as td
 from unittest import TestCase
 from urllib.parse import urlparse
@@ -83,7 +83,7 @@ class MaskKeyTestCase(TestCase):
 class SortChecksTestCase(TestCase):
     def setUp(self) -> None:
         super().setUp()
-        dt = datetime(2020, 1, 1, tzinfo=timezone.utc)
+        dt = datetime(2020, 1, 1, tzinfo=UTC)
         self.early = Check(name="early", last_ping=dt)
         self.late = Check(name="late", last_ping=dt + td(hours=1))
         self.never = Check(name="never")

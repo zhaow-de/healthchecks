@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import re
 import sqlite3
 from collections import Counter, defaultdict
@@ -385,10 +384,7 @@ def _replace_placeholders(doc: str, html: str) -> str:
         # DATA_UPLOAD_MAX_MEMORY_SIZE (2.5 MiB by default), so that size is the
         # most a ping can store
         limit = settings.DATA_UPLOAD_MAX_MEMORY_SIZE or 2621440
-    if limit % 1000 == 0:
-        limit_fmt = f"{limit // 1000} kB"
-    else:
-        limit_fmt = f"{limit} bytes"
+    limit_fmt = f"{limit // 1000} kB" if limit % 1000 == 0 else f"{limit} bytes"
 
     replaces = {
         "{{ default_timeout }}": str(int(DEFAULT_TIMEOUT.total_seconds())),
@@ -401,7 +397,8 @@ def _replace_placeholders(doc: str, html: str) -> str:
         "PING_URL": settings.PING_ENDPOINT + "your-uuid-here",
         "PING_BODY_LIMIT_FORMATTED": limit_fmt,
         "PING_BODY_LIMIT": str(limit),
-        "IMG_URL": os.path.join(settings.STATIC_URL, "img/docs"),
+        # Django's system checks require STATIC_URL to end in a slash
+        "IMG_URL": f"{settings.STATIC_URL}img/docs",
     }
 
     for placeholder, value in replaces.items():
@@ -450,7 +447,7 @@ def docs_search(request: HttpRequest) -> HttpResponse:
 
     # Wrap the query in double quotes to get a valid FTS string
     # https://www.sqlite.org/fts5.html#full_text_query_syntax
-    q = '"%s"' % form.cleaned_data["q"]
+    q = f'"{form.cleaned_data["q"]}"'
     con = sqlite3.connect(settings.BASE_DIR / "search.db")
     cur = con.cursor()
     res = cur.execute(query, (q,))
@@ -586,7 +583,7 @@ def update_timeout(request: AuthenticatedHttpRequest, code: UUID) -> HttpRespons
             # Kick off nags. This would normally happen in the sendalerts management
             # command while processing a flip, but we have already marked the flip
             # as processed
-            check.save(update_fields=fields + ("status",))
+            check.save(update_fields=(*fields, "status"))
             check_saved = True
             check.project.update_next_nag_dates()
 
@@ -669,7 +666,8 @@ def ping_details(request: AuthenticatedHttpRequest, code: UUID, n: int | None = 
 
     check = _get_check_for_user(request, code)
     q = Ping.objects.filter(owner=check)
-    if n:
+    # An if/else rather than a ternary: the comment belongs to the else branch
+    if n:  # noqa: SIM108
         q = q.filter(n=n)
     else:
         # When n is not specified, look up the most recent success or failure,
@@ -1150,11 +1148,11 @@ def edit_channel(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
         from hc.integrations.email.views import email_form
 
         return email_form(request, channel)
-    elif channel.kind == "webhook":
+    if channel.kind == "webhook":
         from hc.integrations.webhook.views import webhook_form
 
         return webhook_form(request, channel)
-    elif channel.kind == "group":
+    if channel.kind == "group":
         from hc.integrations.group.views import group_form
 
         return group_form(request, channel)

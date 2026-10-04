@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import Mock, patch
 from urllib.parse import urlencode
 
@@ -42,7 +42,7 @@ class ValidateScheduleTestCase(BaseTestCase):
     def test_it_rejects_oncalendar_line_with_too_many_components(self, oncalendar: Mock) -> None:
         # The oncalendar library rejects such lines too; it is stubbed to accept
         # anything, so this checks the validator's own field count
-        oncalendar.return_value = iter([datetime(2000, 1, 2, tzinfo=timezone.utc)])
+        oncalendar.return_value = iter([datetime(2000, 1, 2, tzinfo=UTC)])
 
         r = self.client.get(self._url("Mon 2020-01-01 12:00 UTC extra", "oncalendar"))
         self.assertEqual(r.status_code, 200)

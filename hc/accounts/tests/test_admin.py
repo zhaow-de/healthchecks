@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from datetime import timedelta as td
 
 from django.contrib import admin
@@ -81,7 +81,7 @@ class AccountsAdminTestCase(BaseTestCase):
         self.assertEqual(len(r.context["cl"].result_list), 2)
 
     def test_profile_date_columns_show_dates(self) -> None:
-        self.profile.last_active_date = datetime(2020, 1, 2, 3, tzinfo=timezone.utc)
+        self.profile.last_active_date = datetime(2020, 1, 2, 3, tzinfo=UTC)
 
         profile_admin = ProfileAdmin(Profile, admin.site)
         self.assertEqual(profile_admin.last_active(self.profile), date(2020, 1, 2))
@@ -202,7 +202,7 @@ class AccountsAdminTestCase(BaseTestCase):
         self.assertEqual(User.objects.count(), 2)
 
     def test_user_list_shows_last_active_date(self) -> None:
-        last_active = datetime(2020, 1, 2, 3, tzinfo=timezone.utc)
+        last_active = datetime(2020, 1, 2, 3, tzinfo=UTC)
         self.profile.last_active_date = last_active
         self.profile.save()
 

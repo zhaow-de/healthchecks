@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from django.core.management.base import BaseCommand
@@ -15,12 +16,10 @@ except ImportError:
 
 
 def _process(name: str, lexer: Lexer) -> None:
-    with open(f"templates/front/snippets/{name}.txt") as f:
-        source = f.read()
+    source = Path(f"templates/front/snippets/{name}.txt").read_text()
     processed = highlight(source, lexer, HtmlFormatter())
     processed = processed.replace("PING_URL", "{{ ping_url }}")
-    with open(f"templates/front/snippets/{name}.html", "w") as out:
-        out.write(processed)
+    Path(f"templates/front/snippets/{name}.html").write_text(processed)
 
 
 class Command(BaseCommand):

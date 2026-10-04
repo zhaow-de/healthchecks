@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from datetime import timedelta as td
 
 from django import forms
@@ -145,12 +145,12 @@ class LogFiltersForm(forms.Form):
 
     def clean_u(self) -> datetime | None:
         if self.cleaned_data["u"]:
-            return datetime.fromtimestamp(self.cleaned_data["u"], tz=timezone.utc)
+            return datetime.fromtimestamp(self.cleaned_data["u"], tz=UTC)
         return None
 
     def clean_end(self) -> datetime | None:
         if self.cleaned_data["end"]:
-            return datetime.fromtimestamp(self.cleaned_data["end"], tz=timezone.utc)
+            return datetime.fromtimestamp(self.cleaned_data["end"], tz=UTC)
         return None
 
     def kinds(self) -> tuple[str, ...]:

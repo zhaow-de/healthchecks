@@ -449,14 +449,13 @@ def unsubscribe_reports(request: HttpRequest, signed_username: str) -> HttpRespo
 def close(request: AuthenticatedHttpRequest) -> HttpResponse:
     user = request.user
 
-    if request.method == "POST":
-        if request.POST.get("confirmation") == request.user.email:
-            # Deleting user also deletes its profile, checks, channels etc.
-            user.delete()
+    if request.method == "POST" and request.POST.get("confirmation") == request.user.email:
+        # Deleting user also deletes its profile, checks, channels etc.
+        user.delete()
 
-            request.session.flush()
-            path = reverse("hc-login", query={"account-closed": 1})
-            return redirect(path)
+        request.session.flush()
+        path = reverse("hc-login", query={"account-closed": 1})
+        return redirect(path)
 
     ctx = {}
     if "confirmation" in request.POST:
@@ -550,7 +549,7 @@ def add_totp(request: AuthenticatedHttpRequest) -> HttpResponse:
 @require_sudo_mode
 def remove_totp(request: AuthenticatedHttpRequest) -> HttpResponse:
     if request.method == "POST" and "disable_totp" in request.POST:
-        request.profile.totp = None
+        request.profile.totp = ""
         request.profile.totp_created = None
         request.profile.save()
         request.session["disabled_totp"] = True
@@ -576,10 +575,7 @@ def remove_credential(request: AuthenticatedHttpRequest, code: str) -> HttpRespo
         credential.delete()
         return redirect("hc-profile")
 
-    if request.profile.totp:
-        is_last = False
-    else:
-        is_last = request.user.credentials.count() == 1
+    is_last = not request.profile.totp and request.user.credentials.count() == 1
 
     ctx = {"credential": credential, "is_last": is_last}
     return render(request, "accounts/remove_credential.html", ctx)

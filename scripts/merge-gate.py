@@ -187,7 +187,7 @@ def _before_anything_that_can_hide(body: str) -> str:
         if stripped.startswith("<!--") and _COMMENT_CLOSE.search(stripped):
             out.append(raw)
             continue
-        if _FENCE_OPEN.match(raw) or stripped.startswith("<!--") or stripped.startswith("<details"):
+        if _FENCE_OPEN.match(raw) or stripped.startswith(("<!--", "<details")):
             break
         out.append(raw)
     return "\n".join(out)

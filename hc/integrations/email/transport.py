@@ -51,12 +51,11 @@ class Email(Transport):
 
         try:
             emails.alert(self.channel.email.value, ctx, headers)
-        except SMTPServerDisconnected, SMTPDataError, ConnectionRefusedError:
+        except (SMTPServerDisconnected, SMTPDataError, ConnectionRefusedError) as e:
             logger.exception("Exception while sending email")
-            raise TransportError("SMTP connection error")
+            raise TransportError("SMTP connection error") from e
 
     def is_noop(self, status: str) -> bool:
         if status == "down":
             return not self.channel.email.notify_down
-        else:
-            return not self.channel.email.notify_up
+        return not self.channel.email.notify_up

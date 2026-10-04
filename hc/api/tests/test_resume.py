@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from hc.api.models import Check, Flip
 from hc.test import BaseTestCase
@@ -13,9 +13,9 @@ class ResumeTestCase(BaseTestCase):
         self.check = Check.objects.create(
             project=self.project,
             status="paused",
-            last_start=datetime(2020, 1, 1, tzinfo=timezone.utc),
-            last_ping=datetime(2020, 1, 1, tzinfo=timezone.utc),
-            alert_after=datetime(2020, 1, 1, 1, tzinfo=timezone.utc),
+            last_start=datetime(2020, 1, 1, tzinfo=UTC),
+            last_ping=datetime(2020, 1, 1, tzinfo=UTC),
+            alert_after=datetime(2020, 1, 1, 1, tzinfo=UTC),
         )
         self.url = f"/api/v3/checks/{self.check.code}/resume"
 

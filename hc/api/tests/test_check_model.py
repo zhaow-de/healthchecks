@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from datetime import timedelta as td
 from unittest.mock import patch
 
@@ -12,7 +12,7 @@ from django.utils.timezone import now
 from hc.api.models import MAX_DURATION, Channel, Check, Flip, Notification, Ping
 from hc.test import BaseTestCase
 
-CURRENT_TIME = datetime(2020, 1, 15, tzinfo=timezone.utc)
+CURRENT_TIME = datetime(2020, 1, 15, tzinfo=UTC)
 
 
 class CheckModelTestCase(BaseTestCase):
@@ -55,7 +55,7 @@ class CheckModelTestCase(BaseTestCase):
         check.kind = "cron"
         check.schedule = "0 0 * * *"
         check.status = "up"
-        check.last_ping = datetime(2000, 1, 1, tzinfo=timezone.utc)
+        check.last_ping = datetime(2000, 1, 1, tzinfo=UTC)
 
         with time_machine.travel("2000-01-01 23:59+00:00"):
             self.assertEqual(check.get_status(), "up")
@@ -72,7 +72,7 @@ class CheckModelTestCase(BaseTestCase):
         check.kind = "oncalendar"
         check.schedule = "00:00"
         check.status = "up"
-        check.last_ping = datetime(2000, 1, 1, tzinfo=timezone.utc)
+        check.last_ping = datetime(2000, 1, 1, tzinfo=UTC)
 
         with time_machine.travel("2000-01-01 23:59+00:00"):
             self.assertEqual(check.get_status(), "up")
@@ -89,7 +89,7 @@ class CheckModelTestCase(BaseTestCase):
         check.kind = "oncalendar"
         check.schedule = "2019-01-01"
         check.status = "up"
-        check.last_ping = datetime(2020, 1, 1, tzinfo=timezone.utc)
+        check.last_ping = datetime(2020, 1, 1, tzinfo=UTC)
 
         with time_machine.travel(check.last_ping + td(hours=1)):
             self.assertEqual(check.get_status(), "up")
@@ -100,7 +100,7 @@ class CheckModelTestCase(BaseTestCase):
         check.kind = "cron"
         check.schedule = "0 10 * * *"
         check.status = "up"
-        check.last_ping = datetime(2000, 1, 1, tzinfo=timezone.utc)
+        check.last_ping = datetime(2000, 1, 1, tzinfo=UTC)
         check.tz = "Australia/Brisbane"  # UTC+10
 
         with time_machine.travel("2000-01-01 23:59+00:00"):
@@ -171,7 +171,7 @@ class CheckModelTestCase(BaseTestCase):
         self.assertEqual(check.get_status(), "down")
 
     def test_next_ping_with_cron_syntax(self) -> None:
-        dt = datetime(2000, 1, 1, tzinfo=timezone.utc)
+        dt = datetime(2000, 1, 1, tzinfo=UTC)
         # Expect ping every round hour
         check = Check(project=self.project)
         check.kind = "cron"
@@ -187,7 +187,7 @@ class CheckModelTestCase(BaseTestCase):
     @time_machine.travel(CURRENT_TIME)
     def test_downtimes_handles_no_flips(self) -> None:
         check = Check(project=self.project)
-        check.created = datetime(2019, 1, 1, tzinfo=timezone.utc)
+        check.created = datetime(2019, 1, 1, tzinfo=UTC)
         check.save()
 
         jan, dec, nov = check.downtimes(3, "UTC")
@@ -216,7 +216,7 @@ class CheckModelTestCase(BaseTestCase):
     @time_machine.travel(CURRENT_TIME, tick=False)
     def test_downtimes_handles_currently_down_check(self) -> None:
         check = Check(project=self.project, status="down")
-        check.created = datetime(2019, 1, 1, tzinfo=timezone.utc)
+        check.created = datetime(2019, 1, 1, tzinfo=UTC)
         check.save()
 
         records = check.downtimes(10, "UTC")
@@ -232,7 +232,7 @@ class CheckModelTestCase(BaseTestCase):
     @time_machine.travel(CURRENT_TIME)
     def test_monthly_uptime_pct_handles_dst(self) -> None:
         check = Check(project=self.project, status="down")
-        check.created = datetime(2019, 1, 1, tzinfo=timezone.utc)
+        check.created = datetime(2019, 1, 1, tzinfo=UTC)
         check.save()
 
         records = check.downtimes(10, "Europe/Riga")
@@ -245,10 +245,10 @@ class CheckModelTestCase(BaseTestCase):
     @time_machine.travel(CURRENT_TIME, tick=False)
     def test_downtimes_handles_flip_one_day_ago(self) -> None:
         check = Check.objects.create(project=self.project, status="down")
-        check.created = datetime(2019, 1, 1, tzinfo=timezone.utc)
+        check.created = datetime(2019, 1, 1, tzinfo=UTC)
 
         flip = Flip(owner=check)
-        flip.created = datetime(2020, 1, 14, tzinfo=timezone.utc)
+        flip.created = datetime(2020, 1, 14, tzinfo=UTC)
         flip.old_status = "up"
         flip.new_status = "down"
         flip.save()
@@ -267,10 +267,10 @@ class CheckModelTestCase(BaseTestCase):
     @time_machine.travel(CURRENT_TIME, tick=False)
     def test_downtimes_handles_flip_two_months_ago(self) -> None:
         check = Check.objects.create(project=self.project, status="down")
-        check.created = datetime(2019, 1, 1, tzinfo=timezone.utc)
+        check.created = datetime(2019, 1, 1, tzinfo=UTC)
 
         flip = Flip(owner=check)
-        flip.created = datetime(2019, 11, 15, tzinfo=timezone.utc)
+        flip.created = datetime(2019, 11, 15, tzinfo=UTC)
         flip.old_status = "up"
         flip.new_status = "down"
         flip.save()
@@ -300,10 +300,10 @@ class CheckModelTestCase(BaseTestCase):
     @time_machine.travel(CURRENT_TIME, tick=False)
     def test_downtimes_handles_non_utc_timezone(self) -> None:
         check = Check.objects.create(project=self.project, status="down")
-        check.created = datetime(2019, 1, 1, tzinfo=timezone.utc)
+        check.created = datetime(2019, 1, 1, tzinfo=UTC)
 
         flip = Flip(owner=check)
-        flip.created = datetime(2019, 12, 31, 23, tzinfo=timezone.utc)
+        flip.created = datetime(2019, 12, 31, 23, tzinfo=UTC)
         flip.old_status = "up"
         flip.new_status = "down"
         flip.save()
@@ -331,7 +331,7 @@ class CheckModelTestCase(BaseTestCase):
     @time_machine.travel(CURRENT_TIME)
     def test_downtimes_handles_months_when_check_did_not_exist(self) -> None:
         check = Check(project=self.project)
-        check.created = datetime(2020, 1, 1, 9, tzinfo=timezone.utc)
+        check.created = datetime(2020, 1, 1, 9, tzinfo=UTC)
         check.save()
 
         jan, dec, nov = check.downtimes(3, "UTC")
@@ -408,12 +408,12 @@ class CheckModelTestCase(BaseTestCase):
         check.kind = "cron"
         check.schedule = "15 * * * *"
         check.tz = "Europe/Riga"
-        check.last_ping = datetime(2023, 10, 29, 0, 55, tzinfo=timezone.utc)
+        check.last_ping = datetime(2023, 10, 29, 0, 55, tzinfo=UTC)
         check.status = "up"
 
         gs = check.get_grace_start()
         assert gs
-        self.assertEqual(gs.tzinfo, timezone.utc)
+        self.assertEqual(gs.tzinfo, UTC)
 
     @time_machine.travel("2023-10-29T01:05:00")
     def test_get_status_handles_autumn_dst_transition(self) -> None:
@@ -422,7 +422,7 @@ class CheckModelTestCase(BaseTestCase):
         check.schedule = "15 * * * *"
         check.grace = td(minutes=5)
         check.tz = "Europe/Riga"
-        check.last_ping = datetime(2023, 10, 29, 0, 55, tzinfo=timezone.utc)
+        check.last_ping = datetime(2023, 10, 29, 0, 55, tzinfo=UTC)
         check.status = "up"
 
         # The next expected run time is at 2023-10-29 01:15 UTC, so the check

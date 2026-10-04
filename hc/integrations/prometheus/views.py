@@ -81,32 +81,32 @@ def metrics(request: HttpRequest, code: UUID, key: str | None = None) -> HttpRes
 
         yield "# HELP hc_check_up Whether the check is currently up (1 for yes, 0 for no).\n"
         yield "# TYPE hc_check_up gauge\n"
-        for labels, status, started in labels_status_started:
+        for labels, status, _ in labels_status_started:
             value = 0 if status == "down" else 1
             yield f"hc_check_up{labels} {value}\n"
 
         yield "\n"
         yield "# HELP hc_check_started Whether the check is currently started (1 for yes, 0 for no).\n"
         yield "# TYPE hc_check_started gauge\n"
-        for labels, status, started in labels_status_started:
+        for labels, _, started in labels_status_started:
             yield f"hc_check_started{labels} {started}\n"
 
         yield "\n"
         yield "# HELP hc_check_grace Whether the check is currently in the grace period (1 for yes, 0 for no).\n"
         yield "# TYPE hc_check_grace gauge\n"
-        for labels, status, started in labels_status_started:
+        for labels, status, _ in labels_status_started:
             value = 1 if status == "grace" else 0
             yield f"hc_check_grace{labels} {value}\n"
 
         yield "\n"
         yield "# HELP hc_check_paused Whether the check is currently paused (1 for yes, 0 for no).\n"
         yield "# TYPE hc_check_paused gauge\n"
-        for labels, status, started in labels_status_started:
+        for labels, status, _ in labels_status_started:
             value = 1 if status == "paused" else 0
             yield f"hc_check_paused{labels} {value}\n"
 
         all_tags, down_tags, num_down = set(), set(), 0
-        for check, (_, status, _) in zip(checks, labels_status_started):
+        for check, (_, status, _) in zip(checks, labels_status_started, strict=True):
             all_tags.update(check.tags_list())
             if status == "down":
                 num_down += 1
@@ -115,10 +115,10 @@ def metrics(request: HttpRequest, code: UUID, key: str | None = None) -> HttpRes
         yield "\n"
         yield "# HELP hc_tag_up Whether all checks with this tag are up (1 for yes, 0 for no).\n"
         yield "# TYPE hc_tag_up gauge\n"
-        TMPL = """hc_tag_up{tag="%s"} %d\n"""
+        tmpl = """hc_tag_up{tag="%s"} %d\n"""
         for tag in sorted(all_tags):
             value = 0 if tag in down_tags else 1
-            yield TMPL % (esc(tag), value)
+            yield tmpl % (esc(tag), value)
 
         yield "\n"
         yield "# HELP hc_checks_total The total number of checks.\n"

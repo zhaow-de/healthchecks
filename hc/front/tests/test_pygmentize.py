@@ -36,7 +36,7 @@ class PygmentizeTestCase(BaseTestCase):
         for src in (settings.BASE_DIR / "templates" / "front" / "snippets").glob("*.txt"):
             shutil.copy(src, self.snippets / src.name)
 
-        cwd = os.getcwd()
+        cwd = Path.cwd()
         os.chdir(tmp.name)
         self.addCleanup(os.chdir, cwd)
 

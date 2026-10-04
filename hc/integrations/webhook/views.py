@@ -33,7 +33,7 @@ def webhook_form(request: HttpRequest, channel: Channel) -> HttpResponse:
     else:
 
         def flatten(d: dict[str, str]) -> str:
-            return "\n".join("%s: %s" % pair for pair in d.items())
+            return "\n".join(f"{k}: {v}" for k, v in d.items())
 
         doc = json.loads(channel.value)
         doc["headers_down"] = flatten(doc["headers_down"])

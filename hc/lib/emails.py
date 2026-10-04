@@ -56,10 +56,7 @@ def make_message(
 
     # If EMAIL_MAIL_FROM_TMPL is set, prepare a custom MAIL FROM address
     bounce_id = headers.pop("X-Bounce-ID", "bounces")
-    if settings.EMAIL_MAIL_FROM_TMPL:
-        from_email = settings.EMAIL_MAIL_FROM_TMPL % bounce_id
-    else:
-        from_email = settings.DEFAULT_FROM_EMAIL
+    from_email = settings.EMAIL_MAIL_FROM_TMPL % bounce_id if settings.EMAIL_MAIL_FROM_TMPL else settings.DEFAULT_FROM_EMAIL
 
     msg = Message(subject, body, from_email, [to], headers=headers)
     msg.attach_alternative(html, "text/html")

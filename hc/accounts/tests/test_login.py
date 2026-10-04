@@ -127,7 +127,7 @@ class LoginTestCase(BaseTestCase):
 
     @override_settings(SECRET_KEY="test-secret")
     def test_it_rate_limits_emails(self) -> None:
-        # "d60d..." is sha1("alice@example.orgtest-secret")
+        # d60d... is the SHA-1 of alice@example.org followed by test-secret
         obj = TokenBucket(value="em-d60db3b2343e713a4de3e92d4eb417e4f05f06ab")
         obj.tokens = 0
         obj.save()
@@ -188,7 +188,7 @@ class LoginTestCase(BaseTestCase):
 
     @override_settings(SECRET_KEY="test-secret")
     def test_it_rate_limits_password_attempts(self) -> None:
-        # "d60d..." is sha1("alice@example.orgtest-secret")
+        # d60d... is the SHA-1 of alice@example.org followed by test-secret
         obj = TokenBucket(value="pw-d60db3b2343e713a4de3e92d4eb417e4f05f06ab")
         obj.tokens = 0
         obj.save()
@@ -411,7 +411,7 @@ class LoginTestCase(BaseTestCase):
     @override_settings(SECRET_KEY="test-secret")
     def test_device_cookie_survives_drained_email_bucket(self) -> None:
         cookie = self.device_cookie()
-        # "d60d..." is sha1("alice@example.orgtest-secret")
+        # d60d... is the SHA-1 of alice@example.org followed by test-secret
         TokenBucket.objects.create(value="em-d60db3b2343e713a4de3e92d4eb417e4f05f06ab", tokens=0)
 
         form = {"identity": "alice@example.org"}

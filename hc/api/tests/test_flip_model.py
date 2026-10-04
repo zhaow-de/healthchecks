@@ -72,7 +72,7 @@ class FlipModelTestCase(BaseTestCase):
 
     def test_down_duration_asserts_flips_status(self) -> None:
         with self.assertRaises(AssertionError):
-            self.flip.down_duration
+            _ = self.flip.down_duration
 
     def test_down_duration_checks_prev_flips_status(self) -> None:
         self.flip.old_status = "down"

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from datetime import timedelta as td
 from uuid import uuid4
 
@@ -9,7 +9,7 @@ from django.test.utils import override_settings
 from hc.api.models import Check, Ping
 from hc.test import BaseTestCase, TestHttpResponse
 
-EPOCH = datetime(2020, 1, 1, tzinfo=timezone.utc)
+EPOCH = datetime(2020, 1, 1, tzinfo=UTC)
 
 
 class GetPingsTestCase(BaseTestCase):

@@ -3,7 +3,7 @@ from __future__ import annotations
 import signal
 from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from datetime import timedelta as td
 from io import StringIO
 from types import SimpleNamespace
@@ -20,7 +20,7 @@ from hc.api.management.commands.sendreports import Command
 from hc.api.models import Check, Flip
 from hc.test import BaseTestCase
 
-CURRENT_TIME = datetime(2020, 1, 13, 2, tzinfo=timezone.utc)
+CURRENT_TIME = datetime(2020, 1, 13, 2, tzinfo=UTC)
 MOCK_SLEEP = Mock()
 
 
@@ -62,13 +62,13 @@ class SendReportsTestCase(BaseTestCase):
 
         # And it needs at least one check that has been pinged.
         self.check = Check(project=self.project, last_ping=now())
-        self.check.created = datetime(2019, 10, 1, tzinfo=timezone.utc)
+        self.check.created = datetime(2019, 10, 1, tzinfo=UTC)
         self.check.name = "Foo"
         self.check.status = "down"
         self.check.save()
 
         self.flip = Flip(owner=self.check)
-        self.flip.created = datetime(2019, 12, 31, 23, tzinfo=timezone.utc)
+        self.flip.created = datetime(2019, 12, 31, 23, tzinfo=UTC)
         self.flip.old_status = "new"
         self.flip.new_status = "down"
         self.flip.save()

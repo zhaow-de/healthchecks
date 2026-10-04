@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from datetime import timedelta as td
 from zoneinfo import ZoneInfo
 
@@ -14,7 +14,7 @@ from hc.accounts.models import Project
 from hc.api.models import Check, Flip
 from hc.test import BaseTestCase
 
-CURRENT_TIME = datetime(2020, 1, 13, 2, tzinfo=timezone.utc)
+CURRENT_TIME = datetime(2020, 1, 13, 2, tzinfo=UTC)
 
 EMPTY_TABLE = """
 +--------+------+-----------+-----------+
@@ -51,13 +51,13 @@ class ProfileModelTestCase(BaseTestCase):
         super().setUp()
 
         self.check = Check(project=self.project, name="Foo")
-        self.check.created = datetime(2019, 10, 1, tzinfo=timezone.utc)
-        self.check.last_ping = datetime(2019, 12, 31, 23, tzinfo=timezone.utc)
+        self.check.created = datetime(2019, 10, 1, tzinfo=UTC)
+        self.check.last_ping = datetime(2019, 12, 31, 23, tzinfo=UTC)
         self.check.status = "down"
         self.check.save()
 
         self.flip = Flip(owner=self.check)
-        self.flip.created = datetime(2019, 12, 31, 23, tzinfo=timezone.utc)
+        self.flip.created = datetime(2019, 12, 31, 23, tzinfo=UTC)
         self.flip.old_status = "new"
         self.flip.new_status = "down"
         self.flip.save()
@@ -152,7 +152,7 @@ class ProfileModelTestCase(BaseTestCase):
 
     def test_send_report_handles_recently_created_check(self) -> None:
         self.check.status = "new"
-        self.check.created = datetime(2020, 1, 5, tzinfo=timezone.utc)
+        self.check.created = datetime(2020, 1, 5, tzinfo=UTC)
         self.check.save()
 
         self.flip.delete()
@@ -222,7 +222,7 @@ class ProfileModelTestCase(BaseTestCase):
         self.assertEqual(len(mail.outbox), 0)
 
     def test_send_report_noops_if_no_recent_pings(self) -> None:
-        self.check.last_ping = datetime(2019, 1, 1, tzinfo=timezone.utc)
+        self.check.last_ping = datetime(2019, 1, 1, tzinfo=UTC)
         self.check.save()
 
         sent = self.profile.send_report()

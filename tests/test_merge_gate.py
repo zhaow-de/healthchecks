@@ -447,7 +447,7 @@ def test_a_dependabot_bump_with_no_fix_commit_needs_no_read_line():
 
 def test_a_dependabot_pr_carrying_a_fix_commit_takes_every_arm():
     """The exemption is for a PR with NO fix commit; one commit of mine is what withdraws it."""
-    mine = BOT + [{"authors": [{"login": "claude"}]}]
+    mine = [*BOT, {"authors": [{"login": "claude"}]}]
     fails = _eval(_pr(**BUMP_PR, commits=mine))
     assert len(fails) == 1 and fails[0].startswith("no 'Read before push by:")
 
@@ -467,7 +467,7 @@ def test_a_dependabot_branch_with_an_empty_commit_list_is_not_exempt():
 def test_a_commit_with_no_author_entries_withdraws_the_dependabot_exemption():
     """Flattened, such a commit contributes nothing and vanishes; the exemption then survives a commit
     nothing is known about, which is not `every commit is the bot's`."""
-    fails = _eval(_pr(**BUMP_PR, commits=BOT + [{"authors": []}]))
+    fails = _eval(_pr(**BUMP_PR, commits=[*BOT, {"authors": []}]))
     assert len(fails) == 1 and fails[0].startswith("no 'Read before push by:")
 
 
@@ -672,8 +672,8 @@ def test_a_neutral_or_skipped_check_is_done_and_a_status_context_is_read_by_its_
     """A check run reports `conclusion`, a commit status (Coveralls posts one) reports `state`; both are read."""
     done = [{"conclusion": "SUCCESS"}, {"conclusion": "NEUTRAL"}, {"conclusion": "SKIPPED"}, {"state": "SUCCESS"}]
     assert _eval(_pr(statusCheckRollup=done)) == []
-    assert [f for f in _eval(_pr(statusCheckRollup=done + [{"state": "FAILURE"}])) if "failing" in f]
-    assert [f for f in _eval(_pr(statusCheckRollup=done + [{"state": "PENDING"}])) if "still running" in f]
+    assert [f for f in _eval(_pr(statusCheckRollup=[*done, {"state": "FAILURE"}])) if "failing" in f]
+    assert [f for f in _eval(_pr(statusCheckRollup=[*done, {"state": "PENDING"}])) if "still running" in f]
 
 
 @pytest.mark.parametrize("state", ["FAILURE", "ERROR", "PENDING", "EXPECTED", "SUCCESS"])

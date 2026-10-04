@@ -130,7 +130,7 @@ class Command(BaseCommand):
                 break
 
             # Sleep for 60 seconds before looking for more work
-            for i in range(60):
+            for _ in range(60):
                 if not self.shutdown:
                     time.sleep(1)
 

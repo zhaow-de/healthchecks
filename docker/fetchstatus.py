@@ -20,13 +20,14 @@ settings.py uses for reading SITE_ROOT:
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 # Read SITE_ROOT from environment, same as settings.py would do:
 SITE_ROOT = os.getenv("SITE_ROOT", "http://localhost:8000")
 # If local_settings.py exists, load it from there
-if os.path.exists("hc/local_settings.py"):
+if Path("hc/local_settings.py").exists():
     from hc import local_settings
 
     SITE_ROOT = getattr(local_settings, "SITE_ROOT", SITE_ROOT)

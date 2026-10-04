@@ -28,8 +28,8 @@ class AddTotpTestCase(BaseTestCase):
         self.assertIn("totp_secret", self.client.session)
 
     @patch("hc.accounts.views.pyotp.totp.TOTP")
-    def test_it_adds_totp(self, mock_TOTP: Mock) -> None:
-        mock_TOTP.return_value.verify.return_value = True
+    def test_it_adds_totp(self, mock_totp: Mock) -> None:
+        mock_totp.return_value.verify.return_value = True
 
         self.client.login(username="alice@example.org", password="password")
         self.set_sudo_flag()
@@ -47,9 +47,9 @@ class AddTotpTestCase(BaseTestCase):
         self.assertTrue(self.profile.totp_created)
 
     @patch("hc.accounts.views.pyotp.totp.TOTP")
-    def test_it_handles_wrong_code(self, mock_TOTP: Mock) -> None:
-        mock_TOTP.return_value.verify.return_value = False
-        mock_TOTP.return_value.provisioning_uri.return_value = "test-uri"
+    def test_it_handles_wrong_code(self, mock_totp: Mock) -> None:
+        mock_totp.return_value.verify.return_value = False
+        mock_totp.return_value.provisioning_uri.return_value = "test-uri"
 
         self.client.login(username="alice@example.org", password="password")
         self.set_sudo_flag()
@@ -59,7 +59,7 @@ class AddTotpTestCase(BaseTestCase):
         self.assertContains(r, "The code you entered was incorrect.")
 
         self.profile.refresh_from_db()
-        self.assertIsNone(self.profile.totp)
+        self.assertEqual(self.profile.totp, "")
         self.assertIsNone(self.profile.totp_created)
 
     def test_it_checks_if_totp_already_configured(self) -> None:
@@ -73,9 +73,9 @@ class AddTotpTestCase(BaseTestCase):
         self.assertEqual(r.status_code, 400)
 
     @patch("hc.accounts.views.pyotp.totp.TOTP")
-    def test_it_handles_non_numeric_code(self, mock_TOTP: Mock) -> None:
-        mock_TOTP.return_value.verify.return_value = False
-        mock_TOTP.return_value.provisioning_uri.return_value = "test-uri"
+    def test_it_handles_non_numeric_code(self, mock_totp: Mock) -> None:
+        mock_totp.return_value.verify.return_value = False
+        mock_totp.return_value.provisioning_uri.return_value = "test-uri"
 
         self.client.login(username="alice@example.org", password="password")
         self.set_sudo_flag()

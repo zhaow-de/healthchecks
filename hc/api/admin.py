@@ -50,8 +50,7 @@ class ChecksAdmin(ModelAdmin[Check]):
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Check]:
         qs = super().get_queryset(request)
-        qs = qs.annotate(owner_email=F("project__owner__email"))
-        return qs
+        return qs.annotate(owner_email=F("project__owner__email"))
 
     def project_(self, obj: WithAnnotations[Check, CheckAnnotations]) -> str:
         url = obj.project.get_absolute_url()
@@ -72,12 +71,11 @@ class ChecksAdmin(ModelAdmin[Check]):
     def timeout_schedule(self, obj: Check) -> str:
         if obj.kind == "simple":
             return format_duration(obj.timeout)
-        elif obj.kind in ("cron", "oncalendar"):
+        if obj.kind in ("cron", "oncalendar"):
             if len(obj.schedule) > 30:
                 return obj.schedule[:30] + "..."
             return obj.schedule
-        else:
-            return "Unknown"
+        return "Unknown"
 
 
 class SchemeListFilter(admin.SimpleListFilter):
@@ -99,7 +97,7 @@ class MethodListFilter(admin.SimpleListFilter):
     methods = ("HEAD", "GET", "POST", "PUT", "DELETE")
 
     def lookups(self, request: HttpRequest, model_admin: ModelAdmin[Ping]) -> Lookups:
-        return zip(self.methods, self.methods)
+        return zip(self.methods, self.methods, strict=True)
 
     def queryset(self, request: HttpRequest, qs: QuerySet[Ping]) -> QuerySet[Ping]:
         if self.value():
@@ -113,7 +111,7 @@ class KindListFilter(admin.SimpleListFilter):
     kinds = ("start", "fail")
 
     def lookups(self, request: HttpRequest, model_admin: ModelAdmin[Ping]) -> Lookups:
-        return zip(self.kinds, self.kinds)
+        return zip(self.kinds, self.kinds, strict=True)
 
     def queryset(self, request: HttpRequest, qs: QuerySet[Ping]) -> QuerySet[Ping]:
         if self.value():
@@ -218,15 +216,14 @@ class ChannelsAdmin(ModelAdmin[Channel]):
 
     def time(self, obj: Channel) -> str | None:
         if obj.last_notify_duration:
-            return "%.1f" % obj.last_notify_duration.total_seconds()
+            return f"{obj.last_notify_duration.total_seconds():.1f}"
         return None
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Channel]:
         qs = super().get_queryset(request)
         qs = qs.annotate(project_code=F("project__code"))
         qs = qs.annotate(project_name=F("project__name"))
-        qs = qs.annotate(owner_email=F("project__owner__email"))
-        return qs
+        return qs.annotate(owner_email=F("project__owner__email"))
 
     def view_on_site(self, obj: Channel) -> str:
         assert hasattr(obj, "project_code")
@@ -242,7 +239,7 @@ class ChannelsAdmin(ModelAdmin[Channel]):
     @admin.display(description="Value")
     def chopped_value(self, obj: Channel) -> str:
         if len(obj.value) > 100:
-            return "%s…" % obj.value[:100]
+            return f"{obj.value[:100]}…"
 
         return obj.value
 

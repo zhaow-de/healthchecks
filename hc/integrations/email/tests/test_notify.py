@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import email
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from datetime import timedelta as td
 from smtplib import SMTPDataError, SMTPServerDisconnected
 from unittest.mock import Mock, patch
@@ -15,7 +15,7 @@ from django.test.utils import override_settings
 from hc.api.models import Channel, Check, Flip, Notification, Ping
 from hc.test import BaseTestCase
 
-EPOCH = datetime(2020, 1, 1, tzinfo=timezone.utc)
+EPOCH = datetime(2020, 1, 1, tzinfo=UTC)
 
 
 class NotifyEmailTestCase(BaseTestCase):

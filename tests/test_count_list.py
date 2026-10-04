@@ -124,7 +124,7 @@ def test_every_entry_the_guidance_runs_exists_and_every_entry_is_run_by_somethin
     assert len(cited) >= len(names), f"the citation pattern found suspiciously few entries: {sorted(cited)}"
     unknown = {name: files for name, files in cited.items() if name not in names}
     assert unknown == {}, f"guidance runs entries the script lacks: {unknown}"
-    assert NOT_NAMED <= set(cited), f"entries nothing in the guidance runs: {sorted(NOT_NAMED - set(cited))}"
+    assert set(cited) >= NOT_NAMED, f"entries nothing in the guidance runs: {sorted(NOT_NAMED - set(cited))}"
 
 
 def test_a_named_entry_runs_alone_and_an_unknown_name_is_refused():
