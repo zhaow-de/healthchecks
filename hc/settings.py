@@ -195,10 +195,10 @@ DATABASES: Mapping[str, Any] = {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": os.getenv("DB_NAME", BASE_DIR / "hc.sqlite"),
         "OPTIONS": {
-            # auto_vacuum takes effect only on a database this creates: an
-            # existing file keeps its mode until a VACUUM. INCREMENTAL lets
-            # the prune command give free pages back to the file system.
-            "init_command": "PRAGMA busy_timeout = 5000; PRAGMA auto_vacuum = INCREMENTAL;",
+            # auto_vacuum is not set here: on an existing file that PRAGMA writes the
+            # header on every connection. hc.api's connection_created receiver sets it
+            # on a file SQLite has just created.
+            "init_command": "PRAGMA busy_timeout = 5000;",
             "transaction_mode": "IMMEDIATE",
         },
     }
