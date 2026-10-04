@@ -201,12 +201,18 @@ class MyChecksTestCase(BaseTestCase):
         self.assertContains(r, "alice-was-here")
         self.assertContains(r, "(not unique)")
 
+    def test_it_shows_slug_urls_by_default(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(self.url)
+        self.assertContains(r, f"{self.project.ping_key}/alice-was-here")
+        self.assertNotContains(r, f"/ping/{self.check.code}")
+
     def test_it_saves_url_format_preference(self) -> None:
         self.client.login(username="alice@example.org", password="password")
-        self.client.get(self.url + "?urls=slug")
+        self.client.get(self.url + "?urls=uuid")
 
         self.project.refresh_from_db()
-        self.assertTrue(self.project.show_slugs)
+        self.assertFalse(self.project.show_slugs)
 
     def test_it_handles_a_project_deleted_after_it_was_read(self) -> None:
         def get_and_delete(*args: Any, **kwargs: Any) -> Project:

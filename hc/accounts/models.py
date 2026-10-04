@@ -300,7 +300,7 @@ class Project(models.Model):
     api_key = models.CharField(max_length=128, blank=True, db_index=True)
     api_key_readonly = models.CharField(max_length=128, blank=True, db_index=True)
     ping_key = models.CharField(max_length=128, blank=True, null=True, unique=True)
-    show_slugs = models.BooleanField(default=False)
+    show_slugs = models.BooleanField(default=True)
 
     objects = ProjectManager()
     # used in hc.front.views to cache the aggregate status of all checks in the project

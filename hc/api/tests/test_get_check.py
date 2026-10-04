@@ -1,6 +1,7 @@
 from datetime import timedelta as td
 from uuid import UUID
 
+from django.conf import settings
 from django.test.utils import override_settings
 from django.utils.timezone import now
 
@@ -49,7 +50,7 @@ class GetCheckTestCase(BaseTestCase):
         self.assertEqual(doc["slug"], "alice-1-custom-slug")
         self.assertEqual(doc["timeout"], 3600)
         self.assertEqual(doc["grace"], 900)
-        self.assertEqual(doc["ping_url"], self.a1.url())
+        self.assertEqual(doc["ping_url"], settings.PING_ENDPOINT + str(self.a1.code))
         self.assertEqual(doc["last_ping"], None)
         self.assertEqual(doc["n_pings"], 0)
         self.assertEqual(doc["status"], "new")
@@ -88,7 +89,7 @@ class GetCheckTestCase(BaseTestCase):
 
         self.assertEqual(doc["timeout"], 3600)
         self.assertEqual(doc["grace"], 900)
-        self.assertEqual(doc["ping_url"], self.a1.url())
+        self.assertEqual(doc["ping_url"], settings.PING_ENDPOINT + str(self.a1.code))
         self.assertEqual(doc["last_ping"], None)
         self.assertEqual(doc["n_pings"], 0)
         self.assertEqual(doc["status"], "new")
