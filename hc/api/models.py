@@ -488,21 +488,21 @@ class Check(models.Model):
         if self.n_pings % 100 == 0:
             self.prune()
 
-    def prune(self) -> None:
-        """Remove old pings and notifications."""
+    def prune(self) -> tuple[int, int, int]:
+        """Remove old pings, notifications and flips; return how many of each."""
 
         threshold = self.n_pings - self.project.owner_profile.ping_log_limit
 
         # Remove ping objects from db
-        self.ping_set.filter(n__lte=threshold).delete()
+        pings, _ = self.ping_set.filter(n__lte=threshold).delete()
 
         # By "n", not "created" or "id": see Ping.Meta
         ping = self.ping_set.order_by("n").first()
         if ping is None:
-            return
+            return pings, 0, 0
 
         # Delete notifications older than the oldest retained ping
-        self.notification_set.filter(created__lt=ping.created).delete()
+        notifications, _ = self.notification_set.filter(created__lt=ping.created).delete()
 
         # Delete flips older than the oldest retained ping *and*
         # older than 93 days. We need ~3 months of flips for calculating
@@ -511,7 +511,9 @@ class Check(models.Model):
         # We could calculate this precisely, but 3*31 is close enough and
         # much simpler.
         flip_threshold = min(ping.created, now() - td(days=93))
-        self.flip_set.filter(created__lt=flip_threshold).delete()
+        # sendalerts has yet to send the alerts of an unprocessed flip
+        flips, _ = self.flip_set.filter(created__lt=flip_threshold, processed__isnull=False).delete()
+        return pings, notifications, flips
 
     @property
     def visible_pings(self) -> QuerySet[Ping]:

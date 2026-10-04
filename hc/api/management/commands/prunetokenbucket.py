@@ -1,10 +1,9 @@
 from argparse import ArgumentParser
-from datetime import timedelta as td
 from typing import Any
 
 from django.core.management.base import BaseCommand
-from django.utils.timezone import now
 
+from hc.api.management.commands.prune import delete_stale_token_buckets
 from hc.api.models import TokenBucket
 
 
@@ -19,9 +18,9 @@ class Command(BaseCommand):
         )
 
     def handle(self, **options: Any) -> str:
-        q = TokenBucket.objects.all()
-        if not options["all"]:
-            q = q.filter(updated__lt=now() - td(days=1))
-        n_pruned, _ = q.delete()
+        if options["all"]:
+            n_pruned, _ = TokenBucket.objects.all().delete()
+        else:
+            n_pruned = delete_stale_token_buckets()
 
         return f"Done! Pruned {n_pruned} token bucket entries"

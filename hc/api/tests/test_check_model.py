@@ -352,6 +352,7 @@ class CheckModelTestCase(BaseTestCase):
         f = Flip(owner=check)
         # older than the earliest ping, and also older than 93 days
         f.created = CURRENT_TIME - td(days=93, seconds=1)
+        f.processed = f.created
         f.old_status = "new"
         f.new_status = "down"
         f.save()
@@ -362,7 +363,8 @@ class CheckModelTestCase(BaseTestCase):
         n.created = CURRENT_TIME - td(minutes=10)
         n.save()
 
-        check.prune()
+        # One ping, one notification, one flip
+        self.assertEqual(check.prune(), (1, 1, 1))
 
         self.assertTrue(Ping.objects.filter(n=101).exists())
         self.assertFalse(Ping.objects.filter(n=1).exists())
@@ -384,6 +386,16 @@ class CheckModelTestCase(BaseTestCase):
 
         check.prune()
 
+        self.assertEqual(Flip.objects.count(), 1)
+
+    @time_machine.travel(CURRENT_TIME)
+    def test_it_does_not_prune_unprocessed_flips(self) -> None:
+        check = Check.objects.create(project=self.project, n_pings=101)
+        Ping.objects.create(owner=check, n=101)
+        # older than the earliest ping and than 93 days, but its alerts are not sent yet
+        Flip.objects.create(owner=check, created=CURRENT_TIME - td(days=100), old_status="up", new_status="down")
+
+        self.assertEqual(check.prune(), (0, 0, 0))
         self.assertEqual(Flip.objects.count(), 1)
 
     @time_machine.travel(CURRENT_TIME)
@@ -411,7 +423,7 @@ class CheckModelTestCase(BaseTestCase):
         channel = Channel.objects.create(project=self.project, kind="email")
         Notification.objects.create(owner=check, channel=channel, check_status="down", created=CURRENT_TIME - td(days=1))
 
-        check.prune()
+        self.assertEqual(check.prune(), (1, 0, 0))
 
         self.assertFalse(Ping.objects.exists())
         self.assertEqual(Flip.objects.count(), 1)
