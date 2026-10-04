@@ -75,7 +75,7 @@ hc.ready(function () {
     });
 
     let currentSchedule = "";
-    function validateSchedule() {
+    async function validateSchedule() {
         const kind = selectedKind();
         if (kind === "simple") return;
 
@@ -85,14 +85,23 @@ hc.ready(function () {
         if (field.value === currentSchedule)
             return;
 
-        currentSchedule = field.value;
-        const payload = {kind: kind, schedule: field.value};
-        hc.getJSON(base + "/checks/validate_schedule/", payload).then(function(data) {
-            if (field.value !== currentSchedule)
+        const schedule = field.value;
+        currentSchedule = schedule;
+        try {
+            const data = await hc.getJSON(base + "/checks/validate_schedule/", {kind: kind, schedule: schedule});
+            if (schedule !== currentSchedule)
                 return;  // ignore stale results
 
             field.setCustomValidity(data.result ? "" : "Please enter a valid expression");
-        });
+        } catch {
+            if (schedule !== currentSchedule)
+                return;
+
+            // Forget the schedule, so that the next edit retries, and leave the
+            // check to the server instead of keeping an earlier verdict
+            currentSchedule = "";
+            field.setCustomValidity("");
+        }
     }
 
     hc.on("#add-check-schedule", "keyup change", validateSchedule);

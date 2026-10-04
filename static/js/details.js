@@ -62,9 +62,15 @@ hc.ready(function () {
     });
 
     hc.on(".details-integrations tr", "click", function() {
-        const isOn = this.classList.toggle("on");
-        this.querySelector(".badge").textContent = isOn ? "ON" : "OFF";
-        hc.post(this.dataset.url, {"state": isOn ? "on" : "off"}).catch(function() {});
+        const row = this;
+        const badge = row.querySelector(".badge");
+        const isOn = row.classList.toggle("on");
+        badge.textContent = isOn ? "ON" : "OFF";
+        hc.post(row.dataset.url, {"state": isOn ? "on" : "off"}).catch(function() {
+            // The change was not saved: show the state the server still has
+            row.classList.toggle("on", !isOn);
+            badge.textContent = isOn ? "OFF" : "ON";
+        });
     });
 
     const statusUrl = document.getElementById("events").dataset.statusUrl;
@@ -143,14 +149,19 @@ hc.ready(function () {
     // #transfer-modal keeps a static .modal-dialog (Bootstrap caches it when the
     // instance is created): the form loads into its .modal-content.
     let transferFormLoadStarted = false;
-    hc.on("#transfer-btn", "mouseenter click", function() {
+    hc.on("#transfer-btn", "mouseenter click", async function() {
         if (transferFormLoadStarted)
             return;
 
         transferFormLoadStarted = true;
-        hc.getText(this.dataset.url).then(function(data) {
-            hc.$("#transfer-modal .modal-content").innerHTML = data;
-        });
+        const content = hc.$("#transfer-modal .modal-content");
+        try {
+            content.innerHTML = await hc.getText(this.dataset.url);
+        } catch {
+            // Let the next hover or click try again
+            transferFormLoadStarted = false;
+            content.innerHTML = "<div class='modal-body'>Failed to load.</div>";
+        }
     });
 
     hc.$$(".click-to-copy").forEach(function(el) {

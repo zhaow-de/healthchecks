@@ -30,7 +30,7 @@ hc.ready(function () {
         }
     }
 
-    function applyFilters() {
+    async function applyFilters() {
         const url = document.getElementById("log").dataset.refreshUrl;
         slider.disabled = slider.value === slider.max;
         const qs = hc.serialize("#filters").toString();
@@ -43,17 +43,23 @@ hc.ready(function () {
         }
         const ctrl = new AbortController();
         activeRequest = ctrl;
-        hc.get(url + "?" + qs, null, {timeout: 2000, signal: ctrl.signal}).then(function(r) {
-            return r.text().then(function(data) {
+        try {
+            const r = await hc.get(url + "?" + qs, null, {timeout: 2000, signal: ctrl.signal});
+            const data = await r.text();
+            const tbody = document.createElement("tbody");
+            tbody.innerHTML = data;
+            formatPingDates(tbody.querySelectorAll("tr"));
+            hc.$("#log").replaceChildren(tbody);
+            updateNumHits();
+            lastUpdated = r.headers.get("X-Last-Event-Timestamp");
+        } catch {
+            // Aborted, timed out or failed: the table keeps its rows
+        } finally {
+            // A newer applyFilters() request may have replaced this one
+            if (activeRequest === ctrl) {
                 activeRequest = null;
-                lastUpdated = r.headers.get("X-Last-Event-Timestamp");
-                const tbody = document.createElement("tbody");
-                tbody.innerHTML = data;
-                formatPingDates(tbody.querySelectorAll("tr"));
-                hc.$("#log").replaceChildren(tbody);
-                updateNumHits();
-            });
-        }).catch(function() {});
+            }
+        }
     }
 
     hc.on("#end", "input", updateSliderPreview);
@@ -93,8 +99,9 @@ hc.ready(function () {
     // Once it's ready, set it to visible:
     hc.$("#log").style.visibility = "visible";
 
+    // The timestamp of the newest event shown, or empty while the log shows none
     let lastUpdated = document.getElementById("last-event-timestamp").textContent;
-    function fetchNewEvents() {
+    async function fetchNewEvents() {
         // Do not fetch updates if the slider is not set to "now"
         // or there's an AJAX request in flight
         if (slider.value !== slider.max || activeRequest) {
@@ -102,34 +109,33 @@ hc.ready(function () {
         }
 
         const url = document.getElementById("log").dataset.refreshUrl;
-        let qs = hc.serialize("#filters").toString();
-
-        if (lastUpdated) {
-            qs += "&u=" + lastUpdated;
-        }
+        // Without a shown event, ask for the events after the page load (the
+        // slider's max): without u the server returns events up to "end" only
+        const qs = hc.serialize("#filters").toString() + "&u=" + (lastUpdated || slider.max);
 
         const ctrl = new AbortController();
         activeRequest = ctrl;
-        hc.get(url + "?" + qs, null, {timeout: 2000, signal: ctrl.signal}).then(function(r) {
-            return r.text().then(function(data) {
-                activeRequest = null;
-                if (!data)
-                    return;
+        try {
+            const r = await hc.get(url + "?" + qs, null, {timeout: 2000, signal: ctrl.signal});
+            const data = await r.text();
+            if (!data)
+                return;
 
-                lastUpdated = r.headers.get("X-Last-Event-Timestamp");
-                const tbody = document.createElement("tbody");
-                tbody.setAttribute("class", "new");
-                tbody.innerHTML = data;
-                formatPingDates(tbody.querySelectorAll("tr"));
-                document.getElementById("log").prepend(tbody);
-                updateNumHits();
-            });
-        }, function() {
+            const tbody = document.createElement("tbody");
+            tbody.setAttribute("class", "new");
+            tbody.innerHTML = data;
+            formatPingDates(tbody.querySelectorAll("tr"));
+            document.getElementById("log").prepend(tbody);
+            updateNumHits();
+            lastUpdated = r.headers.get("X-Last-Event-Timestamp");
+        } catch {
+            // Aborted, timed out or failed: the next run tries again
+        } finally {
             // A newer applyFilters() request may have replaced this one
             if (activeRequest === ctrl) {
                 activeRequest = null;
             }
-        });
+        }
     }
 
     adaptiveSetInterval(fetchNewEvents, false);

@@ -49,7 +49,11 @@ hc.ready(function () {
         const url =
             base + "/checks/" + checkCode + "/channels/" + channelCode + "/enabled";
 
-        hc.post(url, { state: isOff ? "off" : "on" });
+        const el = this;
+        hc.post(url, { state: isOff ? "off" : "on" }).catch(function () {
+            // The change was not saved: show the state the server still has
+            el.classList.toggle("off", !isOff);
+        });
 
         return false;
     });
@@ -254,9 +258,14 @@ hc.ready(function () {
         // Second click: update UI and pause the check
         btn.classList.remove("confirm");
         tip.hide();
-        rowEl(code, "span.status").className = "status ic-paused";
+        const status = rowEl(code, "span.status");
+        const previous = status.className;
+        status.className = "status ic-paused";
 
-        hc.post(base + "/checks/" + code + "/pause/");
+        hc.post(base + "/checks/" + code + "/pause/").catch(function () {
+            // The check was not paused: show its status again
+            status.className = previous;
+        });
 
         return false;
     });

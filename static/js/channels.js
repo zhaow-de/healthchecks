@@ -1,13 +1,25 @@
 hc.ready(function() {
     const cm = hc.$("#checks-modal");
 
+    // The URL of the form being loaded, so that a slower earlier load does not
+    // replace it
+    let loadingUrl = null;
     hc.on(".edit-checks", "click", function() {
         const tip = bootstrap.Tooltip.getInstance(this);
         if (tip) tip.hide();
 
+        // Replace the previous integration's form at once: it carries that
+        // integration's code, and saving it would change that integration
+        const content = hc.$(".modal-content", cm);
+        content.innerHTML = "<div class='modal-body'>Loading&hellip;</div>";
         hc.showModal(cm);
-        hc.getText(this.dataset.url).then(function(html) {
-            hc.$(".modal-content", cm).innerHTML = html;
+
+        const url = this.dataset.url;
+        loadingUrl = url;
+        hc.getText(url).then(function(html) {
+            if (url === loadingUrl) content.innerHTML = html;
+        }).catch(function() {
+            if (url === loadingUrl) content.innerHTML = "<div class='modal-body'>Failed to load.</div>";
         });
 
         return false;

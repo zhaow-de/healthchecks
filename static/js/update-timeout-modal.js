@@ -196,7 +196,7 @@ hc.ready(function () {
     }
 
     let cronPreviewHash = "";
-    function updateCronPreview() {
+    async function updateCronPreview() {
         const schedule = hc.$("#schedule").value;
         const tz = hc.$("#tz").value;
         const hash = schedule + tz;
@@ -210,8 +210,9 @@ hc.ready(function () {
         const title = hc.$("#cron-preview-title");
         if (title) title.textContent = "Updating...";
 
-        const data = {schedule: schedule, tz: tz};
-        hc.post(base + "/checks/cron_preview/", data).then((r) => r.text()).then(function(html) {
+        try {
+            const r = await hc.post(base + "/checks/cron_preview/", {schedule: schedule, tz: tz});
+            const html = await r.text();
             if (hash !== cronPreviewHash) {
                 return;  // ignore stale results
             }
@@ -219,11 +220,19 @@ hc.ready(function () {
             hc.$("#cron-preview").innerHTML = html;
             const haveError = hc.$("#invalid-arguments") !== null;
             hc.$("#update-cron-submit").disabled = haveError;
-        });
+        } catch {
+            if (hash !== cronPreviewHash) {
+                return;
+            }
+
+            // Forget the values, so that entering them again retries
+            cronPreviewHash = "";
+            hc.$("#cron-preview").textContent = "Failed to load the preview.";
+        }
     }
 
     let onCalendarPreviewHash = "";
-    function updateOnCalendarPreview() {
+    async function updateOnCalendarPreview() {
         const schedule = hc.$("#schedule-oncalendar").value;
         const tz = hc.$("#tz-oncalendar").value;
         const hash = schedule + tz;
@@ -237,8 +246,9 @@ hc.ready(function () {
         const title = hc.$("#oncalendar-preview-title");
         if (title) title.textContent = "Updating...";
 
-        const data = {schedule: schedule, tz: tz};
-        hc.post(base + "/checks/oncalendar_preview/", data).then((r) => r.text()).then(function(html) {
+        try {
+            const r = await hc.post(base + "/checks/oncalendar_preview/", {schedule: schedule, tz: tz});
+            const html = await r.text();
             if (hash !== onCalendarPreviewHash) {
                 return;  // ignore stale results
             }
@@ -246,7 +256,15 @@ hc.ready(function () {
             hc.$("#oncalendar-preview").innerHTML = html;
             const haveError = hc.$("#invalid-oncalendar-arguments") !== null;
             hc.$("#update-oncalendar-submit").disabled = haveError;
-        });
+        } catch {
+            if (hash !== onCalendarPreviewHash) {
+                return;
+            }
+
+            // Forget the values, so that entering them again retries
+            onCalendarPreviewHash = "";
+            hc.$("#oncalendar-preview").textContent = "Failed to load the preview.";
+        }
     }
 
     hc.on("#update-timeout-modal .update-timeout-grace-cron-input", "keyup change", function() {
