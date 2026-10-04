@@ -88,10 +88,12 @@ hc.ready(function () {
         },
     });
 
+    // Hover only: a clicked chip keeps focus, and the default focus trigger would keep its tooltip open
     hc.tooltip("#my-checks-tags .btn", {
         title: function () {
             return this.getAttribute("data-tooltip");
         },
+        trigger: "hover",
     });
 
     function statusMatch(el, statuses) {

@@ -25,14 +25,14 @@ hc.ready(function () {
         hidden: byId("update-oncalendar-grace"),
     });
 
-    const refreshCronPreview = schedulePreview({
+    const cronPreview = schedulePreview({
         input: byId("schedule"),
         tz: byId("tz"),
         url: base + "/checks/cron_preview/",
         target: byId("cron-preview"),
         submit: byId("update-cron-submit"),
     });
-    const refreshOnCalendarPreview = schedulePreview({
+    const onCalendarPreview = schedulePreview({
         input: byId("schedule-oncalendar"),
         tz: byId("tz-oncalendar"),
         url: base + "/checks/oncalendar_preview/",
@@ -65,11 +65,11 @@ hc.ready(function () {
 
         byId("schedule").value = check.kind === "cron" ? check.schedule : "* * * * *";
         byId("tz").tomselect.setValue(check.tz, true);
-        refreshCronPreview();
+        cronPreview.refresh();
 
         byId("schedule-oncalendar").value = check.kind === "oncalendar" ? check.schedule : "*-*-* *:*:*";
         byId("tz-oncalendar").tomselect.setValue(check.tz, true);
-        refreshOnCalendarPreview();
+        onCalendarPreview.refresh();
 
         showPanel(check.kind);
         hc.showModal("#update-timeout-modal");

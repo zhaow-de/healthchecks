@@ -94,8 +94,9 @@ function bindDuration({value, unit, hidden, slider}) {
 
 // Loads url's preview of the schedule in `input`, in the time zone `tz` (a select, or a
 // zone name), into `target` whenever either changes. While the preview reports an error,
-// `submit`, when given, is disabled. Returns refresh(), which shows "Updating..." and
-// loads the preview again even when the values have not changed.
+// `submit`, when given, is disabled. Returns {update, refresh}: update() loads the preview
+// when the values changed, keeping the old one until the new one arrives; refresh()
+// replaces it with "Updating..." and loads it again even when the values have not changed.
 function schedulePreview({input, tz, url, target, submit}) {
     // The values of the preview shown or loading, so an unchanged input loads nothing
     let current = "";
@@ -129,9 +130,11 @@ function schedulePreview({input, tz, url, target, submit}) {
     hc.on(input, "input", update);
     if (typeof tz !== "string") hc.on(tz, "change", update);
 
-    return function refresh() {
+    function refresh() {
         current = "";
         target.innerHTML = "<p>Updating...</p>";
         update();
-    };
+    }
+
+    return {update: update, refresh: refresh};
 }

@@ -1,6 +1,6 @@
 hc.ready(function () {
     const input = document.getElementById("schedule");
-    const refreshPreview = schedulePreview({
+    const preview = schedulePreview({
         input: input,
         tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
         url: hc.base() + "/checks/cron_preview/",
@@ -9,8 +9,8 @@ hc.ready(function () {
 
     hc.on("#common-cron-expressions button", "click", function() {
         input.value = this.closest("tr").querySelector("td:nth-child(2)").textContent;
-        refreshPreview();
+        preview.update();
     });
 
-    refreshPreview();
+    preview.update();
 });
