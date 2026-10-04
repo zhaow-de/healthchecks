@@ -90,7 +90,7 @@ class PingBySlugTestCase(BaseTestCase):
         self.assertEqual(r.status_code, 200)
 
         (select,) = [q["sql"] for q in ctx.captured_queries if q["sql"].startswith("SELECT")]
-        self.assertTrue(select.endswith(' FOR UPDATE OF "api_check"'), select)
+        self.assertTrue(select.endswith(' FOR NO KEY UPDATE OF "api_check"'), select)
 
     def test_it_handles_duplicates(self) -> None:
         # Another check with the same slug:

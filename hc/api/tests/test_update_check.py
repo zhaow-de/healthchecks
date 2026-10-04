@@ -460,8 +460,8 @@ class UpdateCheckTestCase(BaseTestCase):
             r = self.post(self.check.code, {"name": "Foo"})
         self.assertEqual(r.status_code, 200)
 
-        (lock,) = [q["sql"] for q in ctx.captured_queries if "FOR UPDATE" in q["sql"]]
-        self.assertTrue(lock.endswith(' FOR UPDATE OF "api_check"'), lock)
+        (lock,) = [q["sql"] for q in ctx.captured_queries if "FOR NO KEY UPDATE" in q["sql"]]
+        self.assertTrue(lock.endswith(' FOR NO KEY UPDATE OF "api_check"'), lock)
 
     def test_it_does_not_reread_the_project(self) -> None:
         channel = Channel.objects.create(project=self.project)

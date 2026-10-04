@@ -318,7 +318,7 @@ def switch_channel(request: AuthenticatedHttpRequest, code: UUID, channel_code: 
 
     with _404_if_deleted(), transaction.atomic():
         check.lock()
-        Channel.objects.select_for_update().get(id=channel.id)
+        Channel.objects.select_for_update(no_key=True).get(id=channel.id)
         if request.POST.get("state") == "on":
             channel.checks.add(check)
         else:
@@ -933,7 +933,7 @@ def transfer(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
         target_project = _get_project_for_user(request, form.cleaned_data["project"])
         with _404_if_deleted(), transaction.atomic():
             check.lock()
-            Project.objects.select_for_update().get(id=target_project.id)
+            Project.objects.select_for_update(no_key=True).get(id=target_project.id)
             check.project = target_project
             check.save(update_fields=("project",))
             check.assign_all_channels()
@@ -982,7 +982,7 @@ def copy(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
         check.lock()
         copied.save()
         # Locked, so no channel is deleted between this read and the link rows' commit
-        copied.channel_set.add(*check.channel_set.select_for_update(of=("self",)))
+        copied.channel_set.add(*check.channel_set.select_for_update(of=("self",), no_key=True).order_by("id"))
 
     url = reverse("hc-details", args=[copied.code], query={"copied": 1})
     return redirect(url)
@@ -1041,13 +1041,13 @@ def channels(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
                 new_checks.append(check)
 
         with _404_if_deleted(), transaction.atomic():
-            # The checks before the channel, in id order: switch_channel and copy lock a
-            # check first too, so two concurrent writes cannot deadlock on PostgreSQL
+            # Checks in id order, then the channel, as switch_channel and copy lock them: this
+            # POST cannot deadlock with either on PostgreSQL
             ids = {check.id for check in new_checks}
-            q = Check.objects.select_for_update().filter(id__in=ids).order_by("id")
+            q = Check.objects.select_for_update(no_key=True).filter(id__in=ids).order_by("id")
             if set(q.values_list("id", flat=True)) != ids:
                 raise Http404("not found")
-            Channel.objects.select_for_update().get(id=channel.id)
+            Channel.objects.select_for_update(no_key=True).get(id=channel.id)
             channel.checks.set(new_checks)
 
         return redirect("hc-channels", project.code)

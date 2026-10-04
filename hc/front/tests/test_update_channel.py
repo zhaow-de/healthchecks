@@ -135,5 +135,5 @@ class UpdateChannelTestCase(BaseTestCase):
         channel_read = next(i for i, sql in enumerate(locked) if sql.startswith("SELECT") and 'FROM "api_channel"' in sql)
         self.assertLess(check_read, channel_read)
         if connection.vendor == "postgresql":
-            self.assertIn("FOR UPDATE", locked[check_read])
-            self.assertIn("FOR UPDATE", locked[channel_read])
+            self.assertIn("FOR NO KEY UPDATE", locked[check_read])
+            self.assertIn("FOR NO KEY UPDATE", locked[channel_read])

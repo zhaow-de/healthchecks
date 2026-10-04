@@ -478,7 +478,7 @@ class Check(models.Model):
         # another, each to the state the previous one left, and "sendalerts" cannot see
         # the updated check before its Ping row exists
         with transaction.atomic():
-            check = cls.objects.select_for_update(of=("self",)).get(lookup)
+            check = cls.objects.select_for_update(of=("self",), no_key=True).get(lookup)
             frozen_now = now()
             action = check.ping_action(action, method, body)
 
@@ -642,8 +642,13 @@ class Check(models.Model):
         Call it inside transaction.atomic(), before reading what a write depends on:
         a ping may have changed the row since this instance was read. Raises
         Check.DoesNotExist if the check is gone.
+
+        On PostgreSQL the lock is FOR NO KEY UPDATE, as is every row lock the views
+        take on a check, channel or project: it stops a delete or a concurrent write of
+        the row, but not an insert that references it, so a ping or a notification never
+        waits on it, and no lock cycle with "sendalerts" can form.
         """
-        q = Check.objects.select_for_update(of=("self",)).select_related("project")
+        q = Check.objects.select_for_update(of=("self",), no_key=True).select_related("project")
         self.refresh_from_db(from_queryset=q)
 
     def pause(self) -> None:
