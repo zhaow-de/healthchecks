@@ -47,6 +47,18 @@ class MyChecksTestCase(BaseTestCase):
         self.profile.refresh_from_db()
         self.assertTrue(self.profile.last_active_date)
 
+    def test_it_shows_the_same_header_and_footer_as_other_pages(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(self.url)
+        html = r.content.decode()
+        self.assertLess(html.index('id="logo"'), html.index('id="project-menu"'))
+        self.assertEqual(html.count('id="base-url"'), 1)
+        nav = html[html.index("<nav") : html.index("</nav>")]
+        self.assertNotIn("container-fluid", nav)
+        # The content's container and the footer's
+        self.assertContains(r, '<div class="container-fluid">', count=2)
+        self.assertContains(r, '(<a href="https://github.com/zhaow-de/healthchecks">github</a>)')
+
     def test_it_bumps_last_active_date(self) -> None:
         self.profile.last_active_date = now() - td(days=10)
         self.profile.save()
