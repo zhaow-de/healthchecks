@@ -132,10 +132,11 @@ def _get_check_for_user(request: AuthenticatedHttpRequest, code: UUID, preload_o
 
 @contextmanager
 def _404_if_deleted() -> Iterator[None]:
-    """Answer 404 when Check.lock() finds the check deleted since the view read it."""
+    """Answer 404 when the check was deleted after the view read it: Check.lock()
+    raises DoesNotExist then, and a save(update_fields=...) raises NotUpdated."""
     try:
         yield
-    except Check.DoesNotExist:
+    except Check.DoesNotExist, Check.NotUpdated:
         raise Http404("not found") from None
 
 
@@ -513,7 +514,8 @@ def update_name(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
     check.slug = form.cleaned_data["slug"]
     check.tags = form.cleaned_data["tags"]
     check.desc = form.cleaned_data["desc"]
-    check.save(update_fields=("name", "slug", "tags", "desc"))
+    with _404_if_deleted():
+        check.save(update_fields=("name", "slug", "tags", "desc"))
 
     return _redirect_back(request, check)
 
@@ -535,7 +537,8 @@ def filtering_rules(request: AuthenticatedHttpRequest, code: UUID) -> HttpRespon
         update_fields += ["filter_default_fail", "start_kw", "success_kw", "failure_kw"]
     for field in update_fields:
         setattr(check, field, form.cleaned_data[field])
-    check.save(update_fields=update_fields)
+    with _404_if_deleted():
+        check.save(update_fields=update_fields)
 
     return redirect("hc-details", code)
 
@@ -925,7 +928,8 @@ def transfer(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
 
         target_project = _get_project_for_user(request, form.cleaned_data["project"])
         check.project = target_project
-        check.save(update_fields=("project",))
+        with _404_if_deleted():
+            check.save(update_fields=("project",))
         check.assign_all_channels()
 
         messages.success(request, "Check transferred successfully!")
