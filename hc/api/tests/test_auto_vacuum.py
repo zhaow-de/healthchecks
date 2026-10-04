@@ -13,7 +13,7 @@ def change_counter(path: Path) -> int:
     return int.from_bytes(path.read_bytes()[24:28], "big")
 
 
-# A TestCase, not a SimpleTestCase: pytest-django blocks every database connection,
+# A TestCase, not a SimpleTestCase: pytest-django blocks every DatabaseWrapper,
 # this file's own included, outside a test case that uses the database
 @skipUnless(connection.vendor == "sqlite", "reads SQLite's auto_vacuum")
 class AutoVacuumTestCase(TestCase):
