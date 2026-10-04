@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from datetime import timedelta as td
 from functools import cache, cached_property
+from ipaddress import IPv6Address, ip_address, ip_network
 from typing import NotRequired, Self, TypedDict
 from zoneinfo import ZoneInfo
 
@@ -1149,9 +1150,21 @@ class TokenBucket(models.Model):
 
     @staticmethod
     def authorize_auth_ip(request: HttpRequest) -> bool:
-        value = f"auth-ip-{client_ip(request)}"
+        ip = client_ip(request)
+        try:
+            addr = ip_address(ip)
+        except ValueError:
+            addr = None
+
+        if isinstance(addr, IPv6Address):
+            # A client usually holds a whole /64, so a bucket per address
+            # would let it open 2^64 of them. A dual-stack socket reports an
+            # IPv4 client as ::ffff:a.b.c.d, and those all share ::/64.
+            mapped = addr.ipv4_mapped
+            ip = str(mapped) if mapped else str(ip_network((addr, 64), strict=False))
+
         # 20 login attempts for a single IP per hour:
-        return TokenBucket.authorize(value, 20, 3600)
+        return TokenBucket.authorize(f"auth-ip-{ip}", 20, 3600)
 
     @staticmethod
     def authorize_login_email(email: str, device: str = "") -> bool:

@@ -13,6 +13,10 @@ from hc.accounts.models import REPORT_CHOICES
 from hc.api.models import TokenBucket
 from hc.front.forms import TimezoneField
 
+# One text for every refusal, so it does not tell which bucket refused
+# or whether the email exists
+TOO_MANY_ATTEMPTS = "Too many attempts, please try later."
+
 
 class LowercaseEmailField(forms.EmailField):
     def clean(self, value: str) -> str:
@@ -36,11 +40,12 @@ class EmailLoginForm(forms.Form):
         assert self.request
         self.user: User | None = User.objects.filter(email=v).first()
         nonce = device.nonce(self.request, self.user)
-        if not TokenBucket.authorize_login_email(v, nonce):
-            raise forms.ValidationError("Too many attempts, please try later.")
-
+        # The IP bucket goes first: an exhausted IP then adds no row per email
         if not nonce and not TokenBucket.authorize_auth_ip(self.request):
-            raise forms.ValidationError("Too many attempts, please try later.")
+            raise forms.ValidationError(TOO_MANY_ATTEMPTS)
+
+        if not TokenBucket.authorize_login_email(v, nonce):
+            raise forms.ValidationError(TOO_MANY_ATTEMPTS)
 
         return v
 
@@ -61,8 +66,12 @@ class PasswordLoginForm(forms.Form):
             assert self.request
             user = User.objects.filter(email=username).first()
             nonce = device.nonce(self.request, user)
+            # The IP bucket goes first: an exhausted IP then adds no row per email
+            if not nonce and not TokenBucket.authorize_auth_ip(self.request):
+                raise forms.ValidationError(TOO_MANY_ATTEMPTS)
+
             if not TokenBucket.authorize_login_password(username, nonce):
-                raise forms.ValidationError("Too many attempts, please try later.")
+                raise forms.ValidationError(TOO_MANY_ATTEMPTS)
 
             self.user = authenticate(username=username, password=password)
             if self.user is None or not self.user.is_active:
