@@ -121,11 +121,8 @@ hc.ready(function () {
         url.search = "";
 
         // Checked tags
-        const checked = [];
-        hc.$$("#my-checks-tags .checked").forEach(function (el) {
-            checked.push(el.textContent);
-            url.searchParams.append("tag", el.textContent);
-        });
+        const checked = hc.$$("#my-checks-tags .checked").map((el) => el.textContent);
+        checked.forEach((tag) => url.searchParams.append("tag", tag));
 
         // Search string
         const searchInput = document.getElementById("search");
@@ -135,16 +132,10 @@ hc.ready(function () {
         }
 
         // Status filters
-        const statuses = [];
-        activeStatusButtons().forEach(function (el) {
-            statuses.push(el.dataset.value);
-            url.searchParams.append("status", el.dataset.value);
-        });
+        const statuses = activeStatusButtons().map((el) => el.dataset.value);
+        statuses.forEach((status) => url.searchParams.append("status", status));
 
-        // Update hash
-        if (window.history && window.history.replaceState) {
-            window.history.replaceState({}, "", url.toString());
-        }
+        window.history.replaceState({}, "", url.toString());
 
         // Update sort links
         document.querySelectorAll("a[data-sort-value]").forEach((a) => {
@@ -152,61 +143,40 @@ hc.ready(function () {
             a.setAttribute("href", url.toString());
         });
 
-        const rows = hc.$$("#checks-table tr.checks-row");
-        let numVisible = 0;
-        if (checked.length === 0 && !search && statuses.length === 0) {
-            // No checked tags, no search string, no status filters: show all
-            hc.show(rows);
-            numVisible = rows.length;
-        } else {
-            function applySingle(element) {
-                const nameData = element.querySelector(".my-checks-name").dataset;
-                if (search) {
-                    const parts = [nameData.name, nameData.slug, element.id];
-                    const haystack = parts.join("\n").toLowerCase();
-                    if (haystack.indexOf(search) === -1) {
-                        hc.hide(element);
-                        return;
-                    }
-                }
-
-                if (checked.length) {
-                    const tags = nameData.tags.split(" ");
-                    for (let i = 0, checkedTag; (checkedTag = checked[i]); i++) {
-                        if (tags.indexOf(checkedTag) === -1) {
-                            hc.hide(element);
-                            return;
-                        }
-                    }
-                }
-
-                if (statuses.length) {
-                    if (!statusMatch(element, statuses)) {
-                        hc.hide(element);
-                        return;
-                    }
-                }
-
-                hc.show(element);
-                numVisible += 1;
+        function matches(row) {
+            const nameData = row.querySelector(".my-checks-name").dataset;
+            if (search) {
+                const haystack = [nameData.name, nameData.slug, row.id].join("\n").toLowerCase();
+                if (!haystack.includes(search)) return false;
             }
 
-            // For each row, see if it needs to be shown or hidden
-            rows.forEach(applySingle);
+            if (checked.length) {
+                const tags = nameData.tags.split(" ");
+                if (!checked.every((tag) => tags.includes(tag))) return false;
+            }
+
+            return statuses.length === 0 || statusMatch(row, statuses);
         }
+
+        let numVisible = 0;
+        hc.$$("#checks-table tr.checks-row").forEach(function (row) {
+            const match = matches(row);
+            hc.toggle(row, match);
+            if (match) numVisible += 1;
+        });
 
         hc.toggle("#checks-table", numVisible > 0);
         hc.toggle("#no-checks", numVisible === 0);
     }
 
     // User clicks on tags: apply filters
-    hc.on("#my-checks-tags div", "click", function () {
+    hc.on("#my-checks-tags .btn", "click", function () {
         this.classList.toggle("checked");
         applyFilters();
     });
 
     // User changes the search string: apply filters
-    hc.on("#search", "keyup", applyFilters);
+    hc.on("#search", "input", applyFilters);
 
     function switchUrlFormat(format) {
         const url = new URL(window.location.href);
@@ -302,7 +272,7 @@ hc.ready(function () {
     function refreshStatus() {
         hc.getJSON(statusUrl, null, { timeout: 2000 }).then(function (data) {
             let statusChanged = false;
-            for (let i = 0, el; (el = data.details[i]); i++) {
+            for (const el of data.details) {
                 if (lastStatus[el.code] !== el.status) {
                     lastStatus[el.code] = el.status;
                     const statusSpan = rowEl(el.code, "span.status");
@@ -336,7 +306,7 @@ hc.ready(function () {
                 applyFilters();
             }
 
-            hc.$$("#my-checks-tags > div.btn").forEach(function (btn) {
+            hc.$$("#my-checks-tags > .btn").forEach(function (btn) {
                 const tag = btn.innerText;
                 // A tag that no check carries any more has no entry: leave its button as it is
                 const tagData = data.tags[tag];
@@ -363,7 +333,7 @@ hc.ready(function () {
         adaptiveSetInterval(refreshStatus);
     }
 
-    hc.tagSelect("#update-tags-input", hc.$$("#my-checks-tags div").map((el) => el.textContent));
+    hc.tagSelect("#update-tags-input", hc.$$("#my-checks-tags .btn").map((el) => el.textContent));
 
     hc.tooltip(".my-checks-url", { title: "Click to copy" });
     hc.on(".my-checks-url", "click", function () {
@@ -375,9 +345,8 @@ hc.ready(function () {
         hc.copy(this, this.textContent, "Click to copy");
     });
 
-    hc.on("#filters a[data-value]", "click", function () {
-        const v = this.dataset.value;
-        hc.toggle('#check-filters button[data-value="' + v + '"]');
+    hc.on("#filters .dropdown-item[data-value]", "click", function () {
+        hc.toggle('.filter-btn[data-value="' + this.dataset.value + '"]');
         applyFilters();
     });
 

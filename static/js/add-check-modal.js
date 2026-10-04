@@ -8,7 +8,7 @@ hc.ready(function () {
     const grace = document.getElementById("add-check-grace");
     const graceUnit = document.getElementById("add-check-grace-unit");
 
-    hc.tagSelect("#add-check-tags", hc.$$("#my-checks-tags div").map((el) => el.textContent));
+    hc.tagSelect("#add-check-tags", hc.$$("#my-checks-tags .btn").map((el) => el.textContent));
 
     function selectedKind() {
         return hc.$("#add-check-modal input[name=kind]:checked").value;
@@ -71,6 +71,6 @@ hc.ready(function () {
         }
     }
 
-    hc.on("#add-check-schedule", "keyup change", validateSchedule);
-    hc.on("#add-check-schedule-oncalendar", "keyup change", validateSchedule);
+    hc.on("#add-check-schedule", "input", validateSchedule);
+    hc.on("#add-check-schedule-oncalendar", "input", validateSchedule);
 });

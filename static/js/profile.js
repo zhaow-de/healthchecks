@@ -7,12 +7,8 @@ hc.ready(function() {
         refreshThrottle: 0,
     });
 
-    let browserTz = null;
-    try {
-        browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    } catch(err) {}
-
-    if (browserTz && document.getElementById("tz").value !== browserTz) {
+    const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (document.getElementById("tz").value !== browserTz) {
         hc.$("#browser-tz-hint b").textContent = browserTz;
         hc.show("#browser-tz-hint");
     }

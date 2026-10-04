@@ -5,29 +5,7 @@
 
 
 {% block content %}
-<div class="row">
-    <div class="col-sm-12">
-        <h1 class="settings-title">
-            Settings
-            <small class="text-body-secondary">{{ request.user.email }}</small>
-        </h1>
-    </div>
-    {% if messages %}
-    <div class="col-sm-12">
-        {% for message in messages %}
-            <p class="alert alert-{{ message.tags }}">{{ message }}</p>
-        {% endfor %}
-    </div>
-    {% endif %}
-</div>
-
-<div class="row">
-    <div class="col-sm-3">
-        <ul class="nav nav-pills flex-column mb-4">
-            <li class="nav-item"><a class="nav-link active" href="{% url 'hc-profile' %}">Account</a></li>
-            <li class="nav-item"><a class="nav-link" href="{% url 'hc-notifications' %}">Email Reports</a></li>
-        </ul>
-    </div>
+{% include "accounts/settings_nav.html" with active="account" %}
 
     <div class="col-sm-9 col-md-6">
         <div class="card mb-4 border-{{ email_password_status|default:'default' }}">
@@ -231,12 +209,12 @@
                     <p>You do not have any projects. Create one!</p>
                 {% endif %}
 
-                <a
+                <button
                     id="create-project"
-                    href="#"
+                    type="button"
                     class="btn btn-outline-secondary float-end"
                     data-bs-toggle="modal"
-                    data-bs-target="#add-project-modal">Create a New Project</a>
+                    data-bs-target="#add-project-modal">Create a New Project</button>
             </div>
         </div>
 

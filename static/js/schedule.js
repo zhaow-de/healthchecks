@@ -63,7 +63,7 @@ function bindDuration({value, unit, hidden, slider}) {
         value.setCustomValidity("");
     }
 
-    hc.on([value, unit], "keyup change", function() {
+    hc.on([value, unit], "input", function() {
         const secs = Math.round(value.value * unit.value);
         value.setCustomValidity(secs <= 31536000 ? "" : "Must not exceed 365 days");
 
@@ -125,7 +125,7 @@ function schedulePreview({input, tz, url, target, submit}) {
         }
     }
 
-    hc.on(input, "keyup", update);
+    hc.on(input, "input", update);
     if (typeof tz !== "string") hc.on(tz, "change", update);
 
     return function refresh() {

@@ -4,7 +4,7 @@ hc.ready(function() {
     const results = document.getElementById("search-results");
     const nav = document.getElementById("docs-nav");
 
-    hc.on(input, "keyup focus", function() {
+    hc.on(input, "input focus", function() {
         const q = this.value;
         if (q.length < 3) {
             results.classList.remove("on");

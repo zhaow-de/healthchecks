@@ -15,12 +15,6 @@ hc.ready(function () {
         return false;
     });
 
-    hc.on("a[data-create-key]", "click", function () {
-        hc.$("#create-key-type").value = this.dataset.createKey;
-        hc.$("#create-key-form").submit();
-        return false;
-    });
-
     hc.tooltip("code[data-plaintext]", {"title": "Click to reveal"});
     hc.on("code[data-plaintext]", "click", function () {
         const tip = bootstrap.Tooltip.getInstance(this);

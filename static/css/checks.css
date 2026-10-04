@@ -8,7 +8,7 @@
     flex-grow: 1;
 }
 
-#my-checks-tags div {
+#my-checks-tags .btn {
     margin-bottom: 4px;
 }
 

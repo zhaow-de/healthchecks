@@ -1,4 +1,4 @@
-window.addEventListener("DOMContentLoaded", function () {
+hc.ready(function () {
     // Event handler for input's oninput event
     const validateAndSubmit = function () {
         if (this.validity.valid) {

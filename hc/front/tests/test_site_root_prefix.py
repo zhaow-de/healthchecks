@@ -34,7 +34,7 @@ class SiteRootPrefixTestCase(BaseTestCase):
         self._reload_urlconf()
 
         r = self.client.get("/hc/tv/")
-        self.assertContains(r, 'httpRequest.open("GET", "/hc/api/v3/checks/");')
+        self.assertContains(r, 'await fetch("/hc/api/v3/checks/", {headers: {"X-Api-Key": key}});')
 
         r = self.client.get("/hc/api/v3/checks/", HTTP_X_API_KEY="R" * 32)
         self.assertEqual(r.status_code, 401)

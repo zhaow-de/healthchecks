@@ -9,4 +9,4 @@ class DashboardTestCase(BaseTestCase):
         r = self.client.get("/tv/")
         self.assertContains(r, "<title>Mychecks</title>", status_code=200)
         self.assertContains(r, '<div id="panel"></div>')
-        self.assertContains(r, 'httpRequest.open("GET", "/api/v3/checks/");')
+        self.assertContains(r, 'await fetch("/api/v3/checks/", {headers: {"X-Api-Key": key}});')

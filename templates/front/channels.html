@@ -251,37 +251,8 @@
                     </div>
 
                     {% if ch.kind == "webhook" %}
-                    {% with ch.down_webhook_spec as spec %}
-                        {% if spec.url %}
-                            <p><strong>Execute on "down" events:</strong></p>
-                            <pre>{{ spec.method }} {{ spec.url }}</pre>
-                            {% if spec.body %}
-                                <p>Request Body</p>
-                                <pre>{{ spec.body }}</pre>
-                            {% endif %}
-
-                            {% if spec.headers %}
-                                <p>Request Headers</p>
-                                <pre>{{ spec.headers|format_headers }}</pre>
-                            {% endif %}
-                        {% endif %}
-                        {% endwith %}
-
-                        {% with ch.up_webhook_spec as spec %}
-                        {% if spec.url %}
-                            <p><strong>Execute on "up" events:</strong></p>
-                            <pre>{{ spec.method }} {{ spec.url }}</pre>
-                            {% if spec.body %}
-                                <p>Request Body</p>
-                                <pre>{{ spec.body }}</pre>
-                            {% endif %}
-
-                            {% if spec.headers %}
-                                <p>Request Headers</p>
-                                <pre>{{ spec.headers|format_headers }}</pre>
-                            {% endif %}
-                        {% endif %}
-                    {% endwith %}
+                    {% include "front/webhook_spec.html" with spec=ch.down_webhook_spec event="down" %}
+                    {% include "front/webhook_spec.html" with spec=ch.up_webhook_spec event="up" %}
                     {% endif %}
                 </div>
                 <div class="modal-footer">

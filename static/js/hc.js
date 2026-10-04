@@ -147,15 +147,14 @@
         return request(url, Object.assign({}, opts, {method: "POST", data: data}));
     }
 
-    // show/hide work on Bootstrap's d-none, and show() also clears an inline
-    // style="display: none" and the hidden attribute, so an element can start hidden
-    // either way. An element that JS shows and hides must not carry a responsive d-*
-    // class (d-md-block and the like): those are !important and override d-none.
+    // show/hide work on Bootstrap's d-none, and show() also clears the hidden attribute,
+    // so an element can start hidden either way. An element that JS shows and hides must
+    // not carry a responsive d-* class (d-md-block and the like): those are !important
+    // and override d-none.
     function show(target) {
         all(target).forEach(function(el) {
             el.classList.remove("d-none");
             el.hidden = false;
-            if (el.style.display === "none") el.style.display = "";
         });
     }
 
@@ -166,7 +165,7 @@
     }
 
     function isHidden(el) {
-        return el.hidden || el.classList.contains("d-none") || el.style.display === "none";
+        return el.hidden || el.classList.contains("d-none");
     }
 
     function toggle(target, visible) {

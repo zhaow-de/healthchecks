@@ -16,7 +16,7 @@
 <div id="check-filters">
     <div id="my-checks-tags">
     {% for tag, status, tooltip in tags %}
-        <div data-tooltip="{{ tooltip }}" class="btn btn-sm {{ status }} {% if tag in selected_tags %}checked{% endif%}">{{ tag }}</div>
+        <button type="button" data-tooltip="{{ tooltip }}" class="btn btn-sm {{ status }} {% if tag in selected_tags %}checked{% endif%}">{{ tag }}</button>
     {% endfor %}
     </div>
     <div id="search-group" class="input-group">
@@ -29,63 +29,22 @@
             <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown"></button>
             <ul class="dropdown-menu dropdown-menu-end">
                 <li><h6 class="dropdown-header">Filter by status</h6></li>
+                {% for value, label, icon in status_filters %}
                 <li>
-                    <a class="dropdown-item" href="javascript:;" data-value="new">
-                        <span class="status ic-new"></span> New
-                    </a>
+                    <button type="button" class="dropdown-item" data-value="{{ value }}">
+                        <span class="status ic-{{ icon }}"></span> {{ label }}
+                    </button>
                 </li>
-                <li>
-                    <a class="dropdown-item" href="javascript:;" data-value="paused">
-                        <span class="status ic-paused"></span> Paused
-                    </a>
-                </li>
-                <li>
-                    <a class="dropdown-item" href="javascript:;" data-value="started">
-                        <span class="status ic-dots"></span> Started
-                    </a>
-                </li>
-                <li>
-                    <a class="dropdown-item" href="javascript:;" data-value="up">
-                        <span class="status ic-up"></span> Up
-                    </a>
-                </li>
-                <li>
-                    <a class="dropdown-item" href="javascript:;" data-value="grace">
-                        <span class="status ic-grace"></span> Late
-                    </a>
-                </li>
-                <li>
-                    <a class="dropdown-item" href="javascript:;" data-value="down">
-                        <span class="status ic-down"></span> Down
-                    </a>
-                </li>
+                {% endfor %}
             </ul>
         </div>
     </div>
+    {% for value, label, icon in status_filters %}
     <button
-        class="filter-btn btn btn-outline-secondary"
-        {% if 'new' not in selected_statuses %}style="display: none"{% endif %}
-        data-value="new">New ×</button>
-    <button
-        class="filter-btn btn btn-outline-secondary"
-        {% if 'paused' not in selected_statuses %}style="display: none"{% endif %}
-        data-value="paused">Paused ×</button>
-    <button
-        class="filter-btn btn btn-outline-secondary"
-        {% if 'started' not in selected_statuses %}style="display: none"{% endif %}
-        data-value="started">Started ×</button>
-    <button
-        class="filter-btn btn btn-outline-secondary"
-        {% if 'up' not in selected_statuses %}style="display: none"{% endif %}
-        data-value="up">Up ×</button>
-    <button
-        class="filter-btn btn btn-outline-secondary"
-        {% if 'grace' not in selected_statuses %}style="display: none"{% endif %}
-        data-value="grace">Late ×</button>
-    <button
-        class="filter-btn btn btn-outline-secondary"
-        {% if 'down' not in selected_statuses %}style="display: none"{% endif %}
-        data-value="down">Down ×</button>
+        type="button"
+        class="filter-btn btn btn-outline-secondary{% if value not in selected_statuses %} d-none{% endif %}"
+        data-value="{{ value }}">{{ label }} ×</button>
+    {% endfor %}
 
     <button
         class="btn btn-primary"
@@ -99,7 +58,7 @@
 <div class="row">
     <div class="col-sm-12">
         {% include "front/checks_table.html" %}
-        <div id="no-checks" {% if num_visible > 0 %}style="display: none"{% endif %}>
+        <div id="no-checks" {% if num_visible > 0 %}class="d-none"{% endif %}>
             no matching checks found
         </div>
     </div>
@@ -128,27 +87,7 @@
 {% include "front/update_timeout_modal.html" %}
 {% include "front/add_check_modal.html" %}
 
-<div id="ping-details-modal" class="modal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div id="ping-details-body">Loading</div>
-            <div class="modal-footer">
-                <a
-                    id="ping-details-log"
-                    href="#"
-                    class="btn btn-outline-secondary">
-                    Show Earlier Events
-                </a>
-                <button
-                    type="button"
-                    class="btn btn-outline-secondary"
-                    data-bs-dismiss="modal">
-                    Got It!
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
+{% include "front/ping_details_modal.html" with log_link=True %}
 
 {% endblock %}
 

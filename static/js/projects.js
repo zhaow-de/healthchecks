@@ -6,7 +6,7 @@ hc.ready(function () {
     const lastStatus = {};
     const lastStarted = {};
     function refreshStatus() {
-        hc.getJSON(base + "?refresh=1", null, {timeout: 2000}).then(function(data) {
+        hc.getJSON(base + "/?refresh=1", null, {timeout: 2000}).then(function(data) {
             let anyDown = false;
             for (const code in data) {
                 const el = data[code];

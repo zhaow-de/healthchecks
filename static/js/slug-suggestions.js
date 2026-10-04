@@ -29,7 +29,7 @@ hc.ready(function () {
             btn.disabled = !suggested;
         }
 
-        hc.on(nameInput, "keyup change", update);
+        hc.on(nameInput, "input", update);
         hc.on(modal, "shown.bs.modal", update);
 
         hc.on(btn, "click", function() {

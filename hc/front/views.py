@@ -61,6 +61,15 @@ from hc.lib.string import is_valid_uuid_string
 from hc.lib.tz import all_timezones
 
 VALID_SORT_VALUES = ("name", "-name", "last_ping", "-last_ping", "created")
+# The checks list's status filters: (value, label, status icon)
+STATUS_FILTERS = (
+    ("new", "New", "new"),
+    ("paused", "Paused", "paused"),
+    ("started", "Started", "dots"),
+    ("up", "Up", "up"),
+    ("grace", "Late", "grace"),
+    ("down", "Down", "down"),
+)
 STATUS_TEXT_TMPL = get_template("front/log_status_text.html")
 LAST_PING_TMPL = get_template("front/last_ping_cell.html")
 EVENTS_TMPL = get_template("front/details_events.html")
@@ -253,6 +262,7 @@ def checks(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
         "sort": request.profile.sort,
         "selected_tags": selected_tags,
         "selected_statuses": selected_statuses,
+        "status_filters": STATUS_FILTERS,
         "search": search,
         "hidden_checks": hidden_checks,
         "num_visible": len(checks) - len(hidden_checks),

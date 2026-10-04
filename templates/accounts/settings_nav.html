@@ -1,0 +1,27 @@
+{% comment %}
+The title and the navigation of the account settings pages. It opens the row that
+holds the navigation column: the including page adds its own column and closes it.
+{% endcomment %}
+<div class="row">
+    <div class="col-sm-12">
+        <h1 class="settings-title">
+            Settings
+            <small class="text-body-secondary">{{ request.user.email }}</small>
+        </h1>
+    </div>
+    {% if messages %}
+    <div class="col-sm-12">
+        {% for message in messages %}
+            <p class="alert alert-{{ message.tags }}">{{ message }}</p>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+
+<div class="row">
+    <div class="col-sm-3">
+        <ul class="nav nav-pills flex-column mb-4">
+            <li class="nav-item"><a class="nav-link{% if active == 'account' %} active{% endif %}" href="{% url 'hc-profile' %}">Account</a></li>
+            <li class="nav-item"><a class="nav-link{% if active == 'reports' %} active{% endif %}" href="{% url 'hc-notifications' %}">Email Reports</a></li>
+        </ul>
+    </div>
