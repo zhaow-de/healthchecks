@@ -1,7 +1,5 @@
 """No hook runs at push, resolved through pre-commit rather than read off the YAML, which an upstream manifest's stages outrank."""
 
-from __future__ import annotations
-
 import pathlib
 
 _ROOT = pathlib.Path(__file__).resolve().parents[1]

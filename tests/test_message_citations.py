@@ -4,8 +4,6 @@ neither side of the commit is refused, and every shape the hook leaves alone is 
 Synthetic messages over a fake tree drive the judgement; a repository of its own drives the git-facing arms, and the
 wiring test reads the pre-commit config."""
 
-from __future__ import annotations
-
 import hashlib
 import importlib.util
 import pathlib

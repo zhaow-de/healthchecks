@@ -1,8 +1,6 @@
 """merge-gate.py: the read line must be at the floor and name the head, with the exceptions the cases
 below drive, and every gh call it makes names this repository."""
 
-from __future__ import annotations
-
 import importlib.util
 import json
 import os

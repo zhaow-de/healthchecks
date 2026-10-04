@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import tempfile
 from contextlib import redirect_stdout
 from importlib.machinery import ModuleSpec

@@ -3,8 +3,6 @@
 Outside the scope, deliberately: the application under `hc/`, `templates/` and `static/`, whose own paths its own tests hold.
 """
 
-from __future__ import annotations
-
 import re
 import subprocess
 from pathlib import Path

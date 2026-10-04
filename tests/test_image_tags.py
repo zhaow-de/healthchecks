@@ -1,7 +1,5 @@
 """The tag and summary steps of `.github/workflows/image.yml`, run in bash as a Linux runner runs them."""
 
-from __future__ import annotations
-
 import os
 import subprocess
 from pathlib import Path

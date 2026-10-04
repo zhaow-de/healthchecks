@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import hashlib
 import hmac
 import json
@@ -9,7 +7,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from datetime import timedelta as td
-from functools import cache
+from functools import cache, cached_property
 from typing import NotRequired, Self, TypedDict
 from zoneinfo import ZoneInfo
 
@@ -22,7 +20,6 @@ from django.db import IntegrityError, models, transaction
 from django.db.models import F, QuerySet
 from django.http import HttpRequest
 from django.urls import reverse
-from django.utils.functional import cached_property
 from django.utils.module_loading import import_string
 from django.utils.timezone import now
 from oncalendar import OnCalendar
@@ -103,13 +100,13 @@ class CheckDict(TypedDict):
     tz: NotRequired[str]
 
 
-@dataclass
+@dataclass(slots=True)
 class DowntimeRecord:
     boundary: datetime  # The start of this time interval (timezone-aware)
     tz: str  # For calculating total seconds in a month
     no_data: bool  # True if the check did not yet exist in this time interval
-    duration: td  # Total downtime in this time interval
-    count: int  # The number of downtime events in this time interval
+    duration: td = td()  # Total downtime in this time interval
+    count: int = 0  # The number of downtime events in this time interval
 
     def monthly_uptime(self) -> float:
         # NB: this method assumes monthly boundaries.
@@ -131,7 +128,7 @@ class DowntimeRecorder:
             # If the check was created *after* the start of the previous time
             # interval then the check did not yet exist during this time interval:
             no_data = prev_boundary is not None and created > prev_boundary
-            self.records.append(DowntimeRecord(b, tz, no_data, td(), 0))
+            self.records.append(DowntimeRecord(b, tz, no_data))
             prev_boundary = b
 
     def add(self, when: datetime, duration: td) -> None:

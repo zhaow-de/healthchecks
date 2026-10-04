@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from io import StringIO
 from unittest.mock import Mock, patch
 

@@ -4,8 +4,6 @@ Refuses prose, blank lines and extra keys: an inbox is a harvest input for the r
 not a story board.
 """
 
-from __future__ import annotations
-
 import io
 import json
 import sys

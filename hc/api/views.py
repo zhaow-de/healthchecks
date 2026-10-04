@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import email.policy
 import time
 from collections.abc import Callable, Iterable
@@ -295,31 +293,32 @@ def _lookup(project: Project, spec: Spec) -> Check | None:
 def _update(check: Check, spec: Spec) -> None:
     new_channels: Iterable[Channel] | None
     # First, validate the supplied channel codes/names
-    if spec.channels is None:
-        # If the channels key is not present, don't update check's channels
-        new_channels = None
-    elif spec.channels == "*":
-        # "*" means "all project's channels"
-        new_channels = Channel.objects.filter(project=check.project)
-    elif spec.channels == "":
-        # "" means "empty list"
-        new_channels = []
-    else:
-        # expect a comma-separated list of channel codes or names
-        new_channels = set()
-        available = list(Channel.objects.filter(project=check.project))
+    match spec.channels:
+        case None:
+            # If the channels key is not present, don't update check's channels
+            new_channels = None
+        case "*":
+            # "*" means "all project's channels"
+            new_channels = Channel.objects.filter(project=check.project)
+        case "":
+            # "" means "empty list"
+            new_channels = []
+        case _:
+            # expect a comma-separated list of channel codes or names
+            new_channels = set()
+            available = list(Channel.objects.filter(project=check.project))
 
-        for s in spec.channels.split(","):
-            if s == "":
-                raise BadChannelError("empty channel identifier")
+            for s in spec.channels.split(","):
+                if s == "":
+                    raise BadChannelError("empty channel identifier")
 
-            matches = [c for c in available if str(c.code) == s or c.name == s]
-            if len(matches) == 0:
-                raise BadChannelError(f"invalid channel identifier: {s}")
-            if len(matches) > 1:
-                raise BadChannelError(f"non-unique channel identifier: {s}")
+                matches = [c for c in available if str(c.code) == s or c.name == s]
+                if len(matches) == 0:
+                    raise BadChannelError(f"invalid channel identifier: {s}")
+                if len(matches) > 1:
+                    raise BadChannelError(f"non-unique channel identifier: {s}")
 
-            new_channels.add(matches[0])
+                new_channels.add(matches[0])
 
     update_fields = set()
 

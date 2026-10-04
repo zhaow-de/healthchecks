@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from hc.api.models import Check, Ping
 from hc.test import BaseTestCase
 

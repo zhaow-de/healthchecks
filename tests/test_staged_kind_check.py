@@ -1,7 +1,5 @@
 """`scripts/staged-kind-check.sh` — the one-kind-per-commit hook."""
 
-from __future__ import annotations
-
 import os
 import shutil
 import subprocess

@@ -1,6 +1,3 @@
-from __future__ import annotations
-
-import shutil
 import tempfile
 from io import StringIO
 from pathlib import Path
@@ -29,13 +26,12 @@ class PygmentizeTestCase(BaseTestCase):
 
         # The command reads and writes templates/front/snippets under BASE_DIR,
         # so run it against a scratch copy of that directory.
-        tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(tmp.cleanup)
-        self.base_dir = Path(tmp.name)
+        tmp = self.enterContext(tempfile.TemporaryDirectory())
+        self.base_dir = Path(tmp)
         self.snippets = self.base_dir / "templates" / "front" / "snippets"
         self.snippets.mkdir(parents=True)
         for src in (settings.BASE_DIR / "templates" / "front" / "snippets").glob("*.txt"):
-            shutil.copy(src, self.snippets / src.name)
+            src.copy(self.snippets / src.name)
 
     def run_command(self) -> str:
         stdout = StringIO()

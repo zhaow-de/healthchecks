@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from django.contrib.auth.hashers import make_password
 from django.core import signing
 from django.core.signing import TimestampSigner

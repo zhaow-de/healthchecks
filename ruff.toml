@@ -24,8 +24,8 @@ ignore = [
     "RUF003",
 ]
 
-[lint.isort]
-required-imports = ["from __future__ import annotations"]
+[lint.flake8-tidy-imports.banned-api]
+"__future__.annotations".msg = "Python 3.14 evaluates annotations lazily (PEP 649)."
 
 [lint.pep8-naming]
 extend-ignore-names = ["assertEmail*"]

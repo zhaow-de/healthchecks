@@ -4,8 +4,6 @@ Validation is `check-agent-lessons.py`'s `record_errors`, so the harvest's shape
 cannot drift apart; a refusal writes nothing.
 """
 
-from __future__ import annotations
-
 import argparse
 import datetime as dt
 import importlib.util

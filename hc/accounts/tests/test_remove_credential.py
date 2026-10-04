@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from django.test.utils import override_settings
 
 from hc.accounts.models import Credential

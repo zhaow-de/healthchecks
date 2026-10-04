@@ -1,7 +1,5 @@
 """The inbox checker's entry point: with no path it refuses, rather than reporting the clean it never looked for."""
 
-from __future__ import annotations
-
 import json
 import pathlib
 import subprocess

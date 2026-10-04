@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from unittest import TestCase
 
 from hc.lib.html import html2text

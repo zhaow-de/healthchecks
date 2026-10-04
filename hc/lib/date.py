@@ -1,5 +1,4 @@
-from __future__ import annotations
-
+from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -7,11 +6,14 @@ from django.template.defaultfilters import pluralize
 from django.utils.timezone import now
 
 
+@dataclass(frozen=True)
 class Unit:
-    def __init__(self, name: str, nsecs: int):
-        self.name = name
-        self.plural = name + "s"
-        self.nsecs = nsecs
+    name: str
+    nsecs: int
+
+    @property
+    def plural(self) -> str:
+        return self.name + "s"
 
 
 MINUTE = Unit("minute", 60)

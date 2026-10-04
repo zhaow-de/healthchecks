@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import re
 import sqlite3
 from collections import Counter, defaultdict
@@ -530,35 +528,35 @@ def update_timeout(request: AuthenticatedHttpRequest, code: UUID) -> HttpRespons
     check = _get_check_for_user(request, code)
     fields = ("kind", "timeout", "grace", "schedule", "tz", "alert_after")
 
-    kind = request.POST.get("kind")
-    if kind == "simple":
-        simple_form = forms.TimeoutForm(request.POST)
-        if not simple_form.is_valid():
-            return HttpResponseBadRequest()
+    match request.POST.get("kind"):
+        case "simple":
+            simple_form = forms.TimeoutForm(request.POST)
+            if not simple_form.is_valid():
+                return HttpResponseBadRequest()
 
-        check.kind = "simple"
-        check.timeout = simple_form.cleaned_data["timeout"]
-        check.grace = simple_form.cleaned_data["grace"]
-    elif kind == "cron":
-        cron_form = forms.CronForm(request.POST)
-        if not cron_form.is_valid():
-            return HttpResponseBadRequest()
+            check.kind = "simple"
+            check.timeout = simple_form.cleaned_data["timeout"]
+            check.grace = simple_form.cleaned_data["grace"]
+        case "cron":
+            cron_form = forms.CronForm(request.POST)
+            if not cron_form.is_valid():
+                return HttpResponseBadRequest()
 
-        check.kind = "cron"
-        check.schedule = cron_form.cleaned_data["schedule"]
-        check.tz = cron_form.cleaned_data["tz"]
-        check.grace = cron_form.cleaned_data["grace"]
-    elif kind == "oncalendar":
-        oncalendar_form = forms.OnCalendarForm(request.POST)
-        if not oncalendar_form.is_valid():
-            return HttpResponseBadRequest()
+            check.kind = "cron"
+            check.schedule = cron_form.cleaned_data["schedule"]
+            check.tz = cron_form.cleaned_data["tz"]
+            check.grace = cron_form.cleaned_data["grace"]
+        case "oncalendar":
+            oncalendar_form = forms.OnCalendarForm(request.POST)
+            if not oncalendar_form.is_valid():
+                return HttpResponseBadRequest()
 
-        check.kind = "oncalendar"
-        check.schedule = oncalendar_form.cleaned_data["schedule"]
-        check.tz = oncalendar_form.cleaned_data["tz"]
-        check.grace = oncalendar_form.cleaned_data["grace"]
-    else:
-        return HttpResponseBadRequest()
+            check.kind = "oncalendar"
+            check.schedule = oncalendar_form.cleaned_data["schedule"]
+            check.tz = oncalendar_form.cleaned_data["tz"]
+            check.grace = oncalendar_form.cleaned_data["grace"]
+        case _:
+            return HttpResponseBadRequest()
 
     check.alert_after = check.going_down_after()
     check_saved = False
@@ -635,15 +633,14 @@ def oncalendar_preview(request: HttpRequest) -> HttpResponse:
 
 
 def validate_schedule(request: HttpRequest) -> HttpResponse:
-    kind = request.GET.get("kind", "")
-
     validator: CronValidator | OnCalendarValidator
-    if kind == "cron":
-        validator = CronValidator()
-    elif kind == "oncalendar":
-        validator = OnCalendarValidator()
-    else:
-        return HttpResponseBadRequest()
+    match request.GET.get("kind", ""):
+        case "cron":
+            validator = CronValidator()
+        case "oncalendar":
+            validator = OnCalendarValidator()
+        case _:
+            return HttpResponseBadRequest()
 
     schedule = request.GET.get("schedule", "")
     try:

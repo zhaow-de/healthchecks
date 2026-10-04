@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import logging
 import time
 from email.utils import make_msgid

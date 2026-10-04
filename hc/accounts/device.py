@@ -5,8 +5,6 @@ Adapted from django-device-cookies 0.5.0 (https://github.com/knyghty/django-devi
 Copyright (c) 2024 Tom Carrick, under the MIT License; the notice is in LICENSE.
 """
 
-from __future__ import annotations
-
 import secrets
 from datetime import timedelta as td
 

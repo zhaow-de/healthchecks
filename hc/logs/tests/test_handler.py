@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import logging
 import socket
 import sys
@@ -12,7 +10,7 @@ from hc.logs import Handler
 from hc.logs.models import Record
 from hc.test import BaseTestCase
 
-ExcInfo = tuple[type[BaseException], BaseException, TracebackType | None]
+type ExcInfo = tuple[type[BaseException], BaseException, TracebackType | None]
 
 
 class HandlerTestCase(BaseTestCase):

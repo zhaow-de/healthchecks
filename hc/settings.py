@@ -5,8 +5,6 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
-from __future__ import annotations
-
 import os
 import sys
 import tomllib

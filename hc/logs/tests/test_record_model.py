@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from hc.logs.models import Record
 from hc.test import BaseTestCase
 

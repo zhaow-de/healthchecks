@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from uuid import UUID
 
 from django.contrib.auth.decorators import login_required

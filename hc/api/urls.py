@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from django.urls import include, path, register_converter
 
 from hc.api import views

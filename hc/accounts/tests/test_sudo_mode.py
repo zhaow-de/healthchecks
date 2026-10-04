@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from datetime import timedelta as td
 
 import time_machine

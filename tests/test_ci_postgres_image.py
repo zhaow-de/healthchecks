@@ -1,7 +1,5 @@
 """The postgres leg of `.github/workflows/tests.yml` tests the PostgreSQL image `docker/docker-compose.yml` deploys."""
 
-from __future__ import annotations
-
 import re
 from pathlib import Path
 

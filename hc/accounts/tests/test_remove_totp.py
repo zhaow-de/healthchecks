@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from hc.accounts.models import Credential
 from hc.test import BaseTestCase
 

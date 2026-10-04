@@ -5,8 +5,6 @@ and `main`, with `enforce_admins: true` on both: a required context that no job 
 into that branch, the owner's included, until the protection is edited by hand outside the repository.
 """
 
-from __future__ import annotations
-
 import itertools
 import os
 import re

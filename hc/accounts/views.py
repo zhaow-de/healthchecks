@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import logging
 import time
 from secrets import token_urlsafe
@@ -273,23 +271,25 @@ def project(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
 
     if request.method == "POST":
         if "create_key" in request.POST:
-            if request.POST["create_key"] == "api_key":
-                ctx["new_key"] = project.set_api_key()
-            elif request.POST["create_key"] == "api_key_readonly":
-                ctx["new_key"] = project.set_api_key_readonly()
-            elif request.POST["create_key"] == "ping_key":
-                ctx["new_ping_key"] = project.set_ping_key()
+            match request.POST["create_key"]:
+                case "api_key":
+                    ctx["new_key"] = project.set_api_key()
+                case "api_key_readonly":
+                    ctx["new_key"] = project.set_api_key_readonly()
+                case "ping_key":
+                    ctx["new_ping_key"] = project.set_ping_key()
             project.save()
 
             ctx["key_created"] = True
             ctx["api_status"] = "success"
         elif "revoke_key" in request.POST:
-            if request.POST["revoke_key"] == "api_key":
-                project.api_key = ""
-            elif request.POST["revoke_key"] == "api_key_readonly":
-                project.api_key_readonly = ""
-            elif request.POST["revoke_key"] == "ping_key":
-                project.ping_key = None
+            match request.POST["revoke_key"]:
+                case "api_key":
+                    project.api_key = ""
+                case "api_key_readonly":
+                    project.api_key_readonly = ""
+                case "ping_key":
+                    project.ping_key = None
             project.save()
 
             ctx["key_revoked"] = True

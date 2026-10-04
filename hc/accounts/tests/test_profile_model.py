@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from datetime import UTC, date, datetime
 from datetime import timedelta as td
 from zoneinfo import ZoneInfo

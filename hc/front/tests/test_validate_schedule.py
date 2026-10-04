@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from datetime import UTC, datetime
 from unittest.mock import Mock, patch
 from urllib.parse import urlencode

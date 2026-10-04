@@ -17,8 +17,6 @@ settings.py uses for reading SITE_ROOT:
 
 """
 
-from __future__ import annotations
-
 import os
 from pathlib import Path
 from urllib.parse import urlparse

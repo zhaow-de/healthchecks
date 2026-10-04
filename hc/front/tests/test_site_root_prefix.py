@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import importlib
 
 from django.test.utils import override_settings

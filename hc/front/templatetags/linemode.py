@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from django import template
 from django.template import Context, Node, NodeList, TemplateSyntaxError
 from django.template.base import Parser, Token

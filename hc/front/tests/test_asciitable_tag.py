@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from django.template import Context, Template, TemplateSyntaxError
 
 from hc.test import BaseTestCase

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import hmac
 import random
 import uuid
@@ -29,8 +27,6 @@ if TYPE_CHECKING:
     # Importing Check at runtime would cause a circular import, so only import it
     # during type checking
     from hc.api.models import Check
-
-    CheckQuerySet = QuerySet[Check]
 
 
 NO_NAG = td()
@@ -132,7 +128,7 @@ class Profile(models.Model):
     def projects(self) -> QuerySet[Project]:
         return Project.objects.filter(owner_id=self.user_id).order_by(Lower("name"))
 
-    def checks_from_all_projects(self) -> CheckQuerySet:
+    def checks_from_all_projects(self) -> QuerySet[Check]:
         from hc.api.models import Check
 
         return Check.objects.filter(project__owner_id=self.user_id)

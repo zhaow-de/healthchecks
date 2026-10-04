@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import signal
 from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import UTC, datetime

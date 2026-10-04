@@ -1,8 +1,6 @@
-from __future__ import annotations
-
 import re
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from urllib.parse import urlparse
 from uuid import UUID
 
@@ -14,6 +12,7 @@ from django.utils.html import escape, format_html
 from django.utils.safestring import SafeString, mark_safe
 from django.utils.timezone import now
 
+from hc.api.models import Check
 from hc.lib.date import (
     format_approx_duration,
     format_duration,
@@ -21,10 +20,6 @@ from hc.lib.date import (
     format_hms,
 )
 from hc.lib.urls import absolute_url
-
-if TYPE_CHECKING:
-    from hc.api.models import Check
-
 
 register = template.Library()
 

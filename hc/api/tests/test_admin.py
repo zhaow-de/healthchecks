@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from django.urls import reverse
 
 from hc.api.models import Channel, Check, Flip, Notification, Ping

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from datetime import timedelta as td
 
 from django.utils.timezone import now
@@ -328,6 +326,19 @@ class CreateCheckTestCase(BaseTestCase):
     def test_it_validates_timezone(self) -> None:
         r = self.post(
             {"schedule": "* * * * *", "tz": "not-a-timezone", "grace": 60},
+            expect_fragment="tz is not a valid timezone",
+        )
+        self.assertEqual(r.status_code, 400)
+
+    def test_it_accepts_any_zone_zoneinfo_loads(self) -> None:
+        # America/Coyhaique entered the tz database in 2025
+        r = self.post({"schedule": "* * * * *", "tz": "America/Coyhaique", "grace": 60})
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(r.json()["tz"], "America/Coyhaique")
+
+    def test_it_rejects_the_factory_zone(self) -> None:
+        r = self.post(
+            {"schedule": "* * * * *", "tz": "Factory", "grace": 60},
             expect_fragment="tz is not a valid timezone",
         )
         self.assertEqual(r.status_code, 400)

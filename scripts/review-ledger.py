@@ -8,8 +8,6 @@ controller's task rows among them. `read` prints the entries a review or re-revi
 against, which the workflows refuse when it is not their own.
 """
 
-from __future__ import annotations
-
 import argparse
 import datetime as dt
 import json

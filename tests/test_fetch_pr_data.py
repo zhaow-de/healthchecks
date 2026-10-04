@@ -1,8 +1,6 @@
 """`.claude/skills/release/scripts/fetch-pr-data.py`, the release notes' input. `cz` and `gh` are PATH stubs here; git is
 real, over a scratch repository."""
 
-from __future__ import annotations
-
 import datetime as dt
 import json
 import os

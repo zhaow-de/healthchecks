@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import logging
 from secrets import token_urlsafe
 from urllib.parse import urlencode

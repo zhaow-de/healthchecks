@@ -1,7 +1,5 @@
 """The lesson-append helper: it refuses before it writes, and it writes to the main checkout's inbox."""
 
-from __future__ import annotations
-
 import importlib.util
 import json
 import pathlib

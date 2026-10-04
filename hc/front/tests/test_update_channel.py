@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from hc.accounts.models import Project
 from hc.api.models import Channel, Check
 from hc.test import BaseTestCase

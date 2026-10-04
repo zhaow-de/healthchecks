@@ -14,8 +14,6 @@ and an id of another repository. An id the author's own store holds passes the h
 
 `--range <a>..<b>` judges every non-merge commit of a branch by hand; nothing in the tree calls it."""
 
-from __future__ import annotations
-
 import hashlib
 import os
 import pathlib
@@ -23,6 +21,8 @@ import re
 import subprocess
 import sys
 from collections.abc import Iterator, Sequence
+from dataclasses import dataclass
+from functools import cached_property
 
 SCISSORS = "# ------------------------ >8 ------------------------"
 URL = re.compile(r"\b\w+://[^\s`]+")
@@ -42,13 +42,12 @@ def _git(*args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(["git", *args], capture_output=True, text=True, encoding="utf-8", errors="replace")
 
 
+@dataclass
 class Tree:
     """One side a citation may resolve on: the index when `rev` is empty, else a commit; listed only once a message carries a candidate token."""
 
-    def __init__(self, rev: str = "", label: str = "staged") -> None:
-        self.rev, self.label = rev, label
-        self._paths: list[str] | None = None
-        self._digests: set[str] | None = None
+    rev: str = ""
+    label: str = "staged"
 
     def _list(self, *pathspec: str) -> list[str]:
         if self.rev:
@@ -57,26 +56,20 @@ class Tree:
             done = _git("ls-files", "-z", "--full-name", "--", *pathspec)
         return [p for p in done.stdout.split("\0") if p]
 
-    @property
+    @cached_property
     def paths(self) -> list[str]:
-        if self._paths is None:
-            self._paths = self._list()
-        return self._paths
+        return self._list()
 
-    @property
+    @cached_property
     def digests(self) -> set[str]:
-        if self._digests is None:
-            if self.rev:
-                entries = [e.split() for e in _git("ls-tree", "-r", "-z", self.rev).stdout.split("\0") if e]
-                ids = [e[2] for e in entries if e[1] == "blob"]
-            else:
-                entries = [e.split() for e in _git("ls-files", "-s", "-z").stdout.split("\0") if e]
-                ids = [e[1] for e in entries if e[0] != "160000"]
-            batch = subprocess.run(
-                ["git", "cat-file", "--batch"], input="".join(f"{i}\n" for i in ids).encode(), capture_output=True
-            )
-            self._digests = set(_blob_digests(batch.stdout))
-        return self._digests
+        if self.rev:
+            entries = [e.split() for e in _git("ls-tree", "-r", "-z", self.rev).stdout.split("\0") if e]
+            ids = [e[2] for e in entries if e[1] == "blob"]
+        else:
+            entries = [e.split() for e in _git("ls-files", "-s", "-z").stdout.split("\0") if e]
+            ids = [e[1] for e in entries if e[0] != "160000"]
+        batch = subprocess.run(["git", "cat-file", "--batch"], input="".join(f"{i}\n" for i in ids).encode(), capture_output=True)
+        return set(_blob_digests(batch.stdout))
 
     def read(self, path: str) -> bytes | None:
         done = subprocess.run(["git", "show", f"{self.rev}:{path}"], capture_output=True)

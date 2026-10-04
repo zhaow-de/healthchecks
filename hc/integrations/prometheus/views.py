@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from collections.abc import Iterable
 from urllib.parse import urlparse
 from uuid import UUID

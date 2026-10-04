@@ -1,7 +1,5 @@
 """The merge-pr gate: every reason a pull request is not ready to merge, or GATE PASSED."""
 
-from __future__ import annotations
-
 import json
 import pathlib
 import re

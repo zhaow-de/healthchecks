@@ -1,9 +1,8 @@
 """requests-like interface for PycURL."""
 
-from __future__ import annotations
-
 import ipaddress
 import socket
+from dataclasses import dataclass
 from io import BytesIO
 from json import dumps, loads
 from typing import Any, cast
@@ -14,12 +13,12 @@ from django.conf import settings
 
 from hc.lib.typealias import JSONValue
 
-CurlSockAddr = tuple[int, int, int, tuple[str, int]]
+type CurlSockAddr = tuple[int, int, int, tuple[str, int]]
 
 # Type aliases for the arguments of the request function
-Data = dict[str, Any] | str | bytes | None
-Headers = dict[str, str] | None
-Timeout = int | None
+type Data = dict[str, Any] | str | bytes | None
+type Headers = dict[str, str] | None
+type Timeout = int | None
 
 
 class CurlError(Exception):
@@ -28,10 +27,10 @@ class CurlError(Exception):
         self.message = message
 
 
+@dataclass(frozen=True, slots=True)
 class Response:
-    def __init__(self, status_code: int, content: bytes) -> None:
-        self.status_code = status_code
-        self.content = content
+    status_code: int
+    content: bytes
 
     def json(self) -> JSONValue:
         return cast(JSONValue, loads(self.content.decode()))

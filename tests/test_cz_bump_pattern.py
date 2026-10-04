@@ -4,8 +4,6 @@ commitizen is not a dev dependency, so this reads the pattern and the map with t
 `cz bump` does: the pattern searched in every line of every message, its group matched against the map's keys in order.
 """
 
-from __future__ import annotations
-
 import pathlib
 import re
 import tomllib
