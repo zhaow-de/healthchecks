@@ -89,3 +89,13 @@ class CopyCheckTestCase(BaseTestCase):
 
         copy = Check.objects.get(name="Foo (copy)")
         self.assertEqual(copy.slug, "")
+
+    def test_it_keeps_empty_slug_empty(self) -> None:
+        self.check.slug = ""
+        self.check.save()
+
+        self.client.login(username="alice@example.org", password="password")
+        self.client.post(self.copy_url)
+
+        copy = Check.objects.get(name="Foo (copy)")
+        self.assertEqual(copy.slug, "")

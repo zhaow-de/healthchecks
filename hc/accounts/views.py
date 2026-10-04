@@ -257,7 +257,7 @@ def profile(request: AuthenticatedHttpRequest) -> HttpResponse:
 def add_project(request: AuthenticatedHttpRequest) -> HttpResponse:
     form = forms.ProjectNameForm(request.POST)
     if not form.is_valid():
-        return HttpResponseBadRequest()
+        return HttpResponseBadRequest("The project name is required and can be at most 60 characters long.")
 
     project = Project(owner=request.user)
     project.name = form.cleaned_data["name"]

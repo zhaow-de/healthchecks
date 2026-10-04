@@ -29,7 +29,13 @@ class LaxURLField(forms.URLField):
 
 class NameTagsForm(forms.Form):
     name = forms.CharField(max_length=100, required=False)
-    slug = forms.SlugField(max_length=100, required=False)
+    # The characters a slug ping URL accepts (ping_by_slug refuses uppercase)
+    slug = forms.RegexField(
+        regex=r"^[a-z0-9_-]+$",
+        max_length=100,
+        required=False,
+        error_messages={"invalid": "Use lowercase letters, digits, dashes and underscores only."},
+    )
     tags = forms.CharField(max_length=500, required=False)
     desc = forms.CharField(required=False)
 

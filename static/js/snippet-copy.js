@@ -12,8 +12,7 @@ hc.ready(function() {
             tip.hide();
         });
         button.addEventListener("click", function() {
-            navigator.clipboard.writeText(el.innerText);
-            tip.show();
+            navigator.clipboard.writeText(el.innerText).then(() => tip.show());
         });
     });
 });

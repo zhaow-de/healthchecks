@@ -12,8 +12,10 @@ from django.http import (
     HttpResponse,
     HttpResponseBadRequest,
     HttpResponseForbidden,
+    HttpResponseNotFound,
 )
 from django.shortcuts import render
+from django.urls import reverse
 
 from hc.accounts.http import AuthenticatedHttpRequest
 from hc.accounts.models import Project
@@ -26,10 +28,14 @@ from hc.front.views import _get_project_for_user
 @login_required
 def add_prometheus(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
     project = _get_project_for_user(request, code)
+    placeholder = "YOUR-READ-ONLY-API-KEY"
+    metrics_path = reverse("hc-metrics", args=[project.code, placeholder])
     ctx = {
         "page": "channels",
         "project": project,
         "site_scheme": urlparse(settings.SITE_ROOT).scheme,
+        "metrics_path_prefix": metrics_path.removesuffix(placeholder),
+        "key_placeholder": placeholder,
     }
     return render(request, "add_prometheus.html", ctx)
 
@@ -50,6 +56,9 @@ def metrics(request: HttpRequest, code: UUID, key: str | None = None) -> HttpRes
     project = Project.objects.for_api_key(key, accept_rw=False, accept_ro=True)
     if project is None:
         return HttpResponseForbidden()
+
+    if project.code != code:
+        return HttpResponseNotFound()
 
     checks = Check.objects.filter(project_id=project.id).order_by("id")
     # Only load the fields we will use. This results in ~50% request speedup

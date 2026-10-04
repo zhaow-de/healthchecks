@@ -17,8 +17,9 @@ Settings page afterwards shows only its first characters. A project has at most 
 read-only key; to replace it, click "Revoke" in the same row, then "Create" again.
 
 The metrics endpoint answers a key that is not 32 characters long with
-"400 Bad Request", and a read-write key (`hcw_`) or an unknown key with
-"403 Forbidden".
+"400 Bad Request", a read-write key (`hcw_`) or an unknown key with
+"403 Forbidden", and a URL whose project UUID is not the key's project with
+"404 Not Found".
 
 ## Update the prometheus.yml
 

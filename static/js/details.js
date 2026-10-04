@@ -161,8 +161,10 @@ hc.ready(function () {
                 return;
             }
 
-            navigator.clipboard.writeText(el.textContent);
-            hc.flashTooltip(el, "Copied!", "Click to copy");
+            navigator.clipboard.writeText(el.textContent).then(
+                () => hc.flashTooltip(el, "Copied!", "Click to copy"),
+                () => hc.flashTooltip(el, "Copy failed", "Click to copy"),
+            );
         });
     });
 

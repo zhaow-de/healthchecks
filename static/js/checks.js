@@ -382,8 +382,11 @@ hc.ready(function () {
             return;
         }
 
-        navigator.clipboard.writeText(this.textContent);
-        hc.flashTooltip(this, "Copied!", "Click to copy");
+        const el = this;
+        navigator.clipboard.writeText(el.textContent).then(
+            () => hc.flashTooltip(el, "Copied!", "Click to copy"),
+            () => hc.flashTooltip(el, "Copy failed", "Click to copy"),
+        );
     });
 
     hc.on("#filters a[data-value]", "click", function () {

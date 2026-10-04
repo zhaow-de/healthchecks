@@ -23,6 +23,12 @@ class AddProjectTestCase(BaseTestCase):
         self.assertEqual(r.status_code, 400)
         self.assertEqual(Project.objects.filter(owner=self.alice).count(), 1)
 
+    def test_it_rejects_long_name_with_a_message(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.post("/projects/add/", {"name": "a" * 61})
+        self.assertContains(r, "at most 60 characters", status_code=400)
+        self.assertEqual(Project.objects.filter(owner=self.alice).count(), 1)
+
     def test_navbar_opens_the_modal(self) -> None:
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(f"/projects/{self.project.code}/checks/")
@@ -30,5 +36,6 @@ class AddProjectTestCase(BaseTestCase):
         # base_project.html has its own script block, apart from base.html's
         self.assertNotContains(r, "jquery")
         self.assertContains(r, 'id="add-project-modal"')
+        self.assertContains(r, 'maxlength="60"')
         self.assertContains(r, 'id="projects-divider"')
         self.assertContains(r, "js/projects_menu.js")

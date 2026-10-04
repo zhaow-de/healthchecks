@@ -86,10 +86,22 @@ class MetricsTestCase(BaseTestCase):
         self.assertEqual(r.status_code, 400)
 
     def test_it_checks_api_key(self) -> None:
-        rw_key = "X" * 32
-        url = f"/projects/{self.project.code}/checks/metrics/{rw_key}"
+        url = f"/projects/{self.project.code}/metrics/{'X' * 32}"
         r = self.client.get(url)
         self.assertEqual(r.status_code, 403)
+
+    def test_it_has_no_legacy_route(self) -> None:
+        r = self.client.get(f"/projects/{self.project.code}/checks/metrics/{'R' * 32}")
+        self.assertEqual(r.status_code, 404)
+
+    def test_it_checks_project_code(self) -> None:
+        r = self.client.get(f"/projects/{self.charlies_project.code}/metrics/{'R' * 32}")
+        self.assertEqual(r.status_code, 404)
+
+    def test_authenticated_request_checks_project_code(self) -> None:
+        headers = {"Authorization": "Bearer " + "R" * 32}
+        r = self.client.get(f"/projects/{self.charlies_project.code}/metrics/", headers=headers)
+        self.assertEqual(r.status_code, 404)
 
     @override_settings(PROMETHEUS_ENABLED=False)
     def test_it_requires_prometheus_enabled(self) -> None:

@@ -11,10 +11,6 @@ urlpatterns = [
         name="hc-add-prometheus",
     ),
     path(
-        "projects/<uuid:code>/checks/metrics/<slug:key>",
-        views.metrics,
-    ),
-    path(
         "projects/<uuid:code>/metrics/<slug:key>",
         views.metrics,
         name="hc-metrics",

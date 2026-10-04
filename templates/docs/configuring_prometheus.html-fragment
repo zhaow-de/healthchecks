@@ -11,8 +11,9 @@ SITE_NAME shows it once, in the "API Key Created!" dialog: copy it there, as the
 Settings page afterwards shows only its first characters. A project has at most one
 read-only key; to replace it, click "Revoke" in the same row, then "Create" again.</p>
 <p>The metrics endpoint answers a key that is not 32 characters long with
-"400 Bad Request", and a read-write key (<code>hcw_</code>) or an unknown key with
-"403 Forbidden".</p>
+"400 Bad Request", a read-write key (<code>hcw_</code>) or an unknown key with
+"403 Forbidden", and a URL whose project UUID is not the key's project with
+"404 Not Found".</p>
 <h2>Update the prometheus.yml</h2>
 <p>Add the following scrape configuration to Prometheus:</p>
 <div class="highlight"><pre><span></span><code><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">job_name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;healthchecks&quot;</span>
