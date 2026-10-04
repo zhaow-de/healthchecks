@@ -16,7 +16,8 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.sessions.models import Session
 from django.core.management import call_command
 from django.db import connection
-from django.test import SimpleTestCase
+from django.db.backends.sqlite3.base import DatabaseWrapper
+from django.test import SimpleTestCase, TestCase
 from django.test.utils import CaptureQueriesContext
 
 from hc.api.management.commands import prune
@@ -43,7 +44,8 @@ class PruneTestCase(BaseTestCase):
 
     def assert_summary(self, out: str, counts: str) -> None:
         if connection.vendor == "sqlite":
-            # The test database is new, so INCREMENTAL, and the run frees every free page
+            # The test database is new, so INCREMENTAL, and in memory, so not in WAL
+            # mode; the run frees every free page
             self.assertRegex(out, rf"\A{re.escape(counts)}; freed \d+ SQLite pages, 0 left free\n\Z")
         else:
             self.assertEqual(out, counts + "\n")
@@ -287,3 +289,47 @@ class ReclaimSqlitePagesTestCase(SimpleTestCase):
         self.assertEqual(result, "SQLite auto_vacuum is 0, not 2 (INCREMENTAL): no pages freed")
         self.assertEqual(prune.free_pages(cursor), free)
         sleep.assert_not_called()
+
+
+# TestCase: under pytest-django a SimpleTestCase may not open the DatabaseWrapper connect() builds
+@skipUnless(connection.vendor == "sqlite", "checkpoints a SQLite file")
+class CheckpointWalTestCase(TestCase):
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.path = Path(tmp.name) / "db.sqlite"
+
+    def connect(self) -> DatabaseWrapper:
+        """A connection to a new file, which hc/api/apps.py makes INCREMENTAL and WAL."""
+        settings_dict = {**connection.settings_dict, "NAME": str(self.path)}
+        wrapper = DatabaseWrapper(settings_dict, alias="checkpoint_test")
+        self.addCleanup(wrapper.close)
+        wrapper.ensure_connection()
+        return wrapper
+
+    def test_it_shrinks_the_file_by_the_pages_freed(self) -> None:
+        wrapper = self.connect()
+        db = sqlite3.connect(self.path, isolation_level=None)
+        self.addCleanup(db.close)
+        db.execute("CREATE TABLE t (b BLOB)")
+        db.execute("BEGIN")
+        # One row per 4096-byte page
+        db.executemany("INSERT INTO t VALUES (?)", [(bytes(4000),)] * 200)
+        db.execute("COMMIT")
+        # The rows reach the file, then their pages are freed in the -wal alone
+        db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        db.execute("DELETE FROM t")
+        free = prune.free_pages(db.cursor())
+        self.assertGreaterEqual(free, 200)
+        size = self.path.stat().st_size
+
+        out = StringIO()
+        with patch.object(prune, "connection", wrapper), patch.object(prune, "sleep"):
+            call_command("prune", "--skip-checks", stdout=out)
+
+        self.assertRegex(
+            out.getvalue(),
+            rf"\A{re.escape(DELETED_NOTHING)}; freed {free} SQLite pages, 0 left free; "
+            r"checkpointed (\d+) of \1 WAL frames\n\Z",
+        )
+        self.assertLessEqual(self.path.stat().st_size, size - free * 4096)

@@ -11,11 +11,15 @@ from django.db.backends.signals import connection_created
 from django.http.request import split_domain_port, validate_host
 
 
-def set_incremental_auto_vacuum(sender: object, connection: BaseDatabaseWrapper, **kwargs: Any) -> None:
-    """Give a SQLite file with no pages yet auto_vacuum INCREMENTAL, so prune can free pages.
+def set_up_sqlite_file(sender: object, connection: BaseDatabaseWrapper, **kwargs: Any) -> None:
+    """Give a SQLite file with no pages yet auto_vacuum INCREMENTAL, so prune can free pages,
+    and switch any file not in WAL mode to WAL.
 
-    The mode takes effect only before the first table exists, and setting it on an
-    existing file writes the header, so any other file is only read here.
+    auto_vacuum takes effect only while the file has no pages, and the switch to WAL
+    writes page 1, so the switch comes second. Setting either on an existing file
+    writes its header, so a file already in WAL mode is only read here. The check
+    runs on every connection, not only on a new file: a VACUUM INTO backup comes out
+    in rollback mode, and the first connection after a restore switches it back.
     """
     if connection.vendor != "sqlite":
         return
@@ -25,12 +29,17 @@ def set_incremental_auto_vacuum(sender: object, connection: BaseDatabaseWrapper,
         if cursor.fetchone()[0] == 0:
             cursor.execute("PRAGMA auto_vacuum = INCREMENTAL")
 
+        # An in-memory database answers "memory" and ignores the switch
+        cursor.execute("PRAGMA journal_mode")
+        if cursor.fetchone()[0] != "wal":
+            cursor.execute("PRAGMA journal_mode = WAL")
+
 
 class ApiConfig(AppConfig):
     name = "hc.api"
 
     def ready(self) -> None:
-        connection_created.connect(set_incremental_auto_vacuum, dispatch_uid="hc.api.auto_vacuum")
+        connection_created.connect(set_up_sqlite_file, dispatch_uid="hc.api.sqlite_file")
 
 
 @checks.register()  # W001, W002, W005, E002, E003

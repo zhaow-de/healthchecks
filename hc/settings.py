@@ -197,9 +197,15 @@ DATABASES: Mapping[str, Any] = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": os.getenv("DB_NAME", BASE_DIR / "hc.sqlite"),
+        "CONN_MAX_AGE": envint("DB_CONN_MAX_AGE", "600"),
+        "CONN_HEALTH_CHECKS": True,
         "OPTIONS": {
-            # auto_vacuum is set in hc/api/apps.py: here it would write the header on every connection
-            "init_command": "PRAGMA busy_timeout = 5000;",
+            # auto_vacuum and WAL are set by the connection_created receiver in hc/api/apps.py,
+            # which runs after init_command: here, auto_vacuum would write the header on every
+            # connection, and WAL would write page 1 of a new file before auto_vacuum could
+            # take effect. In WAL mode, synchronous NORMAL can lose the last commits to a power
+            # loss or an OS crash, not to a crash of the process.
+            "init_command": "PRAGMA busy_timeout = 5000; PRAGMA synchronous = NORMAL; PRAGMA journal_size_limit = 16777216;",
             "transaction_mode": "IMMEDIATE",
         },
     }
@@ -214,7 +220,8 @@ if os.getenv("DB") == "postgres":
             "NAME": os.getenv("DB_NAME", "hc"),
             "USER": os.getenv("DB_USER", "postgres"),
             "PASSWORD": envsecret("DB_PASSWORD", ""),
-            "CONN_MAX_AGE": envint("DB_CONN_MAX_AGE", "0"),
+            "CONN_MAX_AGE": envint("DB_CONN_MAX_AGE", "600"),
+            "CONN_HEALTH_CHECKS": True,
             "TEST": {"CHARSET": "UTF8"},
             "OPTIONS": {
                 "application_name": "hc",

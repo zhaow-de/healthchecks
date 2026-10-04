@@ -5,8 +5,10 @@
 # JetBrains module file; the IDE adds an exclude folder for every worktree's .venv it finds
 .idea/healthchecks.iml
 
-# Default SQLite database, created by `./manage.py migrate`
+# Default SQLite database, created by `./manage.py migrate`, and the -wal, -shm
+# and -journal files SQLite keeps beside it
 hc.sqlite
+hc.sqlite-*
 
 # STATIC_ROOT, created by `./manage.py collectstatic`
 static-collected/

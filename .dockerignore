@@ -5,6 +5,7 @@ stuff
 # Local development state
 .venv
 hc.sqlite
+hc.sqlite-*
 hc/local_settings.py
 static-collected
 .coverage

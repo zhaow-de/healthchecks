@@ -75,6 +75,23 @@ def reclaim_sqlite_pages(cursor: Any, deadline: float) -> str:
     return f"freed {freed} SQLite pages, {left} left free"
 
 
+def checkpoint_wal(cursor: Any) -> str | None:
+    """Copy the -wal into the database file, so the file shrinks by the pages
+    reclaim_sqlite_pages freed: until a checkpoint, they stay in it.
+
+    PASSIVE does not wait for other connections: frames a reader still needs stay
+    in the -wal for a later checkpoint. Return the part of the summary line that
+    says what it did, or None outside WAL mode.
+    """
+    cursor.execute("PRAGMA journal_mode")
+    if cursor.fetchone()[0] != "wal":
+        return None
+
+    cursor.execute("PRAGMA wal_checkpoint(PASSIVE)")
+    _, frames, checkpointed = cursor.fetchone()
+    return f"checkpointed {checkpointed} of {frames} WAL frames"
+
+
 class Command(BaseCommand):
     help = "Delete what every table keeps past its retention, then give SQLite's free pages back."
 
@@ -111,6 +128,8 @@ class Command(BaseCommand):
                 summary += "; " + reclaim_sqlite_pages(cursor, deadline)
                 cursor.execute("PRAGMA optimize")
                 cursor.fetchall()
+                if checkpoint := checkpoint_wal(cursor):
+                    summary += "; " + checkpoint
         if monotonic() > deadline:
             summary += f"; reached the {TIME_LIMIT} s time limit"
         return summary
