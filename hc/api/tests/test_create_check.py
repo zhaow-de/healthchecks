@@ -1,5 +1,7 @@
 from datetime import timedelta as td
 
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.utils.timezone import now
 
 from hc.api.models import Channel, Check
@@ -187,6 +189,21 @@ class CreateCheckTestCase(BaseTestCase):
         # The tags field should have a value now:
         check.refresh_from_db()
         self.assertEqual(check.tags, "bar")
+
+    def test_it_reads_the_unique_check_once_under_the_lock(self) -> None:
+        Check.objects.create(project=self.project, name="Foo")
+
+        with CaptureQueriesContext(connection) as ctx:
+            r = self.post({"name": "Foo", "tags": "bar", "unique": ["name"]})
+        self.assertEqual(r.status_code, 200)
+
+        sqls = [q["sql"] for q in ctx.captured_queries]
+        # The view's transaction, a savepoint inside the test's own
+        savepoint = next(i for i, sql in enumerate(sqls) if sql.startswith("SAVEPOINT"))
+        (read,) = [i for i, sql in enumerate(sqls) if sql.startswith("SELECT") and 'FROM "api_check"' in sql]
+        self.assertGreater(read, savepoint)
+        if connection.features.has_select_for_update_of:
+            self.assertTrue(sqls[read].endswith(' FOR NO KEY UPDATE OF "api_check"'), sqls[read])
 
     def test_it_creates_new_check_if_unique_references_absent_field(self) -> None:
         Check.objects.create(project=self.project)

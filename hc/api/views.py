@@ -251,7 +251,9 @@ def ping_by_slug(
 def _with_check(view: Callable[..., HttpResponse]) -> ViewFunc:
     """Pass the view the check `code` names: 404 if there is none, 403 if another project owns it.
 
-    The 403 is returned, not raised, so it keeps its empty body and the cors headers.
+    The 403 is returned, not raised, so it keeps its empty body and the cors headers. A
+    write passes project=request.project to the Check method that locks or renames the
+    check, which raises Check.DoesNotExist if a transfer has moved it since this read.
     """
 
     @wraps(view)
@@ -264,13 +266,20 @@ def _with_check(view: Callable[..., HttpResponse]) -> ViewFunc:
         try:
             return view(request, check, **kwds)
         except Check.DoesNotExist:
-            # Deleted between this read and the Check.lock() of a write
+            # Deleted, or moved to another project, between this read and a write
+            if Check.objects.filter(id=check.id).exists():
+                return HttpResponseForbidden()
             return HttpResponseNotFound()
 
     return wrapper
 
 
 def _lookup(project: Project, spec: Spec) -> Check | None:
+    """Return the first check of the project that the spec's `unique` fields match.
+
+    Call it inside transaction.atomic(): the check is read under the lock Check.lock()
+    takes, so it stays in the project until the transaction ends.
+    """
     if not spec.unique:
         return None
 
@@ -292,10 +301,12 @@ def _lookup(project: Project, spec: Spec) -> Check | None:
     if "grace" in spec.unique:
         existing_checks = existing_checks.filter(grace=spec.grace)
 
-    return existing_checks.first()
+    q = existing_checks.select_for_update(of=("self",), no_key=True).select_related("project")
+    return q.first()
 
 
 def _update(check: Check, spec: Spec) -> None:
+    """Apply the spec to a new check, or to one locked in the caller's transaction."""
     new_channels: Iterable[Channel] | None
     # First, validate the supplied channel codes/names
     match spec.channels:
@@ -325,10 +336,7 @@ def _update(check: Check, spec: Spec) -> None:
 
                 new_channels.add(matches[0])
 
-    with transaction.atomic():
-        if not check._state.adding:
-            check.lock()
-        _apply(check, spec, new_channels)
+    _apply(check, spec, new_channels)
 
 
 def _apply(check: Check, spec: Spec, new_channels: Iterable[Channel] | None) -> None:
@@ -429,14 +437,13 @@ def create_check(request: ApiRequest) -> HttpResponse:
     except ValidationError as e:
         return JsonResponse({"error": format_first_error(e)}, status=400)
 
-    created = False
-    check = _lookup(request.project, spec)
-    if check is None:
-        check = Check(project=request.project)
-        created = True
-
     try:
-        _update(check, spec)
+        with transaction.atomic():
+            check = _lookup(request.project, spec)
+            created = check is None
+            if check is None:
+                check = Check(project=request.project)
+            _update(check, spec)
     except BadChannelError as e:
         return JsonResponse({"error": e.message}, status=400)
 
@@ -487,7 +494,9 @@ def update_check(request: ApiRequest, check: Check) -> HttpResponse:
         return JsonResponse({"error": format_first_error(e)}, status=400)
 
     try:
-        _update(check, spec)
+        with transaction.atomic():
+            check.lock(project=request.project)
+            _update(check, spec)
     except BadChannelError as e:
         return JsonResponse({"error": e.message}, status=400)
 
@@ -497,7 +506,7 @@ def update_check(request: ApiRequest, check: Check) -> HttpResponse:
 @authorize
 @_with_check
 def delete_check(request: ApiRequest, check: Check) -> HttpResponse:
-    check.rename_and_delete()
+    check.rename_and_delete(project=request.project)
     return JsonResponse(check.to_dict())
 
 
@@ -518,7 +527,7 @@ def single(request: HttpRequest, code: UUID) -> HttpResponse:
 @authorize
 @_with_check
 def pause(request: ApiRequest, check: Check) -> HttpResponse:
-    check.pause()
+    check.pause(project=request.project)
     return JsonResponse(check.to_dict())
 
 
@@ -527,7 +536,7 @@ def pause(request: ApiRequest, check: Check) -> HttpResponse:
 @authorize
 @_with_check
 def resume(request: ApiRequest, check: Check) -> HttpResponse:
-    if not check.resume():
+    if not check.resume(project=request.project):
         return HttpResponse("check is not paused", status=409)
 
     return JsonResponse(check.to_dict())

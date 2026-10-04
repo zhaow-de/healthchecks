@@ -322,7 +322,7 @@ class Check(models.Model):
 
         return "up"
 
-    def rename_and_delete(self) -> None:
+    def rename_and_delete(self, *, project: Project | None = None) -> None:
         """Change check's code and slug, then delete the check.
 
         Without changing code and slug first, the check can get pinged during
@@ -335,14 +335,19 @@ class Check(models.Model):
            a ping between steps 1 and 2.
         3. If delete fails, retries it once. This can *still* fail, but is less likely.
 
+        With `project`, step 1 renames the check only while it is in that project, and
+        raises Check.DoesNotExist, deleting nothing, if it is gone or in another project.
         """
 
         throwaway_uuid = uuid.uuid4()
         q = Check.objects.filter(id=self.id)
 
         # Rename so it cannot be pinged any longer
-        q.update(code=throwaway_uuid, slug=str(throwaway_uuid))
+        renamed = q if project is None else q.filter(project=project)
+        if not renamed.update(code=throwaway_uuid, slug=str(throwaway_uuid)) and project is not None:
+            raise Check.DoesNotExist
 
+        # By id alone: once renamed in `project`, the check is deleted even if a transfer moves it
         try:
             q.delete()
         except IntegrityError:
@@ -636,24 +641,29 @@ class Check(models.Model):
         flip.reason = reason
         flip.save()
 
-    def lock(self) -> None:
+    def lock(self, *, project: Project | None = None) -> None:
         """Reload the check and its project, and lock the check's row until the transaction ends.
 
         Call it inside transaction.atomic(), before reading what a write depends on:
         a ping may have changed the row since this instance was read. Raises
-        Check.DoesNotExist if the check is gone.
+        Check.DoesNotExist if the check is gone or, with `project`, in another project:
+        a transfer may have moved it since it was read. On PostgreSQL a transfer that
+        commits while this waits for the lock raises it even without `project`: the join
+        to the project is re-checked against the project row read before the wait.
 
         On PostgreSQL the lock is FOR NO KEY UPDATE, as is every row lock on a check,
         channel or project: a ping to the check, another write or a delete of the row waits
         for it; an insert that only references the row, such as a notification, does not.
         """
         q = Check.objects.select_for_update(of=("self",), no_key=True).select_related("project")
+        if project is not None:
+            q = q.filter(project=project)
         self.refresh_from_db(from_queryset=q)
 
-    def pause(self) -> None:
-        """Pause the check, unless it is paused already."""
+    def pause(self, *, project: Project | None = None) -> None:
+        """Pause the check, unless it is paused already; `project` is passed to lock()."""
         with transaction.atomic():
-            self.lock()
+            self.lock(project=project)
             if self.status == "paused":
                 return
 
@@ -669,10 +679,10 @@ class Check(models.Model):
             # and Profile.next_nag_date needs to be cleared out:
             self.project.update_next_nag_dates()
 
-    def resume(self) -> bool:
-        """Resume a paused check as new; return False if it is not paused."""
+    def resume(self, *, project: Project | None = None) -> bool:
+        """Resume a paused check as new; return False if it is not paused. `project` is passed to lock()."""
         with transaction.atomic():
-            self.lock()
+            self.lock(project=project)
             if self.status != "paused":
                 return False
 

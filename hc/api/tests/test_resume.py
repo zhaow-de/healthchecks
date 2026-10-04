@@ -1,5 +1,8 @@
 from datetime import UTC, datetime
+from typing import Any
+from unittest.mock import patch
 
+from hc.accounts.models import Project
 from hc.api.models import Check, Flip
 from hc.test import BaseTestCase
 
@@ -78,6 +81,23 @@ class ResumeTestCase(BaseTestCase):
         r = self.client.post(url, "", content_type="application/json", HTTP_X_API_KEY=self.api_key)
 
         self.assertEqual(r.status_code, 404)
+
+    def test_it_handles_a_check_transferred_after_it_was_read(self) -> None:
+        other_project = Project.objects.create(owner=self.alice)
+
+        def get_and_transfer(*args: Any, **kwargs: Any) -> Check:
+            check = Check.objects.get(id=self.check.id)
+            Check.objects.filter(id=self.check.id).update(project=other_project)
+            return check
+
+        with patch("hc.api.views.get_object_or_404", get_and_transfer):
+            r = self.client.post(self.url, "", content_type="application/json", HTTP_X_API_KEY=self.api_key)
+
+        self.assertEqual(r.status_code, 403)
+        self.assertEqual(r["Access-Control-Allow-Origin"], "*")
+        self.check.refresh_from_db()
+        self.assertEqual(self.check.status, "paused")
+        self.assertFalse(Flip.objects.exists())
 
     def test_it_rejects_non_dict_post_body(self) -> None:
         r = self.csrf_client.post(self.url, "123", content_type="application/json")

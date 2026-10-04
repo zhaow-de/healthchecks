@@ -962,7 +962,7 @@ def copy(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
     if len(new_slug) > 100:
         new_slug = ""
 
-    copied = Check(project=check.project)
+    copied = Check()
     copied.name = new_name
     copied.slug = new_slug
     copied.desc, copied.tags = check.desc, check.tags
@@ -983,6 +983,9 @@ def copy(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
     copied.schedule, copied.tz = check.schedule, check.tz
     with _404_if_deleted(), transaction.atomic():
         check.lock()
+        # The project the check is in now, whose channels it copies: a transfer may have
+        # moved it since it was read
+        copied.project = check.project
         copied.save()
         # Locked, so no channel is deleted between this read and the link rows' commit
         copied.channel_set.add(*check.channel_set.select_for_update(of=("self",), no_key=True).order_by("id"))

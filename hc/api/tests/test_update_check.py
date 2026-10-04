@@ -8,6 +8,7 @@ from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from django.utils.timezone import now
 
+from hc.accounts.models import Project
 from hc.api.models import Channel, Check
 from hc.lib.typealias import JSONDict
 from hc.test import BaseTestCase, TestHttpResponse
@@ -437,6 +438,24 @@ class UpdateCheckTestCase(BaseTestCase):
 
         self.assertEqual(r.status_code, 404)
 
+    def test_it_handles_a_check_transferred_after_it_was_read(self) -> None:
+        other_project = Project.objects.create(owner=self.alice)
+        Channel.objects.create(project=self.project)
+
+        def get_and_transfer(*args: Any, **kwargs: Any) -> Check:
+            check = Check.objects.get(id=self.check.id)
+            Check.objects.filter(id=self.check.id).update(project=other_project)
+            return check
+
+        with patch("hc.api.views.get_object_or_404", get_and_transfer):
+            r = self.post(self.check.code, {"name": "Foo", "channels": "*"})
+
+        self.assertEqual(r.status_code, 403)
+        self.assertEqual(r["Access-Control-Allow-Origin"], "*")
+        self.check.refresh_from_db()
+        self.assertEqual(self.check.name, "")
+        self.assertFalse(self.check.channel_set.exists())
+
     def test_it_computes_alert_after_from_the_row_it_locked(self) -> None:
         started = now()
 
@@ -466,9 +485,9 @@ class UpdateCheckTestCase(BaseTestCase):
     def test_it_does_not_reread_the_project(self) -> None:
         channel = Channel.objects.create(project=self.project)
 
-        # The key's project, the check, the project's channels, the locked check
-        # (bracketed by a savepoint), the update, the links and the new link, and
-        # the check's channel codes for the response
+        # The key's project, the check, then in a savepoint the locked check, the
+        # project's channels, the update, the links and the new link; then the
+        # check's channel codes for the response
         with self.assertNumQueries(10):
             r = self.post(self.check.code, {"schedule": "5 * * * *", "channels": str(channel.code)})
         self.assertEqual(r.status_code, 200)
