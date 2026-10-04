@@ -15,7 +15,7 @@ from cronsim import CronSim
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ObjectDoesNotExist, ObjectNotUpdated, ValidationError
 from django.db import transaction
 from django.db.models import BinaryField, Case, Count, F, Q, When
 from django.db.models.functions import Substr
@@ -132,11 +132,10 @@ def _get_check_for_user(request: AuthenticatedHttpRequest, code: UUID, preload_o
 
 @contextmanager
 def _404_if_deleted() -> Iterator[None]:
-    """Answer 404 when the check was deleted after the view read it: Check.lock()
-    raises DoesNotExist then, and a save(update_fields=...) raises NotUpdated."""
+    """Answer 404 when the check or channel was deleted after the view read it."""
     try:
         yield
-    except Check.DoesNotExist, Check.NotUpdated:
+    except ObjectDoesNotExist, ObjectNotUpdated:
         raise Http404("not found") from None
 
 
@@ -316,10 +315,13 @@ def switch_channel(request: AuthenticatedHttpRequest, code: UUID, channel_code: 
     if channel.project_id != check.project_id:
         return HttpResponseBadRequest()
 
-    if request.POST.get("state") == "on":
-        channel.checks.add(check)
-    else:
-        channel.checks.remove(check)
+    with _404_if_deleted(), transaction.atomic():
+        check.lock()
+        Channel.objects.select_for_update().get(id=channel.id)
+        if request.POST.get("state") == "on":
+            channel.checks.add(check)
+        else:
+            channel.checks.remove(check)
 
     return HttpResponse()
 
@@ -1075,7 +1077,8 @@ def update_channel_name(request: AuthenticatedHttpRequest, code: UUID) -> HttpRe
         return HttpResponseBadRequest()
 
     channel.name = form.cleaned_data["name"]
-    channel.save(update_fields=["name"])
+    with _404_if_deleted():
+        channel.save(update_fields=["name"])
 
     return redirect("hc-channels", channel.project.code)
 

@@ -1,3 +1,6 @@
+from typing import Any
+from unittest.mock import patch
+
 from hc.accounts.models import Project
 from hc.api.models import Channel, Check
 from hc.test import BaseTestCase
@@ -43,3 +46,15 @@ class SwitchChannelTestCase(BaseTestCase):
         self.client.login(username="charlie@example.org", password="password")
         r = self.client.post(self.url, {"state": "on"})
         self.assertEqual(r.status_code, 400)
+
+    def test_it_handles_a_check_deleted_after_it_was_read(self) -> None:
+        def get_and_delete(*args: Any, **kwargs: Any) -> Check:
+            check = Check.objects.get(id=self.check.id)
+            self.check.delete()
+            return check
+
+        self.client.login(username="alice@example.org", password="password")
+        with patch("hc.front.views._get_check_for_user", get_and_delete):
+            r = self.client.post(self.url, {"state": "on"})
+        self.assertEqual(r.status_code, 404)
+        self.assertFalse(self.channel.checks.exists())

@@ -1,3 +1,6 @@
+from typing import Any
+from unittest.mock import patch
+
 from hc.api.models import Channel
 from hc.test import BaseTestCase
 
@@ -48,3 +51,14 @@ class UpdateChannelNameTestCase(BaseTestCase):
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.url)
         self.assertEqual(r.status_code, 405)
+
+    def test_it_handles_a_channel_deleted_after_it_was_read(self) -> None:
+        def get_and_delete(*args: Any, **kwargs: Any) -> Channel:
+            channel = Channel.objects.get(id=self.channel.id)
+            self.channel.delete()
+            return channel
+
+        self.client.login(username="alice@example.org", password="password")
+        with patch("hc.front.views._get_channel_for_user", get_and_delete):
+            r = self.client.post(self.url, data={"name": "My work email"})
+        self.assertEqual(r.status_code, 404)
