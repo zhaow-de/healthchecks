@@ -8,15 +8,10 @@ if TYPE_CHECKING:
     from hc.api.models import Channel, Flip, Notification, Ping
 
 
-def get_ping_body_bytes(ping: Ping | None) -> bytes | None:
-    """Return ping body as bytes for a given Ping object."""
-    return ping.get_body_bytes() if ping else None
-
-
 def get_ping_body(ping: Ping | None, maxlen: int | None = None) -> str | None:
     """Return ping body for a given Ping object."""
     body = None
-    if body_bytes := get_ping_body_bytes(ping):
+    if ping and (body_bytes := ping.get_body_bytes()):
         body = body_bytes.decode(errors="replace")
         if maxlen and len(body) > maxlen:
             body = body[:maxlen] + "\n[truncated]"
@@ -32,7 +27,7 @@ class TransportError(Exception):
 
 
 class Transport:
-    def __init__(self, channel: Channel):
+    def __init__(self, channel: Channel) -> None:
         self.channel = channel
 
     def notify(self, flip: Flip, notification: Notification) -> None:

@@ -5,12 +5,12 @@ import hmac
 import json
 import logging
 import uuid
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from datetime import timedelta as td
-from importlib import import_module
-from typing import Any, NotRequired, TypedDict
+from functools import cache
+from typing import NotRequired, Self, TypedDict
 from zoneinfo import ZoneInfo
 
 from cronsim import CronSim
@@ -23,6 +23,7 @@ from django.db.models import F, QuerySet
 from django.http import HttpRequest
 from django.urls import reverse
 from django.utils.functional import cached_property
+from django.utils.module_loading import import_string
 from django.utils.timezone import now
 from oncalendar import OnCalendar
 from pydantic import BaseModel, Field
@@ -31,6 +32,7 @@ from hc.accounts.models import Project
 from hc.api import transports
 from hc.lib import emails
 from hc.lib.date import month_boundaries, seconds_in_month
+from hc.lib.ip import client_ip
 from hc.lib.urls import absolute_reverse
 
 logger = logging.getLogger(__name__)
@@ -45,7 +47,7 @@ MAX_DURATION = td(hours=72)
 REASONS = (("", "Unknown"), ("timeout", "Timeout"), ("fail", "Fail signal"))
 
 
-TRANSPORTS: dict[str, tuple[str, type[transports.Transport] | str]] = {
+TRANSPORTS: dict[str, tuple[str, str]] = {
     "email": ("Email", "hc.integrations.email.transport.Email"),
     "group": ("Group", "hc.integrations.group.transport.Group"),
     "slack": ("Slack", "hc.integrations.slack.transport.Slack"),
@@ -53,7 +55,12 @@ TRANSPORTS: dict[str, tuple[str, type[transports.Transport] | str]] = {
 }
 
 
-CHANNEL_KINDS = [(kind, label_cls[0]) for kind, label_cls in TRANSPORTS.items()]
+CHANNEL_KINDS = [(kind, label) for kind, (label, _) in TRANSPORTS.items()]
+
+
+@cache
+def _transport_class(path: str) -> type[transports.Transport]:
+    return import_string(path)
 
 
 def isostring(dt: datetime | None) -> str | None:
@@ -574,6 +581,41 @@ class Check(models.Model):
         flip.reason = reason
         flip.save()
 
+    def pause(self) -> None:
+        """Pause the check, unless it is paused already."""
+        if self.status == "paused":
+            return
+
+        # Track the status change for correct downtime calculation in Check.downtimes()
+        self.create_flip("paused", mark_as_processed=True)
+
+        self.status = "paused"
+        self.last_start = None
+        self.alert_after = None
+        self.save(update_fields=("status", "last_start", "alert_after"))
+
+        # After pausing a check we must check if all checks are up,
+        # and Profile.next_nag_date needs to be cleared out:
+        self.project.update_next_nag_dates()
+
+    def resume(self) -> bool:
+        """Resume a paused check as new; return False if it is not paused."""
+        if self.status != "paused":
+            return False
+
+        self.create_flip("new", mark_as_processed=True)
+
+        self.status = "new"
+        self.last_start = None
+        self.last_ping = None
+        self.alert_after = None
+        self.save(update_fields=("status", "last_start", "last_ping", "alert_after"))
+        return True
+
+
+def find_by_unique_key(checks: Iterable[Check], unique_key: str) -> Check | None:
+    return next((check for check in checks if check.unique_key == unique_key), None)
+
 
 class PingDict(TypedDict):
     type: str
@@ -756,12 +798,12 @@ class EmailConf(BaseModel):
     notify_down: bool = Field(alias="down")
 
     @classmethod
-    def load(cls, data: Any) -> EmailConf:
+    def load(cls, data: str) -> Self:
         # Is it a plain email address?
         if not data.startswith("{"):
             return cls.model_validate({"value": data, "up": True, "down": True})
 
-        return super().model_validate_json(data)
+        return cls.model_validate_json(data)
 
 
 class Channel(models.Model):
@@ -824,14 +866,8 @@ class Channel(models.Model):
         if self.kind not in TRANSPORTS:
             raise NotImplementedError(f"Unknown channel kind: {self.kind}")
 
-        label, cls = TRANSPORTS[self.kind]
-        # import transport classes on first use, and cache in TRANSPORTS
-        if isinstance(cls, str):
-            modulename, classname = cls.rsplit(".", maxsplit=1)
-            cls = getattr(import_module(modulename), classname)
-            TRANSPORTS[self.kind] = (label, cls)
-
-        return cls(self)
+        _, path = TRANSPORTS[self.kind]
+        return _transport_class(path)(self)
 
     def notify(self, flip: Flip, is_test: bool = False) -> str:
         if self.transport.is_noop(flip.new_status):
@@ -1085,15 +1121,7 @@ class TokenBucket(models.Model):
 
     @staticmethod
     def authorize_auth_ip(request: HttpRequest) -> bool:
-        headers = request.META
-        remote_addr = headers.get("HTTP_X_FORWARDED_FOR", headers["REMOTE_ADDR"])
-        remote_addr = remote_addr.split(",")[0]
-        if "." in remote_addr and ":" in remote_addr:
-            # If remote_addr is in an ipv4address:port format
-            # (like in Azure App Service), remove the port:
-            remote_addr = remote_addr.split(":")[0]
-
-        value = f"auth-ip-{remote_addr}"
+        value = f"auth-ip-{client_ip(request)}"
         # 20 login attempts for a single IP per hour:
         return TokenBucket.authorize(value, 20, 3600)
 

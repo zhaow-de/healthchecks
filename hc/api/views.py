@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import email.policy
 import time
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from datetime import UTC, datetime
 from datetime import timedelta as td
 from email import message_from_bytes
-from ipaddress import ip_address
+from functools import wraps
 from typing import Any, Literal
 from uuid import UUID
 
@@ -36,9 +36,11 @@ from pydantic_core import PydanticCustomError
 from hc.accounts.models import Profile, Project
 from hc.api.decorators import ApiRequest, authorize, authorize_read, cors
 from hc.api.forms import FlipsFiltersForm
-from hc.api.models import Channel, Check, Flip, Notification, Ping, prepare_durations
+from hc.api.models import Channel, Check, Flip, Notification, Ping, find_by_unique_key, prepare_durations
+from hc.lib.ip import client_ip
 from hc.lib.signing import unsign_bounce_id
 from hc.lib.string import is_valid_uuid_string, match_keywords
+from hc.lib.typealias import ViewFunc
 from hc.lib.tz import all_timezones, legacy_timezones
 
 
@@ -166,14 +168,6 @@ def format_first_error(exc: ValidationError) -> str:
     return "json validation error: " + tmpl % subject
 
 
-def valid_ip(ip: str) -> bool:
-    try:
-        ip_address(ip)
-        return True
-    except ValueError:
-        return False
-
-
 @csrf_exempt
 @never_cache
 def ping(
@@ -193,16 +187,7 @@ def ping(
         return HttpResponseBadRequest("invalid url format")
 
     headers = request.META
-    remote_addr = headers.get("HTTP_X_FORWARDED_FOR", headers["REMOTE_ADDR"])
-    remote_addr = remote_addr.split(",")[0]
-
-    # If remote_addr does not validate but appears to be in ipv4:port form
-    # (like Azure App Service reports), then remove the port
-    if not valid_ip(remote_addr):
-        parts = remote_addr.split(".")
-        if len(parts) == 4 and ":" in parts[-1]:
-            remote_addr = remote_addr.split(":")[0]
-
+    remote_addr = client_ip(request)
     scheme = headers.get("HTTP_X_FORWARDED_PROTO", "http")
     method = headers["REQUEST_METHOD"]
     ua = headers.get("HTTP_USER_AGENT", "")
@@ -263,6 +248,23 @@ def ping_by_slug(
         return HttpResponse("ambiguous slug", status=409)
 
     return ping(request, check.code, check, action, exitstatus)
+
+
+def _with_check(view: Callable[..., HttpResponse]) -> ViewFunc:
+    """Pass the view the check `code` names: 404 if there is none, 403 if another project owns it.
+
+    The 403 is returned, not raised, so it keeps its empty body and the cors headers.
+    """
+
+    @wraps(view)
+    def wrapper(request: ApiRequest, code: UUID, **kwds: Any) -> HttpResponse:
+        check = get_object_or_404(Check, code=code)
+        if check.project_id != request.project.id:
+            return HttpResponseForbidden()
+
+        return view(request, check, **kwds)
+
+    return wrapper
 
 
 def _lookup(project: Project, spec: Spec) -> Check | None:
@@ -446,11 +448,8 @@ def channels(request: ApiRequest) -> JsonResponse:
 
 
 @authorize_read
-def get_check(request: ApiRequest, code: UUID) -> HttpResponse:
-    check = get_object_or_404(Check, code=code)
-    if check.project_id != request.project.id:
-        return HttpResponseForbidden()
-
+@_with_check
+def get_check(request: ApiRequest, check: Check) -> HttpResponse:
     return JsonResponse(check.to_dict(readonly=request.readonly))
 
 
@@ -458,18 +457,16 @@ def get_check(request: ApiRequest, code: UUID) -> HttpResponse:
 @csrf_exempt
 @authorize_read
 def get_check_by_unique_key(request: ApiRequest, unique_key: str) -> HttpResponse:
-    for check in request.project.check_set.all():
-        if check.unique_key == unique_key:
-            return JsonResponse(check.to_dict(readonly=request.readonly))
-    return HttpResponseNotFound()
+    check = find_by_unique_key(request.project.check_set.all(), unique_key)
+    if check is None:
+        return HttpResponseNotFound()
+
+    return JsonResponse(check.to_dict(readonly=request.readonly))
 
 
 @authorize
-def update_check(request: ApiRequest, code: UUID) -> HttpResponse:
-    check = get_object_or_404(Check, code=code)
-    if check.project_id != request.project.id:
-        return HttpResponseForbidden()
-
+@_with_check
+def update_check(request: ApiRequest, check: Check) -> HttpResponse:
     try:
         spec = Spec.model_validate(request.json, strict=True)
     except ValidationError as e:
@@ -486,13 +483,8 @@ def update_check(request: ApiRequest, code: UUID) -> HttpResponse:
 
 
 @authorize
-def delete_check(request: ApiRequest, code: UUID) -> HttpResponse:
-    # Don't acquire lock right away, first see if the check exists
-    # and matches the API key
-    check = get_object_or_404(Check, code=code)
-    if check.project_id != request.project.id:
-        return HttpResponseForbidden()
-
+@_with_check
+def delete_check(request: ApiRequest, check: Check) -> HttpResponse:
     check.rename_and_delete()
     return JsonResponse(check.to_dict())
 
@@ -512,48 +504,19 @@ def single(request: HttpRequest, code: UUID) -> HttpResponse:
 @cors("POST")
 @csrf_exempt
 @authorize
-def pause(request: ApiRequest, code: UUID) -> HttpResponse:
-    check = get_object_or_404(Check, code=code)
-    if check.project_id != request.project.id:
-        return HttpResponseForbidden()
-
-    # Return early, without creating a flip object, if the check is already paused
-    if check.status == "paused":
-        return JsonResponse(check.to_dict())
-
-    # Track the status change for correct downtime calculation in Check.downtimes()
-    check.create_flip("paused", mark_as_processed=True)
-
-    check.status = "paused"
-    check.last_start = None
-    check.alert_after = None
-    check.save(update_fields=("status", "last_start", "alert_after"))
-
-    # After pausing a check we must check if all checks are up,
-    # and Profile.next_nag_date needs to be cleared out:
-    check.project.update_next_nag_dates()
-
+@_with_check
+def pause(request: ApiRequest, check: Check) -> HttpResponse:
+    check.pause()
     return JsonResponse(check.to_dict())
 
 
 @cors("POST")
 @csrf_exempt
 @authorize
-def resume(request: ApiRequest, code: UUID) -> HttpResponse:
-    check = get_object_or_404(Check, code=code)
-    if check.project_id != request.project.id:
-        return HttpResponseForbidden()
-
-    if check.status != "paused":
+@_with_check
+def resume(request: ApiRequest, check: Check) -> HttpResponse:
+    if not check.resume():
         return HttpResponse("check is not paused", status=409)
-
-    check.create_flip("new", mark_as_processed=True)
-
-    check.status = "new"
-    check.last_start = None
-    check.last_ping = None
-    check.alert_after = None
-    check.save(update_fields=("status", "last_start", "last_ping", "alert_after"))
 
     return JsonResponse(check.to_dict())
 
@@ -561,17 +524,13 @@ def resume(request: ApiRequest, code: UUID) -> HttpResponse:
 @cors("GET")
 @csrf_exempt
 @authorize
-def pings(request: ApiRequest, code: UUID) -> HttpResponse:
-    check = get_object_or_404(Check, code=code)
-    if check.project_id != request.project.id:
-        return HttpResponseForbidden()
-
+@_with_check
+def pings(request: ApiRequest, check: Check) -> HttpResponse:
     # Look up ping log limit from account's profile.
     # There might be more pings in the database (depends on how pruning is handled)
     # but we will not return more than the limit allows.
-    profile = Profile.objects.get(user__project=request.project)
     # Cap the number of returned pings to 1000.
-    limit = min(profile.ping_log_limit, 1000)
+    limit = min(request.project.owner_profile.ping_log_limit, 1000)
 
     # Query in descending order so we're sure to get the most recent
     # pings, regardless of the limit restriction
@@ -591,13 +550,9 @@ def pings(request: ApiRequest, code: UUID) -> HttpResponse:
 @cors("GET")
 @csrf_exempt
 @authorize
-def ping_body(request: ApiRequest, code: UUID, n: int) -> HttpResponse:
-    check = get_object_or_404(Check, code=code)
-    if check.project_id != request.project.id:
-        return HttpResponseForbidden()
-
-    profile = Profile.objects.get(user__project=request.project)
-    threshold = check.n_pings - profile.ping_log_limit
+@_with_check
+def ping_body(request: ApiRequest, check: Check, n: int) -> HttpResponse:
+    threshold = check.n_pings - request.project.owner_profile.ping_log_limit
     if n <= threshold:
         raise Http404()
 
@@ -610,9 +565,6 @@ def ping_body(request: ApiRequest, code: UUID, n: int) -> HttpResponse:
 
 
 def flips(request: ApiRequest, check: Check) -> HttpResponse:
-    if check.project_id != request.project.id:
-        return HttpResponseForbidden()
-
     form = FlipsFiltersForm(request.GET)
     if not form.is_valid():
         return HttpResponseBadRequest()
@@ -635,8 +587,8 @@ def flips(request: ApiRequest, check: Check) -> HttpResponse:
 @cors("GET")
 @csrf_exempt
 @authorize_read
-def flips_by_uuid(request: ApiRequest, code: UUID) -> HttpResponse:
-    check = get_object_or_404(Check, code=code)
+@_with_check
+def flips_by_uuid(request: ApiRequest, check: Check) -> HttpResponse:
     return flips(request, check)
 
 
@@ -644,10 +596,11 @@ def flips_by_uuid(request: ApiRequest, code: UUID) -> HttpResponse:
 @csrf_exempt
 @authorize_read
 def flips_by_unique_key(request: ApiRequest, unique_key: str) -> HttpResponse:
-    for check in request.project.check_set.all():
-        if check.unique_key == unique_key:
-            return flips(request, check)
-    return HttpResponseNotFound()
+    check = find_by_unique_key(request.project.check_set.all(), unique_key)
+    if check is None:
+        return HttpResponseNotFound()
+
+    return flips(request, check)
 
 
 def metrics(request: HttpRequest) -> HttpResponse:
@@ -735,10 +688,6 @@ def bounces(request: HttpRequest) -> HttpResponse:
         except Profile.DoesNotExist:
             return HttpResponse("OK (user not found)")
 
-        profile.reports = "off"
-        profile.next_report_date = None
-        profile.nag_period = td()
-        profile.next_nag_date = None
-        profile.save()
+        profile.disable_reports()
 
     return HttpResponse("OK")

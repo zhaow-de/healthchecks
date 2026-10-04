@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from datetime import timedelta as td
+from typing import Any
 
 from django import forms
 
@@ -25,6 +26,21 @@ class LaxURLField(forms.URLField):
     """
 
     default_validators = [WebhookValidator()]
+
+
+class SecondsDurationField(forms.IntegerField):
+    """A number of seconds, from a minute to a year, cleaned to a timedelta."""
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(min_value=60, max_value=31536000, **kwargs)
+
+    def clean(self, value: Any) -> td:
+        return td(seconds=super().clean(value))
+
+
+class TimezoneField(forms.CharField):
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(max_length=36, validators=[TimezoneValidator()], **kwargs)
 
 
 class NameTagsForm(forms.Form):
@@ -52,16 +68,10 @@ class NameTagsForm(forms.Form):
 
 class AddCheckForm(NameTagsForm):
     kind = forms.ChoiceField(choices=_choices("simple,cron,oncalendar"))
-    timeout = forms.IntegerField(min_value=60, max_value=31536000)
+    timeout = SecondsDurationField()
     schedule = forms.CharField(required=False, max_length=100)
-    tz = forms.CharField(max_length=36, validators=[TimezoneValidator()])
-    grace = forms.IntegerField(min_value=60, max_value=31536000)
-
-    def clean_timeout(self) -> td:
-        return td(seconds=self.cleaned_data["timeout"])
-
-    def clean_grace(self) -> td:
-        return td(seconds=self.cleaned_data["grace"])
+    tz = TimezoneField()
+    grace = SecondsDurationField()
 
     def clean_schedule(self) -> str:
         kind = self.cleaned_data.get("kind")
@@ -91,37 +101,23 @@ class FilteringRulesForm(forms.Form):
 
 
 class TimeoutForm(forms.Form):
-    timeout = forms.IntegerField(min_value=60, max_value=31536000)
-    grace = forms.IntegerField(min_value=60, max_value=31536000)
-
-    def clean_timeout(self) -> td:
-        return td(seconds=self.cleaned_data["timeout"])
-
-    def clean_grace(self) -> td:
-        return td(seconds=self.cleaned_data["grace"])
+    timeout = SecondsDurationField()
+    grace = SecondsDurationField()
 
 
 class CronPreviewForm(forms.Form):
     schedule = forms.CharField(max_length=100, validators=[CronValidator()])
-    tz = forms.CharField(max_length=36, validators=[TimezoneValidator()])
+    tz = TimezoneField()
 
 
-class CronForm(forms.Form):
-    schedule = forms.CharField(max_length=100, validators=[CronValidator()])
-    tz = forms.CharField(max_length=36, validators=[TimezoneValidator()])
-    grace = forms.IntegerField(min_value=60, max_value=31536000)
-
-    def clean_grace(self) -> td:
-        return td(seconds=self.cleaned_data["grace"])
+class CronForm(CronPreviewForm):
+    grace = SecondsDurationField()
 
 
 class OnCalendarForm(forms.Form):
     schedule = forms.CharField(max_length=100, validators=[OnCalendarValidator()])
-    tz = forms.CharField(max_length=36, validators=[TimezoneValidator()])
-    grace = forms.IntegerField(min_value=60, max_value=31536000)
-
-    def clean_grace(self) -> td:
-        return td(seconds=self.cleaned_data["grace"])
+    tz = TimezoneField()
+    grace = SecondsDurationField()
 
 
 class AddUrlForm(forms.Form):

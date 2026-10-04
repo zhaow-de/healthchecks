@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import time
-from datetime import timedelta as td
 from secrets import token_urlsafe
 from urllib.parse import urlparse
 from uuid import UUID
@@ -19,7 +18,7 @@ from django.contrib.auth.models import User
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 from django.db.models.functions import Lower
 from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import redirect, render
 from django.urls import Resolver404, resolve, reverse
 from django.utils.timezone import now
 from django.views.decorators.csrf import csrf_exempt
@@ -31,6 +30,7 @@ from hc.accounts.decorators import require_sudo_mode
 from hc.accounts.http import AuthenticatedHttpRequest
 from hc.accounts.models import Credential, Profile, Project
 from hc.api.models import TokenBucket
+from hc.front.views import _get_project_for_user
 from hc.lib.tz import all_timezones
 from hc.lib.webauthn import CreateHelper, GetHelper
 
@@ -205,7 +205,7 @@ def check_token(request: HttpRequest, username: str, token: str, new_email: str 
             user.save()
 
         user.profile.token = ""
-        user.profile.save()
+        user.profile.save(update_fields=["token"])
         return _check_2fa(request, user)
 
     request.session["bad_link"] = True
@@ -244,7 +244,7 @@ def profile(request: AuthenticatedHttpRequest) -> HttpResponse:
         form = forms.TzForm(request.POST)
         if form.is_valid():
             profile.tz = form.cleaned_data["tz"]
-            profile.save()
+            profile.save(update_fields=["tz"])
             ctx["tz_status"] = "info"
             ctx["tz_updated"] = True
 
@@ -268,7 +268,7 @@ def add_project(request: AuthenticatedHttpRequest) -> HttpResponse:
 
 @login_required
 def project(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
-    project = get_object_or_404(Project, code=code, owner=request.user)
+    project = _get_project_for_user(request, code)
     ctx = {"page": "project", "project": project}
 
     if request.method == "POST":
@@ -350,7 +350,7 @@ def set_password(request: AuthenticatedHttpRequest) -> HttpResponse:
             request.user.save()
 
             request.profile.token = ""
-            request.profile.save()
+            request.profile.save(update_fields=["token"])
 
             # update the session with the new password hash so that
             # the user doesn't  get logged out
@@ -434,12 +434,7 @@ def unsubscribe_reports(request: HttpRequest, signed_username: str) -> HttpRespo
         ctx = {"autosubmit": autosubmit}
         return render(request, "accounts/unsubscribe_submit.html", ctx)
 
-    profile = Profile.objects.for_user(user)
-    profile.reports = "off"
-    profile.next_report_date = None
-    profile.nag_period = td()
-    profile.next_nag_date = None
-    profile.save()
+    Profile.objects.for_user(user).disable_reports()
 
     return render(request, "accounts/unsubscribed.html")
 
@@ -466,8 +461,8 @@ def close(request: AuthenticatedHttpRequest) -> HttpResponse:
 
 @require_POST
 @login_required
-def remove_project(request: AuthenticatedHttpRequest, code: str) -> HttpResponse:
-    project = get_object_or_404(Project, code=code, owner=request.user)
+def remove_project(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
+    project = _get_project_for_user(request, code)
     for check in project.check_set.all():
         check.rename_and_delete()
     project.delete()
@@ -531,7 +526,7 @@ def add_totp(request: AuthenticatedHttpRequest) -> HttpResponse:
         if form.is_valid():
             request.profile.totp = request.session["totp_secret"]
             request.profile.totp_created = now()
-            request.profile.save()
+            request.profile.save(update_fields=["totp", "totp_created"])
 
             request.session["enabled_totp"] = True
             request.session.pop("totp_secret")
@@ -555,7 +550,7 @@ def remove_totp(request: AuthenticatedHttpRequest) -> HttpResponse:
     if request.method == "POST" and "disable_totp" in request.POST:
         request.profile.totp = ""
         request.profile.totp_created = None
-        request.profile.save()
+        request.profile.save(update_fields=["totp", "totp_created"])
         request.session["disabled_totp"] = True
         return redirect("hc-profile")
 
@@ -565,7 +560,7 @@ def remove_totp(request: AuthenticatedHttpRequest) -> HttpResponse:
 
 @login_required
 @require_sudo_mode
-def remove_credential(request: AuthenticatedHttpRequest, code: str) -> HttpResponse:
+def remove_credential(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
     if not settings.RP_ID:
         return HttpResponse(status=404)
 

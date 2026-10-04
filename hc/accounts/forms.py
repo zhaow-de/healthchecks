@@ -13,7 +13,7 @@ from pyotp.totp import TOTP
 from hc.accounts import device
 from hc.accounts.models import REPORT_CHOICES
 from hc.api.models import TokenBucket
-from hc.front.validators import TimezoneValidator
+from hc.front.forms import TimezoneField
 
 
 class LowercaseEmailField(forms.EmailField):
@@ -144,4 +144,4 @@ class TotpForm(forms.Form):
 
 
 class TzForm(forms.Form):
-    tz = forms.CharField(max_length=36, validators=[TimezoneValidator()])
+    tz = TimezoneField()

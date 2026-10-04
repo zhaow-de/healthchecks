@@ -89,7 +89,7 @@ class Command(BaseCommand):
             self.pause()
         else:
             profile.next_nag_date = None
-            profile.save()
+            profile.save(update_fields=["next_nag_date"])
 
         return True
 

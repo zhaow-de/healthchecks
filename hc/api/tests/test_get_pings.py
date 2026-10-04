@@ -55,6 +55,13 @@ class GetPingsTestCase(BaseTestCase):
         # body_raw is null
         self.assertIsNone(ping["body_url"])
 
+    def test_it_creates_a_missing_owner_profile(self) -> None:
+        self.profile.delete()
+
+        r = self.get()
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(len(r.json()["pings"]), 1)
+
     def test_readonly_key_is_not_allowed(self) -> None:
         ro_key = self.project.set_api_key_readonly()
         self.project.save()

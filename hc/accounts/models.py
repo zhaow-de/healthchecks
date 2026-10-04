@@ -91,7 +91,7 @@ class Profile(models.Model):
         token = token_urlsafe(24)
         # Store a hashed transformation of the login token
         self.token = make_password(token)
-        self.save()
+        self.save(update_fields=["token"])
         # Sign the token so we can check its age later
         return TimestampSigner().sign(token)
 
@@ -230,6 +230,14 @@ class Profile(models.Model):
 
         return Check.objects.filter(project__owner_id=self.user_id).count()
 
+    def disable_reports(self) -> None:
+        """Turn reports and nags off, as an unsubscribe link or a bounced report asks."""
+        self.reports = "off"
+        self.next_report_date = None
+        self.nag_period = NO_NAG
+        self.next_nag_date = None
+        self.save(update_fields=["reports", "next_report_date", "nag_period", "next_nag_date"])
+
     def update_next_nag_date(self) -> None:
         any_down = self.checks_from_all_projects().filter(status="down").exists()
         if any_down and self.next_nag_date is None and self.nag_period:
@@ -274,10 +282,12 @@ class ProjectManager(models.Manager["Project"]):
         then calls Project.compare_api_key().
         """
 
+        # The owner comes along, so owner_profile costs one query, not two
+        q = Project.objects.select_related("owner")
         if accept_rw and api_key.startswith("hcw_"):
-            q = Project.objects.filter(api_key__startswith=api_key[4:12])
+            q = q.filter(api_key__startswith=api_key[4:12])
         elif accept_ro and api_key.startswith("hcr_"):
-            q = Project.objects.filter(api_key_readonly__startswith=api_key[4:12])
+            q = q.filter(api_key_readonly__startswith=api_key[4:12])
         else:
             return None
 

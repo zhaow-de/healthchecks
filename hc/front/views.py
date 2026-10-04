@@ -47,9 +47,11 @@ from hc.api.models import (
     Flip,
     Notification,
     Ping,
+    find_by_unique_key,
     prepare_durations,
 )
 from hc.front import forms
+from hc.front.decorators import deny_anonymous
 from hc.front.templatetags.hc_extras import (
     down_title,
     num_down_title,
@@ -143,7 +145,7 @@ def _refresh_last_active_date(request: AuthenticatedHttpRequest) -> None:
     profile = request.profile
     if profile.last_active_date is None or (now() - profile.last_active_date).days > 0:
         profile.last_active_date = now()
-        profile.save()
+        profile.save(update_fields=["last_active_date"])
 
         # Also modify session to trigger session cookie refresh
         # and push forward its expiry date:
@@ -155,6 +157,16 @@ def _get_referer_qs(request: HttpRequest) -> str:
     if parsed.query:
         return "?" + parsed.query
     return ""
+
+
+def _redirect_back(request: HttpRequest, check: Check) -> HttpResponse:
+    """Redirect to the details page the request came from, else to the checks list."""
+    if "/details/" in request.headers.get("Referer", ""):
+        return redirect("hc-details", check.code)
+
+    url = reverse("hc-checks", args=[check.project.code])
+    url += _get_referer_qs(request)  # Preserve selected tags and search
+    return redirect(url)
 
 
 def _status_match(check: Check, statuses: set[str]) -> bool:
@@ -170,11 +182,11 @@ def checks(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
 
     if request.GET.get("sort") in VALID_SORT_VALUES:
         request.profile.sort = request.GET["sort"]
-        request.profile.save()
+        request.profile.save(update_fields=["sort"])
 
     if request.GET.get("urls") in ("uuid", "slug"):
         project.show_slugs = request.GET["urls"] == "slug"
-        project.save()
+        project.save(update_fields=["show_slugs"])
 
     if request.session.get("last_project_id") != project.id:
         request.session["last_project_id"] = project.id
@@ -254,10 +266,8 @@ def checks(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
     return render(request, "front/checks.html", ctx)
 
 
-def status(request: HttpRequest, code: UUID) -> HttpResponse:
-    if not request.user.is_authenticated:
-        return HttpResponseForbidden()
-
+@deny_anonymous
+def status(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
     project = _get_project_for_user(request, code)
     checks = list(Check.objects.filter(project=project))
 
@@ -356,17 +366,9 @@ def index(request: HttpRequest) -> HttpResponse:
 @login_required
 def projects_menu(request: AuthenticatedHttpRequest) -> HttpResponse:
     projects = list(request.profile.projects())
-
-    statuses: dict[int, str] = defaultdict(lambda: "up")
-    for check in Check.objects.filter(project__in=projects):
-        old_status = statuses[check.project_id]
-        if old_status != "down":
-            status = check.get_status()
-            if status == "down" or (status == "grace" and old_status == "up"):
-                statuses[check.project_id] = status
-
+    summary = _get_project_summary(request.profile)
     for p in projects:
-        p.overall_status = statuses[p.id]
+        p.overall_status = summary[p.code]["status"]
 
     return render(request, "front/projects_menu.html", {"projects": projects})
 
@@ -497,12 +499,7 @@ def update_name(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
     check.desc = form.cleaned_data["desc"]
     check.save(update_fields=("name", "slug", "tags", "desc"))
 
-    if "/details/" in request.headers.get("Referer", ""):
-        return redirect("hc-details", code)
-
-    url = reverse("hc-checks", args=[check.project.code])
-    url += _get_referer_qs(request)  # Preserve selected tags and search
-    return redirect(url)
+    return _redirect_back(request, check)
 
 
 @require_POST
@@ -592,12 +589,7 @@ def update_timeout(request: AuthenticatedHttpRequest, code: UUID) -> HttpRespons
     if not check_saved:
         check.save(update_fields=fields)
 
-    if "/details/" in request.headers.get("Referer", ""):
-        return redirect("hc-details", code)
-
-    url = reverse("hc-checks", args=[check.project.code])
-    url += _get_referer_qs(request)  # Preserve selected tags and search
-    return redirect(url)
+    return _redirect_back(request, check)
 
 
 @require_POST
@@ -712,22 +704,7 @@ def ping_body(request: AuthenticatedHttpRequest, code: UUID, n: int) -> HttpResp
 @login_required
 def pause(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
     check = _get_check_for_user(request, code)
-
-    # Return early, without creating a flip object, if the check is already paused
-    if check.status == "paused":
-        return redirect("hc-details", code)
-
-    # Track the status change for correct downtime calculation in Check.downtimes()
-    check.create_flip("paused", mark_as_processed=True)
-
-    check.status = "paused"
-    check.last_start = None
-    check.alert_after = None
-    check.save(update_fields=("status", "last_start", "alert_after"))
-
-    # After pausing a check we must check if all checks are up,
-    # and Profile.next_nag_date needs to be cleared out:
-    check.project.update_next_nag_dates()
+    check.pause()
 
     # Don't redirect after an AJAX request:
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
@@ -740,16 +717,8 @@ def pause(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
 @login_required
 def resume(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
     check = _get_check_for_user(request, code)
-    if check.status != "paused":
+    if not check.resume():
         return HttpResponseBadRequest()
-
-    check.create_flip("new", mark_as_processed=True)
-
-    check.status = "new"
-    check.last_start = None
-    check.last_ping = None
-    check.alert_after = None
-    check.save(update_fields=("status", "last_start", "last_ping", "alert_after"))
 
     return redirect("hc-details", code)
 
@@ -891,7 +860,7 @@ def details(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
 
     if request.GET.get("urls") in ("uuid", "slug"):
         check.project.show_slugs = request.GET["urls"] == "slug"
-        check.project.save()
+        check.project.save(update_fields=["show_slugs"])
 
     all_channels = check.project.channel_set.order_by("created")
     regular_channels: list[Channel] = []
@@ -927,11 +896,11 @@ def details(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
 
 @login_required
 def uncloak(request: AuthenticatedHttpRequest, unique_key: str) -> HttpResponse:
-    for check in request.profile.checks_from_all_projects().only("code"):
-        if check.unique_key == unique_key:
-            return redirect("hc-details", check.code)
+    check = find_by_unique_key(request.profile.checks_from_all_projects().only("code"), unique_key)
+    if check is None:
+        raise Http404("not found")
 
-    raise Http404("not found")
+    return redirect("hc-details", check.code)
 
 
 @login_required
@@ -996,12 +965,8 @@ def copy(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
     return redirect(url)
 
 
-def status_single(request: HttpRequest, code: UUID) -> HttpResponse:
-    if not request.user.is_authenticated:
-        return HttpResponseForbidden()
-
-    # We now know user is logged, tell the type checker request.profile exists-
-    request = cast(AuthenticatedHttpRequest, request)
+@deny_anonymous
+def status_single(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
     check = _get_check_for_user(request, code, preload_owner_profile=True)
 
     status = check.get_status()
@@ -1095,7 +1060,7 @@ def update_channel_name(request: AuthenticatedHttpRequest, code: UUID) -> HttpRe
         return HttpResponseBadRequest()
 
     channel.name = form.cleaned_data["name"]
-    channel.save()
+    channel.save(update_fields=["name"])
 
     return redirect("hc-channels", channel.project.code)
 
@@ -1164,10 +1129,8 @@ def edit_channel(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
     return HttpResponseBadRequest()
 
 
-def log_events(request: HttpRequest, code: UUID) -> HttpResponse:
-    if not request.user.is_authenticated:
-        return HttpResponseForbidden()
-
+@deny_anonymous
+def log_events(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
     check = _get_check_for_user(request, code, preload_owner_profile=True)
     form = forms.LogFiltersForm(request.GET)
     if not form.is_valid():

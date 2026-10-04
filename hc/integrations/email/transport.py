@@ -6,7 +6,7 @@ from django.conf import settings
 
 from hc.accounts.models import Profile
 from hc.api.models import Flip, Notification
-from hc.api.transports import Transport, TransportError, get_ping_body_bytes
+from hc.api.transports import Transport, TransportError, get_ping_body
 from hc.lib import emails
 from hc.lib.signing import sign_bounce_id
 
@@ -43,13 +43,11 @@ class Email(Transport):
             projects = None
 
         ping = self.last_ping(flip)
-        body_bytes = get_ping_body_bytes(ping)
-
         ctx = {
             "flip": flip,
             "check": flip.owner,
             "ping": ping,
-            "body": body_bytes.decode(errors="replace") if body_bytes else None,
+            "body": get_ping_body(ping),
             "projects": projects,
             "unsub_link": unsub_link,
             "tz": profile.tz,

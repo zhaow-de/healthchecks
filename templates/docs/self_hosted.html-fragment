@@ -97,8 +97,8 @@ instead of prompting:</p>
 <p>The panel lists checks, pings, channels (integrations), notifications and flips
 (status changes) under "Api"; credentials (security keys), profiles and projects
 under "Accounts"; log records under "Logs"; and groups and users under
-"Authentication and Authorization". Adding a user, a security key or a log record
-there is disabled.</p>
+"Authentication and Authorization". Adding a user, a profile, a security key or a
+log record there is disabled.</p>
 <p>Changing the password in the panel goes through sudo mode, which emails a
 confirmation code, so it works only with <a href="#sending-emails">email set up</a>. Without
 email, the panel shows an "Email Needed" page instead; set the password from the
@@ -203,7 +203,7 @@ by itself:</p>
   of them.</li>
 </ul>
 <p>To keep a longer or a shorter history, go to the Administration Panel, open the
-user's <strong>Profile</strong>, and change "Ping log limit" under "Limits". Lowering the limit
+user's <strong>Profile</strong>, and change its "Ping log limit" field. Lowering the limit
 hides the older pings at once, in the web UI and in the API, but deletes them only
 at the check's next prune. To prune every check now, run:</p>
 <div class="highlight"><pre><span></span><code>$<span class="w"> </span>./manage.py<span class="w"> </span>prunepingsslow

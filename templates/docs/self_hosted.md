@@ -96,8 +96,8 @@ Once logged in, click on the "Account" dropdown in top navigation, and select
 The panel lists checks, pings, channels (integrations), notifications and flips
 (status changes) under "Api"; credentials (security keys), profiles and projects
 under "Accounts"; log records under "Logs"; and groups and users under
-"Authentication and Authorization". Adding a user, a security key or a log record
-there is disabled.
+"Authentication and Authorization". Adding a user, a profile, a security key or a
+log record there is disabled.
 
 Changing the password in the panel goes through sudo mode, which emails a
 confirmation code, so it works only with [email set up](#sending-emails). Without
@@ -214,7 +214,7 @@ Healthchecks deletes old entries from the `api_ping`, `api_flip`, and
   of them.
 
 To keep a longer or a shorter history, go to the Administration Panel, open the
-user's **Profile**, and change "Ping log limit" under "Limits". Lowering the limit
+user's **Profile**, and change its "Ping log limit" field. Lowering the limit
 hides the older pings at once, in the web UI and in the API, but deletes them only
 at the check's next prune. To prune every check now, run:
 

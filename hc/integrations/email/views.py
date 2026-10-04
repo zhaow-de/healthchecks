@@ -86,7 +86,7 @@ def verify(request: HttpRequest, code: UUID, token: str) -> HttpResponse:
     channel = get_object_or_404(Channel, code=code)
     if channel.make_token() == token:
         channel.email_verified = True
-        channel.save()
+        channel.save(update_fields=["email_verified"])
         return render(request, "front/verify_email_success.html")
 
     return render(request, "bad_link.html")
