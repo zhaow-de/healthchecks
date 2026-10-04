@@ -261,7 +261,7 @@
     <div id="events" class="col-sm-7" data-status-url="{% url 'hc-status-single' check.code %}">
         <h2>
             Events
-            <small class="text-muted fs-6">Click on individual items for details</small>
+            <small class="text-body-secondary fs-6">Click on individual items for details</small>
             <span id="tz-switcher" class="btn-group float-end">
                 {% for tz in tz_switches %}
                 <button type="button" class="btn btn-outline-secondary btn-sm {% if forloop.last %}active{% endif %}" data-tz="{{ tz }}">{{ tz }}</button>

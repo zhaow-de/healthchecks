@@ -62,7 +62,7 @@
                         <tr>
                             <td>
                                 {{ credential.name|default:"unnamed" }}
-                                <span class="text-muted">
+                                <span class="text-body-secondary">
                                 – registered on {{ credential.created|date:"M j, Y" }}
                                 </span>
                             </td>
@@ -85,7 +85,7 @@
                         <tr>
                             <td>
                                 Enabled
-                                <span class="text-muted">
+                                <span class="text-body-secondary">
                                 – configured on {{ profile.totp_created|date:"M j, Y" }}
                                 </span>
                             </td>

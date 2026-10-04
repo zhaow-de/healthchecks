@@ -36,7 +36,7 @@
 }
 
 pre {
-    background: var(--pre-bg);
+    background: var(--bs-tertiary-bg);
     padding: 9.5px;
 }
 
@@ -47,21 +47,21 @@ pre {
 }
 
 .status.ic-up {
-    color: #5cb85c;
+    color: var(--hc-up);
 }
 .status.ic-new,
 .status.ic-paused {
-    color: var(--status-new-color);
+    color: var(--hc-new);
 }
 .status.ic-grace {
-    color: #f0ad4e;
+    color: var(--hc-grace);
 }
 .status.ic-down {
-    color: #d9534f;
+    color: var(--hc-down);
 }
 /* used in the filters dropdown: */
 .status.ic-dots {
-    color: var(--text-muted);
+    color: var(--bs-secondary-color);
 }
 
 .hc-dialog {
@@ -78,7 +78,7 @@ pre {
 }
 
 #debug-warning {
-    background: var(--debug-warning-bg);
+    background: var(--bs-secondary-bg);
     text-align: center;
     font-size: small;
     padding: 2px 0;
@@ -159,10 +159,10 @@ pre {
 
 /* no up/down buttons for number fields */
 input[type="number"] {
-    -moz-appearance: textfield;
+    appearance: textfield;
 }
 
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button {
-    -webkit-appearance: none;
+    appearance: none;
 }

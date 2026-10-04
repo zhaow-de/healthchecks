@@ -1,4 +1,4 @@
 .slug-help-block code {
-    color: var(--text-muted);
-    background: var(--pre-bg);
+    color: var(--bs-secondary-color);
+    background: var(--bs-tertiary-bg);
 }

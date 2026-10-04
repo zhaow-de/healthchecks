@@ -35,7 +35,7 @@
         {% if oldest_ping %}
         <div class="alert alert-info">
             Showing <span id="num-hits">{{ events|length }}</span> matching events.
-            <br >
+            <br>
             The oldest stored ping is ping #{{ oldest_ping.n }} from
             <span data-dt="{{ oldest_ping.created|timestamp }}"></span>.
         </div>
@@ -57,7 +57,7 @@
             value="{{ max|timestamp }}"
             autocomplete="off">
 
-        <p id="end-help" class="text-muted">
+        <p id="end-help" class="text-body-secondary">
             ⬆<br>
             <span data-dt="{{ min|timestamp }}"></span>.
         </p>

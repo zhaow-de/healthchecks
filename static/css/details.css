@@ -23,7 +23,7 @@
     display: block;
     padding: 8px;
     margin-bottom: 8px;
-    background: var(--pre-bg);
+    background: var(--bs-tertiary-bg);
 }
 
 .details-block form {
@@ -36,16 +36,13 @@
 
 #details-schedule th {
     padding-top: 4px;
+    vertical-align: top;
+    font-weight: normal;
+    text-align: right;
 }
 
 #details-schedule td {
     padding: 4px 0 4px 8px;
-}
-
-#details-schedule th {
-    vertical-align: top;
-    font-weight: normal;
-    text-align: right;
 }
 
 #details-schedule .value {
@@ -53,7 +50,7 @@
 }
 
 #details-schedule .subtitle {
-    color: #999;
+    color: var(--bs-tertiary-color);
 }
 
 .details-integrations th {
@@ -77,15 +74,15 @@
     width: 100px;
     text-align: right;
     font-weight: normal;
-    color: #888;
+    color: var(--bs-tertiary-color);
 }
 
 #downtimes .uptime {
     display: block;
-    color: #888;
+    color: var(--bs-tertiary-color);
 }
 
-@media (min-width: 1199px) {
+@media (min-width: 1200px) {
     #downtimes .uptime {
         float: right;
     }
