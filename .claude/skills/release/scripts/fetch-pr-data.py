@@ -5,8 +5,6 @@ Writes one JSON file and prints its path on stdout, alone, so whoever runs it re
 Everything a human reads goes to stderr; the path comes from `tempfile`, so two runs never collide.
 """
 
-from __future__ import annotations
-
 import json
 import re
 import subprocess
