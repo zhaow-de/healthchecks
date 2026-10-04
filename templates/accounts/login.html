@@ -114,6 +114,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
+                {% if use_magic_form %}
                 <p>
                     If you need to reset your password, please do the following:
                 </p>
@@ -125,6 +126,13 @@
                         to set a new password.
                     </li>
                 </ol>
+                {% else %}
+                <p>
+                    This server cannot send email, so there is no login link.
+                    Set a new password on the server with
+                    <code>./manage.py changepassword</code>.
+                </p>
+                {% endif %}
                 {% if support_email %}
                 <p>
                     Please contact us at

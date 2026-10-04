@@ -108,13 +108,17 @@ shell with `./manage.py changepassword`, which prompts for the new password twic
 
 Email is optional. Without it, that is while `EMAIL_HOST` is unset:
 
-- the login page offers no "Email Me a Link" login, only the password;
+- the login page offers no "Email Me a Link" login, only the password, and its
+  "Lost your password?" dialog points to `./manage.py changepassword`;
 - sudo mode, which emails a confirmation code, cannot be entered, so Set Password,
   Change Email, Close Account, adding or removing a two-factor method, and the
   password change in the administration panel all show an "Email Needed" page;
   set the password with `./manage.py changepassword` instead;
 - email alerts, reports and reminders, and the `ADMINS` error emails are not
-  sent;
+  sent; an email integration records each alert it could not send with the error
+  "No SMTP configuration";
+- while [EMAIL_USE_VERIFICATION](../self_hosted_configuration/#EMAIL_USE_VERIFICATION)
+  is on, an email integration can be added only for the account's own address;
 - every `manage.py` command that runs the system checks prints the warnings
   `hc.api.W002` ("No SMTP configuration, cannot send email") and Django's
   `mail.W001` ("Your MAILERS setting has no 'default' entry").

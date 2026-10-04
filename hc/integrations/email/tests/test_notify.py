@@ -253,6 +253,17 @@ class NotifyEmailTestCase(BaseTestCase):
         n = Notification.objects.get()
         self.assertEqual(n.error, "Email not verified")
 
+    @override_settings(MAILERS={})
+    def test_it_reports_missing_smtp_configuration(self) -> None:
+        self.channel.notify(self.flip)
+
+        n = Notification.objects.get()
+        self.assertEqual(n.error, "No SMTP configuration")
+        self.channel.refresh_from_db()
+        self.assertEqual(self.channel.last_error, "No SMTP configuration")
+        self.assertFalse(self.channel.disabled)
+        self.assertEqual(len(mail.outbox), 0)
+
     def test_it_checks_up_down_flags(self) -> None:
         payload = {"value": "alice@example.org", "up": True, "down": False}
         self.channel.value = json.dumps(payload)

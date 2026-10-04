@@ -50,10 +50,18 @@ class LoginTestCase(BaseTestCase):
         # It should not show validation errors yet
         self.assertNotContains(r, "This field is required")
 
+    def test_lost_password_dialog_points_to_login_link(self) -> None:
+        r = self.client.get("/accounts/login/")
+        self.assertContains(r, "Log in using the <strong>Email Me a Link</strong> method.")
+        self.assertNotContains(r, "changepassword")
+
     @override_settings(MAILERS={})
     def test_it_handles_no_smtp(self) -> None:
         r = self.client.get("/accounts/login/")
         self.assertNotContains(r, "magic-link-form")
+        # The lost password dialog points to the shell, not to the missing login link
+        self.assertNotContains(r, "Email Me a Link")
+        self.assertContains(r, "<code>./manage.py changepassword</code>")
 
     def test_it_redirects_authenticated_get(self) -> None:
         self.client.login(username="alice@example.org", password="password")

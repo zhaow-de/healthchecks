@@ -35,7 +35,8 @@ check goes down, up, or both. An address other than the account's own stays
 "Unconfirmed" and receives no alerts until someone clicks the confirmation link
 SITE_NAME emails to it, unless the server sets
 [`EMAIL_USE_VERIFICATION`](../self_hosted_configuration/#EMAIL_USE_VERIFICATION)
-to `False`.
+to `False`. On a server that cannot send email, only the account's own address
+can be added while that setting is on.
 * **Webhook**: an optional name, and for "down" events and for "up" events each a
 URL, a method (GET, POST or PUT), a request body (sent with POST and PUT only) and
 request headers (`Header-Name: value`, one per line). Leave one URL empty to skip

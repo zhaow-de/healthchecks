@@ -341,8 +341,8 @@ and receives no alerts, until someone clicks the link. The account's own email
 address is never verified this way: it is confirmed at once.
 
 Verification needs email: with verification on and no [EMAIL_HOST](#EMAIL_HOST),
-adding any other address fails with a server error after the integration is saved,
-and the integration stays unconfirmed.
+the form refuses any address other than the account's own and saves nothing, so
+that no address receives alerts without having been confirmed.
 
 Set `EMAIL_USE_VERIFICATION` to `False` to confirm each address as it is saved.
 The setting does not change integrations already unconfirmed; to confirm one,

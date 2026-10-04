@@ -114,3 +114,29 @@ class AddEmailTestCase(BaseTestCase):
         self.client.login(username="charlie@example.org", password="password")
         r = self.client.get(self.url)
         self.assertEqual(r.status_code, 404)
+
+    @override_settings(MAILERS={})
+    def test_it_refuses_unconfirmable_address_without_smtp(self) -> None:
+        form = {"value": "dan@example.org", "down": "true", "up": "true"}
+
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.post(self.url, form)
+        self.assertContains(r, "This server cannot send email, so it cannot confirm this address.")
+        self.assertFalse(Channel.objects.exists())
+
+    @override_settings(MAILERS={})
+    def test_it_accepts_own_address_without_smtp(self) -> None:
+        form = {"value": "alice@example.org", "down": "true", "up": "true"}
+
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.post(self.url, form)
+        self.assertRedirects(r, self.channels_url)
+
+        c = Channel.objects.get()
+        self.assertTrue(c.email_verified)
+
+    @override_settings(MAILERS={})
+    def test_instructions_say_only_own_address_without_smtp(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(self.url)
+        self.assertContains(r, "only your account's own address can be added")

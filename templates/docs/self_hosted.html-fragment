@@ -106,13 +106,17 @@ shell with <code>./manage.py changepassword</code>, which prompts for the new pa
 <h2 id="sending-emails">Sending Emails</h2>
 <p>Email is optional. Without it, that is while <code>EMAIL_HOST</code> is unset:</p>
 <ul>
-<li>the login page offers no "Email Me a Link" login, only the password;</li>
+<li>the login page offers no "Email Me a Link" login, only the password, and its
+  "Lost your password?" dialog points to <code>./manage.py changepassword</code>;</li>
 <li>sudo mode, which emails a confirmation code, cannot be entered, so Set Password,
   Change Email, Close Account, adding or removing a two-factor method, and the
   password change in the administration panel all show an "Email Needed" page;
   set the password with <code>./manage.py changepassword</code> instead;</li>
 <li>email alerts, reports and reminders, and the <code>ADMINS</code> error emails are not
-  sent;</li>
+  sent; an email integration records each alert it could not send with the error
+  "No SMTP configuration";</li>
+<li>while <a href="../self_hosted_configuration/#EMAIL_USE_VERIFICATION">EMAIL_USE_VERIFICATION</a>
+  is on, an email integration can be added only for the account's own address;</li>
 <li>every <code>manage.py</code> command that runs the system checks prints the warnings
   <code>hc.api.W002</code> ("No SMTP configuration, cannot send email") and Django's
   <code>mail.W001</code> ("Your MAILERS setting has no 'default' entry").</li>
