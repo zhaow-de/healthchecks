@@ -1,7 +1,10 @@
 from typing import Any
+from unittest import skipUnless
 from unittest.mock import patch
 
+from django.db import connection
 from django.shortcuts import get_object_or_404
+from django.test.utils import CaptureQueriesContext
 
 from hc.accounts.models import Project
 from hc.api.models import Channel, Check
@@ -73,3 +76,12 @@ class SwitchChannelTestCase(BaseTestCase):
             r = self.client.post(self.url, {"state": "on"})
         self.assertEqual(r.status_code, 404)
         self.assertFalse(Channel.checks.through.objects.exists())
+
+    @skipUnless(connection.features.has_select_for_update, "no row locks")
+    def test_it_locks_the_channel_for_no_key_update(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        with CaptureQueriesContext(connection) as ctx:
+            self.client.post(self.url, {"state": "on"})
+        locks = [q["sql"] for q in ctx.captured_queries if 'FROM "api_channel"' in q["sql"] and " FOR " in q["sql"]]
+        self.assertEqual(len(locks), 1, locks)
+        self.assertIn(" FOR NO KEY UPDATE", locks[0])

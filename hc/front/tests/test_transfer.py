@@ -1,5 +1,9 @@
 from typing import Any
+from unittest import skipUnless
 from unittest.mock import patch
+
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 
 from hc.accounts.models import Project
 from hc.api.models import Channel, Check
@@ -109,3 +113,12 @@ class TransferTestCase(BaseTestCase):
 
         self.check.refresh_from_db()
         self.assertEqual(self.check.project, self.other)
+
+    @skipUnless(connection.features.has_select_for_update, "no row locks")
+    def test_it_locks_the_target_project_for_no_key_update(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        with CaptureQueriesContext(connection) as ctx:
+            self.client.post(self.url, {"project": self.project.code})
+        locks = [q["sql"] for q in ctx.captured_queries if 'FROM "accounts_project"' in q["sql"] and " FOR " in q["sql"]]
+        self.assertEqual(len(locks), 1, locks)
+        self.assertIn(" FOR NO KEY UPDATE", locks[0])

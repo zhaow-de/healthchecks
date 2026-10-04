@@ -1,6 +1,10 @@
 from datetime import timedelta as td
 from typing import Any
+from unittest import skipUnless
 from unittest.mock import patch
+
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 
 from hc.accounts.models import Project
 from hc.api.models import Channel, Check
@@ -122,3 +126,13 @@ class CopyCheckTestCase(BaseTestCase):
             r = self.client.post(self.copy_url)
         self.assertEqual(r.status_code, 404)
         self.assertFalse(Check.objects.exists())
+
+    @skipUnless(connection.features.has_select_for_update, "no row locks")
+    def test_it_locks_the_channels_for_no_key_update_in_id_order(self) -> None:
+        self.check.channel_set.add(Channel.objects.create(project=self.project, kind="email"))
+        self.client.login(username="alice@example.org", password="password")
+        with CaptureQueriesContext(connection) as ctx:
+            self.client.post(self.copy_url)
+        locks = [q["sql"] for q in ctx.captured_queries if 'FROM "api_channel"' in q["sql"] and " FOR " in q["sql"]]
+        self.assertEqual(len(locks), 1, locks)
+        self.assertIn(' ORDER BY "api_channel"."id" ASC FOR NO KEY UPDATE', locks[0])

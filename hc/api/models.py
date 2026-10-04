@@ -643,10 +643,9 @@ class Check(models.Model):
         a ping may have changed the row since this instance was read. Raises
         Check.DoesNotExist if the check is gone.
 
-        On PostgreSQL the lock is FOR NO KEY UPDATE, as is every row lock the views
-        take on a check, channel or project: it stops a delete or a concurrent write of
-        the row, but not an insert that references it, so a ping or a notification never
-        waits on it, and no lock cycle with "sendalerts" can form.
+        On PostgreSQL the lock is FOR NO KEY UPDATE, as is every row lock on a check,
+        channel or project: a ping to the check, another write or a delete of the row waits
+        for it; an insert that only references the row, such as a notification, does not.
         """
         q = Check.objects.select_for_update(of=("self",), no_key=True).select_related("project")
         self.refresh_from_db(from_queryset=q)
