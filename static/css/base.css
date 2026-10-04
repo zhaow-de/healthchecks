@@ -1,3 +1,9 @@
+html {
+    /* A page too short to scroll keeps the scrollbar's width too, so the centred header
+       stays put between pages that scroll and pages that do not */
+    scrollbar-gutter: stable;
+}
+
 #logo {
     max-height: 50px;
 }
