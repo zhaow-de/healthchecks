@@ -163,11 +163,9 @@ write to it; a host directory mounted there instead must be writable by user ID 
 <li>A clean stop (<code>docker compose stop</code> or <code>down</code>) checkpoints the <code>-wal</code> file and
   removes both files. A killed container (<code>docker kill</code>, out of memory, a host
   crash) leaves them, and the next start applies the <code>-wal</code> file to <code>hc.sqlite</code>.</li>
-<li>Once the <code>-wal</code> file has grown past 16 MiB (16,777,216 bytes), the first write
-  after a checkpoint cuts it back to that size, which it then keeps. Under sustained
-  concurrent writes it grows beyond 16 MiB between checkpoints, to 24 to 32 MiB at
-  about 300 pings per second: keep about 50 MiB of disk free for it beside the
-  database.</li>
+<li>The first write after a checkpoint cuts the <code>-wal</code> file back to 16 MiB, but under
+  sustained concurrent writes it grows past that between checkpoints: keep about
+  50 MiB of disk free for it beside the database.</li>
 </ul>
 <p>Commits use <code>synchronous = NORMAL</code>: a crash of the container loses no committed ping,
 but a power loss or a crash of the host's operating system can lose the last ones.</p>
@@ -242,9 +240,6 @@ spawned uWSGI worker 4 (pid: 11, cores: 1)
 2026-10-04 20:05:06,156 INFO hc sendalerts is now running
 </code></pre></div>
 
-<p>When <code>migrate</code> or a system check fails, its error, such as <code>?: (hc.api.E004) Your
-SECRET_KEY has less than 50 characters, ...</code>, is followed by
-<code>FATAL hook failed, destroying instance</code>, and no worker starts.</p>
 <p><code>docker compose logs -f web</code> follows the log (see <a href="../self_hosted/#logs">Logs</a>).</p>
 <h3 id="uwsgi">uWSGI Configuration</h3>
 <p>You can configure uWSGI by setting <code>UWSGI_...</code> environment variables in <code>.env</code>. For
@@ -323,8 +318,7 @@ $<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> <
 <p><code>VACUUM INTO</code> refuses an existing target: for a second backup from the same
 container, remove <code>/tmp/hc-backup.sqlite</code> first. The copy keeps the database's
 auto-vacuum mode, and is a single file in SQLite's rollback-journal mode; the first
-connection after a restore switches it back to WAL mode. Do not back up by copying
-<code>hc.sqlite</code> while the container runs (see <a href="#sqlite">SQLite and the /data Volume</a>).</p>
+connection after a restore switches it back to WAL mode.</p>
 <p>To restore, stop <code>web</code>, remove the <code>-wal</code> and <code>-shm</code> files, write the backup into
 the volume as the <code>hc</code> user, and start <code>web</code> again:</p>
 <div class="highlight"><pre><span></span><code>$<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span>stop<span class="w"> </span>web
@@ -332,11 +326,9 @@ $<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> <
 $<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span>start<span class="w"> </span>web
 </code></pre></div>
 
-<p><strong>Important:</strong> the <code>rm -f</code> is part of the restore. A clean stop removes the <code>-wal</code>
-and <code>-shm</code> files, but a container that was killed leaves them, and the next start
-applies that old <code>-wal</code> file to the restored <code>hc.sqlite</code>. The result is a corrupt
-database that mixes the two, and nothing reports it: the container stays healthy and
-takes pings, while <code>PRAGMA integrity_check</code> lists errors.</p>
+<p><strong>Important:</strong> the <code>rm -f</code> is part of the restore. A killed container leaves its
+<code>-wal</code> and <code>-shm</code> files, and the next start applies that old <code>-wal</code> file to the
+restored <code>hc.sqlite</code>: the result is a corrupt database, and nothing reports it.</p>
 <p><strong>Important:</strong> <code>docker compose cp ./hc-backup.sqlite web:/data/hc.sqlite</code> alone
 leaves the <code>-wal</code> and <code>-shm</code> files in place, and the file owned by your host user. The
 container then starts, reports healthy and shows the restored data, but cannot write
@@ -441,9 +433,9 @@ internet only through a reverse proxy that terminates TLS and that:</p>
 </ul>
 <p>Caddy does all three by default.</p>
 <h3 id="caddy">Caddy</h3>
-<p>On Debian 13, install Caddy from Debian's own repository. The package is Caddy 2.6.2
-(<code>2.6.2-12+deb13u1</code>); it runs Caddy under systemd as the <code>caddy</code> user, and keeps the
-certificates in that user's home, <code>/var/lib/caddy</code>:</p>
+<p>On Debian 13, install Caddy from Debian's own repository. The package runs Caddy
+under systemd as the <code>caddy</code> user, and keeps the certificates in that user's home,
+<code>/var/lib/caddy</code>:</p>
 <div class="highlight"><pre><span></span><code>$<span class="w"> </span>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>caddy
 </code></pre></div>
 
@@ -504,23 +496,14 @@ HTTP and redirects every other path:</p>
 <h3 id="trusted-proxy-hops">TRUSTED_PROXY_HOPS</h3>
 <p>Healthchecks records each ping's client address, and limits login attempts per
 client address (see <a href="../self_hosted/#login-lockout">Login Lockout</a>). It reads the
-address from <code>X-Forwarded-For</code>, counting entries from the right: with
-<a href="../self_hosted_configuration/#TRUSTED_PROXY_HOPS">TRUSTED_PROXY_HOPS</a> set to N, it
-takes the N-th entry from the right, the one the outermost of your N proxies wrote.
-A client can put anything in the header, but only to the left of what your proxies
-add, so a proxy may append to it as well as replace it.</p>
-<ul>
-<li><code>1</code>, the default: one proxy in front of the container, such as Caddy or NGINX.</li>
-<li><code>2</code>: two proxies in a chain that each append to the header, such as a CDN or a
-  load balancer in front of your proxy. Caddy replaces the header, and so does not
-  append, unless the outer proxy's addresses are in its <code>trusted_proxies</code> option.</li>
-<li><code>0</code>: no proxy. Healthchecks ignores the header and records the address of the
-  connection.</li>
-</ul>
-<p>A request whose header has fewer than N entries did not come through every proxy, and
-Healthchecks records the address of the connection. Whatever reaches port 8000
-without passing the proxy chooses its own address: with the compose file's
-<code>127.0.0.1</code> binding, that is any process on the Docker host.</p>
+address from <code>X-Forwarded-For</code> as
+<a href="../self_hosted_configuration/#TRUSTED_PROXY_HOPS">TRUSTED_PROXY_HOPS</a> describes;
+the default, <code>1</code>, fits one proxy such as Caddy or NGINX, which may append to the
+header as well as replace it. Behind a second proxy, such as a CDN, Caddy replaces
+the header, and so does not append, unless the outer proxy's addresses are in its
+<code>trusted_proxies</code> option.</p>
+<p>Whatever reaches port 8000 without passing the proxy chooses its own address: with
+the compose file's <code>127.0.0.1</code> binding, that is any process on the Docker host.</p>
 <h3 id="nginx">NGINX</h3>
 <p>NGINX needs the three headers set in the <code>location</code> that forwards to the container:</p>
 <div class="highlight"><pre><span></span><code>proxy_pass http://127.0.0.1:8000;
@@ -539,28 +522,23 @@ http-request set-header X-Forwarded-Proto http unless { ssl_fc }
 </code></pre></div>
 
 <h3 id="hsts">HSTS and the Content Security Policy</h3>
-<p>HSTS, the <code>Strict-Transport-Security</code> response header, makes a browser that has seen
-it use only HTTPS for the host, for as long as its <code>max-age</code> says, even if you go back
-to plain HTTP. Neither Caddy nor Healthchecks sends it by default. Once HTTPS works,
-set <a href="../self_hosted_configuration/#SECURE_HSTS_SECONDS">SECURE_HSTS_SECONDS</a>: small
-first, such as <code>3600</code>, then <code>31536000</code> (a year). Healthchecks then sends the header
-on every response to an HTTPS request. It changes nothing for your jobs' pings: curl
-keeps no HSTS list unless it runs with <code>--hsts</code>, and a client that keeps one only
-moves its pings to HTTPS.</p>
-<p>Every response carries an enforced <code>Content-Security-Policy</code>: scripts, styles and
-images come only from the site itself, the console connects only to itself and to
-<code>PING_ENDPOINT</code>'s origin (the details page's "Ping Now!" button posts there), and no
-other site may frame it. The proxy needs to add none. If you customise a template, an
-inline <code>&lt;script&gt;</code> or <code>&lt;style&gt;</code> element needs <code>{% csp_nonce_attr %}</code> in its tag, and a
-<code>style</code> attribute or an inline event handler such as <code>onclick</code> has to move to a
-static file: the browser blocks them otherwise.</p>
+<p>HSTS, the <code>Strict-Transport-Security</code> response header, makes a browser use only HTTPS
+for the host. Neither Caddy nor Healthchecks sends it by default; once HTTPS works,
+turn it on with
+<a href="../self_hosted_configuration/#SECURE_HSTS_SECONDS">SECURE_HSTS_SECONDS</a>. It changes
+nothing for your jobs' pings: curl keeps no HSTS list unless it runs with <code>--hsts</code>,
+and a client that keeps one only moves its pings to HTTPS.</p>
+<p>Every response carries an enforced <code>Content-Security-Policy</code>, so the proxy needs to
+add none. If you customise a template, an inline <code>&lt;script&gt;</code> or <code>&lt;style&gt;</code> element
+needs <code>{% csp_nonce_attr %}</code> in its tag, and a <code>style</code> attribute or an inline event
+handler such as <code>onclick</code> has to move to a static file: the browser blocks them
+otherwise.</p>
 <h2 id="debian-vps">Example: Debian 13 on a VPS</h2>
 <p>One host, such as a Linode node with Debian 13, runs the image on SQLite under Docker
 Compose; Caddy, from Debian's package, terminates TLS on port 443 over IPv4 and IPv6
 and forwards to the container on <code>127.0.0.1:8000</code>; email goes out through Amazon SES.
-The image under this compose file, behind Caddy 2.6.2 from Debian 13's package with
-the Caddyfile of <a href="#caddy">Caddy</a>, is tested. The steps on the host that are not are
-marked <em>(not tested here)</em>: follow their own documentation where it differs.</p>
+The host steps marked <em>(not tested here)</em> were not verified with this setup: follow
+their own documentation where it differs.</p>
 <ul>
 <li><strong>DNS</strong> <em>(not tested here)</em>: point the <code>A</code> and <code>AAAA</code> records of the name, here
   <code>hc.example.org</code>, at the host's IPv4 and IPv6 addresses. Caddy needs them for the

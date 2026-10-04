@@ -558,9 +558,6 @@ Set it once, before first use, and keep it. Changing it later:
   verification link and unsubscribe link in emails already sent.
 * resets the per-email [login rate limits](../self_hosted/#login-lockout).
 
-The Docker sample's `SECRET_KEY=---` has to be replaced: the container does not
-start with it.
-
 This is a standard Django setting, read more in
 [Django documentation](https://docs.djangoproject.com/en/6.1/ref/settings/#secret-key).
 
@@ -771,10 +768,8 @@ outermost of those proxies wrote, whatever the client put to the left of it:
   CDN or a load balancer in front of your proxy.
 
 For a request with fewer entries than that, or no header, the address of the
-connection is used. An entry that is not an IP address gives no
-address: the ping's `remote_addr` is `null`, and such login attempts share one limit.
-A port and an IPv6 zone (`%eth0`) are dropped, and an IPv4-mapped IPv6 address
-(`::ffff:192.0.2.1`) is recorded in its IPv4 form.
+connection is used. An entry that is not an IP address gives none: the ping's
+`remote_addr` is `null`, and such login attempts share one limit.
 
 A value below `0`, or `None`, fails the system check `hc.api.E005`, which stops every
 `manage.py` command that runs the system checks, the Docker container's start

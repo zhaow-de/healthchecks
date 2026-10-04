@@ -47,8 +47,9 @@ curl --header "X-Api-Key: your-api-key" SITE_ROOT/api/v3/checks/
 
 A POST request with a JSON body may carry the key in an `api_key` field of the body
 instead; the header wins when both are present. A key in the header is checked
-before the body is read, so a wrong one gets 401 even when the body is not JSON. GET and DELETE requests read the header only, and no request reads the key
-from the query string.
+before the body is read, so a wrong one gets 401 even when the body is not JSON. GET
+and DELETE requests read the header only, and no request reads the key from the
+query string.
 
 A read-only key receives check objects without the `uuid`, `ping_url`, `update_url`,
 `pause_url`, `resume_url` and `channels` fields and with an extra `unique_key` field,

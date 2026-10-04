@@ -172,13 +172,6 @@ dictionary (a standard Django setting, [docs](https://docs.djangoproject.com/en/
 nothing, but every email fails with Django's `InvalidMailer` error ("The 'use_ssl'
 and 'use_tls' OPTIONS are incompatible").
 
-By default every email leaves from
-[DEFAULT_FROM_EMAIL](../self_hosted_configuration/#DEFAULT_FROM_EMAIL), as its
-`From:` header and as its envelope sender, Django's error emails to `ADMINS`
-included: [SERVER_EMAIL](../self_hosted_configuration/#SERVER_EMAIL) defaults to it,
-and only [EMAIL_MAIL_FROM_TMPL](../self_hosted_configuration/#EMAIL_MAIL_FROM_TMPL)
-changes the envelope sender.
-
 ### Example: Amazon SES {: #ses }
 
 Amazon SES takes email over SMTP with STARTTLS on port 587:
@@ -197,9 +190,10 @@ EMAIL_USE_TLS=True
 - `EMAIL_HOST_USER` and `EMAIL_HOST_PASSWORD` are SES SMTP credentials, which the SES
   console creates under its SMTP settings. An IAM access key ID and its secret access
   key are not SMTP credentials, and SES refuses them.
-- `DEFAULT_FROM_EMAIL` has to be a verified identity in SES, the address itself or
-  its domain: SES refuses a message from any sender it has not verified. Leave
-  `SERVER_EMAIL` and
+- [DEFAULT_FROM_EMAIL](../self_hosted_configuration/#DEFAULT_FROM_EMAIL) has to be a
+  verified identity in SES, the address itself or its domain: SES refuses a message
+  from any sender it has not verified. Leave
+  [SERVER_EMAIL](../self_hosted_configuration/#SERVER_EMAIL) and
   [EMAIL_MAIL_FROM_TMPL](../self_hosted_configuration/#EMAIL_MAIL_FROM_TMPL) unset,
   or point them at verified addresses too.
 - While the SES account is in the sandbox, SES delivers only to verified addresses

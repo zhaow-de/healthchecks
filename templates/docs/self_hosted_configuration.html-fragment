@@ -417,8 +417,6 @@ system checks, <code>migrate</code> included, and so the Docker container's star
   verification link and unsubscribe link in emails already sent.</li>
 <li>resets the per-email <a href="../self_hosted/#login-lockout">login rate limits</a>.</li>
 </ul>
-<p>The Docker sample's <code>SECRET_KEY=---</code> has to be replaced: the container does not
-start with it.</p>
 <p>This is a standard Django setting, read more in
 <a href="https://docs.djangoproject.com/en/6.1/ref/settings/#secret-key">Django documentation</a>.</p>
 <h2 id="SECRET_KEY_FILE"><code>SECRET_KEY_FILE</code></h2>
@@ -577,10 +575,8 @@ outermost of those proxies wrote, whatever the client put to the left of it:</p>
   CDN or a load balancer in front of your proxy.</li>
 </ul>
 <p>For a request with fewer entries than that, or no header, the address of the
-connection is used. An entry that is not an IP address gives no
-address: the ping's <code>remote_addr</code> is <code>null</code>, and such login attempts share one limit.
-A port and an IPv6 zone (<code>%eth0</code>) are dropped, and an IPv4-mapped IPv6 address
-(<code>::ffff:192.0.2.1</code>) is recorded in its IPv4 form.</p>
+connection is used. An entry that is not an IP address gives none: the ping's
+<code>remote_addr</code> is <code>null</code>, and such login attempts share one limit.</p>
 <p>A value below <code>0</code>, or <code>None</code>, fails the system check <code>hc.api.E005</code>, which stops every
 <code>manage.py</code> command that runs the system checks, the Docker container's start
 included. See <a href="../self_hosted_docker/#trusted-proxy-hops">TRUSTED_PROXY_HOPS</a> on the
