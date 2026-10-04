@@ -1,8 +1,10 @@
 from datetime import timedelta as td
+from typing import Any
+from unittest.mock import patch
 
 from django.utils.timezone import now
 
-from hc.api.models import Check
+from hc.api.models import Check, Flip
 from hc.test import BaseTestCase
 
 
@@ -270,3 +272,58 @@ class UpdateTimeoutTestCase(BaseTestCase):
 
         self.check.refresh_from_db()
         self.assertEqual(self.check.timeout.total_seconds(), 3600)
+
+    def test_it_computes_alert_after_from_the_row_it_locked(self) -> None:
+        self.check.status = "new"
+        self.check.last_ping = None
+        self.check.save()
+        pinged = now()
+
+        def get_then_ping(*args: Any, **kwargs: Any) -> Check:
+            check = Check.objects.get(id=self.check.id)
+            # The first ping lands after the view read the check
+            Check.objects.filter(id=self.check.id).update(status="up", last_ping=pinged)
+            return check
+
+        payload = {"kind": "simple", "timeout": 3600, "grace": 60}
+        self.client.login(username="alice@example.org", password="password")
+        with patch("hc.front.views._get_check_for_user", get_then_ping):
+            r = self.client.post(self.url, data=payload)
+        self.assertRedirects(r, self.redirect_url)
+
+        self.check.refresh_from_db()
+        self.assertEqual(self.check.status, "up")
+        self.assertEqual(self.check.alert_after, pinged + td(seconds=3600 + 60))
+
+    def test_it_does_not_mark_down_a_check_pinged_after_the_read(self) -> None:
+        self.check.last_ping = now() - td(hours=1)
+        self.check.save()
+        pinged = now()
+
+        def get_then_ping(*args: Any, **kwargs: Any) -> Check:
+            check = Check.objects.get(id=self.check.id)
+            Check.objects.filter(id=self.check.id).update(last_ping=pinged)
+            return check
+
+        # Down an hour after the read's last_ping, up after the new one
+        payload = {"kind": "simple", "timeout": 60, "grace": 60}
+        self.client.login(username="alice@example.org", password="password")
+        with patch("hc.front.views._get_check_for_user", get_then_ping):
+            self.client.post(self.url, data=payload)
+
+        self.check.refresh_from_db()
+        self.assertEqual(self.check.status, "up")
+        self.assertEqual(self.check.alert_after, pinged + td(seconds=120))
+        self.assertFalse(Flip.objects.exists())
+
+    def test_it_handles_a_check_deleted_after_it_was_read(self) -> None:
+        def get_and_delete(*args: Any, **kwargs: Any) -> Check:
+            check = Check.objects.get(id=self.check.id)
+            self.check.delete()
+            return check
+
+        payload = {"kind": "simple", "timeout": 3600, "grace": 60}
+        self.client.login(username="alice@example.org", password="password")
+        with patch("hc.front.views._get_check_for_user", get_and_delete):
+            r = self.client.post(self.url, data=payload)
+        self.assertEqual(r.status_code, 404)

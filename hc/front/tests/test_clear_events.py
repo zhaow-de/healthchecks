@@ -1,4 +1,9 @@
 from datetime import UTC, datetime, timedelta
+from typing import Any
+from unittest.mock import patch
+
+from django.db import DatabaseError
+from django.db.models import QuerySet
 
 from hc.api.models import Check, Ping
 from hc.test import BaseTestCase
@@ -58,3 +63,28 @@ class ClearEventsTestCase(BaseTestCase):
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.clear_url)
         self.assertEqual(r.status_code, 405)
+
+    def test_it_clears_in_one_transaction(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        with (
+            patch.object(QuerySet, "delete", side_effect=DatabaseError("boom")),
+            self.assertRaises(DatabaseError),
+        ):
+            self.client.post(self.clear_url)
+
+        # The failed delete of the pings left the check as it was
+        self.check.refresh_from_db()
+        self.assertEqual(self.check.status, "up")
+        self.assertIsNotNone(self.check.last_ping)
+        self.assertTrue(self.check.ping_set.exists())
+
+    def test_it_handles_a_check_deleted_after_it_was_read(self) -> None:
+        def get_and_delete(*args: Any, **kwargs: Any) -> Check:
+            check = Check.objects.get(id=self.check.id)
+            self.check.delete()
+            return check
+
+        self.client.login(username="alice@example.org", password="password")
+        with patch("hc.front.views._get_check_for_user", get_and_delete):
+            r = self.client.post(self.clear_url)
+        self.assertEqual(r.status_code, 404)

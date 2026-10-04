@@ -1,8 +1,8 @@
 import re
 import sqlite3
 from collections import Counter, defaultdict
-from collections.abc import Iterable
-from contextlib import closing
+from collections.abc import Iterable, Iterator
+from contextlib import closing, contextmanager
 from datetime import datetime
 from datetime import timedelta as td
 from itertools import islice
@@ -16,6 +16,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.db.models import BinaryField, Case, Count, F, Q, When
 from django.db.models.functions import Substr
 from django.http import (
@@ -127,6 +128,15 @@ def _get_check_for_user(request: AuthenticatedHttpRequest, code: UUID, preload_o
         q = q.select_related("project__owner__profile")
 
     return get_object_or_404(q, code=code, project__owner_id=request.user.id)
+
+
+@contextmanager
+def _404_if_deleted() -> Iterator[None]:
+    """Answer 404 when Check.lock() finds the check deleted since the view read it."""
+    try:
+        yield
+    except Check.DoesNotExist:
+        raise Http404("not found") from None
 
 
 def _get_channel_for_user(request: AuthenticatedHttpRequest, code: UUID) -> Channel:
@@ -536,64 +546,56 @@ def update_timeout(request: AuthenticatedHttpRequest, code: UUID) -> HttpRespons
     check = _get_check_for_user(request, code)
     fields = ("kind", "timeout", "grace", "schedule", "tz", "alert_after")
 
-    match request.POST.get("kind"):
+    form: forms.TimeoutForm | forms.CronForm | forms.OnCalendarForm
+    kind = request.POST.get("kind")
+    match kind:
         case "simple":
-            simple_form = forms.TimeoutForm(request.POST)
-            if not simple_form.is_valid():
-                return HttpResponseBadRequest()
-
-            check.kind = "simple"
-            check.timeout = simple_form.cleaned_data["timeout"]
-            check.grace = simple_form.cleaned_data["grace"]
+            form = forms.TimeoutForm(request.POST)
         case "cron":
-            cron_form = forms.CronForm(request.POST)
-            if not cron_form.is_valid():
-                return HttpResponseBadRequest()
-
-            check.kind = "cron"
-            check.schedule = cron_form.cleaned_data["schedule"]
-            check.tz = cron_form.cleaned_data["tz"]
-            check.grace = cron_form.cleaned_data["grace"]
+            form = forms.CronForm(request.POST)
         case "oncalendar":
-            oncalendar_form = forms.OnCalendarForm(request.POST)
-            if not oncalendar_form.is_valid():
-                return HttpResponseBadRequest()
-
-            check.kind = "oncalendar"
-            check.schedule = oncalendar_form.cleaned_data["schedule"]
-            check.tz = oncalendar_form.cleaned_data["tz"]
-            check.grace = oncalendar_form.cleaned_data["grace"]
+            form = forms.OnCalendarForm(request.POST)
         case _:
             return HttpResponseBadRequest()
 
-    check.alert_after = check.going_down_after()
-    check_saved = False
-    if check.status == "up":
-        assert check.alert_after
-        if check.alert_after < now():
-            # Checks can flip from "up" to "down" state as a result of changing check's
-            # schedule.  We don't want to send notifications when changing schedule
-            # interactively in the web UI. So we update the `alert_after` and `status`
-            # fields, and create a Flip object here the same way as `sendalerts` would
-            # do, but without sending an actual alert.
-            #
-            # We need to create the Flip object because otherwise the calculation
-            # in Check.downtimes() will come out wrong (when this check later comes up,
-            # we will have no record of when it went down).
-            check.create_flip("down", mark_as_processed=True)
+    if not form.is_valid():
+        return HttpResponseBadRequest()
 
-            check.alert_after = None
-            check.status = "down"
+    with _404_if_deleted(), transaction.atomic():
+        check.lock()
+        check.kind = kind
+        # Each field of the three forms is a Check field of the same name
+        for field, value in form.cleaned_data.items():
+            setattr(check, field, value)
 
-            # Kick off nags. This would normally happen in the sendalerts management
-            # command while processing a flip, but we have already marked the flip
-            # as processed
-            check.save(update_fields=(*fields, "status"))
-            check_saved = True
-            check.project.update_next_nag_dates()
+        check.alert_after = check.going_down_after()
+        check_saved = False
+        if check.status == "up":
+            assert check.alert_after
+            if check.alert_after < now():
+                # Checks can flip from "up" to "down" state as a result of changing check's
+                # schedule.  We don't want to send notifications when changing schedule
+                # interactively in the web UI. So we update the `alert_after` and `status`
+                # fields, and create a Flip object here the same way as `sendalerts` would
+                # do, but without sending an actual alert.
+                #
+                # We need to create the Flip object because otherwise the calculation
+                # in Check.downtimes() will come out wrong (when this check later comes up,
+                # we will have no record of when it went down).
+                check.create_flip("down", mark_as_processed=True)
 
-    if not check_saved:
-        check.save(update_fields=fields)
+                check.alert_after = None
+                check.status = "down"
+
+                # Kick off nags. This would normally happen in the sendalerts management
+                # command while processing a flip, but we have already marked the flip
+                # as processed
+                check.save(update_fields=(*fields, "status"))
+                check_saved = True
+                check.project.update_next_nag_dates()
+
+        if not check_saved:
+            check.save(update_fields=fields)
 
     return _redirect_back(request, check)
 
@@ -709,7 +711,8 @@ def ping_body(request: AuthenticatedHttpRequest, code: UUID, n: int) -> HttpResp
 @login_required
 def pause(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
     check = _get_check_for_user(request, code)
-    check.pause()
+    with _404_if_deleted():
+        check.pause()
 
     # Don't redirect after an AJAX request:
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
@@ -722,7 +725,9 @@ def pause(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
 @login_required
 def resume(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
     check = _get_check_for_user(request, code)
-    if not check.resume():
+    with _404_if_deleted():
+        resumed = check.resume()
+    if not resumed:
         return HttpResponseBadRequest()
 
     return redirect("hc-details", code)
@@ -743,26 +748,30 @@ def remove_check(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
 def clear_events(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
     check = _get_check_for_user(request, code)
 
-    check.status = "new"
-    check.last_ping = None
-    check.last_start = None
-    check.last_duration = None
-    check.has_confirmation_link = False
-    check.alert_after = None
-    check.save(
-        update_fields=(
-            "status",
-            "last_ping",
-            "last_start",
-            "last_duration",
-            "has_confirmation_link",
-            "alert_after",
+    # One transaction under the row lock: a ping lands either before the clear, and is
+    # cleared with the rest, or after it, and then keeps its Ping row
+    with _404_if_deleted(), transaction.atomic():
+        check.lock()
+        check.status = "new"
+        check.last_ping = None
+        check.last_start = None
+        check.last_duration = None
+        check.has_confirmation_link = False
+        check.alert_after = None
+        check.save(
+            update_fields=(
+                "status",
+                "last_ping",
+                "last_start",
+                "last_duration",
+                "has_confirmation_link",
+                "alert_after",
+            )
         )
-    )
 
-    check.ping_set.all().delete()
-    check.notification_set.all().delete()
-    check.flip_set.all().delete()
+        check.ping_set.all().delete()
+        check.notification_set.all().delete()
+        check.flip_set.all().delete()
 
     return redirect("hc-details", code)
 
