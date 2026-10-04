@@ -199,6 +199,7 @@ class PingTestCase(BaseTestCase):
                 self.assertEqual(r.status_code, 200)
                 self.assertEqual(Ping.objects.latest("n").scheme, expected)
 
+    @override_settings(SECURE_PROXY_SSL_HEADER=None)
     def test_it_ignores_x_forwarded_proto_django_does_not_trust(self) -> None:
         for value in ("https", "https, http"):
             with self.subTest(value=value):
@@ -206,11 +207,12 @@ class PingTestCase(BaseTestCase):
                 self.assertEqual(r.status_code, 200)
                 self.assertEqual(Ping.objects.latest("n").scheme, "http")
 
-    @override_settings(SECURE_PROXY_SSL_HEADER=("HTTP_X_FORWARDED_PROTO", "https"))
-    def test_it_reads_x_forwarded_proto_django_trusts(self) -> None:
-        r = self.client.get(self.url, HTTP_X_FORWARDED_PROTO="https")
-        self.assertEqual(r.status_code, 200)
-        self.assertEqual(Ping.objects.get().scheme, "https")
+    def test_it_reads_x_forwarded_proto_by_default(self) -> None:
+        for value, expected in (("https", "https"), ("https, http", "https"), ("http", "http")):
+            with self.subTest(value=value):
+                r = self.client.get(self.url, HTTP_X_FORWARDED_PROTO=value)
+                self.assertEqual(r.status_code, 200)
+                self.assertEqual(Ping.objects.latest("n").scheme, expected)
 
     def test_it_cuts_a_long_method_to_the_column(self) -> None:
         r = self.client.generic("VERYLONGMETHODNAME", self.url)

@@ -1,3 +1,5 @@
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from hc.api.models import Channel, Check, Flip, Notification, Ping
@@ -80,3 +82,46 @@ class ApiAdminTestCase(BaseTestCase):
                 r = self.client.get(url)
                 self.assertContains(r, f'name="{field}"')
                 self.assertContains(r, widget)
+
+    def test_changelists_count_their_rows_once(self) -> None:
+        Ping.objects.create(owner=self.check, body_raw=b"x" * 1000)
+        channel = Channel.objects.create(project=self.project, kind="webhook")
+        Notification.objects.create(owner=self.check, channel=channel, check_status="down")
+        self.check.create_flip("down")
+
+        for name, table in (("ping", "api_ping"), ("notification", "api_notification"), ("flip", "api_flip")):
+            with self.subTest(name=name), CaptureQueriesContext(connection) as ctx:
+                r = self.client.get(reverse(f"admin:api_{name}_changelist"))
+                self.assertEqual(r.status_code, 200)
+                counts = [q["sql"] for q in ctx.captured_queries if "COUNT(" in q["sql"] and table in q["sql"]]
+                self.assertEqual(len(counts), 1)
+
+    def test_ping_changelist_reads_no_body(self) -> None:
+        Ping.objects.create(owner=self.check, body_raw=b"x" * 1000)
+
+        with CaptureQueriesContext(connection) as ctx:
+            r = self.client.get(reverse("admin:api_ping_changelist"))
+        self.assertEqual(r.status_code, 200)
+        selects = [q["sql"] for q in ctx.captured_queries if '"api_ping"."id"' in q["sql"]]
+        self.assertTrue(selects)
+        for sql in selects:
+            self.assertNotIn("body_raw", sql)
+
+    def test_editing_a_ping_keeps_its_body(self) -> None:
+        ping = Ping.objects.create(owner=self.check, n=1, body_raw=b"hello")
+
+        form = {
+            "n": "1",
+            "created_0": "2026-01-02",
+            "created_1": "03:04:05",
+            "scheme": "http",
+            "method": "PUT",
+            "exitstatus": "0",
+            "rid": "a0b1c2d3-0000-4000-8000-000000000000",
+        }
+        r = self.client.post(reverse("admin:api_ping_change", args=[ping.id]), form)
+        self.assertEqual(r.status_code, 302)
+
+        ping.refresh_from_db()
+        self.assertEqual(ping.method, "PUT")
+        self.assertEqual(ping.get_body_bytes(), b"hello")

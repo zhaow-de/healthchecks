@@ -6,6 +6,7 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
 import os
+import re
 import sys
 import tomllib
 from collections.abc import Mapping
@@ -16,6 +17,7 @@ from urllib.parse import urlparse
 import django_stubs_ext
 from django.core.exceptions import ImproperlyConfigured
 from django.http.request import split_domain_port
+from django.utils.csp import CSP
 
 django_stubs_ext.monkeypatch()
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -69,11 +71,16 @@ SECRET_KEY = envsecret("SECRET_KEY", "---")
 METRICS_KEY = os.getenv("METRICS_KEY")
 DEBUG = envbool("DEBUG", "True")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "healthchecks@example.org")
+# The sender of Django's error mails to ADMINS; Django's own default, root@localhost,
+# is one an SMTP service that sends only from verified addresses refuses
+SERVER_EMAIL = os.getenv("SERVER_EMAIL", DEFAULT_FROM_EMAIL)
 SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL")
 if admins := os.getenv("ADMINS"):
     ADMINS = admins.split(",")
 
-if v := os.getenv("SECURE_PROXY_SSL_HEADER"):
+# On by default: the reverse proxy in front of the app sets X-Forwarded-Proto, replacing
+# what the client sent. An empty value turns it off.
+if v := os.getenv("SECURE_PROXY_SSL_HEADER", "HTTP_X_FORWARDED_PROTO,https"):
     SECURE_PROXY_SSL_HEADER = tuple(v.split(",", maxsplit=1))
 
 # How many reverse proxies in front of the app write X-Forwarded-For: see hc.lib.ip.client_ip
@@ -107,6 +114,11 @@ INSTALLED_APPS = (
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
+    # Outside every middleware below, so it compresses the body they leave. Not above
+    # WhiteNoise, which serves the build's .gz files itself: there it would compress
+    # every other static file, fonts and images included, on each request.
+    *(["django.middleware.gzip.GZipMiddleware"] if envbool("USE_GZIP_MIDDLEWARE", "False") else []),
+    "django.middleware.csp.ContentSecurityPolicyMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -115,9 +127,6 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "hc.accounts.middleware.ProfileMiddleware",
 ]
-
-if envbool("USE_GZIP_MIDDLEWARE", "False"):
-    MIDDLEWARE.append("django.middleware.gzip.GZipMiddleware")
 
 AUTHENTICATION_BACKENDS = [
     "hc.accounts.backends.EmailBackend",
@@ -137,6 +146,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "django.template.context_processors.csp",
                 "hc.front.context_processors.branding",
             ]
         },
@@ -264,6 +274,32 @@ else:
     # Otherwise, populate it with the domain from SITE_ROOT
     domain, _ = split_domain_port(_site_root_parts.netloc)
     ALLOWED_HOSTS = [domain]
+
+# On an https SITE_ROOT the session, messages, hc-device, auto-login and CSRF cookies are Secure
+SESSION_COOKIE_SECURE = CSRF_COOKIE_SECURE = _site_root_parts.scheme == "https"
+# A form posted from SITE_ROOT passes the CSRF origin check even when the proxy
+# does not tell Django the request came over https
+CSRF_TRUSTED_ORIGINS = [f"{_site_root_parts.scheme}://{_site_root_parts.netloc}"]
+SECURE_HSTS_SECONDS = envint("SECURE_HSTS_SECONDS", "0")
+# SECURE_SSL_REDIRECT stays off: pings may come over http, and docker/fetchstatus.py
+# does. Turned on in local_settings.py, it leaves these paths alone.
+_url_prefix = re.escape(f"{_site_root_parts.path.lstrip('/')}/") if _site_root_parts.path else ""
+SECURE_REDIRECT_EXEMPT = [rf"^{_url_prefix}ping/", rf"^{_url_prefix}api/v3/status/?$"]
+# An inline <script> or <style> needs {% csp_nonce_attr %}. The data: images are the
+# stylesheets' inline SVG icons and the TOTP QR code. The details page's "Ping Now!"
+# posts to PING_ENDPOINT, which may be on another origin.
+_ping_endpoint_parts = urlparse(PING_ENDPOINT)
+SECURE_CSP = {
+    "default-src": [CSP.SELF],
+    "script-src": [CSP.SELF, CSP.NONCE],
+    "style-src": [CSP.SELF, CSP.NONCE],
+    "img-src": [CSP.SELF, "data:"],
+    "connect-src": [CSP.SELF, f"{_ping_endpoint_parts.scheme}://{_ping_endpoint_parts.netloc}"],
+    "object-src": [CSP.NONE],
+    "base-uri": [CSP.SELF],
+    "form-action": [CSP.SELF],
+    "frame-ancestors": [CSP.NONE],
+}
 
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "static-collected"
