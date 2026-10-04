@@ -50,7 +50,7 @@ class NumChecksFilter(admin.SimpleListFilter):
 
     parameter_name = "num_checks"
 
-    def lookups(self, r: HttpRequest, model_admin: ModelAdmin[Profile]) -> Lookups:
+    def lookups(self, request: HttpRequest, model_admin: ModelAdmin[Profile]) -> Lookups:
         return (
             ("10", "More than 10"),
             ("20", "More than 20"),
@@ -61,13 +61,13 @@ class NumChecksFilter(admin.SimpleListFilter):
         )
 
     def queryset(
-        self, r: HttpRequest, qs: QuerySet[WithAnnotations[Profile, ProfileAnnotations]]
+        self, request: HttpRequest, queryset: QuerySet[WithAnnotations[Profile, ProfileAnnotations]]
     ) -> QuerySet[WithAnnotations[Profile, ProfileAnnotations]]:
         value = self.value()
         if value:
-            qs = qs.filter(num_checks__gt=int(value))
+            queryset = queryset.filter(num_checks__gt=int(value))
 
-        return qs
+        return queryset
 
 
 class ProfileAnnotations(TypedDict):

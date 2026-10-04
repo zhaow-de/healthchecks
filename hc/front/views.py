@@ -101,7 +101,7 @@ def _common_timezones(checks: Iterable[Check]) -> list[str]:
     return [tz for tz, _ in counter.most_common(3)]
 
 
-def _get_check_for_user(request: HttpRequest, code: UUID, preload_owner_profile: bool = False) -> Check:
+def _get_check_for_user(request: AuthenticatedHttpRequest, code: UUID, preload_owner_profile: bool = False) -> Check:
     """Return specified check if current user owns its project.
 
     If `preload_owner_profile` is `True`, the returned check's
@@ -119,7 +119,7 @@ def _get_check_for_user(request: HttpRequest, code: UUID, preload_owner_profile:
     return get_object_or_404(q, code=code, project__owner_id=request.user.id)
 
 
-def _get_channel_for_user(request: HttpRequest, code: UUID) -> Channel:
+def _get_channel_for_user(request: AuthenticatedHttpRequest, code: UUID) -> Channel:
     """Return specified channel if current user owns its project."""
 
     assert request.user.is_authenticated
@@ -128,7 +128,7 @@ def _get_channel_for_user(request: HttpRequest, code: UUID) -> Channel:
     return get_object_or_404(q, code=code, project__owner_id=request.user.id)
 
 
-def _get_project_for_user(request: HttpRequest, code: UUID) -> Project:
+def _get_project_for_user(request: AuthenticatedHttpRequest, code: UUID) -> Project:
     """Return specified project if current user owns it."""
 
     assert request.user.is_authenticated

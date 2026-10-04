@@ -427,7 +427,7 @@ def unsubscribe_reports(request: HttpRequest, signed_username: str) -> HttpRespo
         # to see if the timestamp is older than 5 minutes
         try:
             autosubmit = False
-            username = signer.unsign(signed_username, max_age=300)
+            signer.unsign(signed_username, max_age=300)
         except SignatureExpired:
             autosubmit = True
 
@@ -581,10 +581,8 @@ def remove_credential(request: AuthenticatedHttpRequest, code: str) -> HttpRespo
     return render(request, "accounts/remove_credential.html", ctx)
 
 
-def login_webauthn(request: HttpRequest) -> HttpResponse:
-    # We require RP_ID. Fail predicably if it is not set:
-    if not settings.RP_ID:
-        return HttpResponse(status=404)
+def _get_2fa_user(request: HttpRequest) -> User | HttpResponse:
+    """Return the user of the pending two-factor login, or the response to send."""
 
     # Expect an unauthenticated user
     if request.user.is_authenticated:
@@ -598,9 +596,19 @@ def login_webauthn(request: HttpRequest) -> HttpResponse:
         return redirect("hc-login")
 
     try:
-        user = User.objects.get(id=user_id, email=email)
+        return User.objects.get(id=user_id, email=email)
     except User.DoesNotExist:
         return HttpResponseBadRequest()
+
+
+def login_webauthn(request: HttpRequest) -> HttpResponse:
+    # We require RP_ID. Fail predictably if it is not set:
+    if not settings.RP_ID:
+        return HttpResponse(status=404)
+
+    user = _get_2fa_user(request)
+    if isinstance(user, HttpResponse):
+        return user
 
     q = user.credentials.values_list("data", flat=True)
     # GetHelper wants list[bytes] so normalize to that
@@ -636,21 +644,9 @@ def login_webauthn(request: HttpRequest) -> HttpResponse:
 
 
 def login_totp(request: HttpRequest) -> HttpResponse:
-    # Expect an unauthenticated user
-    if request.user.is_authenticated:
-        return HttpResponseBadRequest()
-
-    if "2fa_user" not in request.session:
-        return HttpResponseBadRequest()
-
-    user_id, email, timestamp = request.session["2fa_user"]
-    if timestamp + 300 < time.time():
-        return redirect("hc-login")
-
-    try:
-        user = User.objects.get(id=user_id, email=email)
-    except User.DoesNotExist:
-        return HttpResponseBadRequest()
+    user = _get_2fa_user(request)
+    if isinstance(user, HttpResponse):
+        return user
 
     if not user.profile.totp:
         return HttpResponseBadRequest()

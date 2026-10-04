@@ -28,8 +28,8 @@ class ShortHexTimestampSigner(Signer):
         value = f"{value}{self.sep}{timestamp}"
         return super().sign(value)
 
-    def unsign(self, value: str, max_age: int | None = None) -> str:
-        result = super().unsign(value)
+    def unsign(self, signed_value: str, max_age: int | None = None) -> str:
+        result = super().unsign(signed_value)
         value, timestamp_str = result.rsplit(self.sep, 1)
         timestamp = int(timestamp_str, base=16)
         if max_age is not None:

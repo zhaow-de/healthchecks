@@ -99,10 +99,10 @@ class MethodListFilter(admin.SimpleListFilter):
     def lookups(self, request: HttpRequest, model_admin: ModelAdmin[Ping]) -> Lookups:
         return zip(self.methods, self.methods, strict=True)
 
-    def queryset(self, request: HttpRequest, qs: QuerySet[Ping]) -> QuerySet[Ping]:
+    def queryset(self, request: HttpRequest, queryset: QuerySet[Ping]) -> QuerySet[Ping]:
         if self.value():
-            qs = qs.filter(method=self.value())
-        return qs
+            queryset = queryset.filter(method=self.value())
+        return queryset
 
 
 class KindListFilter(admin.SimpleListFilter):
@@ -113,10 +113,10 @@ class KindListFilter(admin.SimpleListFilter):
     def lookups(self, request: HttpRequest, model_admin: ModelAdmin[Ping]) -> Lookups:
         return zip(self.kinds, self.kinds, strict=True)
 
-    def queryset(self, request: HttpRequest, qs: QuerySet[Ping]) -> QuerySet[Ping]:
+    def queryset(self, request: HttpRequest, queryset: QuerySet[Ping]) -> QuerySet[Ping]:
         if self.value():
-            qs = qs.filter(kind=self.value())
-        return qs
+            queryset = queryset.filter(kind=self.value())
+        return queryset
 
 
 class PingsPaginator(Paginator[Ping]):
@@ -140,20 +140,20 @@ class LastNotifyDurationFilter(admin.SimpleListFilter):
 
     parameter_name = "last_notify_duration"
 
-    def lookups(self, r: HttpRequest, model_admin: ModelAdmin[Channel]) -> Lookups:
+    def lookups(self, request: HttpRequest, model_admin: ModelAdmin[Channel]) -> Lookups:
         return (
             ("1", "More than 1s"),
             ("6", "More than 6s"),
             ("10", "More than 10s"),
         )
 
-    def queryset(self, r: HttpRequest, qs: QuerySet[Channel]) -> QuerySet[Channel]:
+    def queryset(self, request: HttpRequest, queryset: QuerySet[Channel]) -> QuerySet[Channel]:
         v = self.value()
         if v:
             seconds = float(v)
-            qs = qs.filter(last_notify_duration__gt=td(seconds=seconds))
+            queryset = queryset.filter(last_notify_duration__gt=td(seconds=seconds))
 
-        return qs
+        return queryset
 
 
 class LastErrorFilter(admin.SimpleListFilter):
@@ -161,20 +161,20 @@ class LastErrorFilter(admin.SimpleListFilter):
 
     parameter_name = "status"
 
-    def lookups(self, r: HttpRequest, model_admin: ModelAdmin[Channel]) -> Lookups:
+    def lookups(self, request: HttpRequest, model_admin: ModelAdmin[Channel]) -> Lookups:
         return (
             ("ok", "No Error"),
             ("error", "Error"),
         )
 
-    def queryset(self, r: HttpRequest, qs: QuerySet[Channel]) -> QuerySet[Channel]:
+    def queryset(self, request: HttpRequest, queryset: QuerySet[Channel]) -> QuerySet[Channel]:
         v = self.value()
         if v == "ok":
-            qs = qs.filter(last_error="")
+            queryset = queryset.filter(last_error="")
         elif v == "error":
-            qs = qs.exclude(last_error="")
+            queryset = queryset.exclude(last_error="")
 
-        return qs
+        return queryset
 
 
 class ChannelAnnotations(TypedDict):
@@ -265,20 +265,20 @@ class ErrorFilter(admin.SimpleListFilter):
     title = "error"
     parameter_name = "status"
 
-    def lookups(self, r: HttpRequest, model_admin: ModelAdmin[Notification]) -> Lookups:
+    def lookups(self, request: HttpRequest, model_admin: ModelAdmin[Notification]) -> Lookups:
         return (
             ("ok", "OK"),
             ("error", "Error"),
         )
 
-    def queryset(self, r: HttpRequest, qs: QuerySet[Notification]) -> QuerySet[Notification]:
+    def queryset(self, request: HttpRequest, queryset: QuerySet[Notification]) -> QuerySet[Notification]:
         v = self.value()
         if v == "ok":
-            qs = qs.filter(error="")
+            queryset = queryset.filter(error="")
         elif v == "error":
-            qs = qs.exclude(error="")
+            queryset = queryset.exclude(error="")
 
-        return qs
+        return queryset
 
 
 @admin.register(Notification)

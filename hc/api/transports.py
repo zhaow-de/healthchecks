@@ -114,13 +114,14 @@ class HttpTransport(Transport):
         tries_left = 3 if retry else 1
         while True:
             try:
-                return cls._request(
+                cls._request(
                     method,
                     url,
                     data=data,
                     json=json,
                     headers=headers,
                 )
+                return
             except TransportError as e:
                 tries_left = 0 if e.permanent else tries_left - 1
                 # If we have no tries left then abort the retry loop by re-raising
