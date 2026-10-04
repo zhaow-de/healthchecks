@@ -4,8 +4,6 @@ Validation is `check-agent-lessons.py`'s `record_errors`, so the harvest's shape
 cannot drift apart; a refusal writes nothing.
 """
 
-from __future__ import annotations
-
 import argparse
 import datetime as dt
 import importlib.util
@@ -14,11 +12,12 @@ import pathlib
 import re
 import subprocess
 import sys
+import types
 
 _CHECKER = pathlib.Path(__file__).resolve().parent / "check-agent-lessons.py"
 
 
-def _validator():
+def _validator() -> types.ModuleType:
     spec = importlib.util.spec_from_file_location("check_agent_lessons", _CHECKER)
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module

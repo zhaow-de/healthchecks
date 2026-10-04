@@ -1,5 +1,5 @@
 hc.ready(function() {
-    var form = document.getElementById("add-credential-form");
+    const form = document.getElementById("add-credential-form");
 
     function showError(message) {
         hc.hide("#waiting");
@@ -19,8 +19,8 @@ hc.ready(function() {
             return;
         }
 
-        var options = JSON.parse(document.getElementById("options").textContent);
-        var publicKey;
+        const options = JSON.parse(document.getElementById("options").textContent);
+        let publicKey;
         try {
             publicKey = PublicKeyCredential.parseCreationOptionsFromJSON(options.publicKey);
         } catch (err) {
@@ -37,7 +37,7 @@ hc.ready(function() {
     }
 
     hc.on("#name", "keypress", function(e) {
-        if (e.key == "Enter") {
+        if (e.key === "Enter") {
             e.preventDefault();
             requestCredentials();
         }

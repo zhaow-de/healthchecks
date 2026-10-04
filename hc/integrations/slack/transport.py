@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import logging
 from typing import NoReturn
 
@@ -33,7 +31,7 @@ class Slack(HttpTransport):
         fields = SlackFields()
         text = None
         if flip.reason:
-            text = f"Reason: {flip.reason_long()}." if flip.reason else None
+            text = f"Reason: {flip.reason_long()}."
         elif flip.new_status == "up" and flip.down_duration:
             formatted_duration = format_duration_for_sentence(flip.down_duration)
             text = f"The downtime lasted {formatted_duration}."

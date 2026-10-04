@@ -1,11 +1,12 @@
+/* exported adaptiveSetInterval */
 function adaptiveSetInterval(fn, runNow) {
     // unconditionally run every minute
     setInterval(fn, 60000);
 
     // scheduleRun() keeps calling fn and decreasing quota
     // every 3 seconds, until quota runs out.
-    var quota = 0;
-    var scheduledId = null;
+    let quota = 0;
+    let scheduledId = null;
     function scheduleRun() {
         if (quota > 0) {
             quota -= 1;
@@ -16,9 +17,9 @@ function adaptiveSetInterval(fn, runNow) {
     }
 
     document.addEventListener("visibilitychange", function() {
-        if (document.visibilityState == "visible") {
+        if (document.visibilityState === "visible") {
             // tab becomes visible: reset quota
-            if (quota == 0) {
+            if (quota === 0) {
                 quota = 20;
                 scheduleRun();
             } else {
@@ -32,7 +33,7 @@ function adaptiveSetInterval(fn, runNow) {
 
     // user moves mouse: reset quota
     document.addEventListener("mousemove", function() {
-        if (quota == 0) {
+        if (quota === 0) {
             quota = 20;
             scheduleRun();
         } else {

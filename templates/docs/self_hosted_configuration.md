@@ -3,6 +3,27 @@
 Healthchecks prepares its configuration in `hc/settings.py`. It reads configuration
 from environment variables. Below is a list of environment variables it reads and uses.
 
+How the values are read:
+
+* A boolean setting accepts exactly `True` or `False` (case-sensitive). An empty
+  value counts as `False`, not as the default. Any other value stops startup with
+  `ImproperlyConfigured: Unexpected value NAME=..., use 'True' or 'False'`.
+* An integer setting accepts a whole number or `None`. Anything else, an empty
+  value included, stops startup with a `ValueError`.
+* A string setting set to an empty value is the empty string, not the default. For
+  `ADMINS`, `ALLOWED_HOSTS`, `EMAIL_HOST`, `METRICS_KEY`, `RP_ID`,
+  `SECURE_PROXY_SSL_HEADER`, `SLACK_CLIENT_ID` and `SUPPORT_EMAIL` that is the same
+  as unset; for the others, `SITE_ROOT`, `SITE_NAME` and `PING_ENDPOINT` among
+  them, delete the line to get the default.
+* A `<NAME>_FILE` variable with a non-empty value names a file whose content is used
+  instead of `<NAME>`; an empty one counts as unset, and `<NAME>` is read. A
+  non-empty value that does not name an existing regular file stops startup with
+  `ImproperlyConfigured: Error reading <NAME>_FILE (<path>)`, and a file the process
+  may not read stops it with a `PermissionError`. Healthchecks strips whitespace
+  from both ends of the file's content.
+* Settings in `hc/local_settings.py`, when that file exists, override the
+  environment.
+
 <ul class="self-hosted-configuration-toc">
 <li><a href="#ADMINS">ADMINS</a></li>
 <li><a href="#ALLOWED_HOSTS">ALLOWED_HOSTS</a></li>
@@ -22,6 +43,7 @@ from environment variables. Below is a list of environment variables it reads an
 <li><a href="#EMAIL_HOST_PASSWORD">EMAIL_HOST_PASSWORD</a></li>
 <li><a href="#EMAIL_HOST_PASSWORD_FILE">EMAIL_HOST_PASSWORD_FILE</a></li>
 <li><a href="#EMAIL_HOST_USER">EMAIL_HOST_USER</a></li>
+<li><a href="#EMAIL_MAIL_FROM_TMPL">EMAIL_MAIL_FROM_TMPL</a></li>
 <li><a href="#EMAIL_PORT">EMAIL_PORT</a></li>
 <li><a href="#EMAIL_USE_TLS">EMAIL_USE_TLS</a></li>
 <li><a href="#EMAIL_USE_SSL">EMAIL_USE_SSL</a></li>
@@ -29,7 +51,7 @@ from environment variables. Below is a list of environment variables it reads an
 <li><a href="#http_proxy">http_proxy and https_proxy</a></li>
 <li><a href="#INTEGRATIONS_ALLOW_PRIVATE_IPS">INTEGRATIONS_ALLOW_PRIVATE_IPS</a></li>
 <li><a href="#LOG_FORMAT">LOG_FORMAT</a></li>
-<li><a href="#MASTER_BADGE_LABEL">MASTER_BADGE_LABEL</a></li>
+<li><a href="#METRICS_KEY">METRICS_KEY</a></li>
 <li><a href="#PING_BODY_LIMIT">PING_BODY_LIMIT</a></li>
 <li><a href="#PING_ENDPOINT">PING_ENDPOINT</a></li>
 <li><a href="#PROMETHEUS_ENABLED">PROMETHEUS_ENABLED</a></li>
@@ -43,6 +65,8 @@ from environment variables. Below is a list of environment variables it reads an
 <li><a href="#SLACK_CLIENT_SECRET">SLACK_CLIENT_SECRET</a></li>
 <li><a href="#SLACK_CLIENT_SECRET_FILE">SLACK_CLIENT_SECRET_FILE</a></li>
 <li><a href="#SLACK_ENABLED">SLACK_ENABLED</a></li>
+<li><a href="#SUPPORT_EMAIL">SUPPORT_EMAIL</a></li>
+<li><a href="#USE_GZIP_MIDDLEWARE">USE_GZIP_MIDDLEWARE</a></li>
 <li><a href="#WEBHOOKS_ENABLED">WEBHOOKS_ENABLED</a></li>
 </ul>
 
@@ -61,6 +85,13 @@ ADMINS=alice@example.org,bob@example.org
 Note: for error notifications to work, make sure you have also specified working
 SMTP credentials in the `EMAIL_...` environment variables.
 
+The [`sendlogs`](../self_hosted/#sending-notifications) management command also
+emails these addresses, with the count of log records written in the last 24
+hours. Django sends this mail with the subject prefix "[Django] " and from its
+`SERVER_EMAIL` setting, which no environment variable sets, so the sender is
+`root@localhost`; if your SMTP server rejects that sender, set `SERVER_EMAIL` in
+`hc/local_settings.py`.
+
 ## `ALLOWED_HOSTS` {: #ALLOWED_HOSTS }
 
 Default: the domain part of `SITE_ROOT`
@@ -68,6 +99,12 @@ Default: the domain part of `SITE_ROOT`
 The host/domain names that this site can serve. Healthchecks populates this setting
 automatically with the domain part of [SITE_ROOT](#SITE_ROOT). You do not need
 to set it unless you serve Healthchecks on more than one domain.
+
+When set, the list must include the host of `SITE_ROOT`. Otherwise the system check
+`hc.api.E002` fails, and every `manage.py` command that runs the system checks,
+`migrate` included (so also the Docker container's startup), stops with "The
+hostname in settings.SITE_ROOT is not found in settings.ALLOWED_HOSTS". A request
+whose `Host` header is not in the list gets 400 Bad Request.
 
 If you do serve the same Healthchecks instance on more than one domain, specify
 them all in `ALLOWED_HOSTS`, separated by commas:
@@ -86,9 +123,18 @@ Default: `sqlite`
 
 The database engine to use. Possible values: `sqlite`, `postgres`.
 
+Only the exact value `postgres` selects PostgreSQL; any other value, or none, means
+SQLite. `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD` (or `DB_PASSWORD_FILE`),
+`DB_CONN_MAX_AGE`, `DB_SSLMODE` and `DB_TARGET_SESSION_ATTRS` are read only when
+`DB=postgres`. With SQLite, only [DB_NAME](#DB_NAME), a file path, applies.
+
 ## `DB_CONN_MAX_AGE` {: #DB_CONN_MAX_AGE }
 
 Default: `0`
+
+The lifetime of a database connection, in seconds: an integer, `0` to close each
+connection at the end of its request, or `None` for unlimited persistent
+connections. PostgreSQL only.
 
 This is a standard Django setting, read more in
 [Django documentation](https://docs.djangoproject.com/en/6.1/ref/settings/#conn-max-age).
@@ -171,15 +217,27 @@ This is a standard Django setting, read more in
 
 Default: `""` (empty string)
 
-The hostname of a SMTP server to use for sending email. If this environment variable
-is not set, Healthchecks will not be able to send any email.
+The hostname of an SMTP server to use for sending email. If this environment variable
+is not set, Healthchecks will not be able to send any email, and
+[`EMAIL_PORT`](#EMAIL_PORT), [`EMAIL_USE_TLS`](#EMAIL_USE_TLS),
+[`EMAIL_USE_SSL`](#EMAIL_USE_SSL), [`EMAIL_HOST_USER`](#EMAIL_HOST_USER) and
+[`EMAIL_HOST_PASSWORD`](#EMAIL_HOST_PASSWORD) are ignored. Without email, there is
+no login by link, no sudo mode (so Set Password, Change Email, Close Account, the
+two-factor changes and the password change in the administration panel show an
+"Email Needed" page; use `manage.py changepassword` instead), no email alerts,
+reports or `ADMINS` mail, and `manage.py` commands print the warnings
+`hc.api.W002` and `mail.W001`. See [Sending Emails](../self_hosted/#sending-emails).
 
 **On using `local_settings.py`:**
 Healthchecks reads SMTP settings from the `EMAIL_*` environment variables,
 and uses them to construct the `settings.MAILERS` dictionary (a standard Django setting,
 read more in [Django documentation](https://docs.djangoproject.com/en/6.1/ref/settings/#std-setting-MAILERS)).
 To configure SMTP server in the `local_settings.py` file, use the
-`MAILERS` setting, not the individual `EMAIL_*` settings:
+`MAILERS` setting, not the individual `EMAIL_*` settings. A `MAILERS` defined there
+replaces the one built from the environment entirely, defaults included: without
+`port` and `use_tls`, Django connects in plain text on port 25, and without
+`timeout` it waits for the server indefinitely (the environment-built one uses 30
+seconds). For explicit TLS on port 587:
 
 ```
 MAILERS = {
@@ -187,12 +245,18 @@ MAILERS = {
         "BACKEND": "django.core.mail.backends.smtp.EmailBackend",
         "OPTIONS": {
             "host": "smtp.example.org",
+            "port": 587,
+            "use_tls": True,
             "username": "example-username",
             "password": "example-password",
+            "timeout": 30,
         },
     },
 }
 ```
+
+For implicit TLS, use `"port": 465, "use_ssl": True` instead of the `port` and
+`use_tls` lines.
 
 ## `EMAIL_HOST_PASSWORD` {: #EMAIL_HOST_PASSWORD }
 
@@ -215,6 +279,32 @@ Default: `""` (empty string)
 
 Username to use for the SMTP server defined in [EMAIL_HOST](#EMAIL_HOST).
 
+## `EMAIL_MAIL_FROM_TMPL` {: #EMAIL_MAIL_FROM_TMPL }
+
+Default: `""` (empty string)
+
+A template for the envelope sender (the SMTP `MAIL FROM` address) of outgoing
+email, with one `%s`. Example:
+
+```ini
+EMAIL_MAIL_FROM_TMPL=%s@bounces.example.org
+```
+
+Healthchecks fills `%s` with a signed bounce ID for alert and report emails, and
+with `bounces` for other emails. The `From:` header stays
+[DEFAULT_FROM_EMAIL](#DEFAULT_FROM_EMAIL). When the setting is empty, the envelope
+sender is `DEFAULT_FROM_EMAIL` too.
+
+To act on bounces, have the mail service that receives mail for those addresses
+POST each bounce message, as a raw MIME message, to `/api/v3/bounces/` (see
+[Receive Email Bounces](../api/#bounces)); Healthchecks reads the bounce ID from the
+local part of the bounce's `To:` header. Only bounces that arrive within 48 hours
+of the email are acted on:
+
+* a permanent failure of an alert disables that email integration;
+* a permanent failure of a report or reminder email turns reports off, whatever
+  their period (daily, weekly or monthly), and turns reminders off.
+
 ## `EMAIL_PORT` {: #EMAIL_PORT }
 
 Default: `587`
@@ -225,15 +315,19 @@ Port to use for the SMTP server defined in [EMAIL_HOST](#EMAIL_HOST).
 
 Default: `True`
 
-hether to use a TLS (secure) connection when talking to the SMTP server.
+Whether to use a TLS (secure) connection when talking to the SMTP server.
 This is used for explicit TLS connections, generally on port 587.
+Set it to `False` when you set [EMAIL_USE_SSL](#EMAIL_USE_SSL) to `True`: with
+both `True`, every email fails with Django's `InvalidMailer` error, and nothing
+reports it at startup.
 
 ## `EMAIL_USE_SSL` {: #EMAIL_USE_SSL}
 
 Default: `False`
 
 Whether to use an implicit TLS (secure) connection when talking to the SMTP server.
-It is generally used on port 465.
+It is generally used on port 465. Set [EMAIL_USE_TLS](#EMAIL_USE_TLS), which
+defaults to `True`, to `False` with it.
 
 ## `EMAIL_USE_VERIFICATION` {: #EMAIL_USE_VERIFICATION }
 
@@ -241,13 +335,19 @@ Default: `True`
 
 A boolean that turns on/off a verification step when adding an email integration.
 
-If enabled, whenever a user adds an email integration, Healthchecks emails a
-verification link to the new address. The new integration becomes active only
-after the user clicks the verification link.
+If enabled, adding an email integration, changing its address, or saving a disabled
+one emails a verification link to the address. The integration stays "Unconfirmed",
+and receives no alerts, until someone clicks the link. The account's own email
+address is never verified this way: it is confirmed at once.
 
-If you are setting up a private healthchecks instance where
-you trust your users, you can opt to disable the verification step. In that case,
-set `EMAIL_USE_VERIFICATION` to `False`.
+Verification needs email: with verification on and no [EMAIL_HOST](#EMAIL_HOST),
+the form refuses a new or changed address, or a disabled integration, unless the
+address is the account's own, so that no address receives alerts without having
+been confirmed.
+
+Set `EMAIL_USE_VERIFICATION` to `False` to confirm each address as it is saved.
+The setting does not change integrations already unconfirmed; to confirm one,
+change its address and back, or delete it and add it again.
 
 ## `http_proxy` and `https_proxy` {: #http_proxy}
 
@@ -276,8 +376,19 @@ Default: `False`
 
 A boolean that controls whether the integrations are allowed to make
 HTTP(S) requests to private IP addresses (127.0.0.1, 192.168.x.x, ...). This setting
-is set to `False` by default, because allowing users to define webhooks that probe
-internal addresses is a security risk.
+is set to `False` by default, because a webhook could then make the server probe
+internal addresses: its URL is typed in the web UI, but placeholders in it, such as
+`$NAME`, take values that a read-write API key can set.
+
+An address is blocked when Python's `ipaddress` module marks it private. That
+covers 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16,
+0.0.0.0, the documentation and benchmarking ranges (192.0.2.0/24, 198.18.0.0/15,
+198.51.100.0/24, 203.0.113.0/24), 240.0.0.0/4, `::1`, `fc00::/7` and `fe80::/10`;
+100.64.0.0/10 (carrier-grade NAT) is not blocked. The check runs on the address of
+every connection, after DNS resolution and after each redirect, so a public
+hostname that resolves to a private address is blocked as well. A blocked request
+fails with the integration error "Connections to private IP addresses are not
+allowed".
 
 Only enable this setting if you run your Healthchecks instance in a trusted
 environment, and need to integrate with services running in your internal network.
@@ -303,22 +414,40 @@ after it. With `json`, each record is one JSON object on one line, with the keys
 `time` (ISO 8601, in UTC), `level`, `logger`, `message`, and `exception` (the
 formatted traceback) when the record carries one.
 
+Any value other than `json` (case-insensitive) means `text`. Text timestamps are in
+the process's local time (UTC in the Docker image).
+
 Neither `manage.py runserver` nor the Docker image's uWSGI writes a line per HTTP
 request. A uWSGI you run yourself does unless it is started with `--disable-logging`.
 
-## `MASTER_BADGE_LABEL` {: #MASTER_BADGE_LABEL }
+Whatever this setting, records at WARNING and above from Healthchecks' own `hc`
+loggers, and the server errors (5xx) Django logs for requests, are also stored in
+the database and shown in Site Administration › Logs › Records. They are never
+pruned automatically; [`sendlogs`](../self_hosted/#sending-notifications) can email
+a daily count of them to [ADMINS](#ADMINS).
 
-Default: same as `SITE_NAME`
+## `METRICS_KEY` {: #METRICS_KEY }
 
-The label for the "Overall Status" status badge.
+Default: `None`
+
+The secret that the [Read Service Metrics](../api/#metrics) endpoint,
+`/api/v3/metrics/`, expects in its `X-Metrics-Key` request header. While it is
+unset, that endpoint answers 403 to every request.
 
 ## `PING_BODY_LIMIT` {: #PING_BODY_LIMIT }
 
 Default: `10000`
 
 The upper size limit in bytes for logged ping request bodies.
-The default value is 10000 (10 kilobytes). You can adjust the limit or you can remove
-it altogether by setting this value to `None`.
+The default value is 10000 (10 kilobytes). Healthchecks stores the first
+`PING_BODY_LIMIT` bytes of each ping's body and drops the rest without an error,
+and sends the value in the `Ping-Body-Limit` response header. With `None`, the body
+is stored whole and the header is omitted.
+
+Independently, a request whose body is larger than 2,621,440 bytes (2.5 MiB) is
+refused with 400 and not recorded, and `None` does not lift that cap. Only a limit
+above 2,621,440 raises the cap, to the limit itself. See
+[Request Body](../http_api/#request-body).
 
 Healthchecks stores each ping body in the database, with its ping. Keep
 `PING_BODY_LIMIT`, and the bodies your jobs send, no bigger than the output you
@@ -329,7 +458,7 @@ actually need to read.
 Default: `SITE_ROOT` + `/ping/`
 
 The base URL to use for constructing ping URLs for display. Healthchecks constructs ping
-URLs by appending either an UUID value or `<ping-key>/<slug>` value to `PING_ENDPOINT`.
+URLs by appending either a UUID value or `<ping-key>/<slug>` value to `PING_ENDPOINT`.
 
 Notes:
 
@@ -359,6 +488,11 @@ Default: `True`
 
 A boolean that turns on/off the Prometheus integration. Enabled by default.
 
+With `False`, Prometheus is hidden from the Integrations page, its page there
+answers 404, and so do the metrics endpoints (`/projects/<uuid>/metrics/` and
+`/projects/<uuid>/metrics/<key>`), so Prometheus scrapes fail. See
+[Configuring Prometheus](../configuring_prometheus/).
+
 ## `RP_ID` {: #RP_ID }
 
 Default: `None`
@@ -371,12 +505,29 @@ standard. To enable WebAuthn support, set the `RP_ID` setting to a non-null valu
 Set its value to your site's domain without scheme and without port. For example,
 if your site runs on `https://my-hc.example.org`, set `RP_ID` to `my-hc.example.org`.
 
+`RP_ID` turns on security keys (WebAuthn) only: the authenticator app (TOTP) second
+factor is available with or without it. An empty value counts as unset. Browsers
+allow WebAuthn only over HTTPS, or on `localhost`.
+
 ## `SECRET_KEY` {: #SECRET_KEY }
 
 Default: `---`
 
 A secret key used for cryptographic signing. Should be set to a unique,
 unpredictable value.
+
+Set it once, before first use, and keep it. Changing it later:
+
+* stops every Management API key (read-write and read-only) from working, because
+  the database stores only an HMAC of each key made with `SECRET_KEY`; Prometheus
+  scrapes with a read-only key stop too. Create new keys in the **API Access**
+  section of each project's Settings page (see [Authentication](../api/#authentication)).
+* invalidates every session, login link, device cookie, pending sudo code, email
+  verification link and unsubscribe link in emails already sent.
+* resets the per-email [login rate limits](../self_hosted/#login-lockout).
+
+The Docker sample's `SECRET_KEY=---` must be replaced before the first API key is
+created.
 
 This is a standard Django setting, read more in
 [Django documentation](https://docs.djangoproject.com/en/6.1/ref/settings/#secret-key).
@@ -412,6 +563,12 @@ SECURE_PROXY_SSL_HEADER=HTTP_X_FORWARDED_PROTO,https
 
 You should *only* set this environment variable if you control your proxy or have some
 other guarantee that it sets/strips this header appropriately.
+
+The Docker image does not need this setting: its uWSGI already treats a request with
+`X-Forwarded-Proto: https` as secure (see
+[Reverse Proxy, TLS Termination, and CSRF Protection](../self_hosted_docker/#tls-termination)).
+Set it for other WSGI servers. Independently of it, Healthchecks records each ping's
+scheme from `X-Forwarded-Proto`.
 
 **Note on using `local_settings.py`:**
 When Healthchecks reads settings from environment variables, it expects
@@ -460,10 +617,17 @@ URL generation to static files (JS, CSS, images). `STATIC_URL` is a standard Dja
 setting, read more about it in
 [Django documentation](https://docs.djangoproject.com/en/6.1/ref/settings/#static-url).
 
+With a path, Healthchecks also serves every route under it (`/prefix/accounts/login/`,
+`/prefix/ping/<uuid>`, `/prefix/api/v3/...`), so the reverse proxy must forward the
+path unchanged, without stripping the prefix.
+
+A trailing slash is removed. A value that does not start with `http://` or
+`https://` triggers the warning `hc.api.W001`.
+
 **On using `local_settings.py`:** Healthchecks only sets the above additional settings
 if you specify `SITE_ROOT` via an environment variable. If you instead specify it in
 `local_settings.py`, you will also need to set `ALLOWED_HOSTS`, `LOGIN_URL`, and
-`STATIC_URL` there.
+`STATIC_URL` there. The route prefix follows `SITE_ROOT` wherever it is set.
 
 ## `SLACK_CLIENT_ID` {: #SLACK_CLIENT_ID }
 
@@ -471,9 +635,10 @@ Default: `None`
 
 The Slack Client ID, used by the Healthchecks integration for Slack.
 
-The integration can work with or without the Slack Client ID. If
-the Slack Client ID is not set, in the "Integrations - Add Slack" page,
-Healthchecks will ask the user to provide a webhook URL for posting notifications.
+The integration can work with or without the Slack Client ID. If the Slack Client
+ID is not set, the Slack row's "Add Integration" button on the Integrations page opens
+a form that asks for a "Webhook URL" (a Slack incoming-webhook URL). If it is set,
+the same button opens a page with an "Add to Slack" button instead.
 
 If the Slack Client ID _is_ set, Healthchecks will use the OAuth2 flow
 to get the webhook URL from Slack. The OAuth2 flow is more user-friendly.
@@ -508,8 +673,31 @@ Default: `True`
 
 A boolean that turns on/off the Healthchecks integration for Slack. Enabled by default.
 
+With `False`, Slack is hidden from the Integrations page and its add pages answer
+404. Existing Slack integrations stay listed, but each notification through them
+fails with the error "Slack notifications are not enabled."
+
+## `SUPPORT_EMAIL` {: #SUPPORT_EMAIL }
+
+Default: `None`
+
+An email address to contact for help. When it is set, the login page's "Lost your
+password?" dialog shows it, and so does the email that
+[`sendflappingnotices`](../self_hosted/#sending-notifications) sends.
+
+## `USE_GZIP_MIDDLEWARE` {: #USE_GZIP_MIDDLEWARE }
+
+Default: `False` (the Docker image sets `True`)
+
+A boolean that adds Django's `GZipMiddleware`, which compresses responses for
+clients that accept gzip.
+
 ## `WEBHOOKS_ENABLED` {: #WEBHOOKS_ENABLED }
 
 Default: `True`
 
 A boolean that turns on/off the Webhooks integration. Enabled by default.
+
+With `False`, Webhook is hidden from the Integrations page, and its add and edit
+pages answer 404. Existing webhook integrations stay listed, but each notification
+through them fails with the error "Webhook notifications are not enabled."

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 import logging
 import sys
@@ -9,7 +7,7 @@ from types import TracebackType
 from hc.logs import JsonFormatter
 from hc.test import BaseTestCase
 
-ExcInfo = tuple[type[BaseException], BaseException, TracebackType | None]
+type ExcInfo = tuple[type[BaseException], BaseException, TracebackType | None]
 
 
 class JsonFormatterTestCase(BaseTestCase):

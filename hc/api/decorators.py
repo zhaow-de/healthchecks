@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 from collections.abc import Callable
 from functools import wraps
@@ -61,10 +59,7 @@ def authorize(f: ViewFunc) -> ViewFunc:
 def authorize_read(f: ViewFunc) -> ViewFunc:
     @wraps(f)
     def wrapper(request: ApiRequest, *args: Any, **kwds: Any) -> HttpResponse:
-        if "X-Api-Key" in request.headers:
-            api_key = request.headers["X-Api-Key"]
-        else:
-            api_key = ""
+        api_key = request.headers.get("X-Api-Key", "")
 
         if len(api_key) != 32:
             return error("missing api key", 401)
@@ -74,7 +69,7 @@ def authorize_read(f: ViewFunc) -> ViewFunc:
             return error("wrong api key", 401)
 
         request.project = project
-        request.readonly = api_key.startswith("hcr_") or api_key == request.project.api_key_readonly
+        request.readonly = api_key.startswith("hcr_")
         return f(request, *args, **kwds)
 
     return wrapper

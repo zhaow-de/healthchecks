@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from unittest.mock import Mock, patch
 
 from django.test.utils import override_settings
@@ -60,6 +58,17 @@ class AddWebauthnTestCase(BaseTestCase):
 
         # state should have been removed from the session
         self.assertNotIn("state", self.client.session)
+
+    @patch("hc.accounts.views.CreateHelper.verify")
+    def test_it_rejects_post_without_state(self, verify: Mock) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        self.set_sudo_flag()
+
+        payload = {"name": "My New Key", "response": "dummy response"}
+        r = self.client.post(self.url, payload)
+        self.assertEqual(r.status_code, 400)
+        verify.assert_not_called()
+        self.assertFalse(Credential.objects.exists())
 
     def test_it_rejects_missing_name(self) -> None:
         self.client.login(username="alice@example.org", password="password")

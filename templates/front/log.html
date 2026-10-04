@@ -27,7 +27,6 @@
         <table
             class="table"
             id="log"
-            data-url="{% url 'hc-ping-details' check.code '0' %}"
             data-refresh-url="{% url 'hc-log-events' check.code %}">
             <tbody>{% include "front/log_rows.html" %}</tbody>
         </table>
@@ -36,7 +35,7 @@
         {% if oldest_ping %}
         <div class="alert alert-info">
             Showing <span id="num-hits">{{ events|length }}</span> matching events.
-            <br >
+            <br>
             The oldest stored ping is ping #{{ oldest_ping.n }} from
             <span data-dt="{{ oldest_ping.created|timestamp }}"></span>.
         </div>
@@ -58,7 +57,7 @@
             value="{{ max|timestamp }}"
             autocomplete="off">
 
-        <p id="end-help" class="text-muted">
+        <p id="end-help" class="text-body-secondary">
             ⬆<br>
             <span data-dt="{{ min|timestamp }}"></span>.
         </p>
@@ -91,25 +90,16 @@
     </div>
 </div>
 
-<div id="ping-details-modal" class="modal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div id="ping-details-body">Loading</div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Got It!</button>
-            </div>
-        </div>
-    </div>
-</div>
+{% include "front/ping_details_modal.html" %}
 
 {% endblock %}
 
 {% block scripts %}
 <script id="last-event-timestamp" type="data">{{ last_event_timestamp }}</script>
 {% compress js %}
+<script src="{% static 'js/adaptive-setinterval.js' %}"></script>
 <script src="{% static 'js/dates.js' %}"></script>
 <script src="{% static 'js/ping_details.js' %}"></script>
 <script src="{% static 'js/log.js' %}"></script>
-<script src="{% static 'js/adaptive-setinterval.js' %}"></script>
 {% endcompress %}
 {% endblock %}

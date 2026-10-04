@@ -1,5 +1,5 @@
 <h1>SITE_NAME Documentation</h1>
-<p>SITE_NAME is a service for monitoring cron jobs (<a href="monitoring_cron_jobs/">see guide</a>)
+<p>SITE_NAME is a service for monitoring cron jobs (<a href="SITE_ROOT/docs/monitoring_cron_jobs/">see guide</a>)
 and similar periodic processes:</p>
 <ul>
 <li>SITE_NAME <strong>listens for HTTP requests ("pings")</strong> from your cron jobs and scheduled
@@ -28,32 +28,48 @@ benefit from SITE_NAME monitoring:</p>
 </ul>
 <h2>Concepts</h2>
 <p>A <strong>Check</strong> represents a single service you want to monitor. For example, when
-<a href="monitoring_cron_jobs/">monitoring cron jobs</a>, you would create a separate check for
+<a href="SITE_ROOT/docs/monitoring_cron_jobs/">monitoring cron jobs</a>, you would create a separate check for
 each cron job to be monitored. Each check has a unique ping URL, schedule,
 and associated integrations. For the available configuration options, see
-<a href="configuring_checks/">Configuring checks</a>.</p>
+<a href="SITE_ROOT/docs/configuring_checks/">Configuring checks</a>.</p>
 <p>Each check is always in one of the following states, depicted by a status icon:</p>
 <dl>
 <dt><span class="status ic-new"></span></dt>
-<dd><strong>New</strong>. A newly created check that has not received any pings yet. Each new
-check you create will start in this state.</dd>
+<dd><strong>New</strong>. No success or failure signal has arrived yet. Each new check you create
+starts in this state, and stays in it after "start" and "log" signals. Resuming
+a paused check also returns it to this state.</dd>
 <dt><span class="status ic-up"></span></dt>
 <dd><strong>Up</strong>. All is well. The last "success" signal has arrived on time.</dd>
 <dt><span class="status ic-grace"></span></dt>
 <dd><strong>Late</strong>. The "success" signal is due but has not arrived yet.
 It is not yet late by more than the check's configured <strong>Grace Time</strong>.</dd>
 <dt><span class="status ic-down"></span></dt>
-<dd><strong>Down</strong>. The "success" signal has not arrived yet, and the Grace Time has elapsed.
-When a check transitions into the "Down" state, SITE_NAME sends alert
-messages via the configured integrations.</dd>
+<dd><strong>Down</strong>. The "success" signal is overdue by more than the Grace Time, or a
+"failure" signal arrived, or a run opened by a "start" signal did not finish
+within the Grace Time. When a check transitions into the "Down"
+state, SITE_NAME sends alert messages via the configured integrations; it sends
+them again when the check comes back "Up".</dd>
 <dt><span class="status ic-paused"></span></dt>
 <dd><strong>Paused</strong>. You can manually pause the monitoring of specific checks. For example,
 if a frequently running cron job has a known problem, and a fix is in the works
 but not yet ready, you can pause monitoring the corresponding check temporarily to
-avoid unwanted alerts about a known issue.</dd>
+avoid unwanted alerts about a known issue.
+To pause a check, click "Pause" in the "Current Status" section of its details
+page, or click the pause button on its row of the "Checks" page twice (the first
+click asks for confirmation). Pausing ends an open run, and while paused the check
+sends no alerts. A "success" or "failure" signal takes the check out of the paused
+state, to "Up" or "Down", unless its <a href="SITE_ROOT/docs/configuring_checks/#filtering-rules">filtering rules</a>
+say to ignore pings while paused; then only the "(Resume Now)" link on its
+details page or the Management API's <a href="SITE_ROOT/docs/api/#resume-check">resume</a>
+call ends the pause, and the check returns to "New". A "start" or "log" signal
+does not unpause it, but a "start" signal opens a run: if no "success" or
+"failure" signal follows within the Grace Time, the check leaves the paused
+state for "Down" and alerts are sent.</dd>
 <dt><span class="status ic-up"></span><div class="spinner started"></div></dt>
-<dd>Additionally, if the most recent received signal is a "start" signal,
-this will be indicated by three animated dots under the check's status icon.</dd>
+<dd>Additionally, while a run is open (a "start" signal arrived and no "success" or
+"failure" signal has ended it yet), three animated dots appear under the check's
+status icon. A "log" signal or an ignored ping after the start does not remove
+them. See <a href="SITE_ROOT/docs/http_api/#run-ids">Run IDs</a> for how a run ends.</dd>
 </dl>
 <hr />
 <p><strong>Ping URL</strong>. Each check has a unique <strong>Ping URL</strong>. Clients (cron jobs, background
@@ -66,18 +82,21 @@ The check is identified by its UUID. Check UUIDs are assigned
 automatically by SITE_NAME, and are guaranteed to be unique.</li>
 <li><code>PING_ENDPOINT&lt;project-ping-key&gt;/&lt;name-slug&gt;</code><br>
 The check is identified by project's <strong>Ping key</strong> and check's
-<strong>slug</strong> (user-chosen, URL-friendly identifier). Optionally supports auto-provisioning:
-if you ping a slug value that does not have a corresponding check, SITE_NAME can
-create the check automatically.</li>
+<strong>slug</strong> (user-chosen, URL-friendly identifier). A slug URL works only after you
+create the project's ping key on the project's <strong>Settings</strong> page; a new project has
+none.</li>
 </ul>
-<p>You can append <code>/start</code>, <code>/fail</code> or <code>/&lt;exitcode&gt;</code> to the base ping URL to send
-"start" and "failure" signals. The "start" and "failure" signals are optional.
+<p>You can append <code>/start</code>, <code>/fail</code>, <code>/log</code> or <code>/&lt;exitcode&gt;</code> to the base ping URL to send
+"start", "failure" and "log" signals, or to report an exit code; a "log" signal records
+a message and does not change the check's status. See
+<a href="SITE_ROOT/docs/http_api/#task-index">What to Call</a> for every option.
+The "start" and "failure" signals are optional.
 You don't have to use them, but you can gain additional monitoring insights
-if you do use them. See <a href="measuring_script_run_time/">Measuring script run time</a> and
-<a href="signaling_failures/">Signaling failures</a> for details.</p>
+if you do use them. See <a href="SITE_ROOT/docs/measuring_script_run_time/">Measuring script run time</a> and
+<a href="SITE_ROOT/docs/signaling_failures/">Signaling failures</a> for details.</p>
 <p>You should treat check UUIDs and project Ping keys as secrets. If you make them public,
 anybody can send telemetry signals to your checks and mess with your monitoring.</p>
-<p>Read more about Ping URLs in <a href="http_api/">Pinging API</a>.</p>
+<p>Read more about Ping URLs in <a href="SITE_ROOT/docs/http_api/">Pinging API</a>.</p>
 <hr />
 <p><strong>Grace Time</strong> is one of the configuration parameters you can set for each check.
 It is the additional time to wait before sending an alert when a check
@@ -85,8 +104,9 @@ is late. Use this parameter to account for minor, expected deviations in job
 execution times.</p>
 <p>When a check is considered <em>late</em> depends on whether the check uses a simple
 or cron schedule, and whether or not you are
-<a href="measuring_script_run_time/">tracking job durations</a> using the "start" events.</p>
-<p>For <strong>simple schedules</strong>, the check is late when the checks's configured period has passed.
+<a href="SITE_ROOT/docs/measuring_script_run_time/">tracking job durations</a> using the "start" events.</p>
+<p>For <strong>simple schedules</strong>, the check is late when the check's configured period has passed
+since the last "success" or "failure" signal.
 For example, consider a periodic task that should run every hour, and the gaps between
 runs should not deviate by more than 5 minutes (Period = 1 hour,
 Grace Time = 5 minutes). And let's say the last successful ping arrived at 12:00.</p>
@@ -106,21 +126,36 @@ And let's say the last successful ping arrived at 12:30.</p>
 <li>At 13:15 the check will be declared down and the alerts will go out (because 5
   minutes will have passed since the time the cron job was expected to check in).</li>
 </ul>
-<p>If you use "start" signals to <a href="measuring_script_run_time/">measure job execution time</a>,
+<p>If you use "start" signals to <a href="SITE_ROOT/docs/measuring_script_run_time/">measure job execution time</a>,
 Grace Time also sets the maximum allowed time gap between "start" and "success" signals.
 If a job sends a "start" signal but does not send a "success" signal within grace time,
 SITE_NAME will assume failure and send out alerts.</p>
 <hr />
-<p>An <strong>Integration</strong> is a specific method for delivering monitoring alerts when a check's
-change states. SITE_NAME supports email, webhook, Slack and group integrations.
+<p>An <strong>Integration</strong> is a specific method for delivering monitoring alerts when a check
+changes state. SITE_NAME supports email, webhook, Slack and group integrations; the
+server can switch off webhook and Slack integrations
+(<a href="SITE_ROOT/docs/self_hosted_configuration/#WEBHOOKS_ENABLED"><code>WEBHOOKS_ENABLED</code></a>,
+<a href="SITE_ROOT/docs/self_hosted_configuration/#SLACK_ENABLED"><code>SLACK_ENABLED</code></a>), and then
+the Integrations page does not offer them. Prometheus also appears on the Integrations
+page unless the server switches it off
+(<a href="SITE_ROOT/docs/self_hosted_configuration/#PROMETHEUS_ENABLED"><code>PROMETHEUS_ENABLED</code></a>),
+but it is a metrics export and sends no alerts (see
+<a href="SITE_ROOT/docs/configuring_prometheus/">Configuring Prometheus</a>).
 You can set up multiple integrations.
 For each check, you can specify which integrations it should use.</p>
 <p>For more information on integrations, see
-<a href="configuring_notifications/">Configuring notifications</a>.</p>
+<a href="SITE_ROOT/docs/configuring_notifications/">Configuring notifications</a>.</p>
 <hr />
 <p><strong>Project</strong>. To keep things organized, you can group checks and integrations in <strong>Projects</strong>.
 Your account starts with a single default project, but you can create
-additional projects as needed. You can transfer existing checks between projects
-while preserving their configuration and ping URLs.</p>
-<p>Each project has a configurable name and a separate set of API keys.</p>
-<p>For more information on projects, see <a href="projects/">Projects</a>.</p>
+additional projects as needed. The default project has no name, so it is shown under
+the account's email address until you rename it; it holds a check named
+"My First Check" (slug <code>my-first-check</code>) and an email integration to the account's
+address.</p>
+<p>You can transfer a check to another project. Its UUID ping URL, schedule, filtering
+rules and event log stay the same. Its slug URL changes to the target project's ping
+key, and its integrations are replaced by all of the target project's integrations
+(see <a href="SITE_ROOT/docs/projects/#transferring-checks">Projects</a>).</p>
+<p>Each project has its own name, API keys (read-write and read-only) and ping key, all
+set on the project's <strong>Settings</strong> page.</p>
+<p>For more information on projects, see <a href="SITE_ROOT/docs/projects/">Projects</a>.</p>

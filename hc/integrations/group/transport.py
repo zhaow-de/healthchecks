@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from hc.api.models import Flip, Notification
 from hc.api.transports import Transport, TransportError
 

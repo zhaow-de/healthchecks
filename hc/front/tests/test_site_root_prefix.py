@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import importlib
 
 from django.test.utils import override_settings
@@ -29,3 +27,14 @@ class SiteRootPrefixTestCase(BaseTestCase):
 
         r = self.client.get("/docs/")
         self.assertEqual(r.status_code, 404)
+
+    @override_settings(SITE_ROOT="http://testserver/hc")
+    def test_dashboard_polls_api_under_site_root_path(self) -> None:
+        self.addCleanup(self._reload_urlconf)
+        self._reload_urlconf()
+
+        r = self.client.get("/hc/tv/")
+        self.assertContains(r, 'await fetch("/hc/api/v3/checks/", {headers: {"X-Api-Key": key}});')
+
+        r = self.client.get("/hc/api/v3/checks/", HTTP_X_API_KEY="R" * 32)
+        self.assertEqual(r.status_code, 401)

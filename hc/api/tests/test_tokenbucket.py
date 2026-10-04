@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from datetime import datetime
 from datetime import timedelta as td
 from unittest import skipUnless
@@ -12,7 +10,7 @@ from django.utils.timezone import now
 from hc.api.models import TokenBucket
 from hc.test import BaseTestCase
 
-# This is sha1("alice@example.org" + "test-secred")
+# The SHA-1 of alice@example.org followed by test-secret
 ALICE_HASH = "d60db3b2343e713a4de3e92d4eb417e4f05f06ab"
 
 
@@ -98,3 +96,6 @@ class TokenBucketTestCase(BaseTestCase):
             self.assertTrue(TokenBucket.authorize_login_password(f"user{i}@example.org"))
 
         self.assertTrue(TokenBucket.authorize_login_password("alice@example.org"))
+
+    def test_str_shows_the_value(self) -> None:
+        self.assertEqual(str(TokenBucket(value="em-" + ALICE_HASH)), "em-" + ALICE_HASH)

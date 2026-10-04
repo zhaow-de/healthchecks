@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from datetime import timedelta as td
 
 from django.test.utils import override_settings
@@ -143,7 +141,7 @@ class MyChecksTestCase(BaseTestCase):
 
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.url)
-        self.assertContains(r, """<div data-tooltip="1 of 1 down" class="btn btn-sm down ">foo</div>""")
+        self.assertContains(r, """<button type="button" data-tooltip="1 of 1 down" class="btn btn-sm down ">foo</button>""")
 
     def test_it_shows_grace_badge(self) -> None:
         self.check.last_ping = now() - td(days=1, minutes=10)
@@ -153,7 +151,7 @@ class MyChecksTestCase(BaseTestCase):
 
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.url)
-        self.assertContains(r, """<div data-tooltip="1 up" class="btn btn-sm grace ">foo</div>""")
+        self.assertContains(r, """<button type="button" data-tooltip="1 up" class="btn btn-sm grace ">foo</button>""")
 
     def test_it_shows_grace_started_badge(self) -> None:
         self.check.last_start = now()
@@ -164,7 +162,7 @@ class MyChecksTestCase(BaseTestCase):
 
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.url)
-        self.assertContains(r, """<div data-tooltip="1 up" class="btn btn-sm grace ">foo</div>""")
+        self.assertContains(r, """<button type="button" data-tooltip="1 up" class="btn btn-sm grace ">foo</button>""")
 
     def test_it_shows_slugs(self) -> None:
         self.project.show_slugs = True
@@ -223,8 +221,17 @@ class MyChecksTestCase(BaseTestCase):
 
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.url + "?status=down")
-        self.assertContains(r, f'<tr id="{down.code}" class="checks-row" >', status_code=200)
-        self.assertContains(r, f'<tr id="{self.check.code}" class="checks-row" style="display: none">')
+        self.assertContains(r, f'<tr id="{down.code}" class="checks-row">', status_code=200)
+        self.assertContains(r, f'<tr id="{self.check.code}" class="checks-row d-none">')
+
+    def test_it_shows_the_selected_status_filters(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(self.url + "?status=grace")
+        self.assertContains(r, '<span class="status ic-dots"></span> Started', status_code=200)
+        self.assertContains(r, "Late ×")
+        # The button of the selected filter shows, the other five start hidden
+        self.assertContains(r, 'class="filter-btn btn btn-outline-secondary"', count=1)
+        self.assertContains(r, 'class="filter-btn btn btn-outline-secondary d-none"', count=5)
 
     def test_status_filter_matches_started_checks(self) -> None:
         self.check.last_ping = now()
@@ -236,8 +243,8 @@ class MyChecksTestCase(BaseTestCase):
 
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.url + "?status=started")
-        self.assertContains(r, f'<tr id="{self.check.code}" class="checks-row" >', status_code=200)
-        self.assertContains(r, f'<tr id="{idle.code}" class="checks-row" style="display: none">')
+        self.assertContains(r, f'<tr id="{self.check.code}" class="checks-row">', status_code=200)
+        self.assertContains(r, f'<tr id="{idle.code}" class="checks-row d-none">')
 
     def test_it_shows_last_duration_header(self) -> None:
         self.client.login(username="alice@example.org", password="password")

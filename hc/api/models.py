@@ -1,15 +1,14 @@
-from __future__ import annotations
-
 import hashlib
 import hmac
 import json
+import logging
 import uuid
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from datetime import timedelta as td
-from importlib import import_module
-from typing import Any, NotRequired, TypedDict
+from functools import cache, cached_property
+from typing import NotRequired, Self, TypedDict
 from zoneinfo import ZoneInfo
 
 from cronsim import CronSim
@@ -21,7 +20,7 @@ from django.db import IntegrityError, models, transaction
 from django.db.models import F, QuerySet
 from django.http import HttpRequest
 from django.urls import reverse
-from django.utils.functional import cached_property
+from django.utils.module_loading import import_string
 from django.utils.timezone import now
 from oncalendar import OnCalendar
 from pydantic import BaseModel, Field
@@ -30,19 +29,22 @@ from hc.accounts.models import Project
 from hc.api import transports
 from hc.lib import emails
 from hc.lib.date import month_boundaries, seconds_in_month
+from hc.lib.ip import client_ip
 from hc.lib.urls import absolute_reverse
+
+logger = logging.getLogger(__name__)
 
 STATUSES = (("up", "Up"), ("down", "Down"), ("new", "New"), ("paused", "Paused"))
 DEFAULT_TIMEOUT = td(days=1)
 DEFAULT_GRACE = td(hours=1)
-NEVER = datetime(3000, 1, 1, tzinfo=timezone.utc)
+NEVER = datetime(3000, 1, 1, tzinfo=UTC)
 CHECK_KINDS = (("simple", "Simple"), ("cron", "Cron"), ("oncalendar", "OnCalendar"))
 # max time between start and ping where we will consider both events related:
 MAX_DURATION = td(hours=72)
 REASONS = (("", "Unknown"), ("timeout", "Timeout"), ("fail", "Fail signal"))
 
 
-TRANSPORTS: dict[str, tuple[str, type[transports.Transport] | str]] = {
+TRANSPORTS: dict[str, tuple[str, str]] = {
     "email": ("Email", "hc.integrations.email.transport.Email"),
     "group": ("Group", "hc.integrations.group.transport.Group"),
     "slack": ("Slack", "hc.integrations.slack.transport.Slack"),
@@ -50,7 +52,12 @@ TRANSPORTS: dict[str, tuple[str, type[transports.Transport] | str]] = {
 }
 
 
-CHANNEL_KINDS = [(kind, label_cls[0]) for kind, label_cls in TRANSPORTS.items()]
+CHANNEL_KINDS = [(kind, label) for kind, (label, _) in TRANSPORTS.items()]
+
+
+@cache
+def _transport_class(path: str) -> type[transports.Transport]:
+    return import_string(path)
 
 
 def isostring(dt: datetime | None) -> str | None:
@@ -81,7 +88,6 @@ class CheckDict(TypedDict):
     filter_body: bool
     filter_http_body: bool
     filter_default_fail: bool
-    badge_url: str
     last_duration: NotRequired[int]
     unique_key: NotRequired[str]
     ping_url: NotRequired[str]
@@ -94,13 +100,13 @@ class CheckDict(TypedDict):
     tz: NotRequired[str]
 
 
-@dataclass
+@dataclass(slots=True)
 class DowntimeRecord:
     boundary: datetime  # The start of this time interval (timezone-aware)
     tz: str  # For calculating total seconds in a month
     no_data: bool  # True if the check did not yet exist in this time interval
-    duration: td  # Total downtime in this time interval
-    count: int  # The number of downtime events in this time interval
+    duration: td = td()  # Total downtime in this time interval
+    count: int = 0  # The number of downtime events in this time interval
 
     def monthly_uptime(self) -> float:
         # NB: this method assumes monthly boundaries.
@@ -122,7 +128,7 @@ class DowntimeRecorder:
             # If the check was created *after* the start of the previous time
             # interval then the check did not yet exist during this time interval:
             no_data = prev_boundary is not None and created > prev_boundary
-            self.records.append(DowntimeRecord(b, tz, no_data, td(), 0))
+            self.records.append(DowntimeRecord(b, tz, no_data))
             prev_boundary = b
 
     def add(self, when: datetime, duration: td) -> None:
@@ -158,7 +164,6 @@ class Check(models.Model):
     failure_kw = models.CharField(max_length=200, blank=True)
     methods = models.CharField(max_length=30, blank=True)
     manual_resume = models.BooleanField(default=False)
-    badge_key = models.UUIDField(default=uuid.uuid4, unique=True)
 
     n_pings = models.IntegerField(default=0)
     last_ping = models.DateTimeField(null=True, blank=True)
@@ -185,7 +190,10 @@ class Check(models.Model):
         )
 
     def __str__(self) -> str:
-        return "%s (%d)" % (self.name or self.code, self.id)
+        return f"{self.name or self.code} ({self.id})"
+
+    def get_absolute_url(self) -> str:
+        return reverse("hc-details", args=[self.code])
 
     def name_then_code(self) -> str:
         if self.name:
@@ -210,9 +218,6 @@ class Check(models.Model):
             return settings.PING_ENDPOINT + key + "/" + self.slug
 
         return settings.PING_ENDPOINT + str(self.code)
-
-    def get_absolute_url(self) -> str:
-        return reverse("hc-details", args=[self.code])
 
     def cloaked_url(self) -> str:
         return absolute_reverse("hc-uncloak", args=[self.unique_key])
@@ -245,14 +250,14 @@ class Check(models.Model):
             # If the result is kept in the local timezone, adding
             # a timedelta to it later (in `going_down_after` and in `get_status`)
             # may yield incorrect results during DST transitions.
-            result = result.astimezone(timezone.utc)
+            result = result.astimezone(UTC)
         elif self.kind == "oncalendar" and self.status == "up":
             assert self.last_ping is not None
             last_local = self.last_ping.astimezone(ZoneInfo(self.tz))
             try:
                 result = next(OnCalendar(self.schedule, last_local))
                 # Same as for cron, convert back to UTC:
-                result = result.astimezone(timezone.utc)
+                result = result.astimezone(UTC)
             except StopIteration:
                 result = NEVER
 
@@ -381,9 +386,6 @@ class Check(models.Model):
             "filter_body": self.filter_body,
             "filter_http_body": self.filter_http_body,
             "filter_default_fail": self.filter_default_fail,
-            # Optimization: construct badge URLs manually instead of using reverse().
-            # This is significantly quicker when returning hundreds of checks.
-            "badge_url": f"{settings.SITE_ROOT}/b/2/{self.badge_key}.svg",
         }
 
         if self.last_duration:
@@ -543,7 +545,7 @@ class Check(models.Model):
             if status == "down":
                 # Before subtracting datetimes convert them to UTC.
                 # Otherwise we will get incorrect results around DST transitions:
-                delta = dt.astimezone(timezone.utc) - prev_dt.astimezone(timezone.utc)
+                delta = dt.astimezone(UTC) - prev_dt.astimezone(UTC)
                 summary.add(prev_dt, delta)
 
             dt = prev_dt
@@ -561,7 +563,7 @@ class Check(models.Model):
 
         Flip objects record check status changes, and have two uses:
         - for sending notifications asynchronously (create a flip object in
-          wwww process, a separate "sendalerts" process picks it up and processes it)
+          www process, a separate "sendalerts" process picks it up and processes it)
         - for downtime statistics calculation. The Check.downtimes() method
           analyzes the flips and calculates downtime counts and durations per
           month.
@@ -575,6 +577,41 @@ class Check(models.Model):
         flip.new_status = new_status
         flip.reason = reason
         flip.save()
+
+    def pause(self) -> None:
+        """Pause the check, unless it is paused already."""
+        if self.status == "paused":
+            return
+
+        # Track the status change for correct downtime calculation in Check.downtimes()
+        self.create_flip("paused", mark_as_processed=True)
+
+        self.status = "paused"
+        self.last_start = None
+        self.alert_after = None
+        self.save(update_fields=("status", "last_start", "alert_after"))
+
+        # After pausing a check we must check if all checks are up,
+        # and Profile.next_nag_date needs to be cleared out:
+        self.project.update_next_nag_dates()
+
+    def resume(self) -> bool:
+        """Resume a paused check as new; return False if it is not paused."""
+        if self.status != "paused":
+            return False
+
+        self.create_flip("new", mark_as_processed=True)
+
+        self.status = "new"
+        self.last_start = None
+        self.last_ping = None
+        self.alert_after = None
+        self.save(update_fields=("status", "last_start", "last_ping", "alert_after"))
+        return True
+
+
+def find_by_unique_key(checks: Iterable[Check], unique_key: str) -> Check | None:
+    return next((check for check in checks if check.unique_key == unique_key), None)
 
 
 class PingDict(TypedDict):
@@ -595,7 +632,9 @@ class Ping(models.Model):
     n = models.IntegerField(null=True)
     owner = models.ForeignKey(Check, models.CASCADE)
     created = models.DateTimeField(default=now)
-    kind = models.CharField(max_length=6, blank=True, null=True)
+    # NULL is a success ping: Check.ping leaves kind unset for one, and the readers
+    # compare with None.
+    kind = models.CharField(max_length=6, blank=True, null=True)  # noqa: DJ001
     scheme = models.CharField(max_length=10, default="http")
     remote_addr = models.GenericIPAddressField(blank=True, null=True)
     method = models.CharField(max_length=10, blank=True)
@@ -604,14 +643,13 @@ class Ping(models.Model):
     exitstatus = models.SmallIntegerField(null=True)
     rid = models.UUIDField(null=True)
 
-    def to_dict(self, owner_code: uuid.UUID) -> PingDict:
-        if self.has_body():
-            # Optimization: construct API URLs manually instead of using reverse().
-            # This is significantly quicker when returning hundreds of pings.
-            body_url = f"{settings.SITE_ROOT}/api/v3/checks/{owner_code}/pings/{self.n}/body"
+    def __str__(self) -> str:
+        return f"Ping #{self.n} ({self.kind or 'success'})"
 
-        else:
-            body_url = None
+    def to_dict(self, owner_code: uuid.UUID) -> PingDict:
+        # Optimization: construct API URLs manually instead of using reverse().
+        # This is significantly quicker when returning hundreds of pings.
+        body_url = f"{settings.SITE_ROOT}/api/v3/checks/{owner_code}/pings/{self.n}/body" if self.has_body() else None
 
         result: PingDict = {
             "type": self.kind or "success",
@@ -681,7 +719,7 @@ class Ping(models.Model):
         for ping in pings.order_by("-id").only("created", "kind", "rid"):
             if ping.kind == "start" and ping.rid == self.rid:
                 return self.created - ping.created
-            elif ping.kind in (None, "fail") and ping.rid == self.rid:
+            if ping.kind in (None, "fail") and ping.rid == self.rid:
                 return None
 
         return None
@@ -757,12 +795,12 @@ class EmailConf(BaseModel):
     notify_down: bool = Field(alias="down")
 
     @classmethod
-    def load(cls, data: Any) -> EmailConf:
+    def load(cls, data: str) -> Self:
         # Is it a plain email address?
         if not data.startswith("{"):
             return cls.model_validate({"value": data, "up": True, "down": True})
 
-        return super().model_validate_json(data)
+        return cls.model_validate_json(data)
 
 
 class Channel(models.Model):
@@ -784,7 +822,7 @@ class Channel(models.Model):
             return self.name
         if self.kind == "email":
             return f"Email to {self.email.value}"
-        elif self.kind == "slack":
+        if self.kind == "slack":
             return f"Slack {self.slack_channel}"
 
         return self.get_kind_display()
@@ -825,18 +863,19 @@ class Channel(models.Model):
         if self.kind not in TRANSPORTS:
             raise NotImplementedError(f"Unknown channel kind: {self.kind}")
 
-        label, cls = TRANSPORTS[self.kind]
-        # import transport classes on first use, and cache in TRANSPORTS
-        if isinstance(cls, str):
-            modulename, classname = cls.rsplit(".", maxsplit=1)
-            cls = getattr(import_module(modulename), classname)
-            TRANSPORTS[self.kind] = (label, cls)
-
-        return cls(self)
+        _, path = TRANSPORTS[self.kind]
+        return _transport_class(path)(self)
 
     def notify(self, flip: Flip, is_test: bool = False) -> str:
-        if self.transport.is_noop(flip.new_status):
-            return "no-op"
+        try:
+            transport = self.transport
+            if transport.is_noop(flip.new_status):
+                return "no-op"
+        except Exception:
+            # An unknown kind, or a stored value its transport cannot parse
+            logger.exception("Unexpected error in %s transport", self.kind)
+            Channel.objects.filter(id=self.id).update(last_error="Unexpected error")
+            return "Unexpected error"
 
         n = Notification(channel=self)
         if is_test:
@@ -855,11 +894,16 @@ class Channel(models.Model):
 
         start, error, disabled = now(), "", self.disabled
         try:
-            self.transport.notify(flip, notification=n)
+            transport.notify(flip, notification=n)
 
         except transports.TransportError as e:
             disabled = True if e.permanent else disabled
             error = e.message
+        except Exception:
+            # A bug in one transport must not stop the flip's other channels,
+            # a group's members, or the Test button
+            logger.exception("Unexpected error in %s transport", self.kind)
+            error = "Unexpected error"
 
         Notification.objects.filter(id=n.id).update(error=error)
         Channel.objects.filter(id=self.id).update(
@@ -956,6 +1000,9 @@ class Notification(models.Model):
     class Meta:
         get_latest_by = "created"
 
+    def __str__(self) -> str:
+        return f"Notification {self.code} ({self.check_status})"
+
 
 class FlipDict(TypedDict):
     timestamp: str
@@ -986,6 +1033,9 @@ class Flip(models.Model):
             ),
         )
 
+    def __str__(self) -> str:
+        return f"Flip from {self.old_status} to {self.new_status}"
+
     def to_dict(self) -> FlipDict:
         return {
             "timestamp": self.created.replace(microsecond=0).isoformat(),
@@ -1008,9 +1058,15 @@ class Flip(models.Model):
         if self.new_status not in ("up", "down"):
             raise NotImplementedError(f"Unexpected status: {self.new_status}")
 
+        def is_noop(ch: Channel) -> bool:
+            try:
+                return ch.transport.is_noop(self.new_status)
+            except Exception:  # noqa: BLE001
+                return False  # Channel.notify() logs the error and records it
+
         q = self.owner.channel_set.exclude(disabled=True)
         q = q.order_by(F("last_notify_duration").asc(nulls_last=True))
-        return [ch for ch in q if not ch.transport.is_noop(self.new_status)]
+        return [ch for ch in q if not is_noop(ch)]
 
     def reason_long(self) -> str | None:
         if self.reason == "timeout":
@@ -1043,6 +1099,9 @@ class TokenBucket(models.Model):
     tokens = models.FloatField(default=1.0)
     updated = models.DateTimeField(default=now)
 
+    def __str__(self) -> str:
+        return self.value
+
     @staticmethod
     def authorize(value: str, capacity: int, refill_time_secs: int) -> bool:
         # The row lock (PostgreSQL) or the IMMEDIATE transaction (SQLite)
@@ -1072,15 +1131,7 @@ class TokenBucket(models.Model):
 
     @staticmethod
     def authorize_auth_ip(request: HttpRequest) -> bool:
-        headers = request.META
-        remote_addr = headers.get("HTTP_X_FORWARDED_FOR", headers["REMOTE_ADDR"])
-        remote_addr = remote_addr.split(",")[0]
-        if "." in remote_addr and ":" in remote_addr:
-            # If remote_addr is in a ipv4address:port format
-            # (like in Azure App Service), remove the port:
-            remote_addr = remote_addr.split(":")[0]
-
-        value = f"auth-ip-{remote_addr}"
+        value = f"auth-ip-{client_ip(request)}"
         # 20 login attempts for a single IP per hour:
         return TokenBucket.authorize(value, 20, 3600)
 

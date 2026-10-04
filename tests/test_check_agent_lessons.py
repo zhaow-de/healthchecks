@@ -48,6 +48,12 @@ def test_an_unreadable_path_refuses_the_same_way_no_path_does(tmp_path: pathlib.
     assert "Traceback" not in done.stderr
 
 
+def test_a_file_path_with_a_trailing_slash_is_unreadable(tmp_path: pathlib.Path) -> None:
+    done = _run(_inbox(tmp_path, OK) + "/")
+    assert done.returncode == 2, "a file named as a directory is refused, not read"
+    assert "cannot read" in done.stderr
+
+
 def test_a_file_whose_bytes_are_not_utf8_is_unreadable_not_malformed(tmp_path: pathlib.Path) -> None:
     path = tmp_path / "main.jsonl"
     path.write_bytes(b"\xff\xfe not utf-8\n")

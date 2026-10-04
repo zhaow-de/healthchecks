@@ -1,8 +1,7 @@
 {% load hc_extras static %}
 <table
     id="checks-table"
-    class="table"
-    {% if num_visible == 0 %}style="display: none"{% endif %}
+    class="table{% if num_visible == 0 %} d-none{% endif %}"
     data-status-url="{% url 'hc-status' project.code %}"
     data-profile-tz="{{ profile_tz }}">
     <tr>
@@ -56,7 +55,7 @@
         <th></th>
     </tr>
     {% for check in checks %}
-    <tr id="{{ check.code }}" class="checks-row" {% if check in hidden_checks %}style="display: none"{% endif %}>
+    <tr id="{{ check.code }}" class="checks-row{% if check in hidden_checks %} d-none{% endif %}">
         <td>
             <span class="status ic-{{ check.cached_status }}"></span>
             <div class="spinner {% if check.last_start %}started{% endif %}"></div>

@@ -1,6 +1,4 @@
-from __future__ import annotations
-
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from django import forms
 from django.core.exceptions import ValidationError
@@ -14,13 +12,13 @@ class TimestampField(forms.Field):
         try:
             value_int = int(value)
         except ValueError:
-            raise ValidationError(message="Must be an integer")
+            raise ValidationError(message="Must be an integer") from None
 
         # 10000000000 is year 2286 (a sanity check)
         if value_int < 0 or value_int > 10000000000:
             raise ValidationError(message="Out of bounds")
 
-        return datetime.fromtimestamp(value_int, timezone.utc)
+        return datetime.fromtimestamp(value_int, UTC)
 
 
 class FlipsFiltersForm(forms.Form):

@@ -1,6 +1,6 @@
 hc.ready(function() {
-    var common = document.getElementById("common-timezones").textContent.split(",");
-    var all = document.getElementById("all-timezones").textContent.split(",");
+    const common = document.getElementById("common-timezones").textContent.split(",");
+    const all = document.getElementById("all-timezones").textContent.split(",");
 
     function toOption(tz) {
         return {value: tz, group: common.includes(tz) ? ["c", "a"] : "a"}

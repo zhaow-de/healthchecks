@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import tempfile
 from contextlib import redirect_stdout
 from importlib.machinery import ModuleSpec
@@ -19,10 +17,6 @@ Some *emphasis* here.
 
 ```python
 print("hello")
-```
-
-```php
-file_get_contents("x");
 ```
 
 | Name | Value |
@@ -67,8 +61,6 @@ class RenderDocsTestCase(BaseTestCase):
         self.assertIn("<p>Some <em>emphasis</em> here.</p>", html)
         # fenced_code + codehilite with css_class="highlight"
         self.assertIn('<div class="highlight"><pre><span></span><code><span class="nb">print</span>', html)
-        # codehilite's startinline highlights PHP that has no "<?php" opener
-        self.assertIn('<code><span class="nb">file_get_contents</span>', html)
         self.assertIn("<th>Name</th>", html)
         self.assertIn("<dt>Grace Time</dt>\n<dd>How long to wait.</dd>", html)
         self.assertIn('<h2 id="anchored">Anchored</h2>', html)

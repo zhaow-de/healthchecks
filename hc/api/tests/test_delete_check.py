@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from django.utils.timezone import now
 
 from hc.api.models import Check
@@ -13,7 +11,7 @@ class DeleteCheckTestCase(BaseTestCase):
         self.url = f"/api/v3/checks/{self.check.code}"
 
     def test_it_works(self) -> None:
-        r = self.client.delete(self.url, HTTP_X_API_KEY="X" * 32)
+        r = self.client.delete(self.url, HTTP_X_API_KEY=self.api_key)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r["Access-Control-Allow-Origin"], "*")
 
@@ -22,7 +20,7 @@ class DeleteCheckTestCase(BaseTestCase):
 
     def test_it_handles_missing_check(self) -> None:
         self.check.delete()
-        r = self.client.delete(self.url, HTTP_X_API_KEY="X" * 32)
+        r = self.client.delete(self.url, HTTP_X_API_KEY=self.api_key)
         self.assertEqual(r.status_code, 404)
 
     def test_it_handles_options(self) -> None:
@@ -38,7 +36,7 @@ class DeleteCheckTestCase(BaseTestCase):
         self.check.last_start = now()
         self.check.save()
 
-        r = self.client.delete(self.url, HTTP_X_API_KEY="X" * 32)
+        r = self.client.delete(self.url, HTTP_X_API_KEY=self.api_key)
         doc = r.json()
         self.assertEqual(doc["status"], "new")
         self.assertTrue(doc["started"])
@@ -47,7 +45,7 @@ class DeleteCheckTestCase(BaseTestCase):
         charlies_check = Check.objects.create(project=self.charlies_project)
 
         url = f"/api/v3/checks/{charlies_check.code}"
-        r = self.client.delete(url, HTTP_X_API_KEY="X" * 32)
+        r = self.client.delete(url, HTTP_X_API_KEY=self.api_key)
         self.assertEqual(r.status_code, 403)
 
         # The check should still exist

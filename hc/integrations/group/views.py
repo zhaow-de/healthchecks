@@ -1,9 +1,7 @@
-from __future__ import annotations
-
 from uuid import UUID
 
 from django.contrib.auth.decorators import login_required
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpResponse
 from django.shortcuts import redirect, render
 
 from hc.accounts.http import AuthenticatedHttpRequest
@@ -12,7 +10,7 @@ from hc.front.views import _get_project_for_user
 from hc.integrations.group.forms import GroupForm
 
 
-def group_form(request: HttpRequest, channel: Channel) -> HttpResponse:
+def group_form(request: AuthenticatedHttpRequest, channel: Channel) -> HttpResponse:
     adding = channel._state.adding
     if request.method == "POST":
         form = GroupForm(request.POST, project=channel.project)

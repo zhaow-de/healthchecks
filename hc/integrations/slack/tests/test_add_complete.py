@@ -1,11 +1,10 @@
-from __future__ import annotations
-
 import json
 from unittest.mock import Mock, patch
 
 from django.test.utils import override_settings
 
 from hc.api.models import Channel
+from hc.lib.curl import CurlError, Response
 from hc.test import BaseTestCase
 
 
@@ -91,6 +90,40 @@ class AddSlackCompleteTestCase(BaseTestCase):
         self.assertRedirects(r, self.channels_url)
         self.assertContains(r, "Received an unexpected response from Slack")
         self.assertTrue(logger.warning.called)
+
+    @patch("hc.integrations.slack.views.logger")
+    @patch("hc.integrations.slack.views.curl.post", autospec=True)
+    def test_it_handles_curl_error(self, mock_post: Mock, logger: Mock) -> None:
+        session = self.client.session
+        session["add_slack"] = ("foo", str(self.project.code))
+        session.save()
+
+        mock_post.side_effect = CurlError("Connection timed out")
+
+        url = "/integrations/add_slack_btn/?code=12345678&state=foo"
+
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(url, follow=True)
+        self.assertRedirects(r, self.channels_url)
+        self.assertContains(r, "Received an unexpected response from Slack")
+        self.assertTrue(logger.warning.called)
+        self.assertFalse(Channel.objects.exists())
+
+    @patch("hc.integrations.slack.views.curl.post", autospec=True)
+    def test_it_handles_non_json_response(self, mock_post: Mock) -> None:
+        session = self.client.session
+        session["add_slack"] = ("foo", str(self.project.code))
+        session.save()
+
+        mock_post.return_value = Response(502, b"<html>Bad Gateway</html>")
+
+        url = "/integrations/add_slack_btn/?code=12345678&state=foo"
+
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(url, follow=True)
+        self.assertRedirects(r, self.channels_url)
+        self.assertContains(r, "Received an unexpected response from Slack")
+        self.assertFalse(Channel.objects.exists())
 
     @override_settings(SLACK_CLIENT_ID=None)
     def test_it_requires_client_id(self) -> None:

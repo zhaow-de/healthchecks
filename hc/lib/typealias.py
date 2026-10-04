@@ -1,12 +1,10 @@
-from __future__ import annotations
-
 from collections.abc import Callable
 
 from django.http import HttpResponse
 
-JSONDict = dict[str, "JSONValue"]
-JSONList = list["JSONValue"]
-JSONValue = JSONDict | JSONList | str | int | float | bool | None
+type JSONDict = dict[str, JSONValue]
+type JSONList = list[JSONValue]
+type JSONValue = JSONDict | JSONList | str | int | float | bool | None
 
 
-ViewFunc = Callable[..., HttpResponse]
+type ViewFunc = Callable[..., HttpResponse]

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from django.test.utils import override_settings
 
 from hc.accounts.models import Credential
@@ -14,6 +12,7 @@ class ProfileTestCase(BaseTestCase):
         self.assertContains(r, "Email and Password")
         self.assertContains(r, "Change Password")
         self.assertContains(r, "Set Up Authenticator App")
+        self.assertContains(r, '<a href="/accounts/profile/notifications/">email reports</a>')
 
     def test_it_shows_own_projects(self) -> None:
         self.client.login(username="alice@example.org", password="password")

@@ -1,9 +1,9 @@
-from __future__ import annotations
-
 import json
+from datetime import UTC, datetime
 from datetime import timedelta as td
 from urllib.parse import urlencode
 
+import time_machine
 from django.utils.timezone import now
 
 from hc.api.models import Channel, Check, Flip, Notification, Ping
@@ -101,6 +101,13 @@ class LogTestCase(BaseTestCase):
         for sample in ["surprise", "100000000000000000"]:
             r = self.client.get(self.url(u=sample))
             self.assertEqual(r.status_code, 400)
+
+    @time_machine.travel(datetime(2031, 6, 1, tzinfo=UTC))
+    def test_it_accepts_timestamps_after_2030(self) -> None:
+        ts = str(now().timestamp())
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(self.url(u=ts) + "&" + urlencode({"end": ts}))
+        self.assertEqual(r.status_code, 200)
 
     def test_it_does_not_show_too_old_notifications(self) -> None:
         # This moves ping #1 outside the 100 most recent pings:

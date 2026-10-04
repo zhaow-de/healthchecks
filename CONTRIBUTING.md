@@ -17,8 +17,13 @@ the next version number is computed from them. Every pull request runs the
 ## Code Style
 
 * Run the commit gate, `uv run pre-commit run -a`, before every commit. It
-  formats Python with [ruff](https://docs.astral.sh/ruff/) and checks file
-  hygiene and YAML.
+  formats and lints Python with [ruff](https://docs.astral.sh/ruff/), refusing
+  the commit over a lint finding it cannot fix itself (the rule set is in
+  `ruff.toml`), lints our JavaScript under `static/js` and the integrations'
+  `static/js` with [ESLint](https://eslint.org/) for undefined and unused names
+  (`eslint.config.js`, no formatter), and checks file hygiene and YAML. You do
+  not need Node: on its first run pre-commit downloads the Node version the hook
+  pins, together with ESLint, into its cache.
 * Prefer simplicity over cleverness.
 * If you are fixing a bug or adding a feature, add a test. Run
   `uv run pytest hc -n auto` (the Django suite) and `uv run pytest -n auto` (the
@@ -59,7 +64,7 @@ You will need to make changes in the following files:
 * Update `TRANSPORTS` in `/hc/api/models.py`.
 * Edit the view(s) for provisioning the integration in
   `/hc/integrations/<kind>/views.py`.
-* Write a HTML template for the new view in
+* Write an HTML template for the new view in
   `/hc/integrations/<kind>/templates/add_<kind>.html`, and prepare any supporting
   illustrations in `/hc/integrations/<kind>/static/img/`.
 * Edit routes for the new view(s) in `/hc/integrations/<kind>/urls.py`.

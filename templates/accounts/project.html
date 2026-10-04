@@ -11,11 +11,11 @@
             <div class="card-body settings-block">
                 <h2>Project Name</h2>
                 {{ project }}
-                <a
-                    href="#"
+                <button
+                    type="button"
                     class="btn btn-outline-secondary float-end"
                     data-bs-toggle="modal"
-                    data-bs-target="#set-project-name-modal">Change Project Name</a>
+                    data-bs-target="#set-project-name-modal">Change Project Name</button>
             </div>
 
            {% if project_name_updated %}
@@ -32,10 +32,8 @@
                     <tr>
                         <td>API key</td>
                         <td>
-                            {% if "." in project.api_key %}
+                            {% if project.api_key %}
                                 <code>{{ project.api_key|mask_rw_key }}</code>
-                            {% elif project.api_key %}
-                                <code data-plaintext="{{ project.api_key }}">{{ project.api_key|mask_key }}</code>
                             {% else %}
                                 <span class="not-set">not set</span>
                             {% endif %}
@@ -46,17 +44,20 @@
                                data-revoke-key="api_key"
                                data-name="API key">Revoke</a>
                             {% else %}
-                            <a href="#" data-create-key="api_key">Create</a>
+                            <button
+                                type="submit"
+                                form="create-key-form"
+                                name="create_key"
+                                value="api_key"
+                                class="btn btn-link p-0 border-0 align-baseline">Create</button>
                             {% endif %}
                         </td>
                     </tr>
                     <tr>
                         <td>API key (read-only)</td>
                         <td>
-                            {% if "." in project.api_key_readonly %}
+                            {% if project.api_key_readonly %}
                                 <code>{{ project.api_key_readonly|mask_ro_key }}</code>
-                            {% elif project.api_key_readonly %}
-                                <code data-plaintext="{{ project.api_key_readonly }}">{{ project.api_key_readonly|mask_key }}</code>
                             {% else %}
                                 <span class="not-set">not set</span>
                             {% endif %}
@@ -67,7 +68,12 @@
                                data-revoke-key="api_key_readonly"
                                data-name="read-only API key">Revoke</a>
                             {% else %}
-                            <a href="#" data-create-key="api_key_readonly">Create</a>
+                            <button
+                                type="submit"
+                                form="create-key-form"
+                                name="create_key"
+                                value="api_key_readonly"
+                                class="btn btn-link p-0 border-0 align-baseline">Create</button>
                             {% endif %}
                         </td>
                     </tr>
@@ -86,7 +92,12 @@
                                data-revoke-key="ping_key"
                                data-name="Ping key">Revoke</a>
                             {% else %}
-                            <a href="#" data-create-key="ping_key">Create</a>
+                            <button
+                                type="submit"
+                                form="create-key-form"
+                                name="create_key"
+                                value="ping_key"
+                                class="btn btn-link p-0 border-0 align-baseline">Create</button>
                             {% endif %}
                         </td>
                     </tr>
@@ -115,10 +126,11 @@
         <div class="card mb-4">
             <div class="card-body settings-block">
                 <h2>Remove Project</h2>
-                <a href="#"
-                   class="btn btn-outline-danger float-end"
-                   data-bs-toggle="modal"
-                   data-bs-target="#remove-project-modal">Remove Project</a>
+                <button
+                    type="button"
+                    class="btn btn-outline-danger float-end"
+                    data-bs-toggle="modal"
+                    data-bs-target="#remove-project-modal">Remove Project</button>
                 This will permanently remove project {{ project }}.
             </div>
         </div>
@@ -128,7 +140,6 @@
 
 <form id="create-key-form" method="post">
     {% csrf_token %}
-    <input id="create-key-type" type="hidden" name="create_key">
 </form>
 
 <div id="revoke-key-modal" class="modal" tabindex="-1">

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from django.test.utils import override_settings
 
 from hc.test import BaseTestCase
@@ -11,3 +9,4 @@ class DashboardTestCase(BaseTestCase):
         r = self.client.get("/tv/")
         self.assertContains(r, "<title>Mychecks</title>", status_code=200)
         self.assertContains(r, '<div id="panel"></div>')
+        self.assertContains(r, 'await fetch("/api/v3/checks/", {headers: {"X-Api-Key": key}});')

@@ -12,4 +12,20 @@ indent-style = "space"
 skip-magic-trailing-comma = false
 
 [lint]
-select = ["I"]
+select = [
+    "F", "E", "W", "I", "UP", "C4", "B", "DTZ", "DJ", "RET", "SIM", "PIE", "PERF", "PTH", "RUF",
+    "N", "A", "ERA", "ISC", "ICN", "TID", "TD", "PGH", "G", "LOG", "BLE",
+]
+ignore = [
+    "E501",
+    "ISC001",
+    "RUF012",
+    "RUF001",
+    "RUF003",
+]
+
+[lint.flake8-tidy-imports.banned-api]
+"__future__.annotations".msg = "Python 3.14 evaluates annotations lazily (PEP 649)."
+
+[lint.pep8-naming]
+extend-ignore-names = ["assertEmail*"]

@@ -84,6 +84,18 @@ repos:
       - id: shellcheck
         types: [shell]
 
+  # `language_version` pins the Node that pre-commit installs through nodeenv, so a clone needs no Node
+  # of its own, and one on PATH is not used.
+  - repo: local
+    hooks:
+      - id: eslint
+        name: eslint
+        entry: eslint --max-warnings=0
+        language: node
+        language_version: 24.21.0
+        additional_dependencies: [eslint@10.12.0, globals@17.13.0]
+        files: ^(static/js|hc/integrations/[^/]+/static/js)/.*\.js$
+
   # The one-kind-per-commit rule keeps claude-kind files apart; feat/fix commits legitimately mix code,
   # tests, templates and docs.
   - repo: local

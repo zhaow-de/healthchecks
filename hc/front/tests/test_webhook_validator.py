@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from hc.front.validators import WebhookValidator
 from hc.test import BaseTestCase
 

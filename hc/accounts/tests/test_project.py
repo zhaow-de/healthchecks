@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from hc.test import BaseTestCase
 
 
@@ -21,7 +19,8 @@ class ProjectTestCase(BaseTestCase):
         self.assertContains(r, 'id="create-key-form"')
         self.assertContains(r, 'id="revoke-key-modal"')
         self.assertContains(r, 'data-revoke-key="api_key"')
-        self.assertContains(r, 'data-create-key="api_key_readonly"')
+        self.assertContains(r, 'form="create-key-form"')
+        self.assertContains(r, 'value="api_key_readonly"')
         self.assertContains(r, 'data-revoke-key="ping_key"')
         self.assertContains(r, 'data-bs-target="#remove-project-modal"')
         self.assertContains(r, 'id="remove-project-modal"')
@@ -40,8 +39,8 @@ class ProjectTestCase(BaseTestCase):
         r = self.client.get(self.url)
         self.assertEqual(r.status_code, 404)
 
-    def test_it_shows_plaintext_keys(self) -> None:
-        self.project.api_key_readonly = "R" * 32
+    def test_it_shows_masked_api_keys_and_the_ping_key(self) -> None:
+        ro_key = self.project.set_api_key_readonly()
         self.project.ping_key = "P" * 22
         self.project.save()
 
@@ -50,8 +49,10 @@ class ProjectTestCase(BaseTestCase):
         r = self.client.get(self.url)
         self.assertEqual(r.status_code, 200)
 
-        self.assertContains(r, "X" * 32)
-        self.assertContains(r, "R" * 32)
+        self.assertContains(r, "hcw_" + self.project.api_key[:4] + "*" * 24)
+        self.assertContains(r, "hcr_" + self.project.api_key_readonly[:4] + "*" * 24)
+        self.assertNotContains(r, self.api_key)
+        self.assertNotContains(r, ro_key)
         self.assertContains(r, "P" * 22)
 
     def test_it_creates_api_key(self) -> None:
@@ -111,7 +112,7 @@ class ProjectTestCase(BaseTestCase):
         self.assertEqual(self.project.api_key, "")
 
     def test_it_revokes_readonly_key(self) -> None:
-        self.project.api_key_readonly = "R" * 32
+        self.project.set_api_key_readonly()
         self.project.save()
 
         self.client.login(username="alice@example.org", password="password")
@@ -120,7 +121,7 @@ class ProjectTestCase(BaseTestCase):
 
         self.project.refresh_from_db()
         self.assertEqual(self.project.api_key_readonly, "")
-        self.assertEqual(self.project.api_key, "X" * 32)
+        self.assertTrue(self.project.compare_api_key(self.api_key))
 
     def test_it_revokes_ping_key(self) -> None:
         self.client.login(username="alice@example.org", password="password")
@@ -129,7 +130,7 @@ class ProjectTestCase(BaseTestCase):
 
         self.project.refresh_from_db()
         self.assertIsNone(self.project.ping_key)
-        self.assertEqual(self.project.api_key, "X" * 32)
+        self.assertTrue(self.project.compare_api_key(self.api_key))
 
     def test_it_checks_access_to_revoke_key(self) -> None:
         self.client.login(username="charlie@example.org", password="password")
@@ -137,7 +138,7 @@ class ProjectTestCase(BaseTestCase):
         self.assertEqual(r.status_code, 404)
 
         self.project.refresh_from_db()
-        self.assertEqual(self.project.api_key, "X" * 32)
+        self.assertTrue(self.project.compare_api_key(self.api_key))
 
     def test_it_sets_project_name(self) -> None:
         self.client.login(username="alice@example.org", password="password")

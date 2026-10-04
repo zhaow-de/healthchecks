@@ -5,8 +5,6 @@ and `main`, with `enforce_admins: true` on both: a required context that no job 
 into that branch, the owner's included, until the protection is edited by hand outside the repository.
 """
 
-from __future__ import annotations
-
 import itertools
 import os
 import re
@@ -190,7 +188,7 @@ def test_the_aggregate_job_fails_unless_every_job_it_needs_succeeded(tmp_path):
     needs = _needs(job)
     wrong = [
         results
-        for results in (dict(zip(needs, combo)) for combo in itertools.product(RESULTS, repeat=len(needs)))
+        for results in (dict(zip(needs, combo, strict=True)) for combo in itertools.product(RESULTS, repeat=len(needs)))
         if _aggregate_passes(tmp_path, results) != all(result == "success" for result in results.values())
     ]
     assert not wrong, f"the aggregate's verdict is wrong when the jobs it needs end with {wrong}"

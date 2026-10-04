@@ -5,8 +5,6 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
-from __future__ import annotations
-
 import os
 import sys
 import tomllib
@@ -241,7 +239,6 @@ AUTH_PASSWORD_VALIDATORS = [
 
 SITE_ROOT = os.getenv("SITE_ROOT", "http://localhost:8000").removesuffix("/")
 SITE_NAME = os.getenv("SITE_NAME", "Healthchecks")
-MASTER_BADGE_LABEL = os.getenv("MASTER_BADGE_LABEL", SITE_NAME)
 PING_ENDPOINT = os.getenv("PING_ENDPOINT", SITE_ROOT + "/ping/")
 PING_BODY_LIMIT = envint("PING_BODY_LIMIT", "10000")
 # If PING_BODY_LIMIT is higher than the default value for DATA_UPLOAD_MAX_MEMORY_SIZE,
@@ -328,9 +325,10 @@ SLACK_ENABLED = envbool("SLACK_ENABLED", "True")
 WEBHOOKS_ENABLED = envbool("WEBHOOKS_ENABLED", "True")
 INTEGRATIONS_ALLOW_PRIVATE_IPS = envbool("INTEGRATIONS_ALLOW_PRIVATE_IPS", "False")
 
-# Read additional configuration from hc/local_settings.py if it exists
+# Read additional configuration from hc/local_settings.py if it exists. The star import
+# is the override: every name it defines replaces the one above.
 if (BASE_DIR / "hc/local_settings.py").exists():
-    from .local_settings import *
+    from .local_settings import *  # noqa: F403
 
 # Overrides for testing
 if sys.argv[1:2] == ["test"] or "pytest" in sys.modules:

@@ -25,6 +25,7 @@ CLAUDE.md
 .cz.toml
 .pre-commit-config.yaml
 ruff.toml
+eslint.config.js
 scripts
 tests
 

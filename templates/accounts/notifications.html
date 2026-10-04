@@ -4,22 +4,7 @@
 {% block title %}Account Settings - {{ site_name }}{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-sm-12">
-        <h1 class="settings-title">
-            Settings
-            <small class="text-body-secondary">{{ request.user.email }}</small>
-        </h1>
-    </div>
-</div>
-
-<div class="row">
-    <div class="col-sm-3">
-        <ul class="nav nav-pills flex-column mb-4">
-            <li class="nav-item"><a class="nav-link" href="{% url 'hc-profile' %}">Account</a></li>
-            <li class="nav-item"><a class="nav-link active" href="{% url 'hc-notifications' %}">Email Reports</a></li>
-        </ul>
-    </div>
+{% include "accounts/settings_nav.html" with active="reports" %}
 
     <div class="col-sm-9 col-md-6">
         <div class="card mb-4 border-{{ status }}">
@@ -98,7 +83,7 @@
                     </label>
 
                     <br />
-                    <p class="text-muted">
+                    <p class="text-body-secondary">
                         {% site_name %} will send reports and ongoing reminders to
                         <strong>{{ profile.user.email }}</strong>.
                         {% if profile.next_report_date %}

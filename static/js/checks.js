@@ -1,11 +1,10 @@
 hc.ready(function () {
-    var base = hc.base();
-    var favicon = document.querySelector('link[rel="icon"]');
+    const base = hc.base();
 
     // Check codes are UUIDs and may start with a digit, which is not a valid
     // "#id" CSS selector, so rows are looked up with getElementById.
     function rowEl(code, selector) {
-        var row = document.getElementById(code);
+        const row = document.getElementById(code);
         return row && row.querySelector(selector);
     }
 
@@ -14,13 +13,13 @@ hc.ready(function () {
     }
 
     hc.on(".my-checks-name", "click", function () {
-        var url = base + "/checks/" + rowCode(this) + "/name/";
+        const url = base + "/checks/" + rowCode(this) + "/name/";
 
         hc.$("#update-name-form").setAttribute("action", url);
         hc.$("#update-name-input").value = this.dataset.name;
         hc.$("#update-slug-input").value = this.dataset.slug;
 
-        var tagsTs = document.getElementById("update-tags-input").tomselect;
+        const tagsTs = document.getElementById("update-tags-input").tomselect;
         tagsTs.setValue(this.dataset.tags.split(" "));
 
         hc.$("#update-desc-input").value = this.dataset.desc;
@@ -31,7 +30,7 @@ hc.ready(function () {
     });
 
     function channelEl(span) {
-        var idx = Array.from(span.parentElement.children).indexOf(span);
+        const idx = Array.from(span.parentElement.children).indexOf(span);
         return document.getElementById("ch-" + idx);
     }
 
@@ -42,62 +41,68 @@ hc.ready(function () {
     });
 
     hc.on(".integrations", "click", "span", function () {
-        var isOff = this.classList.toggle("off");
-        var checkCode = rowCode(this);
-        var channelCode = channelEl(this).dataset.code;
+        const isOff = this.classList.toggle("off");
+        const checkCode = rowCode(this);
+        const channelCode = channelEl(this).dataset.code;
 
-        var url =
+        const url =
             base + "/checks/" + checkCode + "/channels/" + channelCode + "/enabled";
 
-        hc.post(url, { state: isOff ? "off" : "on" });
+        const el = this;
+        hc.post(url, { state: isOff ? "off" : "on" }).catch(function () {
+            // The change was not saved: show the state the server still has
+            el.classList.toggle("off", !isOff);
+        });
 
         return false;
     });
 
     hc.on(".last-ping", "click", function () {
-        if (this.innerText == "Never") {
+        if (this.innerText === "Never") {
             return false;
         }
-        var code = rowCode(this);
-        var lastPingUrl = base + "/checks/" + code + "/last_ping/";
+        const code = rowCode(this);
+        const lastPingUrl = base + "/checks/" + code + "/last_ping/";
         loadPingDetails(lastPingUrl);
 
-        var logUrl = base + "/checks/" + code + "/log/";
+        const logUrl = base + "/checks/" + code + "/log/";
         hc.$("#ping-details-log").setAttribute("href", logUrl);
 
         return false;
     });
 
-    var table = document.getElementById("checks-table");
-    var profileTz = table ? table.dataset.profileTz : undefined;
-    var dateFormatter = new DateFormatter(profileTz);
+    const table = document.getElementById("checks-table");
+    const profileTz = table ? table.dataset.profileTz : undefined;
+    const dateFormatter = new DateFormatter(profileTz);
     hc.tooltip(".last-ping", {
         delay: 200,
         title: function () {
             if (this.querySelector(".label-confirmation")) {
                 return 'The word "confirm" was found in request body';
             }
-            var dtSpan = this.querySelector("[data-dt]");
+            const dtSpan = this.querySelector("[data-dt]");
             if (dtSpan) {
-                var dt = new Date(dtSpan.dataset.dt * 1000);
+                const dt = new Date(dtSpan.dataset.dt * 1000);
                 return dateFormatter.formatTimestamp(dt);
             }
         },
     });
 
+    // Hover only: a clicked chip keeps focus, and the default focus trigger would keep its tooltip open
     hc.tooltip("#my-checks-tags .btn", {
         title: function () {
             return this.getAttribute("data-tooltip");
         },
+        trigger: "hover",
     });
 
     function statusMatch(el, statuses) {
-        var statusClassList = el.querySelector(".status").classList;
+        const statusClassList = el.querySelector(".status").classList;
         // Go through currently active status filters, and, for each,
         // check if the current check matches
         for (const status of statuses) {
             if (
-                status == "started" &&
+                status === "started" &&
                 el.querySelector(".spinner").classList.contains("started")
             ) {
                 return true;
@@ -114,34 +119,25 @@ hc.ready(function () {
     }
 
     function applyFilters() {
-        var url = new URL(window.location.href);
+        const url = new URL(window.location.href);
         url.search = "";
 
         // Checked tags
-        var checked = [];
-        hc.$$("#my-checks-tags .checked").forEach(function (el) {
-            checked.push(el.textContent);
-            url.searchParams.append("tag", el.textContent);
-        });
+        const checked = hc.$$("#my-checks-tags .checked").map((el) => el.textContent);
+        checked.forEach((tag) => url.searchParams.append("tag", tag));
 
         // Search string
-        var searchInput = document.getElementById("search");
-        var search = searchInput ? searchInput.value.toLowerCase() : "";
+        const searchInput = document.getElementById("search");
+        const search = searchInput ? searchInput.value.toLowerCase() : "";
         if (search) {
             url.searchParams.append("search", search);
         }
 
         // Status filters
-        var statuses = [];
-        activeStatusButtons().forEach(function (el) {
-            statuses.push(el.dataset.value);
-            url.searchParams.append("status", el.dataset.value);
-        });
+        const statuses = activeStatusButtons().map((el) => el.dataset.value);
+        statuses.forEach((status) => url.searchParams.append("status", status));
 
-        // Update hash
-        if (window.history && window.history.replaceState) {
-            window.history.replaceState({}, "", url.toString());
-        }
+        window.history.replaceState({}, "", url.toString());
 
         // Update sort links
         document.querySelectorAll("a[data-sort-value]").forEach((a) => {
@@ -149,72 +145,51 @@ hc.ready(function () {
             a.setAttribute("href", url.toString());
         });
 
-        var rows = hc.$$("#checks-table tr.checks-row");
-        var numVisible = 0;
-        if (checked.length == 0 && !search && statuses.length == 0) {
-            // No checked tags, no search string, no status filters: show all
-            hc.show(rows);
-            numVisible = rows.length;
-        } else {
-            function applySingle(element) {
-                var nameData = element.querySelector(".my-checks-name").dataset;
-                if (search) {
-                    var parts = [nameData.name, nameData.slug, element.id];
-                    var haystack = parts.join("\n").toLowerCase();
-                    if (haystack.indexOf(search) == -1) {
-                        hc.hide(element);
-                        return;
-                    }
-                }
-
-                if (checked.length) {
-                    var tags = nameData.tags.split(" ");
-                    for (var i = 0, checkedTag; (checkedTag = checked[i]); i++) {
-                        if (tags.indexOf(checkedTag) == -1) {
-                            hc.hide(element);
-                            return;
-                        }
-                    }
-                }
-
-                if (statuses.length) {
-                    if (!statusMatch(element, statuses)) {
-                        hc.hide(element);
-                        return;
-                    }
-                }
-
-                hc.show(element);
-                numVisible += 1;
+        function matches(row) {
+            const nameData = row.querySelector(".my-checks-name").dataset;
+            if (search) {
+                const haystack = [nameData.name, nameData.slug, row.id].join("\n").toLowerCase();
+                if (!haystack.includes(search)) return false;
             }
 
-            // For each row, see if it needs to be shown or hidden
-            rows.forEach(applySingle);
+            if (checked.length) {
+                const tags = nameData.tags.split(" ");
+                if (!checked.every((tag) => tags.includes(tag))) return false;
+            }
+
+            return statuses.length === 0 || statusMatch(row, statuses);
         }
 
+        let numVisible = 0;
+        hc.$$("#checks-table tr.checks-row").forEach(function (row) {
+            const match = matches(row);
+            hc.toggle(row, match);
+            if (match) numVisible += 1;
+        });
+
         hc.toggle("#checks-table", numVisible > 0);
-        hc.toggle("#no-checks", numVisible == 0);
+        hc.toggle("#no-checks", numVisible === 0);
     }
 
     // User clicks on tags: apply filters
-    hc.on("#my-checks-tags div", "click", function () {
+    hc.on("#my-checks-tags .btn", "click", function () {
         this.classList.toggle("checked");
         applyFilters();
     });
 
     // User changes the search string: apply filters
-    hc.on("#search", "keyup", applyFilters);
+    hc.on("#search", "input", applyFilters);
 
     function switchUrlFormat(format) {
-        var url = new URL(window.location.href);
+        const url = new URL(window.location.href);
         url.searchParams.delete("urls");
         url.searchParams.append("urls", format);
         window.location.href = url.toString();
         return false;
     }
 
-    hc.on("#to-uuid", "click", (e) => switchUrlFormat("uuid"));
-    hc.on("#to-slug", "click", (e) => switchUrlFormat("slug"));
+    hc.on("#to-uuid", "click", () => switchUrlFormat("uuid"));
+    hc.on("#to-slug", "click", () => switchUrlFormat("slug"));
 
     function isPaused(code) {
         return rowEl(code, "span.status").classList.contains("ic-paused");
@@ -233,9 +208,9 @@ hc.ready(function () {
     });
 
     hc.on(".pause", "click", function () {
-        var btn = this;
-        var tip = hc.tooltip(btn);
-        var code = rowCode(btn);
+        const btn = this;
+        const tip = hc.tooltip(btn);
+        const code = rowCode(btn);
 
         // A click on an already paused check. Bootstrap 5 hides a manual tooltip that
         // is shown again while open, so show it only when it is not open yet.
@@ -254,9 +229,14 @@ hc.ready(function () {
         // Second click: update UI and pause the check
         btn.classList.remove("confirm");
         tip.hide();
-        rowEl(code, "span.status").className = "status ic-paused";
+        const status = rowEl(code, "span.status");
+        const previous = status.className;
+        status.className = "status ic-paused";
 
-        hc.post(base + "/checks/" + code + "/pause/");
+        hc.post(base + "/checks/" + code + "/pause/").catch(function () {
+            // The check was not paused: show its status again
+            status.className = previous;
+        });
 
         return false;
     });
@@ -271,7 +251,7 @@ hc.ready(function () {
     hc.tooltip("#checks-table span.status, #checks-table a[data-sort-value]", {
         html: true,
         title: function () {
-            var cssClasses = this.getAttribute("class");
+            const cssClasses = this.getAttribute("class");
             if (cssClasses.indexOf("ic-new") > -1)
                 return "New. Has never received a ping.";
             if (cssClasses.indexOf("ic-paused") > -1)
@@ -287,35 +267,35 @@ hc.ready(function () {
 
     // Schedule refresh to run every 3s when tab is visible and user
     // is active, every 60s otherwise
-    var lastStatus = {};
-    var lastStarted = {};
-    var lastPing = {};
-    var statusUrl = table ? table.dataset.statusUrl : null;
+    const lastStatus = {};
+    const lastStarted = {};
+    const lastPing = {};
+    const statusUrl = table ? table.dataset.statusUrl : null;
     function refreshStatus() {
         hc.getJSON(statusUrl, null, { timeout: 2000 }).then(function (data) {
-            var statusChanged = false;
-            for (var i = 0, el; (el = data.details[i]); i++) {
-                if (lastStatus[el.code] != el.status) {
+            let statusChanged = false;
+            for (const el of data.details) {
+                if (lastStatus[el.code] !== el.status) {
                     lastStatus[el.code] = el.status;
-                    var statusSpan = rowEl(el.code, "span.status");
+                    const statusSpan = rowEl(el.code, "span.status");
                     if (statusSpan) {
                         statusSpan.className = "status ic-" + el.status;
                     }
                     statusChanged = true;
                 }
 
-                if (lastStarted[el.code] != el.started) {
+                if (lastStarted[el.code] !== el.started) {
                     lastStarted[el.code] = el.started;
-                    var spinner = rowEl(el.code, ".spinner");
+                    const spinner = rowEl(el.code, ".spinner");
                     if (spinner) {
                         spinner.classList.toggle("started", el.started);
                     }
                     statusChanged = true;
                 }
 
-                if (lastPing[el.code] != el.last_ping) {
+                if (lastPing[el.code] !== el.last_ping) {
                     lastPing[el.code] = el.last_ping;
-                    var lastPingCell = rowEl(el.code, ".last-ping");
+                    const lastPingCell = rowEl(el.code, ".last-ping");
                     if (lastPingCell) {
                         lastPingCell.innerHTML = el.last_ping;
                     }
@@ -328,21 +308,24 @@ hc.ready(function () {
                 applyFilters();
             }
 
-            hc.$$("#my-checks-tags > div.btn").forEach(function (btn) {
-                var tag = btn.innerText;
-                btn.setAttribute("data-tooltip", data.tags[tag][1]);
-                var status = data.tags[tag][0];
-                if (lastStatus[tag] != status) {
+            hc.$$("#my-checks-tags > .btn").forEach(function (btn) {
+                const tag = btn.innerText;
+                // A tag that no check carries any more has no entry: leave its button as it is
+                const tagData = data.tags[tag];
+                if (!tagData) return;
+
+                btn.setAttribute("data-tooltip", tagData[1]);
+                const status = tagData[0];
+                if (lastStatus[tag] !== status) {
                     btn.classList.remove("up", "grace", "down");
                     btn.classList.add(status);
                     lastStatus[tag] = status;
                 }
             });
 
-            if (document.title != data.title) {
+            if (document.title !== data.title) {
                 document.title = data.title;
-                var downPostfix = data.title.includes("down") ? "_down" : "";
-                favicon.href = `${base}/static/img/favicon${downPostfix}.svg`;
+                hc.setFavicon(data.title.includes("down"));
             }
         }).catch(function () {});
     }
@@ -352,39 +335,20 @@ hc.ready(function () {
         adaptiveSetInterval(refreshStatus);
     }
 
-    // Configure TomSelect for entering tags
-    function divToOption(el) {
-        return { value: el.textContent };
-    }
-
-    new TomSelect("#update-tags-input", {
-        create: true,
-        createOnBlur: true,
-        delimiter: " ",
-        diacritics: false,
-        hideSelected: true,
-        highlight: false,
-        labelField: "value",
-        options: hc.$$("#my-checks-tags div").map(divToOption),
-        refreshThrottle: 0,
-        render: { no_results: (data, escape) => "" },
-        searchField: ["value"],
-    });
+    hc.tagSelect("#update-tags-input", hc.$$("#my-checks-tags .btn").map((el) => el.textContent));
 
     hc.tooltip(".my-checks-url", { title: "Click to copy" });
-    hc.on(".my-checks-url", "click", function (e) {
+    hc.on(".my-checks-url", "click", function () {
         if (window.getSelection().toString()) {
             // do nothing, selection not empty
             return;
         }
 
-        navigator.clipboard.writeText(this.textContent);
-        hc.flashTooltip(this, "Copied!", "Click to copy");
+        hc.copy(this, this.textContent, "Click to copy");
     });
 
-    hc.on("#filters a[data-value]", "click", function () {
-        var v = this.dataset.value;
-        hc.toggle('#check-filters button[data-value="' + v + '"]');
+    hc.on("#filters .dropdown-item[data-value]", "click", function () {
+        hc.toggle('.filter-btn[data-value="' + this.dataset.value + '"]');
         applyFilters();
     });
 

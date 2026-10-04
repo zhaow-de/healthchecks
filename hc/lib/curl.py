@@ -1,9 +1,8 @@
 """requests-like interface for PycURL."""
 
-from __future__ import annotations
-
 import ipaddress
 import socket
+from dataclasses import dataclass
 from io import BytesIO
 from json import dumps, loads
 from typing import Any, cast
@@ -14,23 +13,24 @@ from django.conf import settings
 
 from hc.lib.typealias import JSONValue
 
-CurlSockAddr = tuple[int, int, int, tuple[str, int]]
+type CurlSockAddr = tuple[int, int, int, tuple[str, int]]
 
 # Type aliases for the arguments of the request function
-Data = dict[str, Any] | str | bytes | None
-Headers = dict[str, str] | None
-Timeout = int | None
+type Data = dict[str, Any] | str | bytes | None
+type Headers = dict[str, str] | None
+type Timeout = int | None
 
 
 class CurlError(Exception):
     def __init__(self, message: str) -> None:
+        super().__init__(message)
         self.message = message
 
 
+@dataclass(frozen=True, slots=True)
 class Response:
-    def __init__(self, status_code: int, content: bytes) -> None:
-        self.status_code = status_code
-        self.content = content
+    status_code: int
+    content: bytes
 
     def json(self) -> JSONValue:
         return cast(JSONValue, loads(self.content.decode()))
@@ -59,7 +59,7 @@ def request(
     headers: Headers = None,
     timeout: Timeout = None,
 ) -> Response:
-    """Make a HTTP request using pycurl, return a Response object.
+    """Make an HTTP request using pycurl, return a Response object.
 
     The `method` argument specifies the HTTP verb, and must be
     one of: "get", "post", "put".
@@ -122,67 +122,69 @@ def request(
         return socket.socket(family, socktype, protocol)
 
     c = pycurl.Curl()
-    c.setopt(pycurl.NOSIGNAL, 1)
-    c.setopt(pycurl.PROTOCOLS, pycurl.PROTO_HTTP | pycurl.PROTO_HTTPS)
-    c.setopt(pycurl.OPENSOCKETFUNCTION, opensocket)
-    c.setopt(pycurl.FOLLOWLOCATION, True)  # Allow redirects
-    c.setopt(pycurl.MAXREDIRS, 3)
-    if timeout is not None:
-        c.setopt(pycurl.TIMEOUT, timeout)
-
-    c.setopt(pycurl.URL, url.encode())
-
-    if headers is None:
-        headers = {}
-
-    if json is not None:
-        data = dumps(json)
-        headers["Content-Type"] = "application/json"
-
-    if "User-Agent" not in headers:
-        headers["User-Agent"] = "zcrypto-hc.zhaow.me"
-
-    headers_list = [_makeheader(k, v) for k, v in headers.items()]
-    c.setopt(pycurl.HTTPHEADER, headers_list)
-
-    if method in ("post", "put"):
-        if isinstance(data, dict):
-            c.setopt(pycurl.POSTFIELDS, urlencode(data))
-
-        if isinstance(data, str):
-            data = data.encode()
-
-        if isinstance(data, bytes):
-            c.setopt(pycurl.UPLOAD, 1)
-            c.setopt(pycurl.INFILESIZE, len(data))
-            c.setopt(pycurl.READDATA, BytesIO(data))
-
-        c.setopt(pycurl.CUSTOMREQUEST, method.upper())
-
-    buffer = BytesIO()
-    c.setopt(pycurl.WRITEDATA, buffer)
-
     try:
-        c.perform()
-    except pycurl.error as e:
-        errcode = e.args[0]
-        if errcode == pycurl.E_OPERATION_TIMEDOUT:
-            raise CurlError("Connection timed out")
-        elif errcode == pycurl.E_COULDNT_RESOLVE_HOST:
-            raise CurlError("Could not resolve host")
-        elif errcode == pycurl.E_COULDNT_CONNECT:
-            if opensocket_rejected_ips:
-                raise CurlError("Connections to private IP addresses are not allowed")
-            raise CurlError("Connection failed")
-        elif errcode == pycurl.E_TOO_MANY_REDIRECTS:
-            raise CurlError("Too many redirects")
-        elif errcode in (pycurl.E_SSL_CONNECT_ERROR, pycurl.E_PEER_FAILED_VERIFICATION):
-            raise CurlError("TLS handshake failed")
+        c.setopt(pycurl.NOSIGNAL, 1)
+        c.setopt(pycurl.PROTOCOLS, pycurl.PROTO_HTTP | pycurl.PROTO_HTTPS)
+        c.setopt(pycurl.OPENSOCKETFUNCTION, opensocket)
+        c.setopt(pycurl.FOLLOWLOCATION, True)  # Allow redirects
+        c.setopt(pycurl.MAXREDIRS, 3)
+        if timeout is not None:
+            c.setopt(pycurl.TIMEOUT, timeout)
 
-        raise CurlError(f"HTTP request failed, code: {errcode}")
+        c.setopt(pycurl.URL, url.encode())
 
-    status = c.getinfo(pycurl.RESPONSE_CODE)
-    c.close()
+        if headers is None:
+            headers = {}
+
+        if json is not None:
+            data = dumps(json)
+            headers["Content-Type"] = "application/json"
+
+        if "User-Agent" not in headers:
+            headers["User-Agent"] = "zcrypto-hc.zhaow.me"
+
+        headers_list = [_makeheader(k, v) for k, v in headers.items()]
+        c.setopt(pycurl.HTTPHEADER, headers_list)
+
+        if method in ("post", "put"):
+            if isinstance(data, dict):
+                c.setopt(pycurl.POSTFIELDS, urlencode(data))
+
+            if isinstance(data, str):
+                data = data.encode()
+
+            if isinstance(data, bytes):
+                c.setopt(pycurl.UPLOAD, 1)
+                c.setopt(pycurl.INFILESIZE, len(data))
+                c.setopt(pycurl.READDATA, BytesIO(data))
+
+            c.setopt(pycurl.CUSTOMREQUEST, method.upper())
+
+        buffer = BytesIO()
+        c.setopt(pycurl.WRITEDATA, buffer)
+
+        try:
+            c.perform()
+        except pycurl.error as e:
+            errcode = e.args[0]
+            if errcode == pycurl.E_OPERATION_TIMEDOUT:
+                raise CurlError("Connection timed out") from e
+            if errcode == pycurl.E_COULDNT_RESOLVE_HOST:
+                raise CurlError("Could not resolve host") from e
+            if errcode == pycurl.E_COULDNT_CONNECT:
+                if opensocket_rejected_ips:
+                    raise CurlError("Connections to private IP addresses are not allowed") from e
+                raise CurlError("Connection failed") from e
+            if errcode == pycurl.E_TOO_MANY_REDIRECTS:
+                raise CurlError("Too many redirects") from e
+            if errcode in (pycurl.E_SSL_CONNECT_ERROR, pycurl.E_PEER_FAILED_VERIFICATION):
+                raise CurlError("TLS handshake failed") from e
+
+            raise CurlError(f"HTTP request failed, code: {errcode}") from e
+
+        status = c.getinfo(pycurl.RESPONSE_CODE)
+    finally:
+        c.close()
 
     return Response(status, buffer.getvalue())
 

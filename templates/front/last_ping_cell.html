@@ -5,10 +5,10 @@
     {% if check.has_confirmation_link %}
     <br /><span class="badge label-confirmation">confirmation link</span>
     {% elif check.clamped_last_duration %}
-	<br />
-	<span class="checks-subline">
-		<span class="ic-timer"></span> {{ check.clamped_last_duration|hms }}
-	</span>
+    <br />
+    <span class="checks-subline">
+        <span class="ic-timer"></span> {{ check.clamped_last_duration|hms }}
+    </span>
     {% endif %}
 {% else %}
     Never

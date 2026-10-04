@@ -1,7 +1,3 @@
-from __future__ import annotations
-
-import os
-import shutil
 import tempfile
 from io import StringIO
 from pathlib import Path
@@ -9,6 +5,7 @@ from unittest.mock import patch
 
 from django.conf import settings
 from django.core.management import call_command
+from django.test.utils import override_settings
 
 from hc.test import BaseTestCase
 
@@ -16,15 +13,10 @@ SNIPPET_NAMES = [
     "bash_curl",
     "bash_wget",
     "browser",
-    "cs",
     "node",
     "go",
     "python_urllib2",
     "python_requests",
-    "php",
-    "powershell",
-    "powershell_inline",
-    "ruby",
 ]
 
 
@@ -32,22 +24,19 @@ class PygmentizeTestCase(BaseTestCase):
     def setUp(self) -> None:
         super().setUp()
 
-        # The command reads and writes templates/front/snippets relative to the
-        # working directory, so run it in a scratch copy of that directory.
-        tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(tmp.cleanup)
-        self.snippets = Path(tmp.name) / "templates" / "front" / "snippets"
+        # The command reads and writes templates/front/snippets under BASE_DIR,
+        # so run it against a scratch copy of that directory.
+        tmp = self.enterContext(tempfile.TemporaryDirectory())
+        self.base_dir = Path(tmp)
+        self.snippets = self.base_dir / "templates" / "front" / "snippets"
         self.snippets.mkdir(parents=True)
         for src in (settings.BASE_DIR / "templates" / "front" / "snippets").glob("*.txt"):
-            shutil.copy(src, self.snippets / src.name)
-
-        cwd = os.getcwd()
-        os.chdir(tmp.name)
-        self.addCleanup(os.chdir, cwd)
+            src.copy(self.snippets / src.name)
 
     def run_command(self) -> str:
         stdout = StringIO()
-        call_command("pygmentize", stdout=stdout)
+        with override_settings(BASE_DIR=self.base_dir):
+            call_command("pygmentize", stdout=stdout)
         return stdout.getvalue()
 
     def test_it_highlights_every_snippet(self) -> None:
@@ -65,10 +54,6 @@ class PygmentizeTestCase(BaseTestCase):
 
         python = (self.snippets / "python_requests.html").read_text()
         self.assertIn('<span class="kn">import</span>', python)
-
-        # PhpLexer(startinline=True) highlights code that has no "<?php" opener
-        php = (self.snippets / "php.html").read_text()
-        self.assertIn('<span class="nb">file_get_contents</span>', php)
 
     def test_it_requires_pygments(self) -> None:
         with patch("hc.front.management.commands.pygmentize.have_pygments", False):

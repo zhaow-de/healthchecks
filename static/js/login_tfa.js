@@ -1,5 +1,5 @@
 hc.ready(function() {
-    var form = document.getElementById("login-tfa-form");
+    const form = document.getElementById("login-tfa-form");
 
     function showError(message) {
         hc.hide("#waiting");
@@ -17,8 +17,8 @@ hc.ready(function() {
             return;
         }
 
-        var options = JSON.parse(document.getElementById("options").textContent);
-        var publicKey;
+        const options = JSON.parse(document.getElementById("options").textContent);
+        let publicKey;
         try {
             publicKey = PublicKeyCredential.parseRequestOptionsFromJSON(options.publicKey);
         } catch (err) {

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import time
 from unittest.mock import patch
 from urllib.parse import quote_plus
@@ -50,10 +48,18 @@ class LoginTestCase(BaseTestCase):
         # It should not show validation errors yet
         self.assertNotContains(r, "This field is required")
 
+    def test_lost_password_dialog_points_to_login_link(self) -> None:
+        r = self.client.get("/accounts/login/")
+        self.assertContains(r, "Log in using the <strong>Email Me a Link</strong> method.")
+        self.assertNotContains(r, "changepassword")
+
     @override_settings(MAILERS={})
     def test_it_handles_no_smtp(self) -> None:
         r = self.client.get("/accounts/login/")
         self.assertNotContains(r, "magic-link-form")
+        # The lost password dialog points to the shell, not to the missing login link
+        self.assertNotContains(r, "Email Me a Link")
+        self.assertContains(r, "<code>./manage.py changepassword</code>")
 
     def test_it_redirects_authenticated_get(self) -> None:
         self.client.login(username="alice@example.org", password="password")
@@ -127,7 +133,7 @@ class LoginTestCase(BaseTestCase):
 
     @override_settings(SECRET_KEY="test-secret")
     def test_it_rate_limits_emails(self) -> None:
-        # "d60d..." is sha1("alice@example.orgtest-secret")
+        # d60d... is the SHA-1 of alice@example.org followed by test-secret
         obj = TokenBucket(value="em-d60db3b2343e713a4de3e92d4eb417e4f05f06ab")
         obj.tokens = 0
         obj.save()
@@ -188,7 +194,7 @@ class LoginTestCase(BaseTestCase):
 
     @override_settings(SECRET_KEY="test-secret")
     def test_it_rate_limits_password_attempts(self) -> None:
-        # "d60d..." is sha1("alice@example.orgtest-secret")
+        # d60d... is the SHA-1 of alice@example.org followed by test-secret
         obj = TokenBucket(value="pw-d60db3b2343e713a4de3e92d4eb417e4f05f06ab")
         obj.tokens = 0
         obj.save()
@@ -259,7 +265,7 @@ class LoginTestCase(BaseTestCase):
         # It should not log the user in yet
         self.assertNotIn("_auth_user_id", self.client.session)
 
-        # Instead, it should set 2fa_user_id in the session
+        # Instead, it should set 2fa_user in the session
         user_id, _email, _valid_until = self.client.session["2fa_user"]
         self.assertEqual(user_id, self.alice.id)
 
@@ -286,7 +292,7 @@ class LoginTestCase(BaseTestCase):
         # It should not log the user in yet
         self.assertNotIn("_auth_user_id", self.client.session)
 
-        # Instead, it should set 2fa_user_id in the session
+        # Instead, it should set 2fa_user in the session
         user_id, _email, _valid_until = self.client.session["2fa_user"]
         self.assertEqual(user_id, self.alice.id)
 
@@ -411,7 +417,7 @@ class LoginTestCase(BaseTestCase):
     @override_settings(SECRET_KEY="test-secret")
     def test_device_cookie_survives_drained_email_bucket(self) -> None:
         cookie = self.device_cookie()
-        # "d60d..." is sha1("alice@example.orgtest-secret")
+        # d60d... is the SHA-1 of alice@example.org followed by test-secret
         TokenBucket.objects.create(value="em-d60db3b2343e713a4de3e92d4eb417e4f05f06ab", tokens=0)
 
         form = {"identity": "alice@example.org"}

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 from datetime import timedelta as td
 
@@ -72,7 +70,7 @@ class FlipModelTestCase(BaseTestCase):
 
     def test_down_duration_asserts_flips_status(self) -> None:
         with self.assertRaises(AssertionError):
-            self.flip.down_duration
+            _ = self.flip.down_duration
 
     def test_down_duration_checks_prev_flips_status(self) -> None:
         self.flip.old_status = "down"
@@ -106,3 +104,6 @@ class FlipModelTestCase(BaseTestCase):
 
         self.flip.reason = ""
         self.assertIsNone(self.flip.reason_long())
+
+    def test_str_shows_the_transition(self) -> None:
+        self.assertEqual(str(self.flip), "Flip from up to down")

@@ -1,7 +1,7 @@
 export const meta = {
   name: 're-review',
   description: 'The single-lens review of a fix range: every prior closed, left, or open',
-  whenToUse: 'After the fixes a review asked for, each fix its own commit and never an amend, so the range exists; at most two per branch — a Critical or Important still open after the second goes to the user. Priors are open Critical/Important only. args: {repo, range, tip, prior: [{id, severity, path, line, claim}], reportDir, ledger, left?, reported?, drive?, model?}',
+  whenToUse: 'After the fixes a review asked for, made in new commits grouped by area and never an amend, so the range exists; at most two per branch — a Critical or Important still open after the second goes to the user. Priors are open Critical/Important only. args: {repo, range, tip, prior: [{id, severity, path, line, claim}], reportDir, ledger, left?, reported?, drive?, model?}',
   phases: [
     { title: 'Re-read', detail: 'one reader over the fix range with the open priors' },
     { title: 'Refute', detail: 'one skeptic per Critical and Important, new or reopened' },

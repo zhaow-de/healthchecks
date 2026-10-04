@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from django.contrib.auth.hashers import make_password
 from django.core import signing
 from django.core.signing import TimestampSigner
@@ -83,6 +81,6 @@ class CheckTokenTestCase(BaseTestCase):
         # It should not log the user in yet
         self.assertNotIn("_auth_user_id", self.client.session)
 
-        # Instead, it should set 2fa_user_id in the session
+        # Instead, it should set 2fa_user in the session
         user_id, _email, _valid_until = self.client.session["2fa_user"]
         self.assertEqual(user_id, self.alice.id)

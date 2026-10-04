@@ -9,5 +9,5 @@
 
 #channel-choices .channel-details-mini {
     font-size: 11.7px;
-    color: #888;
+    color: var(--bs-tertiary-color);
 }

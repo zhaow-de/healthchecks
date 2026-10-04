@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import logging
 import signal
 import time
@@ -47,7 +45,7 @@ class Command(BaseCommand):
             return False
 
         # A sort of optimistic lock. Will try to update next_report_date,
-        # and if does get modified, we're in drivers seat:
+        # and if it does get modified, we're in the driver's seat:
         qq = Profile.objects.filter(id=profile.id, next_report_date=profile.next_report_date)
 
         # Next report date is currently not scheduled: schedule it and move on.
@@ -89,7 +87,7 @@ class Command(BaseCommand):
             self.pause()
         else:
             profile.next_nag_date = None
-            profile.save()
+            profile.save(update_fields=["next_nag_date"])
 
         return True
 
@@ -130,7 +128,7 @@ class Command(BaseCommand):
                 break
 
             # Sleep for 60 seconds before looking for more work
-            for i in range(60):
+            for _ in range(60):
                 if not self.shutdown:
                     time.sleep(1)
 

@@ -19,25 +19,13 @@
                         <a class="nav-link" href="#python" data-bs-toggle="pill">Python</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#ruby" data-bs-toggle="pill">Ruby</a>
-                    </li>
-                    <li class="nav-item">
                         <a class="nav-link" href="#node" data-bs-toggle="pill">Node.js</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="#go" data-bs-toggle="pill">Go</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#php" data-bs-toggle="pill">PHP</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#cs" data-bs-toggle="pill">C#</a>
-                    </li>
-                    <li class="nav-item">
                         <a class="nav-link" href="#browser" data-bs-toggle="pill">Browser</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#powershell" data-bs-toggle="pill">PowerShell</a>
                     </li>
                 </ul>
             </div>
@@ -66,27 +54,14 @@
                         {% include "front/snippets/python_urllib2.html" %}
                         {% include "front/snippets/python_requests.html" %}
                     </div>
-                    <div role="tabpanel" class="tab-pane" id="ruby">
-                        {% include "front/snippets/ruby.html" %}
-                    </div>
                     <div role="tabpanel" class="tab-pane" id="node">
                         {% include "front/snippets/node.html" %}
                     </div>
                     <div role="tabpanel" class="tab-pane" id="go">
                         {% include "front/snippets/go.html" %}
                     </div>
-                    <div role="tabpanel" class="tab-pane" id="php">
-                        {% include "front/snippets/php.html" %}
-                    </div>
-                    <div role="tabpanel" class="tab-pane" id="cs">
-                        {% include "front/snippets/cs.html" %}
-                    </div>
                     <div class="tab-pane" id="browser">
                         {% include "front/snippets/browser.html" %}
-                    </div>
-                    <div class="tab-pane" id="powershell">
-                        {% include "front/snippets/powershell.html" %}
-                        {% include "front/snippets/powershell_inline.html" %}
                     </div>
                     {% endwith %}
                 </div>

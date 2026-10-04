@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import sys
 from argparse import ArgumentParser
 from getpass import getpass
@@ -23,7 +21,6 @@ def _make_user(email: str) -> User:
     user.save()
 
     project = Project(owner=user)
-    project.badge_key = user.username
     project.save()
 
     check = Check(project=project)

@@ -1,8 +1,6 @@
 """The three review workflows carry one grading, one scope and one set of rules, copied because a workflow script
 cannot import another."""
 
-from __future__ import annotations
-
 import json
 import pathlib
 import re

@@ -1,10 +1,8 @@
-from __future__ import annotations
-
 import email
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from datetime import timedelta as td
-from smtplib import SMTPDataError, SMTPServerDisconnected
+from smtplib import SMTPDataError, SMTPRecipientsRefused, SMTPServerDisconnected
 from unittest.mock import Mock, patch
 
 import time_machine
@@ -15,7 +13,7 @@ from django.test.utils import override_settings
 from hc.api.models import Channel, Check, Flip, Notification, Ping
 from hc.test import BaseTestCase
 
-EPOCH = datetime(2020, 1, 1, tzinfo=timezone.utc)
+EPOCH = datetime(2020, 1, 1, tzinfo=UTC)
 
 
 class NotifyEmailTestCase(BaseTestCase):
@@ -253,6 +251,17 @@ class NotifyEmailTestCase(BaseTestCase):
         n = Notification.objects.get()
         self.assertEqual(n.error, "Email not verified")
 
+    @override_settings(MAILERS={})
+    def test_it_reports_missing_smtp_configuration(self) -> None:
+        self.channel.notify(self.flip)
+
+        n = Notification.objects.get()
+        self.assertEqual(n.error, "No SMTP configuration")
+        self.channel.refresh_from_db()
+        self.assertEqual(self.channel.last_error, "No SMTP configuration")
+        self.assertFalse(self.channel.disabled)
+        self.assertEqual(len(mail.outbox), 0)
+
     def test_it_checks_up_down_flags(self) -> None:
         payload = {"value": "alice@example.org", "up": True, "down": False}
         self.channel.value = json.dumps(payload)
@@ -331,7 +340,7 @@ class NotifyEmailTestCase(BaseTestCase):
     def test_it_handles_server_disconnected(self, logger: Mock) -> None:
         self.channel.notify(self.flip)
         n = Notification.objects.get()
-        self.assertEqual(n.error, "SMTP connection error")
+        self.assertEqual(n.error, "SMTP error: SMTPServerDisconnected")
         self.assertTrue(logger.exception.called)
 
     @patch("hc.integrations.email.transport.logger")
@@ -339,7 +348,7 @@ class NotifyEmailTestCase(BaseTestCase):
     def test_it_handles_data_error(self, logger: Mock) -> None:
         self.channel.notify(self.flip)
         n = Notification.objects.get()
-        self.assertEqual(n.error, "SMTP connection error")
+        self.assertEqual(n.error, "SMTP error: SMTPDataError")
         self.assertTrue(logger.exception.called)
 
     @patch("hc.integrations.email.transport.logger")
@@ -347,5 +356,17 @@ class NotifyEmailTestCase(BaseTestCase):
     def test_it_handles_connection_refused_error(self, logger: Mock) -> None:
         self.channel.notify(self.flip)
         n = Notification.objects.get()
-        self.assertEqual(n.error, "SMTP connection error")
+        self.assertEqual(n.error, "SMTP error: ConnectionRefusedError")
         self.assertTrue(logger.exception.called)
+
+    @patch("hc.integrations.email.transport.logger")
+    @patch("hc.lib.emails.send", Mock(side_effect=SMTPRecipientsRefused({"alice@example.org": (550, b"no")})))
+    def test_it_handles_recipients_refused(self, logger: Mock) -> None:
+        self.channel.notify(self.flip)
+        n = Notification.objects.get()
+        self.assertEqual(n.error, "SMTP error: SMTPRecipientsRefused")
+        self.assertTrue(logger.exception.called)
+
+        self.channel.refresh_from_db()
+        self.assertEqual(self.channel.last_error, "SMTP error: SMTPRecipientsRefused")
+        self.assertFalse(self.channel.disabled)

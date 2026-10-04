@@ -18,7 +18,7 @@
     <div class="col-sm-12">
         <p id="new-check-alert" class="alert alert-success">
             <strong>Copy created!</strong>
-            This is a brand new check, with details copied over from your existing check.
+            This is a brand-new check, with details copied over from your existing check.
             You might now want to
             <a data-target="edit-name" href="#">update its name and tags</a>.
         </p>
@@ -61,10 +61,10 @@
         <div id="how-to-ping" class="details-block">
             <h2>
                 How To Ping
-                <div class="btn-group float-end">
+                <span class="btn-group float-end">
                     <a href="?urls=uuid" class="btn btn-outline-secondary btn-sm {% if not project.show_slugs %}active{% endif %}">uuid</a>
                     <a href="?urls=slug" class="btn btn-outline-secondary btn-sm {% if project.show_slugs %}active{% endif %}">slug</a>
-                </div>
+                </span>
             </h2>
             <div>
                 <p>
@@ -206,35 +206,16 @@
             <h2>Notification Groups</h2>
             <table class="details-integrations table table-hover">
                 {% for channel in group_channels %}
-                    <tr data-url="{% url 'hc-switch-channel' check.code channel.code %}" {% if channel in enabled_channels %}class="on"{% endif %}>
-                        <th>
-                            <span class="badge">
-                                {% if channel in enabled_channels %}ON{% else %}OFF{% endif %}
-                            </span>
-                        </th>
-                        <td>
-                            <span class="ic">{{ channel.kind }}</span>
-                            {{ channel }}
-                        </td>
-                    </tr>
+                {% include "front/details_channel_row.html" %}
                 {% endfor %}
             </table>
             {% endif %}
             <h2>Notification Methods</h2>
             {% if channels %}
             <table class="details-integrations table table-hover">
-            {% for channel in channels %}
-                <tr data-url="{% url 'hc-switch-channel' check.code channel.code %}" {% if channel in enabled_channels %}class="on"{% endif %}>
-                    <th>
-                        <span class="badge">
-                            {% if channel in enabled_channels %}ON{% else %}OFF{% endif %}
-                        </span>
-                    </th>
-                    <td>
-                        <span class="ic">{{ channel.kind }}</span> {{ channel }}
-                    </td>
-                </tr>
-            {% endfor %}
+                {% for channel in channels %}
+                {% include "front/details_channel_row.html" %}
+                {% endfor %}
             </table>
             {% else %}
             <div class="alert alert-secondary text-center no-channels">
@@ -280,12 +261,12 @@
     <div id="events" class="col-sm-7" data-status-url="{% url 'hc-status-single' check.code %}">
         <h2>
             Events
-            <small class="text-muted fs-6">Click on individual items for details</small>
-            <div id="tz-switcher" class="btn-group float-end">
+            <small class="text-body-secondary fs-6">Click on individual items for details</small>
+            <span id="tz-switcher" class="btn-group float-end">
                 {% for tz in tz_switches %}
                 <button type="button" class="btn btn-outline-secondary btn-sm {% if forloop.last %}active{% endif %}" data-tz="{{ tz }}">{{ tz }}</button>
                 {% endfor %}
-            </div>
+            </span>
         </h2>
 
         <div id="log-container"></div>
@@ -293,16 +274,7 @@
     </div>
 </div>
 
-<div id="ping-details-modal" class="modal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div id="ping-details-body">Loading</div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Got It!</button>
-            </div>
-        </div>
-    </div>
-</div>
+{% include "front/ping_details_modal.html" %}
 
 <div id="transfer-modal" class="modal" tabindex="-1">
     <div class="modal-dialog">
@@ -359,6 +331,7 @@
 <script src="{% static 'js/snippet-copy.js' %}"></script>
 <script src="{% static 'js/dates.js' %}"></script>
 <script src="{% static 'js/initialize-timezone-selects.js' %}"></script>
+<script src="{% static 'js/schedule.js' %}"></script>
 <script src="{% static 'js/update-timeout-modal.js' %}"></script>
 <script src="{% static 'js/adaptive-setinterval.js' %}"></script>
 <script src="{% static 'js/ping_details.js' %}"></script>

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from hc.api.models import Check
 from hc.test import BaseTestCase
 
@@ -23,6 +21,12 @@ class AddCheckTestCase(BaseTestCase):
         }
         payload.update(kwargs)
         return payload
+
+    def test_it_rejects_uppercase_slug(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.post(self.url, self._payload(slug="Custom-Slug"))
+        self.assertEqual(r.status_code, 400)
+        self.assertFalse(Check.objects.exists())
 
     def test_it_works(self) -> None:
         self.client.login(username="alice@example.org", password="password")

@@ -1,0 +1,14 @@
+{% load hc_extras %}
+{% if spec.url %}
+<p><strong>Execute on "{{ event }}" events:</strong></p>
+<pre>{{ spec.method }} {{ spec.url }}</pre>
+{% if spec.body %}
+<p>Request Body</p>
+<pre>{{ spec.body }}</pre>
+{% endif %}
+
+{% if spec.headers %}
+<p>Request Headers</p>
+<pre>{{ spec.headers|format_headers }}</pre>
+{% endif %}
+{% endif %}

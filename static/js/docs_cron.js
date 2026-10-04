@@ -1,38 +1,16 @@
 hc.ready(function () {
-    var base = hc.base();
-    var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    var input = document.getElementById("schedule");
-
-    var currentPreviewHash = "";
-    function updateCronPreview() {
-        var schedule = input.value;
-
-        // Don't try preview with empty values, or if values have not changed
-        if (!schedule || schedule == currentPreviewHash)
-            return;
-
-        // OK, we're good
-        currentPreviewHash = schedule;
-        hc.$$("#cron-preview-title").forEach(function(el) {
-            el.textContent = "Updating...";
-        });
-
-        hc.post(base + "/checks/cron_preview/", {schedule: schedule, tz: tz}).then(function(r) {
-            return r.text();
-        }).then(function(data) {
-            if (schedule != currentPreviewHash) {
-                return;  // ignore stale results
-            }
-
-            document.getElementById("cron-preview").innerHTML = data;
-        });
-    }
+    const input = document.getElementById("schedule");
+    const preview = schedulePreview({
+        input: input,
+        tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        url: hc.base() + "/checks/cron_preview/",
+        target: document.getElementById("cron-preview"),
+    });
 
     hc.on("#common-cron-expressions button", "click", function() {
         input.value = this.closest("tr").querySelector("td:nth-child(2)").textContent;
-        updateCronPreview();
+        preview.update();
     });
 
-    hc.on(input, "keyup", updateCronPreview);
-    updateCronPreview();
+    preview.update();
 });

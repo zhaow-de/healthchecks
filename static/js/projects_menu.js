@@ -1,5 +1,5 @@
 hc.ready(function() {
-    var timeout = null;
+    let timeout = null;
     function refreshMenu() {
         if (timeout) return;
 

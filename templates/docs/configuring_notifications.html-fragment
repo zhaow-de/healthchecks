@@ -14,36 +14,128 @@ post in chat, send an email, and call a webhook.</li>
 <p>Each notification method ("integration") belongs to a project:
 if you want to use a notification method in multiple projects, you must
 set it up in each project separately.</p>
-<p>The "Checks" page in the web interface shows a visual overview of which alerting
-methods are active for each check. You can click the icons to toggle them on and off:</p>
-<video autoplay loop muted playsinline>
-  <source src="IMG_URL/checks_integrations.webm" type="video/webm">
-</video>
-
-<p>You can also toggle the integrations by clicking the "ON" / "OFF" labels on
-each check's details pages:</p>
-<video autoplay loop muted playsinline>
-  <source src="IMG_URL/details_integrations.webm" type="video/webm">
-</video>
-
-<h2>Repeated Notifications</h2>
+<h2 id="when-alerts-are-sent">When Alerts Are Sent</h2>
+<p>An integration sends an alert when a check goes <strong>down</strong>, and when it comes back
+<strong>up</strong> from down. Nothing is sent when a new or paused check receives its first
+success signal, when you pause or resume a check, or when a schedule change made in
+the web interface marks a check down (see
+<a href="../configuring_checks/#schedule-changes">Schedule Changes</a>). How a ping changes a
+check's status is in <a href="../http_api/#interpreting-pings">How SITE_NAME Interprets a Ping</a>.</p>
+<h2 id="adding-an-integration">Adding an Integration</h2>
+<p>Open the project's "Integrations" page from the top navigation. Under "Add More",
+click "Add Integration" next to one of these:</p>
+<ul>
+<li><strong>Email</strong>: an address, and under "Notify When", whether to send an alert when a
+check goes down, up, or both. An address other than the account's own stays
+"Unconfirmed" and receives no alerts until someone clicks the confirmation link
+SITE_NAME emails to it, unless the server sets
+<a href="../self_hosted_configuration/#EMAIL_USE_VERIFICATION"><code>EMAIL_USE_VERIFICATION</code></a>
+to <code>False</code>. On a server that cannot send email, only the account's own address
+can be added while that setting is on.</li>
+<li><strong>Webhook</strong>: an optional name, and for "down" events and for "up" events each a
+URL, a method (GET, POST or PUT), a request body (sent with POST and PUT only) and
+request headers (<code>Header-Name: value</code>, one per line). Leave one URL empty to skip
+that event; at least one is required. The URL, the body and the header values accept
+placeholders, listed in the form's "(available placeholders)" dialog: <code>$CODE</code>,
+<code>$NAME</code>, <code>$NAME_JSON</code>, <code>$SLUG</code>, <code>$NOW</code>, <code>$STATUS</code>, <code>$TAGS</code>, <code>$TAG1</code>, <code>$TAG2</code>, …,
+<code>$BODY</code> and <code>$BODY_JSON</code> (the body of the most recent ping; in the request body
+only), <code>$EXITSTATUS</code> (the exit status of the most recent ping, <code>-1</code> when it has none)
+and <code>$JSON</code> (the check as the <a href="../api/#check-object">Management API</a> returns it). A
+call that gets no complete response within 30 seconds, or a status code other than
+200, 201, 202 or 204, counts as failed and is retried twice.</li>
+<li><strong>Slack</strong>: the URL of a Slack incoming webhook, which receives an alert when a
+check goes down and when it comes back up. When the server has a Slack app
+configured (<a href="../self_hosted_configuration/#SLACK_CLIENT_ID"><code>SLACK_CLIENT_ID</code></a>),
+the page shows an "Add to Slack" button instead, which lets you pick the channel in
+Slack.</li>
+<li><strong>Group</strong>: a Label, and a selection of the project's other integrations (groups
+cannot contain groups). An alert to the group goes to each selected integration.</li>
+</ul>
+<p>The server can switch off the Webhook and Slack integrations
+(<a href="../self_hosted_configuration/#WEBHOOKS_ENABLED"><code>WEBHOOKS_ENABLED</code></a>,
+<a href="../self_hosted_configuration/#SLACK_ENABLED"><code>SLACK_ENABLED</code></a>), and then the page
+does not offer them. Prometheus, also listed there, is a metrics export and sends no
+alerts; see <a href="../configuring_prometheus/">Configuring Prometheus</a>.</p>
+<p>Each integration is a row on the Integrations page. Click its name to rename it.
+"Edit" (email, webhook and group integrations; a Slack integration cannot be edited)
+opens its form again. "Test!" sends a test alert for a dummy check named "TEST": a
+"down" alert, or an "up" alert to an integration that sends only those; it is not
+retried. The "Status" column shows "Ready to deliver", "Unconfirmed" or "Disabled",
+and "Last Notification" shows "Delivered" or "Failed" with the time of the latest
+attempt (hover over "Failed" for the error), or "Never".</p>
+<h2 id="assigning-integrations">Assigning Integrations to Checks</h2>
+<p>A check alerts only through the integrations enabled for it. A check created in the
+web interface starts with every integration of its project enabled, and a newly added
+integration is enabled for every existing check in its project. A check created
+through the Management API gets only the integrations its
+<a href="../api/#field-channels"><code>channels</code></a> field names; a check
+<a href="../projects/#transferring-checks">transferred</a> to another project gets all of the
+target project's integrations. You can switch an integration on or off for a single
+check in two places:</p>
+<ul>
+<li><strong>The Checks page.</strong> The "Integrations" column shows one icon per integration in
+the project, in the same order on every row. An icon in full color is on for that
+check, a greyed-out icon is off; hover over an icon to see the integration's name.
+Click an icon to switch it. A project with more than ten integrations shows a count
+such as "3 of 12" in that column instead of the icons; use the details page there.</li>
+<li><strong>A check's details page.</strong> The "Notification Methods" section lists every
+integration in the project, each row starting with an "ON" or "OFF" label (Group
+integrations are listed separately, under "Notification Groups", above "Notification
+Methods"; that section appears only when the project has a group). Click a row to
+switch that integration for this check.</li>
+</ul>
+<p>Both switches take effect at once, with no Save button. To set one integration for
+many checks at a time, click the "N of M" count in the "Assigned Checks" column of the
+Integrations page: it opens a list of the project's checks with a checkbox each, saved
+with "Save Changes". Through the <a href="../api/">Management API</a>, a check's <code>channels</code> field
+sets the same assignment.</p>
+<p>When a Group is on for a check, each of its members is notified, even a member that
+is off for that check, and even a disabled one. A member that is also on for the
+check gets the alert twice. Since a new check gets every integration, groups and
+their members alike, switch the members off for checks that should alert only
+through the group.</p>
+<h2 id="disabled-integrations">Disabled Integrations</h2>
+<p>SITE_NAME disables an integration that cannot deliver:</p>
+<ul>
+<li>An email integration, when an alert to it bounces permanently (when the mail
+service reports bounces; see <a href="../api/#bounces">Receive Email Bounces</a>), or when the
+recipient clicks the "Unsubscribe" link in an alert.</li>
+<li>A Slack integration, when Slack answers an alert with 404, or with 400 and
+<code>invalid_token</code>.</li>
+</ul>
+<p>A disabled integration shows "Disabled" in the "Status" column and sends nothing on
+its own; a group that contains it still delivers to it. To re-enable an email
+integration, click "Fix…" on its row and save the form (an address other than the
+account's own has to be confirmed again). A Slack integration cannot be edited:
+remove it and add it again.</p>
+<h2 id="repeated-notifications">Repeated Notifications</h2>
 <p>If you want to receive repeated notifications for as long as a particular check is
 down, SITE_NAME can send <strong>hourly or daily email reminders</strong> if any check is down
 in any of your projects.
-Set them up in <a href="../../accounts/profile/notifications/">Account Settings › Email Reports</a>:</p>
-<p><img alt="Email reminder options" src="IMG_URL/email_reports.png" /></p>
-<h2>Weekly and Monthly Reports</h2>
-<p>SITE_NAME sends periodic email reports, either monthly at the start of each month
-or weekly every Monday. Use them to ensure all checks have their expected state
-and nothing has "fallen through the cracks."</p>
+Set them up in <a href="../../accounts/profile/notifications/">Account Settings › Email Reports</a>:
+under "Ongoing reminders if any checks are down", pick "Remind me daily" or
+"Remind me hourly", and click "Save Changes".</p>
+<p>Reminders go to the account's own email address, not to the email integrations.
+Each one lists only the checks that are down at that moment, and reminders stop once
+no check is down.</p>
+<h2 id="reports">Daily, Weekly and Monthly Reports</h2>
+<p>SITE_NAME sends periodic email reports, either monthly at the start of each month,
+weekly every Monday, or daily. Use them to ensure all checks have their expected state
+and nothing has "fallen through the cracks." Reports go to the account's email
+address, between 9:00 and 11:00 in the account's preferred time zone (set under
+<a href="../../accounts/profile/">Account Settings › Account</a>, "Preferred Time Zone").
+No report and no reminder is sent while no check in any project has received a
+ping in the last 180 days.</p>
 <p>The reports list checks from all your projects, grouped by project.
 For each check, they show:</p>
 <ul>
 <li>the check's current status</li>
-<li>the number of downtimes by month for the last two months</li>
-<li>the total downtime duration by month for the last two months</li>
+<li>the number of downtimes in each of the last two report periods (months, weeks
+or days)</li>
+<li>the total downtime duration in each of the last two report periods</li>
 </ul>
-<p><img alt="Example monthly report" src="IMG_URL/monthly_report.png" /></p>
-<p>You can opt-out from receiving the reports in the
+<p>You can opt out of receiving the reports in the
 <a href="../../accounts/profile/notifications/">Account Settings › Email Reports</a> page
-or by clicking the "Unsubscribe" link in the email report's footer.</p>
+or by clicking the "Unsubscribe" link in the email report's footer. The
+"Unsubscribe" link in a report or a reminder turns off both the reports and the
+reminders.</p>

@@ -1,8 +1,6 @@
-from __future__ import annotations
-
 import re
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from urllib.parse import urlparse
 from uuid import UUID
 
@@ -14,6 +12,7 @@ from django.utils.html import escape, format_html
 from django.utils.safestring import SafeString, mark_safe
 from django.utils.timezone import now
 
+from hc.api.models import Check
 from hc.lib.date import (
     format_approx_duration,
     format_duration,
@@ -21,10 +20,6 @@ from hc.lib.date import (
     format_hms,
 )
 from hc.lib.urls import absolute_url
-
-if TYPE_CHECKING:
-    from hc.api.models import Check
-
 
 register = template.Library()
 
@@ -170,8 +165,7 @@ def sortbydowntime(checks: list[Check]) -> list[Check]:
 def num_down_title(num_down: int) -> str:
     if num_down:
         return f"{num_down} down – {settings.SITE_NAME}"
-    else:
-        return settings.SITE_NAME
+    return settings.SITE_NAME
 
 
 @register.filter
@@ -183,7 +177,7 @@ def down_title(check: Check) -> str:
 
     """
 
-    s = "%s – %s" % (check.name_then_code(), settings.SITE_NAME)
+    s = f"{check.name_then_code()} – {settings.SITE_NAME}"
     if check.get_status() == "down":
         s = "DOWN – " + s
 
@@ -202,7 +196,7 @@ def break_underscore(s: str) -> str:
 
 @register.filter
 def format_headers(headers: dict[str, str]) -> str:
-    return "\n".join("%s: %s" % (k, v) for k, v in headers.items())
+    return "\n".join(f"{k}: {v}" for k, v in headers.items())
 
 
 @register.simple_tag

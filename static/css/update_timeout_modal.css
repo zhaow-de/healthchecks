@@ -38,7 +38,7 @@
 }
 
 #period-slider .noUi-connect {
-    background: #22bc66;
+    background: var(--hc-confirm);
 }
 
 #grace-slider {
@@ -46,22 +46,24 @@
 }
 
 #grace-slider .noUi-connect {
-    background: #f0ad4e;
+    background: var(--hc-grace);
 }
 
 #period-slider .noUi-value,
 #grace-slider .noUi-value {
     cursor: pointer;
-    color: var(--text-muted);
+    color: var(--bs-secondary-color);
+    font-size: 12px;
+    padding-top: 5px;
 }
 
 #period-slider .noUi-value:hover,
 #grace-slider .noUi-value:hover {
-    color: var(--text-color);
+    color: var(--bs-body-color);
 }
 
 .update-timeout-terms {
-    color: var(--text-muted);
+    color: var(--bs-secondary-color);
 }
 
 .update-timeout-terms p {
@@ -92,12 +94,12 @@
     font-weight: bold;
     font-style: italic;
     font-size: 18px;
-    color: var(--text-color);
-    padding: 16px 8px 0px 8px;
+    color: var(--bs-body-color);
+    padding: 16px 8px 0 8px;
 }
 
 #cron-preview {
-    background: var(--pre-bg);
+    background: var(--bs-tertiary-bg);
     min-height: 298px;
 }
 
@@ -127,7 +129,7 @@
     font-size: small;
     font-family: monospace;
     text-align: right;
-    color: var(--text-muted);
+    color: var(--bs-secondary-color);
 }
 
 /* OnCalendar */
@@ -146,7 +148,7 @@
 }
 
 #oncalendar-preview {
-    background: var(--pre-bg);
+    background: var(--bs-tertiary-bg);
     min-height: 409px;
 }
 

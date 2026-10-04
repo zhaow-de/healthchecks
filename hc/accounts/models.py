@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import hmac
 import random
 import uuid
@@ -14,7 +12,7 @@ from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.models import User
 from django.core.signing import BadSignature, TimestampSigner
 from django.db import models
-from django.db.models import Q, QuerySet
+from django.db.models import QuerySet
 from django.db.models.functions import Lower
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -29,8 +27,6 @@ if TYPE_CHECKING:
     # Importing Check at runtime would cause a circular import, so only import it
     # during type checking
     from hc.api.models import Check
-
-    CheckQuerySet = QuerySet[Check]
 
 
 NO_NAG = td()
@@ -71,7 +67,7 @@ class Profile(models.Model):
     last_active_date = models.DateTimeField(null=True, blank=True)
     tz = models.CharField(max_length=36, default="UTC")
 
-    totp = models.CharField(max_length=32, null=True, blank=True)
+    totp = models.CharField(max_length=32, blank=True, default="")
     totp_created = models.DateTimeField(null=True, blank=True)
 
     objects = ProfileManager()
@@ -91,7 +87,7 @@ class Profile(models.Model):
         token = token_urlsafe(24)
         # Store a hashed transformation of the login token
         self.token = make_password(token)
-        self.save()
+        self.save(update_fields=["token"])
         # Sign the token so we can check its age later
         return TimestampSigner().sign(token)
 
@@ -132,12 +128,15 @@ class Profile(models.Model):
     def projects(self) -> QuerySet[Project]:
         return Project.objects.filter(owner_id=self.user_id).order_by(Lower("name"))
 
-    def checks_from_all_projects(self) -> CheckQuerySet:
+    def checks_from_all_projects(self) -> QuerySet[Check]:
         from hc.api.models import Check
 
         return Check.objects.filter(project__owner_id=self.user_id)
 
     def send_report(self, nag: bool = False) -> bool:
+        if not settings.MAILERS:
+            return False
+
         q = self.checks_from_all_projects()
 
         # Has there been a ping in last 6 months?
@@ -227,6 +226,14 @@ class Profile(models.Model):
 
         return Check.objects.filter(project__owner_id=self.user_id).count()
 
+    def disable_reports(self) -> None:
+        """Turn reports and nags off, as an unsubscribe link or a bounced report asks."""
+        self.reports = "off"
+        self.next_report_date = None
+        self.nag_period = NO_NAG
+        self.next_nag_date = None
+        self.save(update_fields=["reports", "next_report_date", "nag_period", "next_nag_date"])
+
     def update_next_nag_date(self) -> None:
         any_down = self.checks_from_all_projects().filter(status="down").exists()
         if any_down and self.next_nag_date is None and self.nag_period:
@@ -267,44 +274,20 @@ class ProjectManager(models.Manager["Project"]):
     def for_api_key(self, api_key: str, accept_rw: bool, accept_ro: bool) -> Project | None:
         """Look up project by API key.
 
-        This handles both the old plain text API keys, and the new hashed API keys.
-        For the hashed API keys, it looks up project by the first 8 characters of the
-        random part of the key, then calls Project.compare_api_key().
+        It looks up projects by the first 8 characters of the random part of the key,
+        then calls Project.compare_api_key().
         """
 
-        # Hashed keys
+        # The owner comes along, so owner_profile costs one query, not two
+        q = Project.objects.select_related("owner")
         if accept_rw and api_key.startswith("hcw_"):
-            secret8 = api_key[4:12]
-            for project in Project.objects.filter(api_key__startswith=secret8):
-                if project.compare_api_key(api_key):
-                    return project
+            q = q.filter(api_key__startswith=api_key[4:12])
+        elif accept_ro and api_key.startswith("hcr_"):
+            q = q.filter(api_key_readonly__startswith=api_key[4:12])
+        else:
+            return None
 
-        if accept_ro and api_key.startswith("hcr_"):
-            secret8 = api_key[4:12]
-            for project in Project.objects.filter(api_key_readonly__startswith=secret8):
-                if project.compare_api_key(api_key):
-                    return project
-
-        # Plain text keys
-        if accept_rw and accept_ro:
-            write_key_match = Q(api_key=api_key)
-            read_key_match = Q(api_key_readonly=api_key)
-            try:
-                return Project.objects.get(write_key_match | read_key_match)
-            except Project.DoesNotExist:
-                pass
-        elif accept_rw:
-            try:
-                return Project.objects.get(api_key=api_key)
-            except Project.DoesNotExist:
-                pass
-        elif accept_ro:
-            try:
-                return Project.objects.get(api_key_readonly=api_key)
-            except Project.DoesNotExist:
-                pass
-
-        return None
+        return next((project for project in q if project.compare_api_key(api_key)), None)
 
 
 class Project(models.Model):
@@ -313,7 +296,6 @@ class Project(models.Model):
     owner = models.ForeignKey(User, models.CASCADE)
     api_key = models.CharField(max_length=128, blank=True, db_index=True)
     api_key_readonly = models.CharField(max_length=128, blank=True, db_index=True)
-    badge_key = models.CharField(max_length=150, unique=True)
     ping_key = models.CharField(max_length=128, blank=True, null=True, unique=True)
     show_slugs = models.BooleanField(default=False)
 
@@ -324,6 +306,9 @@ class Project(models.Model):
 
     def __str__(self) -> str:
         return self.name or self.owner.email
+
+    def get_absolute_url(self) -> str:
+        return reverse("hc-checks", args=[self.code])
 
     @property
     def owner_profile(self) -> Profile:
@@ -359,9 +344,6 @@ class Project(models.Model):
 
     def auth_metrics_url(self) -> str:
         return absolute_reverse("hc-auth-metrics", args=[self.code])
-
-    def get_absolute_url(self) -> str:
-        return reverse("hc-checks", args=[self.code])
 
     def _make_api_key(self, prefix: str) -> tuple[str, str]:
         """Generate an API key with specified prefix, return (key, key_hash) tuple.
@@ -406,10 +388,7 @@ class Project(models.Model):
         return self.ping_key
 
     def compare_api_key(self, key: str) -> bool:
-        if key.startswith("hcr_"):
-            expected = self.api_key_readonly
-        else:
-            expected = self.api_key
+        expected = self.api_key_readonly if key.startswith("hcr_") else self.api_key
 
         # Only calculate and compare digest if db key length is 8 + 64 = 72
         if "." not in expected:
@@ -426,3 +405,6 @@ class Credential(models.Model):
     user = models.ForeignKey(User, models.CASCADE, related_name="credentials")
     created = models.DateTimeField(auto_now_add=True)
     data = models.BinaryField()
+
+    def __str__(self) -> str:
+        return self.name

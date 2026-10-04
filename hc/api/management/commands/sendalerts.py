@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import logging
 import signal
 import time
@@ -75,7 +73,6 @@ class Command(BaseCommand):
                 logger.info(logs)
         except Exception as exc:
             logger.error("Exception in notify", exc_info=exc)
-            raise
 
     def process_one_flip(self) -> bool:
         """Find unprocessed flip, send notifications.

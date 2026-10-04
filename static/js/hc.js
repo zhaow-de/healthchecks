@@ -7,7 +7,7 @@
     // Element | Document | Window | selector string | NodeList | array -> array of targets
     function all(target, root) {
         if (!target) return [];
-        if (typeof target == "string") {
+        if (typeof target === "string") {
             return Array.from((root || document).querySelectorAll(target));
         }
         if (target instanceof EventTarget) return [target];
@@ -15,7 +15,7 @@
     }
 
     function ready(fn) {
-        if (document.readyState == "loading") {
+        if (document.readyState === "loading") {
             document.addEventListener("DOMContentLoaded", fn);
         } else {
             fn();
@@ -29,7 +29,7 @@
     // and stops propagation. Use mouseover/focusin rather than mouseenter/focus for
     // delegation: those do not bubble.
     function on(target, types, selector, handler) {
-        if (typeof selector == "function") {
+        if (typeof selector === "function") {
             handler = selector;
             selector = null;
         }
@@ -37,9 +37,9 @@
         all(target).forEach(function(root) {
             types.split(" ").forEach(function(type) {
                 root.addEventListener(type, function(event) {
-                    var el = root;
+                    let el = root;
                     if (selector) {
-                        var start = event.target.closest ? event.target : event.target.parentElement;
+                        const start = event.target.closest ? event.target : event.target.parentElement;
                         el = start && start.closest(selector);
                         if (!el || (root.contains && !root.contains(el))) return;
                     }
@@ -56,21 +56,21 @@
     // The href of #base-url (the navbar's "All Projects" link or the logo) without its
     // trailing slash: SITE_ROOT's path, or "" at the domain root.
     function base() {
-        var el = document.getElementById("base-url");
+        const el = document.getElementById("base-url");
         return el ? el.getAttribute("href").replace(/\/$/, "") : "";
     }
 
     function csrfToken() {
-        var input = document.querySelector("input[name=csrfmiddlewaretoken]");
+        const input = document.querySelector("input[name=csrfmiddlewaretoken]");
         if (input) return input.value;
 
-        var m = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]*)/);
+        const m = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]*)/);
         return m ? decodeURIComponent(m[1]) : "";
     }
 
     // A form's successful controls: disabled and unchecked fields are left out.
     function serialize(form) {
-        if (typeof form == "string") form = document.querySelector(form);
+        if (typeof form === "string") form = document.querySelector(form);
         return new URLSearchParams(new FormData(form));
     }
 
@@ -81,9 +81,9 @@
         if (data instanceof HTMLFormElement) return serialize(data);
         if (data instanceof FormData) return new URLSearchParams(data);
 
-        var params = new URLSearchParams();
+        const params = new URLSearchParams();
         Object.keys(data).forEach(function(key) {
-            var value = data[key];
+            const value = data[key];
             if (value === undefined || value === null) return;
             [].concat(value).forEach(function(v) { params.append(key, v); });
         });
@@ -91,40 +91,39 @@
     }
 
     function sameOrigin(url) {
-        return new URL(url, window.location.href).origin == window.location.origin;
+        return new URL(url, window.location.href).origin === window.location.origin;
     }
 
     // fetch() that resolves to the Response for a 2xx status and rejects otherwise.
     // A same-origin request carries X-Requested-With (the pause view answers it
     // differently), and a same-origin POST carries X-CSRFToken. A cross-origin request
     // carries neither, so it stays a simple request with no CORS preflight.
-    function request(url, opts) {
-        opts = opts || {};
-        var method = (opts.method || "GET").toUpperCase();
-        var headers = Object.assign({}, opts.headers);
-        var init = {method: method, headers: headers};
+    function request(url, opts = {}) {
+        const method = (opts.method || "GET").toUpperCase();
+        const headers = Object.assign({}, opts.headers);
+        const init = {method: method, headers: headers};
 
-        var params = toParams(opts.data);
-        if (method == "GET") {
-            var qs = params.toString();
-            if (qs) url += (url.indexOf("?") == -1 ? "?" : "&") + qs;
+        const params = toParams(opts.data);
+        if (method === "GET") {
+            const qs = params.toString();
+            if (qs) url += (url.indexOf("?") === -1 ? "?" : "&") + qs;
         } else {
             init.body = params;
         }
 
         if (sameOrigin(url)) {
             headers["X-Requested-With"] = "XMLHttpRequest";
-            if (method != "GET") headers["X-CSRFToken"] = csrfToken();
+            if (method !== "GET") headers["X-CSRFToken"] = csrfToken();
         }
 
-        var signals = [];
+        const signals = [];
         if (opts.timeout) signals.push(AbortSignal.timeout(opts.timeout));
         if (opts.signal) signals.push(opts.signal);
-        if (signals.length) init.signal = signals.length == 1 ? signals[0] : AbortSignal.any(signals);
+        if (signals.length) init.signal = signals.length === 1 ? signals[0] : AbortSignal.any(signals);
 
         return fetch(url, init).then(function(response) {
             if (!response.ok) {
-                var err = new Error("HTTP " + response.status + " from " + url);
+                const err = new Error("HTTP " + response.status + " from " + url);
                 err.response = response;
                 throw err;
             }
@@ -148,15 +147,14 @@
         return request(url, Object.assign({}, opts, {method: "POST", data: data}));
     }
 
-    // show/hide work on Bootstrap's d-none, and show() also clears an inline
-    // style="display: none" and the hidden attribute, so an element can start hidden
-    // either way. An element that JS shows and hides must not carry a responsive d-*
-    // class (d-md-block and the like): those are !important and override d-none.
+    // show/hide work on Bootstrap's d-none, and show() also clears the hidden attribute,
+    // so an element can start hidden either way. An element that JS shows and hides must
+    // not carry a responsive d-* class (d-md-block and the like): those are !important
+    // and override d-none.
     function show(target) {
         all(target).forEach(function(el) {
             el.classList.remove("d-none");
             el.hidden = false;
-            if (el.style.display == "none") el.style.display = "";
         });
     }
 
@@ -167,12 +165,12 @@
     }
 
     function isHidden(el) {
-        return el.hidden || el.classList.contains("d-none") || el.style.display == "none";
+        return el.hidden || el.classList.contains("d-none");
     }
 
     function toggle(target, visible) {
         all(target).forEach(function(el) {
-            var v = visible === undefined ? isHidden(el) : visible;
+            const v = visible === undefined ? isHidden(el) : visible;
             if (v) show(el); else hide(el);
         });
     }
@@ -188,12 +186,12 @@
     // The bootstrap.Modal of an element or selector, or null when it is not on the page.
     // Options apply only when the instance is first created.
     function modal(target, opts) {
-        var el = first(target);
+        const el = first(target);
         return el ? bootstrap.Modal.getOrCreateInstance(el, opts) : null;
     }
 
     function showModal(target, opts) {
-        var m = modal(target, opts);
+        const m = modal(target, opts);
         if (m) m.show();
         return m;
     }
@@ -201,7 +199,7 @@
     // One tooltip per element: tooltip("#x", {title: "..."}) -> the instance of the first
     // match (or null), created on every match.
     function tooltip(target, opts) {
-        var instances = all(target).map(function(el) {
+        const instances = all(target).map(function(el) {
             return bootstrap.Tooltip.getOrCreateInstance(el, Object.assign({container: "body"}, opts));
         });
         return instances[0] || null;
@@ -213,7 +211,7 @@
     // Root it on a page element, not document.body, which carries the global delegation
     // below, and leave data-bs-toggle="tooltip" off those children.
     function tooltips(root, selector, opts) {
-        var el = first(root);
+        const el = first(root);
         if (!el) return null;
         return new bootstrap.Tooltip(el, Object.assign({container: "body"}, opts, {selector: selector}));
     }
@@ -222,16 +220,49 @@
     // it shows `resting`, by default the element's title attribute, again. A tooltip
     // whose title came from the options needs `resting`, or it keeps saying `text`.
     function flashTooltip(el, text, resting) {
-        var tip = bootstrap.Tooltip.getOrCreateInstance(el);
+        const tip = bootstrap.Tooltip.getOrCreateInstance(el);
         tip.setContent({".tooltip-inner": text});
         tip.show();
         resting = resting || el.getAttribute("data-bs-original-title");
-        if (resting && resting != text) {
+        if (resting && resting !== text) {
             el.addEventListener("hidden.bs.tooltip", function() {
                 tip.setContent({".tooltip-inner": resting});
             }, {once: true});
         }
         return tip;
+    }
+
+    // Copy text to the clipboard and say in el's tooltip whether that worked; `resting` as
+    // in flashTooltip.
+    function copy(el, text, resting) {
+        return navigator.clipboard.writeText(text).then(
+            () => flashTooltip(el, "Copied!", resting),
+            () => flashTooltip(el, "Copy failed", resting),
+        );
+    }
+
+    // Point the page's favicon at the "down" icon or the normal one.
+    function setFavicon(down) {
+        const link = document.querySelector('link[rel="icon"]');
+        if (link) link.href = base() + "/static/img/favicon" + (down ? "_down" : "") + ".svg";
+    }
+
+    // A Tom Select on a check's space-separated tags input, offering `tags` (strings) and
+    // accepting new ones. The page loads tom-select itself.
+    function tagSelect(selector, tags) {
+        return new TomSelect(selector, {
+            create: true,
+            createOnBlur: true,
+            delimiter: " ",
+            diacritics: false,
+            hideSelected: true,
+            highlight: false,
+            labelField: "value",
+            options: tags.map((tag) => ({value: tag})),
+            refreshThrottle: 0,
+            render: {no_results: () => ""},
+            searchField: ["value"],
+        });
     }
 
     // Every element with data-bs-toggle="tooltip" and a title gets a tooltip, also when it
@@ -250,7 +281,6 @@
         $$: function(selector, root) { return all(selector, root); },
         on: on,
         base: base,
-        csrfToken: csrfToken,
         serialize: serialize,
         request: request,
         get: get,
@@ -265,6 +295,9 @@
         showModal: showModal,
         tooltip: tooltip,
         tooltips: tooltips,
-        flashTooltip: flashTooltip
+        flashTooltip: flashTooltip,
+        copy: copy,
+        setFavicon: setFavicon,
+        tagSelect: tagSelect
     };
 })();

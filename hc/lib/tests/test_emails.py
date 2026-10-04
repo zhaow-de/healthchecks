@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from smtplib import SMTPDataError, SMTPServerDisconnected
 from unittest import TestCase
 from unittest.mock import Mock, patch
@@ -17,7 +15,7 @@ class EmailsTestCase(TestCase):
         mock_msg.send = Mock(side_effect=[SMTPServerDisconnected, None])
 
         t = EmailThread(mock_msg)
-        t.run()
+        t.deliver()
 
         self.assertEqual(mock_msg.send.call_count, 2)
 
@@ -27,16 +25,28 @@ class EmailsTestCase(TestCase):
 
         with self.assertRaises(SMTPServerDisconnected):
             t = EmailThread(mock_msg)
-            t.run()
+            t.deliver()
 
         self.assertEqual(mock_msg.send.call_count, 3)
+
+    def test_thread_logs_final_failure(self, mock_time: Mock) -> None:
+        mock_msg = Mock()
+        mock_msg.send = Mock(side_effect=SMTPServerDisconnected)
+
+        with self.assertLogs("hc.lib.emails", "ERROR") as logs:
+            EmailThread(mock_msg).run()
+
+        [record] = logs.records
+        self.assertEqual(record.getMessage(), "Failed to send email")
+        assert record.exc_info
+        self.assertIsInstance(record.exc_info[1], SMTPServerDisconnected)
 
     def test_it_retries_smtp_data_error(self, mock_time: Mock) -> None:
         mock_msg = Mock()
         mock_msg.send = Mock(side_effect=[SMTPDataError(454, "hello"), None])
 
         t = EmailThread(mock_msg)
-        t.run()
+        t.deliver()
 
         self.assertEqual(mock_msg.send.call_count, 2)
 
@@ -56,7 +66,7 @@ class SendTestCase(TestCase):
 
         thread.assert_called_once_with(message)
         thread.return_value.start.assert_called_once()
-        thread.return_value.run.assert_not_called()
+        thread.return_value.deliver.assert_not_called()
 
     @patch("hc.lib.emails.EmailThread")
     def test_block_flag_sends_synchronously(self, thread: Mock) -> None:
@@ -66,5 +76,5 @@ class SendTestCase(TestCase):
             send(message, block=True)
 
         thread.assert_called_once_with(message)
-        thread.return_value.run.assert_called_once()
+        thread.return_value.deliver.assert_called_once()
         thread.return_value.start.assert_not_called()

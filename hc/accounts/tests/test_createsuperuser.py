@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from io import StringIO
 from unittest.mock import Mock, patch
 
@@ -52,7 +50,6 @@ class CreateSuperuserTestCase(TestCase):
 
         project = Project.objects.get()
         self.assertEqual(project.owner, u)
-        self.assertEqual(project.badge_key, u.username)
 
         check = Check.objects.get()
         self.assertEqual(check.project, project)

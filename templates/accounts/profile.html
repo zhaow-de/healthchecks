@@ -5,29 +5,7 @@
 
 
 {% block content %}
-<div class="row">
-    <div class="col-sm-12">
-        <h1 class="settings-title">
-            Settings
-            <small class="text-body-secondary">{{ request.user.email }}</small>
-        </h1>
-    </div>
-    {% if messages %}
-    <div class="col-sm-12">
-        {% for message in messages %}
-            <p class="alert alert-{{ message.tags }}">{{ message }}</p>
-        {% endfor %}
-    </div>
-    {% endif %}
-</div>
-
-<div class="row">
-    <div class="col-sm-3">
-        <ul class="nav nav-pills flex-column mb-4">
-            <li class="nav-item"><a class="nav-link active" href="{% url 'hc-profile' %}">Account</a></li>
-            <li class="nav-item"><a class="nav-link" href="{% url 'hc-notifications' %}">Email Reports</a></li>
-        </ul>
-    </div>
+{% include "accounts/settings_nav.html" with active="account" %}
 
     <div class="col-sm-9 col-md-6">
         <div class="card mb-4 border-{{ email_password_status|default:'default' }}">
@@ -84,7 +62,7 @@
                         <tr>
                             <td>
                                 {{ credential.name|default:"unnamed" }}
-                                <span class="text-muted">
+                                <span class="text-body-secondary">
                                 – registered on {{ credential.created|date:"M j, Y" }}
                                 </span>
                             </td>
@@ -107,7 +85,7 @@
                         <tr>
                             <td>
                                 Enabled
-                                <span class="text-muted">
+                                <span class="text-body-secondary">
                                 – configured on {{ profile.totp_created|date:"M j, Y" }}
                                 </span>
                             </td>
@@ -231,12 +209,12 @@
                     <p>You do not have any projects. Create one!</p>
                 {% endif %}
 
-                <a
+                <button
                     id="create-project"
-                    href="#"
+                    type="button"
                     class="btn btn-outline-secondary float-end"
                     data-bs-toggle="modal"
-                    data-bs-target="#add-project-modal">Create a New Project</a>
+                    data-bs-target="#add-project-modal">Create a New Project</button>
             </div>
         </div>
 
@@ -245,7 +223,7 @@
                 <form method="post">
                     {% csrf_token %}
                     <h2>Preferred Time Zone</h2>
-                    <select id="tz" name="tz" class="form-select" value="{{ profile.tz }}">
+                    <select id="tz" name="tz" class="form-select">
                         <option{% if profile.tz == "UTC" %} selected{% endif %}>UTC</option>
                         {% for tz in timezones %}
                         {% if tz != "UTC" %}
@@ -265,7 +243,7 @@
                         <li>Format dates and times here in the web interface.</li>
                         <li>Format dates and times in monitoring alerts.</li>
                         <li>
-                            Deliver <a href="{% url 'hc-profile' %}">email reports</a>
+                            Deliver <a href="{% url 'hc-notifications' %}">email reports</a>
                             (if enabled) between 9:00 and 11:00 local time.
                         </li>
                     </ul>

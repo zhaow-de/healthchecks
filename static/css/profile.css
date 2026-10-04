@@ -1,13 +1,14 @@
+/* The settings templates build these classes as border-{{ status }}, so a search for the literal names finds no use. */
 .card.border-success > .card-footer {
-    background: var(--panel-success-bg);
-    color: var(--alert-success-color);
+    background: var(--bs-success-bg-subtle);
+    color: var(--bs-success-text-emphasis);
     font-size: small;
     text-align: center;
 }
 
 .card.border-info > .card-footer {
-    background: var(--state-info-bg);
-    color: var(--state-info-color);
+    background: var(--bs-info-bg-subtle);
+    color: var(--bs-info-text-emphasis);
     font-size: small;
     text-align: center;
 }
@@ -21,7 +22,7 @@
 
 #my-keys .missing {
     font-style: italic;
-    color: var(--text-muted);
+    color: var(--bs-secondary-color);
 }
 
 .settings-bar {

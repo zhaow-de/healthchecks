@@ -8,7 +8,7 @@ licensed under the BSD 3-clause license, and this fork's changes under the MIT l
 <li>Django 6.1</li>
 <li>SQLite (the default) or PostgreSQL</li>
 </ul>
-<h2>Setting Up for Development</h2>
+<h2 id="setting-up-for-development">Setting Up for Development</h2>
 <p>You can set up a development environment on your local system to develop a new
 feature, write a new integration or test a bugfix. Healthchecks uses
 <a href="https://docs.astral.sh/uv/">uv</a> to manage the Python interpreter,
@@ -43,7 +43,17 @@ $<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>./
 </code></pre></div>
 
 <p>The superuser is the instance's only user: there is no sign-up, and
-<code>createsuperuser</code> refuses to run once a user exists.</p>
+<code>createsuperuser</code> refuses to run once a user exists: a second run prints
+"Error: a user already exists, and this instance has only one" and exits with
+status 2.</p>
+<p>Besides the user, <code>createsuperuser</code> creates the user's project, a check named
+"My First Check" (slug <code>my-first-check</code>), and an email integration for the
+user's address, already verified and assigned to that check. The password must
+pass Django's password validators: at least 12 characters, not too similar to
+the email address, not a common password, and not all digits. Without a
+terminal, <code>--email</code> and <code>--password</code> (see
+<a href="#admin-panel">Accessing Administration Panel</a>) are both required: a missing
+or invalid one prints an error and exits with status 2.</p>
 <p>With the default configuration, Healthchecks stores data in a SQLite file
 <code>hc.sqlite</code> in the project directory (<code>~/webapps/healthchecks/</code>).</p>
 </li>
@@ -61,8 +71,10 @@ $<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>./
 </li>
 <li>
 <p>From another shell, run the <code>sendalerts</code> management command, responsible for
-  sending out notifications:
-        $ uv run ./manage.py sendalerts</p>
+  sending out notifications:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>./manage.py<span class="w"> </span>sendalerts
+</code></pre></div>
+
 </li>
 </ul>
 <p>At this point, the site should now be running at <code>http://localhost:8000</code>.</p>
@@ -70,7 +82,7 @@ $<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>./
 activate the virtual environment with <code>source .venv/bin/activate</code>, and then
 run <code>./manage.py</code> directly. The <code>./manage.py</code> examples in the rest of this document
 assume an activated virtual environment.</p>
-<h2>Accessing Administration Panel</h2>
+<h2 id="admin-panel">Accessing Administration Panel</h2>
 <p>Healthchecks comes with Django's administration panel where you can perform
 administrative tasks: change the user's password, inspect contents of
 database tables.</p>
@@ -81,11 +93,40 @@ instead of prompting:</p>
 </code></pre></div>
 
 <p>Once logged in, click on the "Account" dropdown in top navigation, and select
-"Site Administration".</p>
-<h2>Sending Emails</h2>
-<p>Healthchecks must be able to send email messages, so it can send out login
-links and alerts to users. Specify your SMTP credentials using the following
-environment variables:</p>
+"Site Administration". The panel is at <code>SITE_ROOT/admin/</code>.</p>
+<p>The panel lists checks, pings, channels (integrations), notifications and flips
+(status changes) under "Api"; credentials (security keys), profiles and projects
+under "Accounts"; log records under "Logs"; and groups and users under
+"Authentication and Authorization". Adding a user, a profile, a security key or a
+log record there is disabled.</p>
+<p>Changing the password in the panel goes through sudo mode, which emails a
+confirmation code, so it works only with <a href="#sending-emails">email set up</a>. Without
+email, the panel shows an "Email Needed" page instead; set the password from the
+shell with <code>./manage.py changepassword</code>, which prompts for the new password twice.</p>
+<h2 id="sending-emails">Sending Emails</h2>
+<p>Email is optional. Without it, that is while <code>EMAIL_HOST</code> is unset:</p>
+<ul>
+<li>the login page offers no "Email Me a Link" login, only the password, and its
+  "Lost your password?" dialog points to <code>./manage.py changepassword</code>;</li>
+<li>sudo mode, which emails a confirmation code, cannot be entered, so Set Password,
+  Change Email, Close Account, adding or removing a two-factor method, and the
+  password change in the administration panel all show an "Email Needed" page;
+  set the password with <code>./manage.py changepassword</code> instead;</li>
+<li>email alerts, reports and reminders, and the <code>ADMINS</code> error emails are not
+  sent; an email integration records each alert it could not send with the error
+  "No SMTP configuration";</li>
+<li>while <a href="../self_hosted_configuration/#EMAIL_USE_VERIFICATION">EMAIL_USE_VERIFICATION</a>
+  is on, an email integration can be added only for the account's own address;</li>
+<li>every <code>manage.py</code> command that runs the system checks prints the warnings
+  <code>hc.api.W002</code> ("No SMTP configuration, cannot send email") and Django's
+  <code>mail.W001</code> ("Your MAILERS setting has no 'default' entry").</li>
+</ul>
+<p>Healthchecks reads the SMTP variables below from the process environment, and
+outside Docker nothing loads a <code>.env</code> file for it: export them in the shell, or the
+service definition, that runs <code>runserver</code> (or your WSGI server), <code>sendalerts</code> and
+<code>sendreports</code>, or set <code>MAILERS</code> in <code>hc/local_settings.py</code> (see
+<a href="../self_hosted_configuration/#EMAIL_HOST">EMAIL_HOST</a>). Specify your SMTP
+credentials using the following environment variables:</p>
 <ul>
 <li>Implicit TLS (<em>recommended</em>):</li>
 </ul>
@@ -113,8 +154,12 @@ to use a TLS certificate and not an SSL one.</p>
 </code></pre></div>
 
 <p>Healthchecks uses these environment variables to construct the <code>settings.MAILERS</code>
-dictionary (a standard Django setting, <a href="https://docs.djangoproject.com/en/6.1/ref/settings/#std-setting-MAILERS">docs</a>).</p>
-<h2>Sending Status Notifications</h2>
+dictionary (a standard Django setting, <a href="https://docs.djangoproject.com/en/6.1/ref/settings/#std-setting-MAILERS">docs</a>).
+<code>EMAIL_USE_TLS</code> defaults to <code>True</code>, so set it to <code>False</code> when you set
+<code>EMAIL_USE_SSL=True</code>: with both <code>True</code>, startup and <code>manage.py check</code> report
+nothing, but every email fails with Django's <code>InvalidMailer</code> error ("The 'use_ssl'
+and 'use_tls' OPTIONS are incompatible").</p>
+<h2 id="sending-notifications">Sending Status Notifications</h2>
 <p>The <code>sendalerts</code> management command continuously polls the database for any checks
 changing state, and sends out notifications as needed.
 When <code>sendalerts</code> is not running, the Healthchecks instance will not send out any
@@ -123,14 +168,52 @@ alerts.</p>
 <div class="highlight"><pre><span></span><code>$<span class="w"> </span>./manage.py<span class="w"> </span>sendalerts
 </code></pre></div>
 
-<p>In a production setup, make sure the <code>sendalerts</code> command can survive
-server restarts.</p>
+<p><code>sendalerts</code> takes <code>--num-workers N</code> (default 1), the number of notifications it
+sends at the same time. Several <code>sendalerts</code> processes can run at once: each check
+going down and each status change is handled by exactly one of them.</p>
+<p>The <code>sendreports</code> management command sends the monthly (or weekly or daily)
+reports and, while any check is down, the hourly or daily reminders, as each
+profile's notification settings choose. Run it as a second long-running process:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>./manage.py<span class="w"> </span>sendreports<span class="w"> </span>--loop
+</code></pre></div>
+
+<p>With <code>--loop</code> it looks for due reports and reminders every 60 seconds; without
+it, it sends what is due once and exits.</p>
+<p>In a production setup, make sure the <code>sendalerts</code> and <code>sendreports --loop</code>
+commands can survive server restarts. The Docker image runs both under uWSGI
+(see <a href="../self_hosted_docker/">Running with Docker</a>).</p>
+<p>Two more commands are for occasional use, from cron for example; nothing runs them
+by itself:</p>
+<ul>
+<li><code>./manage.py sendlogs</code> emails the <code>ADMINS</code> addresses the number of log records
+  written in the last 24 hours, with a link to them, and sends nothing when there
+  are none.</li>
+<li><code>./manage.py sendflappingnotices</code> emails the owner about each check that changed
+  status more than 200 times in the last 24 hours.</li>
+</ul>
 <h2 id="database-cleanup">Database Cleanup</h2>
-<p>Healthchecks deletes old entries from <code>api_ping</code>, <code>api_flip</code>, and <code>api_notification</code>
-tables automatically. By default, Healthchecks keeps the 100 most recent
-pings for every check. You can set the limit higher to keep a longer history:
-go to the Administration Panel, look up user's <strong>Profile</strong> and modify its
-"Ping log limit" field.</p>
+<p>Healthchecks deletes old entries from the <code>api_ping</code>, <code>api_flip</code>, and
+<code>api_notification</code> tables automatically. Each check prunes its own entries on every
+100th ping it receives:</p>
+<ul>
+<li>pings older than the newest "Ping log limit" pings are deleted (100 by default);</li>
+<li>notifications older than the oldest kept ping are deleted;</li>
+<li>status changes (flips) are deleted only when they are older than both the oldest
+  kept ping and 93 days, because the downtime statistics need about three months
+  of them.</li>
+</ul>
+<p>To keep a longer or a shorter history, go to the Administration Panel, open the
+user's <strong>Profile</strong>, and change its "Ping log limit" field. Lowering the limit
+hides the older pings at once, in the web UI and in the API, but deletes them only
+at the check's next prune. To prune every check now, run:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>./manage.py<span class="w"> </span>prunepingsslow
+</code></pre></div>
+
+<p>It prunes, one by one, every check that has received more than 100 pings. Raising
+the limit does not bring back pings that were already deleted. Whatever the limit,
+the API returns at most 1000 pings (see <a href="../api/#list-pings">List check's logged pings</a>).</p>
+<p>Log records (Site Administration › Logs › Records) are never pruned
+automatically; delete old ones in the Administration Panel.</p>
 <p>Healthchecks provides a management command for cleaning up the <code>api_tokenbucket</code>
 (rate limiting records) table. The TokenBucket model is used for rate-limiting
 login attempts and similar operations. Any records older than one day can be
@@ -142,14 +225,23 @@ safely removed.</p>
 test it on a copy of your database, not on the live database right away.
 In a production setup, you will want to run this command regularly, as well as
 have regular, automatic database backups set up.</p>
-<p>A browser that has completed a login gets login rate limits of its own, but a
-new browser shares them with everyone else, so a run of wrong passwords for the
-account's email, from anywhere, can lock it out. To get back in, wait for the
-limits to refill, use the login link sent by email if email is set up, or clear
-every rate limit record, the recent ones too:</p>
+<h2 id="login-lockout">Login Lockout</h2>
+<p>Logging in is rate limited per email address:</p>
+<ul>
+<li>password attempts: 20 per 24 hours, refilling at one attempt every 72 minutes;</li>
+<li>login link requests: 10 per hour, plus, from a browser that has not logged in
+  before, 20 per client IP address per hour.</li>
+</ul>
+<p>A browser that has completed a login keeps a device cookie for 365 days and gets
+login rate limits of its own, but a new browser shares them with everyone else, so
+a run of wrong passwords for the account's email, from anywhere, can lock it out.
+To get back in, wait for the limits to refill, use the login link sent by email if
+email is set up, or clear every rate limit record, the recent ones too:</p>
 <div class="highlight"><pre><span></span><code>$<span class="w"> </span>./manage.py<span class="w"> </span>prunetokenbucket<span class="w"> </span>--all
 </code></pre></div>
 
+<p>Changing <a href="../self_hosted_configuration/#SECRET_KEY">SECRET_KEY</a> also resets the
+per-email limits, but not the per-IP one, and has other effects, listed there.</p>
 <p>If you have forgotten the password, set a new one with <code>./manage.py changepassword</code>.</p>
 <h2>Next Steps</h2>
 <p>Get the <a href="https://github.com/zhaow-de/healthchecks">source code</a>.</p>

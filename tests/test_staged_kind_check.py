@@ -1,10 +1,9 @@
 """`scripts/staged-kind-check.sh` — the one-kind-per-commit hook."""
 
-from __future__ import annotations
-
 import os
 import shutil
 import subprocess
+from functools import partial
 from pathlib import Path
 
 import pytest
@@ -12,8 +11,12 @@ import pytest
 HOOK = Path(__file__).resolve().parents[1] / "scripts" / "staged-kind-check.sh"
 
 
+def _git(repo: Path, *args: str) -> subprocess.CompletedProcess[bytes]:
+    return subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True)
+
+
 def _repo(tmp_path: Path) -> Path:
-    run = lambda *a: subprocess.run(["git", "-C", str(tmp_path), *a], check=True, capture_output=True)  # noqa: E731
+    run = partial(_git, tmp_path)
     run("init", "-q")
     run("config", "user.email", "t@example.com")
     run("config", "user.name", "t")
@@ -57,7 +60,7 @@ def test_the_hook_refuses_only_a_mixed_kind(tmp_path, staged, rc):
 
 def _stopped_merge(repo: Path, heads: int = 1) -> None:
     """Both kinds arrive from THEIRS, so each is new against HEAD and a staged set of the two is really mixed."""
-    run = lambda *a: subprocess.run(["git", "-C", str(repo), *a], check=True, capture_output=True)  # noqa: E731
+    run = partial(_git, repo)
     shas = []
     for n in range(heads):
         run("checkout", "-q", "-b", f"theirs{n}")
@@ -88,7 +91,7 @@ def test_a_merge_exempts_its_own_files(tmp_path):
 def test_a_merge_does_not_exempt_a_pair_only_our_side_touched(tmp_path):
     """A mixed pair from our own history, staged by hand during a stopped merge, is the author's, not the merge's."""
     repo = _repo(tmp_path)
-    run = lambda *a: subprocess.run(["git", "-C", str(repo), *a], check=True, capture_output=True)  # noqa: E731
+    run = partial(_git, repo)
     base = subprocess.run(["git", "-C", str(repo), "rev-parse", "HEAD"], check=True, capture_output=True, text=True).stdout.strip()
     run("checkout", "-q", "-b", "theirs", base)
     _stage(repo, "docs/other.md")
@@ -127,7 +130,7 @@ def test_a_merge_does_not_exempt_files_neither_parent_touched(tmp_path):
 
 def _merging(repo: Path, theirs: dict[str, str], ours: dict[str, str] | None = None) -> int:
     """`git merge --no-commit` of a branch that writes `theirs`, after our side writes `ours`; its rc, 1 on a conflict."""
-    git = lambda *a: subprocess.run(["git", "-C", str(repo), *a], check=True, capture_output=True)  # noqa: E731
+    git = partial(_git, repo)
     git("checkout", "-q", "-b", "theirs")
     for name, text in theirs.items():
         _write(repo, name, text)

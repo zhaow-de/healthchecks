@@ -1,6 +1,4 @@
-from __future__ import annotations
-
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from datetime import timedelta as td
 from uuid import uuid4
 
@@ -8,7 +6,7 @@ from hc.api.models import Check, Ping
 from hc.front.views import _get_events
 from hc.test import BaseTestCase
 
-EPOCH = datetime(2020, 1, 1, tzinfo=timezone.utc)
+EPOCH = datetime(2020, 1, 1, tzinfo=UTC)
 
 
 class GetEventsTestCase(BaseTestCase):
@@ -56,7 +54,7 @@ class GetEventsTestCase(BaseTestCase):
             self.assertEqual(pings[1].duration, td(minutes=2))
 
     def test_it_disables_duration_display(self) -> None:
-        # Set up a worst case scenario where each success ping has an unique rid,
+        # Set up a worst case scenario where each success ping has a unique rid,
         # and there are no "start" pings:
         for i in range(1, 12):
             self.check.ping_set.create(n=i, rid=uuid4(), created=EPOCH + td(minutes=i))

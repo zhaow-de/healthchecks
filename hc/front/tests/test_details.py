@@ -1,6 +1,4 @@
-from __future__ import annotations
-
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from datetime import timedelta as td
 
 import time_machine
@@ -47,6 +45,12 @@ class DetailsTestCase(BaseTestCase):
         # in the timezone switcher:
         self.assertContains(r, "Europe/Riga")
         self.assertContains(r, "Europe/Berlin")
+
+    def test_it_gives_the_ping_dialog_the_check_s_ping_url(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(self.url)
+        # ping_details.js opens a ping from #log and from a #ping-<n> hash with this URL
+        self.assertContains(r, f'data-url="/checks/{self.check.code}/pings/0/"')
 
     @override_settings(PING_ENDPOINT="http://ping.example.org/")
     def test_it_shows_no_ping_email_address(self) -> None:
@@ -179,19 +183,19 @@ class DetailsTestCase(BaseTestCase):
 
     @time_machine.travel("2020-02-01 00:00+00:00")
     def test_it_calculates_downtime_summary(self) -> None:
-        self.check.created = datetime(2019, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+        self.check.created = datetime(2019, 1, 1, 0, 0, 0, tzinfo=UTC)
         self.check.save()
 
         # going down on Jan 15, at 12:00
         f1 = Flip(owner=self.check)
-        f1.created = datetime(2020, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+        f1.created = datetime(2020, 1, 15, 12, 0, 0, tzinfo=UTC)
         f1.old_status = "up"
         f1.new_status = "down"
         f1.save()
 
         # back up on Jan 15, at 13:00
         f2 = Flip(owner=self.check)
-        f2.created = datetime(2020, 1, 15, 13, 0, 0, tzinfo=timezone.utc)
+        f2.created = datetime(2020, 1, 15, 13, 0, 0, tzinfo=UTC)
         f2.old_status = "down"
         f2.new_status = "up"
         f2.save()
@@ -208,19 +212,19 @@ class DetailsTestCase(BaseTestCase):
 
     @time_machine.travel("2020-02-01 00:00+00:00")
     def test_it_downtime_summary_handles_plural(self) -> None:
-        self.check.created = datetime(2019, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+        self.check.created = datetime(2019, 1, 1, 0, 0, 0, tzinfo=UTC)
         self.check.save()
 
         # going down on Jan 15, at 12:00
         f1 = Flip(owner=self.check)
-        f1.created = datetime(2020, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+        f1.created = datetime(2020, 1, 15, 12, 0, 0, tzinfo=UTC)
         f1.old_status = "up"
         f1.new_status = "down"
         f1.save()
 
         # back up 2 hours later
         f2 = Flip(owner=self.check)
-        f2.created = datetime(2020, 1, 15, 14, 0, 0, tzinfo=timezone.utc)
+        f2.created = datetime(2020, 1, 15, 14, 0, 0, tzinfo=UTC)
         f2.old_status = "down"
         f2.new_status = "up"
         f2.save()
@@ -236,7 +240,7 @@ class DetailsTestCase(BaseTestCase):
         self.profile.tz = "America/New_York"
         self.profile.save()
 
-        self.check.created = datetime(2019, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+        self.check.created = datetime(2019, 1, 1, 0, 0, 0, tzinfo=UTC)
         self.check.save()
 
         self.client.login(username="alice@example.org", password="password")
@@ -252,7 +256,7 @@ class DetailsTestCase(BaseTestCase):
         self.profile.tz = "Europe/Riga"
         self.profile.save()
 
-        self.check.created = datetime(2019, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+        self.check.created = datetime(2019, 1, 1, 0, 0, 0, tzinfo=UTC)
         self.check.save()
 
         self.client.login(username="alice@example.org", password="password")
@@ -264,7 +268,7 @@ class DetailsTestCase(BaseTestCase):
 
     @time_machine.travel("2020-02-01 00:00+00:00")
     def test_it_handles_months_when_check_did_not_exist(self) -> None:
-        self.check.created = datetime(2020, 1, 10, 0, 0, 0, tzinfo=timezone.utc)
+        self.check.created = datetime(2020, 1, 10, 0, 0, 0, tzinfo=UTC)
         self.check.save()
 
         self.client.login(username="alice@example.org", password="password")

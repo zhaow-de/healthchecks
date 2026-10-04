@@ -1,8 +1,6 @@
 """The uv cache that `.github/workflows/uv-cache.yml` seeds on develop is the one the jobs of
 `.github/workflows/tests.yml` look up, and a pull request saves its own copy only when it changes uv.lock."""
 
-from __future__ import annotations
-
 import os
 import subprocess
 from pathlib import Path

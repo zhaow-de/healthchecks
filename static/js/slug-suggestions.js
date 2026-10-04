@@ -13,13 +13,13 @@ hc.ready(function () {
     }
 
     hc.$$(".with-slug-suggestions").forEach(function(modal) {
-        var nameInput = hc.$("input[name='name']", modal);
-        var slugInput = hc.$("input[name='slug']", modal);
-        var btn = hc.$(".use-suggested-slug", modal);
-        var help = hc.$(".slug-help-block", modal);
+        const nameInput = hc.$("input[name='name']", modal);
+        const slugInput = hc.$("input[name='slug']", modal);
+        const btn = hc.$(".use-suggested-slug", modal);
+        const help = hc.$(".slug-help-block", modal);
 
         function update() {
-            var suggested = slugify(nameInput.value);
+            const suggested = slugify(nameInput.value);
             if (suggested) {
                 help.innerHTML = `Suggested value: <code>${suggested}</code>`;
             } else {
@@ -29,7 +29,7 @@ hc.ready(function () {
             btn.disabled = !suggested;
         }
 
-        hc.on(nameInput, "keyup change", update);
+        hc.on(nameInput, "input", update);
         hc.on(modal, "shown.bs.modal", update);
 
         hc.on(btn, "click", function() {

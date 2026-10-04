@@ -1,20 +1,10 @@
-from __future__ import annotations
-
-from datetime import date, datetime, timezone
-from datetime import timedelta as td
-
-from django.contrib import admin
 from django.contrib.auth.models import User
-from django.contrib.messages import get_messages
 from django.core import mail
-from django.test import RequestFactory
 from django.urls import reverse
 from django.utils.timezone import now
 
-from hc.accounts.admin import HcUserAdmin, ProfileAdmin
-from hc.accounts.models import Credential, Profile, Project
-from hc.api.models import Channel, Check
-from hc.test import BaseTestCase, TestHttpResponse
+from hc.accounts.models import Credential
+from hc.test import BaseTestCase
 
 
 class AccountsAdminTestCase(BaseTestCase):
@@ -24,9 +14,6 @@ class AccountsAdminTestCase(BaseTestCase):
         self.alice.is_staff = True
         self.alice.is_superuser = True
         self.alice.save()
-
-    def messages(self, r: TestHttpResponse) -> list[str]:
-        return [str(m) for m in get_messages(r.wsgi_request)]
 
     def test_it_shows_profiles(self) -> None:
         self.client.login(username="alice@example.org", password="password")
@@ -47,7 +34,7 @@ class AccountsAdminTestCase(BaseTestCase):
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get("/admin/accounts/project/")
         self.assertContains(r, "Alices Project")
-        self.assertContains(r, "Default Project for charlie@example.org")
+        self.assertContains(r, '<td class="field-owner nowrap">charlie</td>', html=True)
 
     def test_it_escapes_emails_when_showing_projects(self) -> None:
         self.charlie.email = "charlie&friends@example.org"
@@ -58,88 +45,36 @@ class AccountsAdminTestCase(BaseTestCase):
         # The amperstand should be escaped
         self.assertNotContains(r, "charlie&friends@example.org")
 
-    def test_it_highlights_check_count_above_one(self) -> None:
-        Check.objects.create(project=self.project)
-        Check.objects.create(project=self.project)
-        Check.objects.create(project=self.charlies_project)
-
-        self.client.login(username="alice@example.org", password="password")
-        r = self.client.get(reverse("admin:accounts_profile_changelist"))
-        self.assertContains(r, '<td class="field-checks"><b>2</b></td>', html=True)
-        self.assertContains(r, '<td class="field-checks">1</td>', html=True)
-
-    def test_it_filters_profiles_by_check_count(self) -> None:
-        Check.objects.bulk_create([Check(project=self.project) for _ in range(11)])
-        Check.objects.bulk_create([Check(project=self.charlies_project) for _ in range(10)])
-
-        self.client.login(username="alice@example.org", password="password")
-        url = reverse("admin:accounts_profile_changelist")
-        r = self.client.get(url, {"num_checks": "10"})
-        self.assertEqual(list(r.context["cl"].result_list), [self.profile])
-
-        r = self.client.get(url)
-        self.assertEqual(len(r.context["cl"].result_list), 2)
-
-    def test_profile_date_columns_show_dates(self) -> None:
-        self.profile.last_active_date = datetime(2020, 1, 2, 3, tzinfo=timezone.utc)
-
-        profile_admin = ProfileAdmin(Profile, admin.site)
-        self.assertEqual(profile_admin.last_active(self.profile), date(2020, 1, 2))
-
-    def test_profile_date_columns_handle_missing_dates(self) -> None:
-        profile_admin = ProfileAdmin(Profile, admin.site)
-        self.assertIsNone(profile_admin.last_active(self.charlies_profile))
-
-    def test_it_has_no_login_as_action(self) -> None:
-        self.client.login(username="alice@example.org", password="password")
-        payload = {"action": "login", "_selected_action": [self.charlies_profile.id]}
-        r = self.client.post(reverse("admin:accounts_profile_changelist"), payload)
-        self.assertEqual(r.status_code, 302)
-        self.assertEqual(self.messages(r), ["No action selected."])
-        self.assertEqual(self.client.session["_auth_user_id"], str(self.alice.id))
-
-    def test_send_report_action_sends_report(self) -> None:
-        Check.objects.create(project=self.project, name="Foo", status="up", last_ping=now())
-
-        self.client.login(username="alice@example.org", password="password")
-        payload = {"action": "send_report", "_selected_action": [self.profile.id]}
-        r = self.client.post(reverse("admin:accounts_profile_changelist"), payload)
-        self.assertEqual(r.status_code, 302)
-        self.assertEqual(self.messages(r), ["1 email(s) sent"])
-
-        self.assertEqual(len(mail.outbox), 1)
-        self.assertEqual(mail.outbox[0].to, ["alice@example.org"])
-        self.assertEqual(mail.outbox[0].subject, "Monthly Report")
-        self.assertEmailContains("Foo")
-
-    def test_send_nag_action_sends_nag(self) -> None:
-        self.profile.nag_period = td(hours=1)
-        self.profile.save()
-        Check.objects.create(project=self.project, name="Foo", status="down", last_ping=now())
-
-        self.client.login(username="alice@example.org", password="password")
-        payload = {"action": "send_nag", "_selected_action": [self.profile.id]}
-        r = self.client.post(reverse("admin:accounts_profile_changelist"), payload)
-        self.assertEqual(r.status_code, 302)
-        self.assertEqual(self.messages(r), ["1 email(s) sent"])
-
-        self.assertEqual(len(mail.outbox), 1)
-        self.assertEqual(mail.outbox[0].to, ["alice@example.org"])
-        self.assertEqual(mail.outbox[0].subject, "Reminder: 1 check still down")
-
-    def test_it_has_no_remove_totp_action(self) -> None:
+    def test_it_offers_no_profile_actions(self) -> None:
         self.profile.totp = "0" * 32
         self.profile.totp_created = now()
         self.profile.save()
 
         self.client.login(username="alice@example.org", password="password")
-        payload = {"action": "remove_totp", "_selected_action": [self.profile.id]}
-        r = self.client.post(reverse("admin:accounts_profile_changelist"), payload)
-        self.assertEqual(r.status_code, 302)
-        self.assertEqual(self.messages(r), ["No action selected."])
+        r = self.client.get(reverse("admin:accounts_profile_changelist"))
+        self.assertNotContains(r, 'name="action"', status_code=200)
 
+        # Neither a log-in-as nor a TOTP removal, nor a report sent from here
+        for action in ("login", "remove_totp", "send_report", "send_nag"):
+            payload = {"action": action, "_selected_action": [self.profile.id]}
+            self.client.post(reverse("admin:accounts_profile_changelist"), payload)
+
+        self.assertEqual(self.client.session["_auth_user_id"], str(self.alice.id))
         self.profile.refresh_from_db()
         self.assertEqual(self.profile.totp, "0" * 32)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_it_does_not_show_totp_fields(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(reverse("admin:accounts_profile_change", args=[self.profile.id]))
+        self.assertContains(r, 'name="tz"')
+        self.assertNotContains(r, 'name="totp"')
+        self.assertNotContains(r, 'name="totp_created"')
+
+    def test_it_does_not_add_profiles(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(reverse("admin:accounts_profile_add"))
+        self.assertEqual(r.status_code, 403)
 
     def test_it_does_not_delete_profiles(self) -> None:
         self.profile.totp = "0" * 32
@@ -158,34 +93,11 @@ class AccountsAdminTestCase(BaseTestCase):
         self.profile.refresh_from_db()
         self.assertEqual(self.profile.totp, "0" * 32)
 
-    def test_it_shows_project_usage(self) -> None:
-        Check.objects.create(project=self.project)
-        Channel.objects.create(project=self.project, kind="webhook")
-        for _ in range(2):
-            Check.objects.create(project=self.charlies_project)
-            Channel.objects.create(project=self.charlies_project, kind="webhook")
-        Project.objects.create(owner=self.alice, name="Empty Project")
-
-        self.client.login(username="alice@example.org", password="password")
-        r = self.client.get(reverse("admin:accounts_project_changelist"))
-        self.assertContains(r, '<td class="field-usage">1 check, 1 channel</td>', html=True)
-        self.assertContains(
-            r,
-            '<td class="field-usage"><strong>2 checks</strong>, <strong>2 channels</strong></td>',
-            html=True,
-        )
-        self.assertContains(r, '<td class="field-usage">0 checks, 0 channels</td>', html=True)
-
     def test_it_shows_users(self) -> None:
-        Check.objects.create(project=self.project)
-        Check.objects.create(project=self.project)
-        Channel.objects.create(project=self.project, kind="webhook")
-
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(reverse("admin:auth_user_changelist"))
         self.assertEqual(len(r.context["cl"].result_list), 2)
-        self.assertContains(r, '<td class="field-usage"><strong>2 checks</strong>, 1 channel</td>', html=True)
-        self.assertContains(r, '<td class="field-usage">0 checks, 0 channels</td>', html=True, count=1)
+        self.assertContains(r, "charlie@example.org")
 
     def test_it_does_not_add_users(self) -> None:
         self.client.login(username="alice@example.org", password="password")
@@ -200,19 +112,6 @@ class AccountsAdminTestCase(BaseTestCase):
         r = self.client.post(reverse("admin:auth_user_add"), payload)
         self.assertEqual(r.status_code, 403)
         self.assertEqual(User.objects.count(), 2)
-
-    def test_user_list_shows_last_active_date(self) -> None:
-        last_active = datetime(2020, 1, 2, 3, tzinfo=timezone.utc)
-        self.profile.last_active_date = last_active
-        self.profile.save()
-
-        request = RequestFactory().get("/")
-        request.user = self.alice
-        user_admin = HcUserAdmin(User, admin.site)
-        users = {u.id: u for u in user_admin.get_queryset(request)}
-
-        self.assertEqual(user_admin.last_active(users[self.alice.id]), last_active)
-        self.assertIsNone(user_admin.last_active(users[self.charlie.id]))
 
     def test_it_offers_no_activate_or_deactivate_action(self) -> None:
         # Deactivating the one user would lock the instance: createsuperuser refuses
@@ -334,7 +233,7 @@ class AccountsAdminTestCase(BaseTestCase):
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(reverse("admin:accounts_credential_changelist"))
         self.assertContains(r, '<td class="field-name">Charlies Yubikey</td>', html=True)
-        self.assertContains(r, '<td class="field-email">charlie@example.org</td>', html=True)
+        self.assertContains(r, '<td class="field-user nowrap">charlie</td>', html=True)
 
     def test_it_does_not_add_credentials(self) -> None:
         self.client.login(username="alice@example.org", password="password")

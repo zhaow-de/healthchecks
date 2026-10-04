@@ -1,47 +1,23 @@
-from __future__ import annotations
-
 import signal
-from collections.abc import Iterator
 from concurrent.futures import Future, ThreadPoolExecutor
-from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from datetime import timedelta as td
 from io import StringIO
 from threading import BoundedSemaphore, Event
 from types import SimpleNamespace
-from typing import Any
 from unittest.mock import Mock, call, patch
 
 import time_machine
+from django.core import mail
 from django.core.management import call_command
-from django.db.models import QuerySet
 from django.utils.timezone import now
 
 from hc.api.management.commands.sendalerts import Command, notify
-from hc.api.models import Channel, Check, Flip
+from hc.api.models import Channel, Check, Flip, Notification
 from hc.api.transports import TransportError
-from hc.test import BaseTestCase
+from hc.test import BaseTestCase, updated_concurrently
 
-CURRENT_TIME = datetime(2020, 1, 13, 2, tzinfo=timezone.utc)
-
-
-@contextmanager
-def updated_concurrently(**fields: Any) -> Iterator[None]:
-    """Make QuerySet.first() return its row, then change that row in the database.
-
-    This is what another sendalerts process does when it claims the same row
-    between our SELECT and our UPDATE.
-    """
-    first = QuerySet.first
-
-    def first_then_update(qs: QuerySet[Any]) -> Any:
-        obj = first(qs)
-        if obj is not None:
-            qs.model._default_manager.filter(pk=obj.pk).update(**fields)
-        return obj
-
-    with patch.object(QuerySet, "first", first_then_update):
-        yield
+CURRENT_TIME = datetime(2020, 1, 13, 2, tzinfo=UTC)
 
 
 class SendAlertsTestCase(BaseTestCase):
@@ -212,11 +188,11 @@ class SendAlertsTestCase(BaseTestCase):
         channel = Channel.objects.create(project=self.project, kind="webhook")
         channel.checks.add(check)
 
-        with patch("hc.api.models.Channel.transport") as Webhook:
-            Webhook.is_noop.return_value = False
+        with patch("hc.api.models.Channel.transport") as mock_transport:
+            mock_transport.is_noop.return_value = False
             notify(flip)
 
-            args = Webhook.notify.call_args.args
+            args = mock_transport.notify.call_args.args
             # Before sending a notification, we used to set flip.owner.status value
             # to "IF_YOU_SEE_THIS_WE_HAVE_A_BUG". The idea was to use it as 0xDEADBEEF:
             # if it surfaces anywhere in notification contents we know we have a bug.
@@ -238,8 +214,8 @@ class SendAlertsTestCase(BaseTestCase):
         channel = Channel.objects.create(project=self.project, kind="webhook")
         channel.checks.add(check)
 
-        with patch("hc.api.models.Channel.transport") as Webhook:
-            Webhook.is_noop.return_value = False
+        with patch("hc.api.models.Channel.transport") as mock_transport:
+            mock_transport.is_noop.return_value = False
             log = notify(flip)
 
         assert log is not None
@@ -258,14 +234,60 @@ class SendAlertsTestCase(BaseTestCase):
         channel = Channel.objects.create(project=self.project, kind="webhook")
         channel.checks.add(check)
 
-        with patch("hc.api.models.Channel.transport") as Webhook:
-            Webhook.is_noop.return_value = False
-            Webhook.notify.side_effect = TransportError("Test error message")
+        with patch("hc.api.models.Channel.transport") as mock_transport:
+            mock_transport.is_noop.return_value = False
+            mock_transport.notify.side_effect = TransportError("Test error message")
             log = notify(flip)
 
         assert log is not None
         self.assertIn(f"{str(channel.code)[:8]} (webhook) Error in", log)
         self.assertIn("Test error message", log)
+
+    def test_a_raising_channel_does_not_stop_the_others(self) -> None:
+        check = Check.objects.create(project=self.project, status="down")
+        flip = Flip.objects.create(owner=check, created=now(), old_status="up", new_status="down")
+        for _ in range(2):
+            Channel.objects.create(project=self.project, kind="webhook").checks.add(check)
+
+        with (
+            patch("hc.api.models.Channel.transport") as mock_transport,
+            self.assertLogs("hc.api.models", "ERROR") as logs,
+        ):
+            mock_transport.is_noop.return_value = False
+            mock_transport.notify.side_effect = [RuntimeError("boom"), None]
+            log = notify(flip)
+
+        assert log is not None
+        self.assertIn(") Error in", log)
+        self.assertIn(") OK in", log)
+        self.assertEqual(logs.records[0].getMessage(), "Unexpected error in webhook transport")
+
+        # The error is recorded, and the channel stays enabled
+        errors = sorted(Notification.objects.values_list("error", flat=True))
+        self.assertEqual(errors, ["", "Unexpected error"])
+        failed = Channel.objects.get(last_error="Unexpected error")
+        self.assertFalse(failed.disabled)
+
+    def test_a_channel_without_a_transport_does_not_stop_the_others(self) -> None:
+        check = Check.objects.create(project=self.project, status="down")
+        flip = Flip.objects.create(owner=check, created=now(), old_status="up", new_status="down")
+        broken = Channel.objects.create(project=self.project, kind="unknown")
+        broken.checks.add(check)
+        email = Channel.objects.create(project=self.project, kind="email", value="bob@example.org", email_verified=True)
+        email.checks.add(check)
+
+        with self.assertLogs("hc.api.models", "ERROR") as logs:
+            log = notify(flip)
+
+        assert log is not None
+        self.assertIn(f"{str(broken.code)[:8]} (unknown) Error in", log)
+        self.assertIn(f"{str(email.code)[:8]} (email) OK in", log)
+        self.assertEqual(logs.records[0].getMessage(), "Unexpected error in unknown transport")
+        self.assertEqual(len(mail.outbox), 1)
+
+        broken.refresh_from_db()
+        self.assertEqual(broken.last_error, "Unexpected error")
+        self.assertFalse(broken.disabled)
 
     @patch("hc.api.management.commands.sendalerts.close_old_connections")
     @patch("hc.api.management.commands.sendalerts.connection")
@@ -281,7 +303,7 @@ class SendAlertsTestCase(BaseTestCase):
         self.assertIsNone(notify(flip))
         close_old_connections.assert_called_once_with()
 
-    def test_it_reraises_and_logs_notify_exceptions(self) -> None:
+    def test_it_logs_notify_exceptions(self) -> None:
         cmd = Command(stdout=Mock())
         cmd.seats = BoundedSemaphore(1)
         cmd.seats.acquire()
@@ -289,9 +311,9 @@ class SendAlertsTestCase(BaseTestCase):
         future: Future[str | None] = Future()
         future.set_exception(ValueError("boom"))
 
+        # The callback does not re-raise: concurrent.futures would log it again
         with self.assertLogs("hc", "ERROR") as logs:
-            with self.assertRaisesRegex(ValueError, "boom"):
-                cmd.on_notify_done(future)
+            cmd.on_notify_done(future)
 
         [record] = logs.records
         self.assertEqual(record.getMessage(), "Exception in notify")
@@ -352,9 +374,11 @@ class SendAlertsTestCase(BaseTestCase):
         check.alert_after = check.last_ping + td(days=1, hours=1)
         check.save()
 
-        with patch.object(Check, "get_status", side_effect=ValueError("bad schedule")):
-            with self.assertRaisesRegex(ValueError, "bad schedule"):
-                Command().handle_going_down()
+        with (
+            patch.object(Check, "get_status", side_effect=ValueError("bad schedule")),
+            self.assertRaisesRegex(ValueError, "bad schedule"),
+        ):
+            Command().handle_going_down()
 
         check.refresh_from_db()
         self.assertEqual(check.alert_after, CURRENT_TIME + td(hours=1))

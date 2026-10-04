@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from datetime import timedelta as td
 
 from django.utils.timezone import now
@@ -37,6 +35,12 @@ class LogTestCase(BaseTestCase):
         # in the timezone switcher:
         self.assertContains(r, "Europe/Riga")
         self.assertContains(r, "Europe/Berlin")
+
+    def test_it_gives_the_ping_dialog_the_check_s_ping_url(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(self.url)
+        # ping_details.js opens a ping from #log and from a #ping-<n> hash with this URL
+        self.assertContains(r, f'data-url="/checks/{self.check.code}/pings/0/"')
 
     def test_it_handles_bad_uuid(self) -> None:
         url = "/checks/not-uuid/log/"

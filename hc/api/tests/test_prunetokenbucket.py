@@ -1,6 +1,4 @@
-from __future__ import annotations
-
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from datetime import timedelta as td
 from io import StringIO
 
@@ -10,7 +8,7 @@ from django.core.management import call_command
 from hc.api.models import TokenBucket
 from hc.test import BaseTestCase
 
-CURRENT_TIME = datetime(2020, 1, 13, 2, tzinfo=timezone.utc)
+CURRENT_TIME = datetime(2020, 1, 13, 2, tzinfo=UTC)
 
 
 @time_machine.travel(CURRENT_TIME, tick=False)

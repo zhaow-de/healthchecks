@@ -1,8 +1,6 @@
 """`.claude/skills/release/scripts/fetch-pr-data.py`, the release notes' input. `cz` and `gh` are PATH stubs here; git is
 real, over a scratch repository."""
 
-from __future__ import annotations
-
 import datetime as dt
 import json
 import os
@@ -158,9 +156,9 @@ def _written(done: subprocess.CompletedProcess[str]) -> Path:
 def test_the_list_names_the_repository_and_keeps_the_prs_merged_after_the_last_tag(tmp_path):
     out = None
     try:
-        before = dt.date.today().isoformat()
+        before = dt.datetime.now().astimezone().date().isoformat()
         done, gh_args = _prepare(tmp_path, tagged=True)
-        after = dt.date.today().isoformat()
+        after = dt.datetime.now().astimezone().date().isoformat()
         assert done.returncode == 0, done.stderr
         assert gh_args.strip() == _GH_ARGS.format(limit=_limit()), "the list names zhaow-de/healthchecks, never the remotes' pick"
         out = _written(done)

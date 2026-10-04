@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import time
 from unittest.mock import Mock, patch
 
@@ -44,7 +42,7 @@ class LoginTotpTestCase(BaseTestCase):
         self.assertEqual(r.status_code, 400)
 
     def test_it_requires_totp_secret(self) -> None:
-        self.profile.totp = None
+        self.profile.totp = ""
         self.profile.save()
 
         r = self.client.get(self.url)
@@ -67,27 +65,27 @@ class LoginTotpTestCase(BaseTestCase):
         self.assertRedirects(r, "/accounts/login/")
 
     @patch("hc.accounts.views.pyotp.totp.TOTP")
-    def test_it_logs_in(self, mock_TOTP: Mock) -> None:
-        mock_TOTP.return_value.verify.return_value = True
+    def test_it_logs_in(self, mock_totp: Mock) -> None:
+        mock_totp.return_value.verify.return_value = True
 
         r = self.client.post(self.url, {"code": "000000"})
         self.assertRedirects(r, self.checks_url)
         payload = signing.loads(r.cookies[device.COOKIE_NAME].value, salt=device.SALT)
         self.assertEqual(payload["u"], self.alice.id)
 
-        self.assertNotIn("2fa_user_id", self.client.session)
+        self.assertNotIn("2fa_user", self.client.session)
 
     @patch("hc.accounts.views.pyotp.totp.TOTP")
-    def test_it_redirects_after_login(self, mock_TOTP: Mock) -> None:
-        mock_TOTP.return_value.verify.return_value = True
+    def test_it_redirects_after_login(self, mock_totp: Mock) -> None:
+        mock_totp.return_value.verify.return_value = True
 
         url = self.url + "?next=" + self.channels_url
         r = self.client.post(url, {"code": "000000"})
         self.assertRedirects(r, self.channels_url)
 
     @patch("hc.accounts.views.pyotp.totp.TOTP")
-    def test_it_handles_authentication_failure(self, mock_TOTP: Mock) -> None:
-        mock_TOTP.return_value.verify.return_value = False
+    def test_it_handles_authentication_failure(self, mock_totp: Mock) -> None:
+        mock_totp.return_value.verify.return_value = False
 
         r = self.client.post(self.url, {"code": "000000"})
         self.assertContains(r, "The code you entered was incorrect.")
@@ -101,8 +99,8 @@ class LoginTotpTestCase(BaseTestCase):
         self.assertContains(r, "Too Many Requests")
 
     @patch("hc.accounts.views.pyotp.totp.TOTP")
-    def test_it_rejects_used_code(self, mock_TOTP: Mock) -> None:
-        mock_TOTP.return_value.verify.return_value = True
+    def test_it_rejects_used_code(self, mock_totp: Mock) -> None:
+        mock_totp.return_value.verify.return_value = True
 
         obj = TokenBucket(value=f"totpc-{self.alice.id}-000000")
         obj.tokens = 0

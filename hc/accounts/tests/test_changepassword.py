@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from io import StringIO
 from unittest.mock import Mock, patch
 
@@ -52,9 +50,11 @@ class ChangePasswordTestCase(TestCase):
             call_command("changepassword", "nobody@example.org", stdout=StringIO())
 
     def test_it_runs_the_password_validators(self) -> None:
-        with patch.object(Command, "_get_pass", Mock(return_value="1qaz2wsx3edc")):
-            with self.assertRaisesMessage(CommandError, "after 3 attempts"):
-                call_command("changepassword", stdout=StringIO(), stderr=StringIO())
+        with (
+            patch.object(Command, "_get_pass", Mock(return_value="1qaz2wsx3edc")),
+            self.assertRaisesMessage(CommandError, "after 3 attempts"),
+        ):
+            call_command("changepassword", stdout=StringIO(), stderr=StringIO())
 
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password("old"))

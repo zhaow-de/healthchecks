@@ -3,7 +3,7 @@
 <div class="modal-body">
     <h3>Ping #{{ ping.n }}
         {% if ping.kind == "ign" %}
-        <span class="text-muted">(ignored)</span>
+        <span class="text-body-secondary">(ignored)</span>
         {% elif ping.exitstatus > 0 %}
         <span class="text-danger">(failure, exit status {{ ping.exitstatus }})</span>
         {% elif ping.exitstatus == 0 %}
@@ -13,7 +13,7 @@
         {% elif ping.kind == "start" %}
         <span class="text-success">(received via the <code>/start</code> endpoint)</span>
         {% elif ping.kind == "log" %}
-        <span class="text-muted">(received via the <code>/log</code> endpoint)</span>
+        <span class="text-body-secondary">(received via the <code>/log</code> endpoint)</span>
         {% endif %}
     </h3>
 
@@ -22,15 +22,15 @@
             <p>
                 <strong>Time Received</strong>
                 <code>{{ ping.created.isoformat }}</code>
-                <div class="times" data-dt="{{ ping.created|timestamp }}">
-                    {% for tz in tz_switches %}
-                    <div>
-                        {{ tz }}<br>
-                        <span data-tz="{{ tz }}"></span>
-                    </div>
-                    {% endfor %}
-                </div>
             </p>
+            <div class="times mb-3" data-dt="{{ ping.created|timestamp }}">
+                {% for tz in tz_switches %}
+                <div>
+                    {{ tz }}<br>
+                    <span data-tz="{{ tz }}"></span>
+                </div>
+                {% endfor %}
+            </div>
         </div>
 
         <div class="col-sm-6">

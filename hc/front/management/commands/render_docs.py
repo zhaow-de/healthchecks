@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from importlib.util import find_spec
 from pathlib import Path
 from typing import Any
@@ -28,13 +26,13 @@ class Command(BaseCommand):
             "def_list",
             "attr_list",
         ]
-        extension_configs = {"codehilite": {"css_class": "highlight", "startinline": True}}
+        extension_configs = {"codehilite": {"css_class": "highlight"}}
 
         def process_directory(path: Path) -> None:
             for src_path in path.glob("*.md"):
                 print(f"Rendering {src_path.name}")
 
-                text = src_path.open("r", encoding="utf-8").read()
+                text = src_path.read_text(encoding="utf-8")
                 html = markdown.markdown(text, extensions=extensions, extension_configs=extension_configs)
 
                 dst_path = src_path.with_suffix(".html-fragment")

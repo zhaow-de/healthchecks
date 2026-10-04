@@ -1,11 +1,8 @@
-from __future__ import annotations
-
 import logging
 import time
-from datetime import timedelta as td
 from secrets import token_urlsafe
 from urllib.parse import urlparse
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import pyotp
 import segno
@@ -19,7 +16,7 @@ from django.contrib.auth.models import User
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 from django.db.models.functions import Lower
 from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import redirect, render
 from django.urls import Resolver404, resolve, reverse
 from django.utils.timezone import now
 from django.views.decorators.csrf import csrf_exempt
@@ -31,6 +28,7 @@ from hc.accounts.decorators import require_sudo_mode
 from hc.accounts.http import AuthenticatedHttpRequest
 from hc.accounts.models import Credential, Profile, Project
 from hc.api.models import TokenBucket
+from hc.front.views import _get_project_for_user
 from hc.lib.tz import all_timezones
 from hc.lib.webauthn import CreateHelper, GetHelper
 
@@ -190,7 +188,7 @@ def check_token(request: HttpRequest, username: str, token: str, new_email: str 
     # *or* if the browser presents a cookie we had set when sending the login link.
     #
     # If the method is GET and the auto-login cookie isn't present, we serve
-    # a HTML form with a submit button.
+    # an HTML form with a submit button.
     if request.method != "POST" and "auto-login" not in request.COOKIES:
         return render(request, "accounts/check_token_submit.html")
 
@@ -205,7 +203,7 @@ def check_token(request: HttpRequest, username: str, token: str, new_email: str 
             user.save()
 
         user.profile.token = ""
-        user.profile.save()
+        user.profile.save(update_fields=["token"])
         return _check_2fa(request, user)
 
     request.session["bad_link"] = True
@@ -244,7 +242,7 @@ def profile(request: AuthenticatedHttpRequest) -> HttpResponse:
         form = forms.TzForm(request.POST)
         if form.is_valid():
             profile.tz = form.cleaned_data["tz"]
-            profile.save()
+            profile.save(update_fields=["tz"])
             ctx["tz_status"] = "info"
             ctx["tz_updated"] = True
 
@@ -257,10 +255,9 @@ def profile(request: AuthenticatedHttpRequest) -> HttpResponse:
 def add_project(request: AuthenticatedHttpRequest) -> HttpResponse:
     form = forms.ProjectNameForm(request.POST)
     if not form.is_valid():
-        return HttpResponseBadRequest()
+        return HttpResponseBadRequest("The project name is required and can be at most 60 characters long.")
 
     project = Project(owner=request.user)
-    project.code = project.badge_key = str(uuid4())
     project.name = form.cleaned_data["name"]
     project.save()
 
@@ -269,28 +266,30 @@ def add_project(request: AuthenticatedHttpRequest) -> HttpResponse:
 
 @login_required
 def project(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
-    project = get_object_or_404(Project, code=code, owner=request.user)
+    project = _get_project_for_user(request, code)
     ctx = {"page": "project", "project": project}
 
     if request.method == "POST":
         if "create_key" in request.POST:
-            if request.POST["create_key"] == "api_key":
-                ctx["new_key"] = project.set_api_key()
-            elif request.POST["create_key"] == "api_key_readonly":
-                ctx["new_key"] = project.set_api_key_readonly()
-            elif request.POST["create_key"] == "ping_key":
-                ctx["new_ping_key"] = project.set_ping_key()
+            match request.POST["create_key"]:
+                case "api_key":
+                    ctx["new_key"] = project.set_api_key()
+                case "api_key_readonly":
+                    ctx["new_key"] = project.set_api_key_readonly()
+                case "ping_key":
+                    ctx["new_ping_key"] = project.set_ping_key()
             project.save()
 
             ctx["key_created"] = True
             ctx["api_status"] = "success"
         elif "revoke_key" in request.POST:
-            if request.POST["revoke_key"] == "api_key":
-                project.api_key = ""
-            elif request.POST["revoke_key"] == "api_key_readonly":
-                project.api_key_readonly = ""
-            elif request.POST["revoke_key"] == "ping_key":
-                project.ping_key = None
+            match request.POST["revoke_key"]:
+                case "api_key":
+                    project.api_key = ""
+                case "api_key_readonly":
+                    project.api_key_readonly = ""
+                case "ping_key":
+                    project.ping_key = None
             project.save()
 
             ctx["key_revoked"] = True
@@ -351,7 +350,7 @@ def set_password(request: AuthenticatedHttpRequest) -> HttpResponse:
             request.user.save()
 
             request.profile.token = ""
-            request.profile.save()
+            request.profile.save(update_fields=["token"])
 
             # update the session with the new password hash so that
             # the user doesn't  get logged out
@@ -428,19 +427,14 @@ def unsubscribe_reports(request: HttpRequest, signed_username: str) -> HttpRespo
         # to see if the timestamp is older than 5 minutes
         try:
             autosubmit = False
-            username = signer.unsign(signed_username, max_age=300)
+            signer.unsign(signed_username, max_age=300)
         except SignatureExpired:
             autosubmit = True
 
         ctx = {"autosubmit": autosubmit}
         return render(request, "accounts/unsubscribe_submit.html", ctx)
 
-    profile = Profile.objects.for_user(user)
-    profile.reports = "off"
-    profile.next_report_date = None
-    profile.nag_period = td()
-    profile.next_nag_date = None
-    profile.save()
+    Profile.objects.for_user(user).disable_reports()
 
     return render(request, "accounts/unsubscribed.html")
 
@@ -450,14 +444,13 @@ def unsubscribe_reports(request: HttpRequest, signed_username: str) -> HttpRespo
 def close(request: AuthenticatedHttpRequest) -> HttpResponse:
     user = request.user
 
-    if request.method == "POST":
-        if request.POST.get("confirmation") == request.user.email:
-            # Deleting user also deletes its profile, checks, channels etc.
-            user.delete()
+    if request.method == "POST" and request.POST.get("confirmation") == request.user.email:
+        # Deleting user also deletes its profile, checks, channels etc.
+        user.delete()
 
-            request.session.flush()
-            path = reverse("hc-login", query={"account-closed": 1})
-            return redirect(path)
+        request.session.flush()
+        path = reverse("hc-login", query={"account-closed": 1})
+        return redirect(path)
 
     ctx = {}
     if "confirmation" in request.POST:
@@ -468,8 +461,8 @@ def close(request: AuthenticatedHttpRequest) -> HttpResponse:
 
 @require_POST
 @login_required
-def remove_project(request: AuthenticatedHttpRequest, code: str) -> HttpResponse:
-    project = get_object_or_404(Project, code=code, owner=request.user)
+def remove_project(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
+    project = _get_project_for_user(request, code)
     for check in project.check_set.all():
         check.rename_and_delete()
     project.delete()
@@ -492,7 +485,11 @@ def add_webauthn(request: AuthenticatedHttpRequest) -> HttpResponse:
         if not form.is_valid():
             return HttpResponseBadRequest()
 
-        state = request.session["state"]
+        # A POST without the GET that stores the state: a stale tab or a crafted request
+        state = request.session.get("state")
+        if state is None:
+            return HttpResponseBadRequest()
+
         try:
             credential_bytes = helper.verify(state, form.cleaned_data["response"])
         except ValueError:
@@ -529,7 +526,7 @@ def add_totp(request: AuthenticatedHttpRequest) -> HttpResponse:
         if form.is_valid():
             request.profile.totp = request.session["totp_secret"]
             request.profile.totp_created = now()
-            request.profile.save()
+            request.profile.save(update_fields=["totp", "totp_created"])
 
             request.session["enabled_totp"] = True
             request.session.pop("totp_secret")
@@ -551,9 +548,9 @@ def add_totp(request: AuthenticatedHttpRequest) -> HttpResponse:
 @require_sudo_mode
 def remove_totp(request: AuthenticatedHttpRequest) -> HttpResponse:
     if request.method == "POST" and "disable_totp" in request.POST:
-        request.profile.totp = None
+        request.profile.totp = ""
         request.profile.totp_created = None
-        request.profile.save()
+        request.profile.save(update_fields=["totp", "totp_created"])
         request.session["disabled_totp"] = True
         return redirect("hc-profile")
 
@@ -563,7 +560,7 @@ def remove_totp(request: AuthenticatedHttpRequest) -> HttpResponse:
 
 @login_required
 @require_sudo_mode
-def remove_credential(request: AuthenticatedHttpRequest, code: str) -> HttpResponse:
+def remove_credential(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
     if not settings.RP_ID:
         return HttpResponse(status=404)
 
@@ -577,19 +574,14 @@ def remove_credential(request: AuthenticatedHttpRequest, code: str) -> HttpRespo
         credential.delete()
         return redirect("hc-profile")
 
-    if request.profile.totp:
-        is_last = False
-    else:
-        is_last = request.user.credentials.count() == 1
+    is_last = not request.profile.totp and request.user.credentials.count() == 1
 
     ctx = {"credential": credential, "is_last": is_last}
     return render(request, "accounts/remove_credential.html", ctx)
 
 
-def login_webauthn(request: HttpRequest) -> HttpResponse:
-    # We require RP_ID. Fail predicably if it is not set:
-    if not settings.RP_ID:
-        return HttpResponse(status=404)
+def _get_2fa_user(request: HttpRequest) -> User | HttpResponse:
+    """Return the user of the pending two-factor login, or the response to send."""
 
     # Expect an unauthenticated user
     if request.user.is_authenticated:
@@ -603,9 +595,19 @@ def login_webauthn(request: HttpRequest) -> HttpResponse:
         return redirect("hc-login")
 
     try:
-        user = User.objects.get(id=user_id, email=email)
+        return User.objects.get(id=user_id, email=email)
     except User.DoesNotExist:
         return HttpResponseBadRequest()
+
+
+def login_webauthn(request: HttpRequest) -> HttpResponse:
+    # We require RP_ID. Fail predictably if it is not set:
+    if not settings.RP_ID:
+        return HttpResponse(status=404)
+
+    user = _get_2fa_user(request)
+    if isinstance(user, HttpResponse):
+        return user
 
     q = user.credentials.values_list("data", flat=True)
     # GetHelper wants list[bytes] so normalize to that
@@ -617,7 +619,8 @@ def login_webauthn(request: HttpRequest) -> HttpResponse:
         if not form.is_valid():
             return HttpResponseBadRequest()
 
-        if not helper.verify(request.session["state"], form.cleaned_data["response"]):
+        state = request.session.get("state")
+        if state is None or not helper.verify(state, form.cleaned_data["response"]):
             return HttpResponseBadRequest()
 
         request.session.pop("state")
@@ -641,21 +644,9 @@ def login_webauthn(request: HttpRequest) -> HttpResponse:
 
 
 def login_totp(request: HttpRequest) -> HttpResponse:
-    # Expect an unauthenticated user
-    if request.user.is_authenticated:
-        return HttpResponseBadRequest()
-
-    if "2fa_user" not in request.session:
-        return HttpResponseBadRequest()
-
-    user_id, email, timestamp = request.session["2fa_user"]
-    if timestamp + 300 < time.time():
-        return redirect("hc-login")
-
-    try:
-        user = User.objects.get(id=user_id, email=email)
-    except User.DoesNotExist:
-        return HttpResponseBadRequest()
+    user = _get_2fa_user(request)
+    if isinstance(user, HttpResponse):
+        return user
 
     if not user.profile.totp:
         return HttpResponseBadRequest()
@@ -669,7 +660,7 @@ def login_totp(request: HttpRequest) -> HttpResponse:
 
         form = forms.TotpForm(totp, request.POST)
         if form.is_valid():
-            # We blacklist an used TOTP code for 90 seconds,
+            # We blacklist a used TOTP code for 90 seconds,
             # so an attacker cannot reuse a stolen code.
             if not TokenBucket.authorize_totp_code(user, form.cleaned_data["code"]):
                 return render(request, "try_later.html")

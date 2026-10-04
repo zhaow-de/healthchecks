@@ -1,19 +1,23 @@
 # Cloning Checks
 
 You can clone individual checks from the "Check Details"
-page:
-
-![The "Create a Copy" button](IMG_URL/create_copy.png)
+page: click "Create a Copy…" in its "Danger Zone" section, and confirm with
+"Create a Copy" in the dialog that opens.
 
 The "Create a Copy..." function creates a new check in the same project and copies
 over the following:
 
-* Name, tags, description
-* Schedule
-* Filtering rules
+* Name, with " (copy)" appended; when that would make it longer than 100 characters,
+  the first 90 characters of the name followed by "... (copy)"
+* Slug, with "-copy" appended; the copy gets an empty slug when the check has none,
+  or when "-copy" would make it longer than 100 characters
+* Tags, description
+* Schedule: its type, period or expression, time zone, and grace time
+* Filtering rules: every setting of the "Filtering Rules" dialog
 * Assigned notification methods
 
-The newly created check has a different ping URL and an empty event log.
+The newly created check has a different ping URL and an empty event log, and starts
+in the "new" state. SITE_NAME then opens its details page with a "Copy created!" note.
 
 ## Cloning All Checks Into a New Project
 

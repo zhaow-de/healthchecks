@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from datetime import timedelta as td
 
 from django.utils.timezone import now
@@ -16,7 +14,7 @@ class PauseTestCase(BaseTestCase):
         self.url = f"/api/v3/checks/{self.check.code}/pause"
 
     def test_it_works(self) -> None:
-        r = self.csrf_client.post(self.url, "", content_type="application/json", HTTP_X_API_KEY="X" * 32)
+        r = self.csrf_client.post(self.url, "", content_type="application/json", HTTP_X_API_KEY=self.api_key)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r["Access-Control-Allow-Origin"], "*")
 
@@ -32,7 +30,7 @@ class PauseTestCase(BaseTestCase):
         self.assertTrue(flip.processed)
 
     def test_it_accepts_api_key_in_post_body(self) -> None:
-        payload = {"api_key": "X" * 32}
+        payload = {"api_key": self.api_key}
         r = self.csrf_client.post(self.url, payload, content_type="application/json")
         self.assertEqual(r.status_code, 200)
 
@@ -45,26 +43,26 @@ class PauseTestCase(BaseTestCase):
         self.assertIn("POST", r["Access-Control-Allow-Methods"])
 
     def test_it_only_allows_post(self) -> None:
-        r = self.client.get(self.url, HTTP_X_API_KEY="X" * 32)
+        r = self.client.get(self.url, HTTP_X_API_KEY=self.api_key)
         self.assertEqual(r.status_code, 405)
 
     def test_it_validates_ownership(self) -> None:
         check = Check.objects.create(project=self.charlies_project, status="up")
 
         url = f"/api/v3/checks/{check.code}/pause"
-        r = self.client.post(url, "", content_type="application/json", HTTP_X_API_KEY="X" * 32)
+        r = self.client.post(url, "", content_type="application/json", HTTP_X_API_KEY=self.api_key)
 
         self.assertEqual(r.status_code, 403)
 
     def test_it_validates_uuid(self) -> None:
         url = "/api/v3/checks/not-uuid/pause"
-        r = self.client.post(url, "", content_type="application/json", HTTP_X_API_KEY="X" * 32)
+        r = self.client.post(url, "", content_type="application/json", HTTP_X_API_KEY=self.api_key)
 
         self.assertEqual(r.status_code, 404)
 
     def test_it_handles_missing_check(self) -> None:
         url = "/api/v3/checks/07c2f548-9850-4b27-af5d-6c9dc157ec02/pause"
-        r = self.client.post(url, "", content_type="application/json", HTTP_X_API_KEY="X" * 32)
+        r = self.client.post(url, "", content_type="application/json", HTTP_X_API_KEY=self.api_key)
 
         self.assertEqual(r.status_code, 404)
 
@@ -73,7 +71,7 @@ class PauseTestCase(BaseTestCase):
         self.check.alert_after = self.check.last_start + td(hours=1)
         self.check.save()
 
-        r = self.client.post(self.url, "", content_type="application/json", HTTP_X_API_KEY="X" * 32)
+        r = self.client.post(self.url, "", content_type="application/json", HTTP_X_API_KEY=self.api_key)
 
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r["Access-Control-Allow-Origin"], "*")
@@ -87,7 +85,7 @@ class PauseTestCase(BaseTestCase):
         self.profile.next_nag_date = now() + td(minutes=30)
         self.profile.save()
 
-        self.client.post(self.url, "", content_type="application/json", HTTP_X_API_KEY="X" * 32)
+        self.client.post(self.url, "", content_type="application/json", HTTP_X_API_KEY=self.api_key)
 
         self.profile.refresh_from_db()
         self.assertIsNone(self.profile.next_nag_date)
@@ -101,7 +99,7 @@ class PauseTestCase(BaseTestCase):
         self.check.status = "paused"
         self.check.save()
 
-        r = self.csrf_client.post(self.url, "", content_type="application/json", HTTP_X_API_KEY="X" * 32)
+        r = self.csrf_client.post(self.url, "", content_type="application/json", HTTP_X_API_KEY=self.api_key)
         self.assertEqual(r.status_code, 200)
 
         self.check.refresh_from_db()

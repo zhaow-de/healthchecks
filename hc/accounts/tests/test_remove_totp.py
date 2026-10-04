@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from hc.accounts.models import Credential
 from hc.test import BaseTestCase
 
@@ -44,5 +42,5 @@ class RemoveCredentialTestCase(BaseTestCase):
         self.assertContains(r, "Disabled the authenticator app.")
 
         self.profile.refresh_from_db()
-        self.assertIsNone(self.profile.totp)
+        self.assertEqual(self.profile.totp, "")
         self.assertIsNone(self.profile.totp_created)

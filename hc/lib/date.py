@@ -1,17 +1,19 @@
-from __future__ import annotations
-
-from datetime import date, datetime, timedelta, timezone
+from dataclasses import dataclass
+from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from django.template.defaultfilters import pluralize
 from django.utils.timezone import now
 
 
+@dataclass(frozen=True)
 class Unit:
-    def __init__(self, name: str, nsecs: int):
-        self.name = name
-        self.plural = name + "s"
-        self.nsecs = nsecs
+    name: str
+    nsecs: int
+
+    @property
+    def plural(self) -> str:
+        return self.name + "s"
 
 
 MINUTE = Unit("minute", 60)
@@ -106,7 +108,7 @@ def month_boundaries(months: int, tzstr: str) -> list[datetime]:
 
     now_value = now().astimezone(tz)
     y, m = now_value.year, now_value.month
-    for x in range(months):
+    for _ in range(months):
         result.append(datetime(y, m, 1, tzinfo=tz))
 
         m -= 1
@@ -124,7 +126,7 @@ def week_boundaries(weeks: int, tzstr: str) -> list[datetime]:
 
     today = now().astimezone(tz).date()
     needle = today - timedelta(days=today.weekday())
-    for x in range(weeks):
+    for _ in range(weeks):
         result.append(datetime(needle.year, needle.month, needle.day, tzinfo=tz))
         needle -= timedelta(days=7)
 
@@ -137,7 +139,7 @@ def day_boundaries(days: int, tzstr: str) -> list[datetime]:
     result: list[datetime] = []
 
     needle = now().astimezone(tz).date()
-    for x in range(days):
+    for _ in range(days):
         result.append(datetime(needle.year, needle.month, needle.day, tzinfo=tz))
         needle -= timedelta(days=1)
 
@@ -147,7 +149,7 @@ def day_boundaries(days: int, tzstr: str) -> list[datetime]:
 def seconds_in_month(d: date, tzstr: str) -> float:
     tz = ZoneInfo(tzstr)
     start = datetime(d.year, d.month, 1, tzinfo=tz)
-    start_utc = start.astimezone(timezone.utc)
+    start_utc = start.astimezone(UTC)
 
     y, m = d.year, d.month
     m += 1
@@ -156,5 +158,5 @@ def seconds_in_month(d: date, tzstr: str) -> float:
         m = 1
 
     end = datetime(y, m, 1, tzinfo=tz)
-    end_utc = end.astimezone(timezone.utc)
+    end_utc = end.astimezone(UTC)
     return (end_utc - start_utc).total_seconds()

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from hc.api.models import Check
 from hc.test import BaseTestCase
 
@@ -35,6 +33,14 @@ class FilteringRulesTestCase(BaseTestCase):
         self.assertEqual(self.check.methods, "POST")
         self.assertTrue(self.check.manual_resume)
         self.assertTrue(self.check.filter_default_fail)
+
+    def test_it_rejects_invalid_form(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.post(self.url, data={"filter_http_body": "on", "methods": "PUT"})
+        self.assertEqual(r.status_code, 400)
+
+        self.check.refresh_from_db()
+        self.assertFalse(self.check.filter_http_body)
 
     def test_it_clears_methods(self) -> None:
         self.check.methods = "POST"

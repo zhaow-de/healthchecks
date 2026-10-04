@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from django.urls import reverse
 
@@ -23,7 +21,7 @@ class RecordsAdminTestCase(BaseTestCase):
 
     def test_it_shows_records(self) -> None:
         Record.objects.create(
-            created=datetime(2020, 1, 2, 3, 4, tzinfo=timezone.utc),
+            created=datetime(2020, 1, 2, 3, 4, tzinfo=UTC),
             host="web-1",
             name="hc.api",
             level=logging.ERROR,

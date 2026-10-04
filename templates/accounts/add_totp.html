@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% load compress static hc_extras %}
 
+{% block title %}Set Up Authenticator App - {{ site_name }}{% endblock %}
+
 {% block content %}
 
 <div class="row">
@@ -21,7 +23,7 @@
     </p>
 
     <p>Secret key: <code class="totp-secret">{{ secret }}</code></p>
-    <img src="{{ qr_data_uri }}" />
+    <img src="{{ qr_data_uri }}" alt="QR code" />
 
     <p class="add-totp-step">
         <strong>Step 2.</strong>

@@ -1,12 +1,10 @@
-from __future__ import annotations
-
 import email.policy
 import time
-from collections.abc import Iterable
-from datetime import datetime, timezone
+from collections.abc import Callable, Iterable
+from datetime import UTC, datetime
 from datetime import timedelta as td
 from email import message_from_bytes
-from ipaddress import ip_address
+from functools import wraps
 from typing import Any, Literal
 from uuid import UUID
 
@@ -36,15 +34,17 @@ from pydantic_core import PydanticCustomError
 from hc.accounts.models import Profile, Project
 from hc.api.decorators import ApiRequest, authorize, authorize_read, cors
 from hc.api.forms import FlipsFiltersForm
-from hc.api.models import Channel, Check, Flip, Notification, Ping, prepare_durations
-from hc.lib.badges import check_signature, get_badge_svg, get_badge_url
+from hc.api.models import Channel, Check, Flip, Notification, Ping, find_by_unique_key, prepare_durations
+from hc.lib.ip import client_ip
 from hc.lib.signing import unsign_bounce_id
 from hc.lib.string import is_valid_uuid_string, match_keywords
+from hc.lib.typealias import ViewFunc
 from hc.lib.tz import all_timezones, legacy_timezones
 
 
-class BadChannelException(Exception):
+class BadChannelError(Exception):
     def __init__(self, message: str):
+        super().__init__(message)
         self.message = message
 
 
@@ -115,17 +115,17 @@ class Spec(BaseModel):
         if guess_kind(v) == "cron":
             try:
                 # Test if cronsim accepts it and can calculate the next datetime
-                it = CronSim(v, datetime(2000, 1, 1))
+                it = CronSim(v, datetime(2000, 1, 1, tzinfo=UTC))
                 next(it)
             except CronSimError, StopIteration:
-                raise PydanticCustomError("cron_syntax", "not a valid cron expression")
+                raise PydanticCustomError("cron_syntax", "not a valid cron expression") from None
         else:
             try:
                 # Test if oncalendar accepts it, and can calculate the next datetime
-                oncalendar_it = OnCalendar(v, datetime(2000, 1, 1, tzinfo=timezone.utc))
+                oncalendar_it = OnCalendar(v, datetime(2000, 1, 1, tzinfo=UTC))
                 next(oncalendar_it)
             except OnCalendarError, StopIteration:
-                raise PydanticCustomError("cron_syntax", "not a valid expression")
+                raise PydanticCustomError("cron_syntax", "not a valid expression") from None
 
         return v
 
@@ -166,14 +166,6 @@ def format_first_error(exc: ValidationError) -> str:
     return "json validation error: " + tmpl % subject
 
 
-def valid_ip(ip: str) -> bool:
-    try:
-        ip_address(ip)
-        return True
-    except ValueError:
-        return False
-
-
 @csrf_exempt
 @never_cache
 def ping(
@@ -193,16 +185,7 @@ def ping(
         return HttpResponseBadRequest("invalid url format")
 
     headers = request.META
-    remote_addr = headers.get("HTTP_X_FORWARDED_FOR", headers["REMOTE_ADDR"])
-    remote_addr = remote_addr.split(",")[0]
-
-    # If remote_addr does not validate but appears to be in ipv4:port form
-    # (like Azure App Service reports), then remove the port
-    if not valid_ip(remote_addr):
-        parts = remote_addr.split(".")
-        if len(parts) == 4 and ":" in parts[-1]:
-            remote_addr = remote_addr.split(":")[0]
-
+    remote_addr = client_ip(request)
     scheme = headers.get("HTTP_X_FORWARDED_PROTO", "http")
     method = headers["REQUEST_METHOD"]
     ua = headers.get("HTTP_USER_AGENT", "")
@@ -215,7 +198,9 @@ def ping(
         action = "ign"
 
     if action != "ign" and check.filter_http_body:
-        body_text = body.decode()
+        # Undecodable bytes, a multibyte character cut by PING_BODY_LIMIT included,
+        # become U+FFFD, so the rest of the body is still matched
+        body_text = body.decode(errors="replace")
         if check.failure_kw and match_keywords(body_text, check.failure_kw):
             action = "fail"
         elif check.success_kw and match_keywords(body_text, check.success_kw):
@@ -253,30 +238,31 @@ def ping_by_slug(
     if slug != slug.lower():
         return HttpResponseBadRequest("invalid url format")
 
-    created = False
     try:
         check = Check.objects.get(slug=slug, project__ping_key=ping_key)
     except Check.DoesNotExist:
-        if request.GET.get("create") != "1":
-            return HttpResponseNotFound("not found")
-
-        try:
-            project = Project.objects.get(ping_key=ping_key)
-        except Project.DoesNotExist:
-            return HttpResponseNotFound("not found")
-
-        check = Check(project=project, name=slug, slug=slug)
-        check.save()
-        check.assign_all_channels()
-        created = True
+        return HttpResponseNotFound("not found")
     except Check.MultipleObjectsReturned:
         return HttpResponse("ambiguous slug", status=409)
 
-    response = ping(request, check.code, check, action, exitstatus)
-    if response.status_code == 200 and created:
-        response.content = b"Created"
-        response.status_code = 201
-    return response
+    return ping(request, check.code, check, action, exitstatus)
+
+
+def _with_check(view: Callable[..., HttpResponse]) -> ViewFunc:
+    """Pass the view the check `code` names: 404 if there is none, 403 if another project owns it.
+
+    The 403 is returned, not raised, so it keeps its empty body and the cors headers.
+    """
+
+    @wraps(view)
+    def wrapper(request: ApiRequest, code: UUID, **kwds: Any) -> HttpResponse:
+        check = get_object_or_404(Check, code=code)
+        if check.project_id != request.project.id:
+            return HttpResponseForbidden()
+
+        return view(request, check, **kwds)
+
+    return wrapper
 
 
 def _lookup(project: Project, spec: Spec) -> Check | None:
@@ -307,31 +293,32 @@ def _lookup(project: Project, spec: Spec) -> Check | None:
 def _update(check: Check, spec: Spec) -> None:
     new_channels: Iterable[Channel] | None
     # First, validate the supplied channel codes/names
-    if spec.channels is None:
-        # If the channels key is not present, don't update check's channels
-        new_channels = None
-    elif spec.channels == "*":
-        # "*" means "all project's channels"
-        new_channels = Channel.objects.filter(project=check.project)
-    elif spec.channels == "":
-        # "" means "empty list"
-        new_channels = []
-    else:
-        # expect a comma-separated list of channel codes or names
-        new_channels = set()
-        available = list(Channel.objects.filter(project=check.project))
+    match spec.channels:
+        case None:
+            # If the channels key is not present, don't update check's channels
+            new_channels = None
+        case "*":
+            # "*" means "all project's channels"
+            new_channels = Channel.objects.filter(project=check.project)
+        case "":
+            # "" means "empty list"
+            new_channels = []
+        case _:
+            # expect a comma-separated list of channel codes or names
+            new_channels = set()
+            available = list(Channel.objects.filter(project=check.project))
 
-        for s in spec.channels.split(","):
-            if s == "":
-                raise BadChannelException("empty channel identifier")
+            for s in spec.channels.split(","):
+                if s == "":
+                    raise BadChannelError("empty channel identifier")
 
-            matches = [c for c in available if str(c.code) == s or c.name == s]
-            if len(matches) == 0:
-                raise BadChannelException(f"invalid channel identifier: {s}")
-            elif len(matches) > 1:
-                raise BadChannelException(f"non-unique channel identifier: {s}")
+                matches = [c for c in available if str(c.code) == s or c.name == s]
+                if len(matches) == 0:
+                    raise BadChannelError(f"invalid channel identifier: {s}")
+                if len(matches) > 1:
+                    raise BadChannelError(f"non-unique channel identifier: {s}")
 
-            new_channels.add(matches[0])
+                new_channels.add(matches[0])
 
     update_fields = set()
 
@@ -414,11 +401,8 @@ def get_checks(request: ApiRequest) -> JsonResponse:
     if slug := request.GET.get("slug"):
         q = q.filter(slug=slug)
 
-    checks = []
-    for check in q:
-        # precise, final filtering
-        if not tags or check.matches_tag_set(tags):
-            checks.append(check.to_dict(readonly=request.readonly))
+    # precise, final filtering
+    checks = [check.to_dict(readonly=request.readonly) for check in q if not tags or check.matches_tag_set(tags)]
 
     return JsonResponse({"checks": checks})
 
@@ -438,7 +422,7 @@ def create_check(request: ApiRequest) -> HttpResponse:
 
     try:
         _update(check, spec)
-    except BadChannelException as e:
+    except BadChannelError as e:
         return JsonResponse({"error": e.message}, status=400)
 
     return JsonResponse(check.to_dict(), status=201 if created else 200)
@@ -463,11 +447,8 @@ def channels(request: ApiRequest) -> JsonResponse:
 
 
 @authorize_read
-def get_check(request: ApiRequest, code: UUID) -> HttpResponse:
-    check = get_object_or_404(Check, code=code)
-    if check.project_id != request.project.id:
-        return HttpResponseForbidden()
-
+@_with_check
+def get_check(request: ApiRequest, check: Check) -> HttpResponse:
     return JsonResponse(check.to_dict(readonly=request.readonly))
 
 
@@ -475,18 +456,16 @@ def get_check(request: ApiRequest, code: UUID) -> HttpResponse:
 @csrf_exempt
 @authorize_read
 def get_check_by_unique_key(request: ApiRequest, unique_key: str) -> HttpResponse:
-    for check in request.project.check_set.all():
-        if check.unique_key == unique_key:
-            return JsonResponse(check.to_dict(readonly=request.readonly))
-    return HttpResponseNotFound()
+    check = find_by_unique_key(request.project.check_set.all(), unique_key)
+    if check is None:
+        return HttpResponseNotFound()
+
+    return JsonResponse(check.to_dict(readonly=request.readonly))
 
 
 @authorize
-def update_check(request: ApiRequest, code: UUID) -> HttpResponse:
-    check = get_object_or_404(Check, code=code)
-    if check.project_id != request.project.id:
-        return HttpResponseForbidden()
-
+@_with_check
+def update_check(request: ApiRequest, check: Check) -> HttpResponse:
     try:
         spec = Spec.model_validate(request.json, strict=True)
     except ValidationError as e:
@@ -494,7 +473,7 @@ def update_check(request: ApiRequest, code: UUID) -> HttpResponse:
 
     try:
         _update(check, spec)
-    except BadChannelException as e:
+    except BadChannelError as e:
         return JsonResponse({"error": e.message}, status=400)
     except Check.NotUpdated:
         return HttpResponseNotFound()
@@ -503,13 +482,8 @@ def update_check(request: ApiRequest, code: UUID) -> HttpResponse:
 
 
 @authorize
-def delete_check(request: ApiRequest, code: UUID) -> HttpResponse:
-    # Don't acquire lock right away, first see if the check exists
-    # and matches the API key
-    check = get_object_or_404(Check, code=code)
-    if check.project_id != request.project.id:
-        return HttpResponseForbidden()
-
+@_with_check
+def delete_check(request: ApiRequest, check: Check) -> HttpResponse:
     check.rename_and_delete()
     return JsonResponse(check.to_dict())
 
@@ -529,48 +503,19 @@ def single(request: HttpRequest, code: UUID) -> HttpResponse:
 @cors("POST")
 @csrf_exempt
 @authorize
-def pause(request: ApiRequest, code: UUID) -> HttpResponse:
-    check = get_object_or_404(Check, code=code)
-    if check.project_id != request.project.id:
-        return HttpResponseForbidden()
-
-    # Return early, without creating a flip object, if the check is already paused
-    if check.status == "paused":
-        return JsonResponse(check.to_dict())
-
-    # Track the status change for correct downtime calculation in Check.downtimes()
-    check.create_flip("paused", mark_as_processed=True)
-
-    check.status = "paused"
-    check.last_start = None
-    check.alert_after = None
-    check.save(update_fields=("status", "last_start", "alert_after"))
-
-    # After pausing a check we must check if all checks are up,
-    # and Profile.next_nag_date needs to be cleared out:
-    check.project.update_next_nag_dates()
-
+@_with_check
+def pause(request: ApiRequest, check: Check) -> HttpResponse:
+    check.pause()
     return JsonResponse(check.to_dict())
 
 
 @cors("POST")
 @csrf_exempt
 @authorize
-def resume(request: ApiRequest, code: UUID) -> HttpResponse:
-    check = get_object_or_404(Check, code=code)
-    if check.project_id != request.project.id:
-        return HttpResponseForbidden()
-
-    if check.status != "paused":
+@_with_check
+def resume(request: ApiRequest, check: Check) -> HttpResponse:
+    if not check.resume():
         return HttpResponse("check is not paused", status=409)
-
-    check.create_flip("new", mark_as_processed=True)
-
-    check.status = "new"
-    check.last_start = None
-    check.last_ping = None
-    check.alert_after = None
-    check.save(update_fields=("status", "last_start", "last_ping", "alert_after"))
 
     return JsonResponse(check.to_dict())
 
@@ -578,17 +523,13 @@ def resume(request: ApiRequest, code: UUID) -> HttpResponse:
 @cors("GET")
 @csrf_exempt
 @authorize
-def pings(request: ApiRequest, code: UUID) -> HttpResponse:
-    check = get_object_or_404(Check, code=code)
-    if check.project_id != request.project.id:
-        return HttpResponseForbidden()
-
+@_with_check
+def pings(request: ApiRequest, check: Check) -> HttpResponse:
     # Look up ping log limit from account's profile.
     # There might be more pings in the database (depends on how pruning is handled)
     # but we will not return more than the limit allows.
-    profile = Profile.objects.get(user__project=request.project)
     # Cap the number of returned pings to 1000.
-    limit = min(profile.ping_log_limit, 1000)
+    limit = min(request.project.owner_profile.ping_log_limit, 1000)
 
     # Query in descending order so we're sure to get the most recent
     # pings, regardless of the limit restriction
@@ -608,13 +549,9 @@ def pings(request: ApiRequest, code: UUID) -> HttpResponse:
 @cors("GET")
 @csrf_exempt
 @authorize
-def ping_body(request: ApiRequest, code: UUID, n: int) -> HttpResponse:
-    check = get_object_or_404(Check, code=code)
-    if check.project_id != request.project.id:
-        return HttpResponseForbidden()
-
-    profile = Profile.objects.get(user__project=request.project)
-    threshold = check.n_pings - profile.ping_log_limit
+@_with_check
+def ping_body(request: ApiRequest, check: Check, n: int) -> HttpResponse:
+    threshold = check.n_pings - request.project.owner_profile.ping_log_limit
     if n <= threshold:
         raise Http404()
 
@@ -623,14 +560,10 @@ def ping_body(request: ApiRequest, code: UUID, n: int) -> HttpResponse:
     if not body:
         raise Http404()
 
-    response = HttpResponse(body, content_type="text/plain")
-    return response
+    return HttpResponse(body, content_type="text/plain")
 
 
 def flips(request: ApiRequest, check: Check) -> HttpResponse:
-    if check.project_id != request.project.id:
-        return HttpResponseForbidden()
-
     form = FlipsFiltersForm(request.GET)
     if not form.is_valid():
         return HttpResponseBadRequest()
@@ -653,8 +586,8 @@ def flips(request: ApiRequest, check: Check) -> HttpResponse:
 @cors("GET")
 @csrf_exempt
 @authorize_read
-def flips_by_uuid(request: ApiRequest, code: UUID) -> HttpResponse:
-    check = get_object_or_404(Check, code=code)
+@_with_check
+def flips_by_uuid(request: ApiRequest, check: Check) -> HttpResponse:
     return flips(request, check)
 
 
@@ -662,128 +595,11 @@ def flips_by_uuid(request: ApiRequest, code: UUID) -> HttpResponse:
 @csrf_exempt
 @authorize_read
 def flips_by_unique_key(request: ApiRequest, unique_key: str) -> HttpResponse:
-    for check in request.project.check_set.all():
-        if check.unique_key == unique_key:
-            return flips(request, check)
-    return HttpResponseNotFound()
-
-
-@cors("GET")
-@csrf_exempt
-@authorize_read
-def badges(request: ApiRequest) -> JsonResponse:
-    tags = {"*"}
-    for check in request.project.check_set.all():
-        tags.update(check.tags_list())
-
-    key = request.project.badge_key
-    badges = {}
-    for tag in tags:
-        badges[tag] = {
-            "svg": get_badge_url(key, tag),
-            "svg3": get_badge_url(key, tag, with_late=True),
-            "json": get_badge_url(key, tag, fmt="json"),
-            "json3": get_badge_url(key, tag, fmt="json", with_late=True),
-            "shields": get_badge_url(key, tag, fmt="shields"),
-            "shields3": get_badge_url(key, tag, fmt="shields", with_late=True),
-        }
-
-    return JsonResponse({"badges": badges})
-
-
-SHIELDS_COLORS = {"up": "success", "late": "important", "down": "critical"}
-
-
-def _shields_response(label: str, status: str) -> JsonResponse:
-    return JsonResponse(
-        {
-            "schemaVersion": 1,
-            "label": label,
-            "message": status,
-            "color": SHIELDS_COLORS[status],
-        }
-    )
-
-
-@never_cache
-@cors("GET")
-def badge(request: HttpRequest, badge_key: str, signature: str, tag: str, fmt: str) -> HttpResponse:
-    if fmt not in ("svg", "json", "shields"):
+    check = find_by_unique_key(request.project.check_set.all(), unique_key)
+    if check is None:
         return HttpResponseNotFound()
 
-    with_late = True
-    if len(signature) == 10 and signature.endswith("-2"):
-        with_late = False
-
-    if not check_signature(badge_key, tag, signature):
-        return HttpResponseNotFound()
-
-    q = Check.objects.filter(project__badge_key=badge_key)
-    if tag == "*":
-        label = settings.MASTER_BADGE_LABEL
-    else:
-        q = q.filter(tags__contains=tag)
-        label = tag
-
-    status, total, grace, down = "up", 0, 0, 0
-    for check in q:
-        if tag != "*" and tag not in check.tags_list():
-            continue
-
-        total += 1
-        check_status = check.get_status()
-
-        if check_status == "down":
-            down += 1
-            status = "down"
-            if fmt == "svg":
-                # For SVG badges, we can leave the loop as soon as we
-                # find the first "down"
-                break
-        elif check_status == "grace":
-            grace += 1
-            if status == "up" and with_late:
-                status = "late"
-
-    if fmt == "shields":
-        return _shields_response(label, status)
-
-    if fmt == "json":
-        return JsonResponse({"status": status, "total": total, "grace": grace, "down": down})
-
-    svg = get_badge_svg(label, status)
-    return HttpResponse(svg, content_type="image/svg+xml")
-
-
-@never_cache
-@cors("GET")
-def check_badge(request: HttpRequest, states: int, badge_key: UUID, fmt: str) -> HttpResponse:
-    if fmt not in ("svg", "json", "shields"):
-        return HttpResponseNotFound()
-
-    check = get_object_or_404(Check, badge_key=badge_key)
-    check_status = check.get_status()
-    status = "up"
-    if check_status == "down":
-        status = "down"
-    elif check_status == "grace" and states == 3:
-        status = "late"
-
-    if fmt == "shields":
-        return _shields_response(check.name_then_code(), status)
-
-    if fmt == "json":
-        return JsonResponse(
-            {
-                "status": status,
-                "total": 1,
-                "grace": 1 if check_status == "grace" else 0,
-                "down": 1 if check_status == "down" else 0,
-            }
-        )
-
-    svg = get_badge_svg(check.name_then_code(), status)
-    return HttpResponse(svg, content_type="image/svg+xml")
+    return flips(request, check)
 
 
 def metrics(request: HttpRequest) -> HttpResponse:
@@ -851,10 +667,8 @@ def bounces(request: HttpRequest) -> HttpResponse:
         except Notification.DoesNotExist:
             return HttpResponse("OK (notification not found)")
 
-        if diagnostic:
-            error = f"Delivery failed ({diagnostic})"[:200]
-        else:
-            error = f"Delivery failed (SMTP status code: {status})"[:200]
+        reason = diagnostic or f"SMTP status code: {status}"
+        error = f"Delivery failed ({reason})"[:200]
 
         n.error = error
         n.save(update_fields=["error"])
@@ -873,10 +687,6 @@ def bounces(request: HttpRequest) -> HttpResponse:
         except Profile.DoesNotExist:
             return HttpResponse("OK (user not found)")
 
-        profile.reports = "off"
-        profile.next_report_date = None
-        profile.nag_period = td()
-        profile.next_nag_date = None
-        profile.save()
+        profile.disable_reports()
 
     return HttpResponse("OK")

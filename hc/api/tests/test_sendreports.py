@@ -1,46 +1,22 @@
-from __future__ import annotations
-
 import signal
-from collections.abc import Iterator
-from contextlib import contextmanager
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from datetime import timedelta as td
 from io import StringIO
 from types import SimpleNamespace
-from typing import Any
 from unittest.mock import Mock, call, patch
 
 import time_machine
 from django.core import mail
 from django.core.management import call_command
-from django.db.models import QuerySet
+from django.test.utils import override_settings
 from django.utils.timezone import now
 
 from hc.api.management.commands.sendreports import Command
 from hc.api.models import Check, Flip
-from hc.test import BaseTestCase
+from hc.test import BaseTestCase, updated_concurrently
 
-CURRENT_TIME = datetime(2020, 1, 13, 2, tzinfo=timezone.utc)
+CURRENT_TIME = datetime(2020, 1, 13, 2, tzinfo=UTC)
 MOCK_SLEEP = Mock()
-
-
-@contextmanager
-def updated_concurrently(**fields: Any) -> Iterator[None]:
-    """Make QuerySet.first() return its row, then change that row in the database.
-
-    This is what another sendreports process does when it handles the same
-    profile between our SELECT and our UPDATE.
-    """
-    first = QuerySet.first
-
-    def first_then_update(qs: QuerySet[Any]) -> Any:
-        obj = first(qs)
-        if obj is not None:
-            qs.model._default_manager.filter(pk=obj.pk).update(**fields)
-        return obj
-
-    with patch.object(QuerySet, "first", first_then_update):
-        yield
 
 
 @time_machine.travel(CURRENT_TIME)
@@ -62,13 +38,13 @@ class SendReportsTestCase(BaseTestCase):
 
         # And it needs at least one check that has been pinged.
         self.check = Check(project=self.project, last_ping=now())
-        self.check.created = datetime(2019, 10, 1, tzinfo=timezone.utc)
+        self.check.created = datetime(2019, 10, 1, tzinfo=UTC)
         self.check.name = "Foo"
         self.check.status = "down"
         self.check.save()
 
         self.flip = Flip(owner=self.check)
-        self.flip.created = datetime(2019, 12, 31, 23, tzinfo=timezone.utc)
+        self.flip.created = datetime(2019, 12, 31, 23, tzinfo=UTC)
         self.flip.old_status = "new"
         self.flip.new_status = "down"
         self.flip.save()
@@ -176,6 +152,20 @@ class SendReportsTestCase(BaseTestCase):
 
         # next_nag_date should now be unset
         self.profile.refresh_from_db()
+        self.assertIsNone(self.profile.next_nag_date)
+
+    @override_settings(MAILERS={})
+    def test_it_sends_nothing_without_smtp(self) -> None:
+        cmd = Command(stdout=Mock())
+        self.assertTrue(cmd.handle_one_report())
+        self.assertTrue(cmd.handle_one_nag())
+        self.assertEqual(len(mail.outbox), 0)
+
+        # The report date moves on and the nag date is cleared, so the
+        # loop does not pick the same profile again
+        self.profile.refresh_from_db()
+        assert self.profile.next_report_date
+        self.assertEqual(self.profile.next_report_date.date(), date(2020, 2, 1))
         self.assertIsNone(self.profile.next_nag_date)
 
     def test_it_skips_report_sent_by_another_process(self) -> None:

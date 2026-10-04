@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import secrets
 from functools import wraps
 from typing import Any
@@ -9,6 +7,7 @@ from django.core.signing import SignatureExpired, TimestampSigner
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 
+from hc.accounts.http import AuthenticatedHttpRequest
 from hc.api.models import TokenBucket
 from hc.lib import emails
 from hc.lib.typealias import ViewFunc
@@ -26,7 +25,7 @@ def _session_unsign(request: HttpRequest, key: str, max_age: int) -> str | None:
 
 def require_sudo_mode(f: ViewFunc) -> ViewFunc:
     @wraps(f)
-    def wrapper(request: HttpRequest, *args: Any, **kwds: Any) -> HttpResponse:
+    def wrapper(request: AuthenticatedHttpRequest, *args: Any, **kwds: Any) -> HttpResponse:
         assert request.user.is_authenticated
 
         # is sudo mode active and has not expired yet?
@@ -50,7 +49,7 @@ def require_sudo_mode(f: ViewFunc) -> ViewFunc:
                 return redirect(request.path)
 
         if not _session_unsign(request, "sudo_code", 900):
-            code = "%06d" % secrets.randbelow(1000000)
+            code = f"{secrets.randbelow(1000000):06d}"
             request.session["sudo_code"] = TimestampSigner().sign(code)
             emails.sudo_code(request.user.email, {"sudo_code": code})
 

@@ -58,7 +58,7 @@ allowed-tools: Bash(git add:*), Bash(git checkout:*), Bash(git tag:*), Bash(git 
    ```
 
    - If the merge succeeds cleanly: `develop` takes no direct push (`.github/settings.yml`), so land it exactly as step 17 lands the back-merge — a short `chore/pre-release-sync-<timestamp>` branch, a PR into `develop` titled `Pre-release sync of main into develop` (no type, for step 17's reason), poll-then-merge. Then continue to step 3.
-   - If the merge fails with conflicts, do **not** push. Investigate each conflicted file, propose a resolution to the user (typical patterns: `.cz.toml`, `pyproject.toml` and the README badge → the higher version; `uv.lock` → either side, then `uv lock`; modified-on-main but deleted-on-develop → confirm the fix exists in the replacement code, then keep the deletion), apply it, commit the merge, and land it via the same PR route. Only then continue.
+   - If the merge fails with conflicts, do **not** push. Investigate each conflicted file, propose a resolution to the user (typical patterns: `.cz.toml` and `pyproject.toml` → the higher version; `uv.lock` → either side, then `uv lock`; modified-on-main but deleted-on-develop → confirm the fix exists in the replacement code, then keep the deletion), apply it, commit the merge, and land it via the same PR route. Only then continue.
 
    **If the user chooses to abort:** stop and report — do not proceed.
 
@@ -72,7 +72,7 @@ allowed-tools: Bash(git add:*), Bash(git checkout:*), Bash(git tag:*), Bash(git 
    cz bump --yes --version-files-only
    ```
 
-   This computes the new version from the commit types since the last tag (rules in `.cz.toml`) and rewrites it in `.cz.toml`, `pyproject.toml` and the README `Version` badge. This repository has no `CHANGELOG.md` and gets none: never add `--changelog`. If `cz` stops with `NO_COMMITS_FOUND` or `NO_COMMITS_TO_BUMP`, there is nothing to release: switch back to `develop`, delete the release branch, and report.
+   This computes the new version from the commit types since the last tag (rules in `.cz.toml`) and rewrites it in `.cz.toml` and `pyproject.toml`. This repository has no `CHANGELOG.md` and gets none: never add `--changelog`. If `cz` stops with `NO_COMMITS_FOUND` or `NO_COMMITS_TO_BUMP`, there is nothing to release: switch back to `develop`, delete the release branch, and report.
 
 5. **Refresh `uv.lock` to record the new version**:
    ```bash
@@ -85,13 +85,11 @@ allowed-tools: Bash(git add:*), Bash(git checkout:*), Bash(git tag:*), Bash(git 
    ```bash
    NEW_VERSION=$(cz version --project)
    PYPROJECT_VERSION=$(grep -E '^version' pyproject.toml | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
-   README_VERSION=$(grep -oE 'badge/version-v[0-9]+\.[0-9]+\.[0-9]+' README.md | head -1 | sed -E 's/.*-v//')
 
-   if [ "$PYPROJECT_VERSION" != "$NEW_VERSION" ] || [ "$README_VERSION" != "$NEW_VERSION" ]; then
+   if [ "$PYPROJECT_VERSION" != "$NEW_VERSION" ]; then
        echo "ERROR: cz bump skipped one or more version_files"
        echo "  cz says: $NEW_VERSION"
        echo "  pyproject.toml: $PYPROJECT_VERSION"
-       echo "  README.md badge: $README_VERSION"
        exit 1
    fi
    if ! uv lock --check; then
@@ -102,7 +100,7 @@ allowed-tools: Bash(git add:*), Bash(git checkout:*), Bash(git tag:*), Bash(git 
        echo "ERROR: CHANGELOG.md exists; this repository keeps no changelog file"
        exit 1
    fi
-   echo "OK: version $NEW_VERSION in .cz.toml, pyproject.toml, README.md and uv.lock"
+   echo "OK: version $NEW_VERSION in .cz.toml, pyproject.toml and uv.lock"
    ```
 
    If this fails, stop and report — do not push. The usual cause of a skipped file is a version that drifted from `.cz.toml` in a past release, so the find-and-replace cannot locate the old value.
@@ -114,12 +112,12 @@ allowed-tools: Bash(git add:*), Bash(git checkout:*), Bash(git tag:*), Bash(git 
 
    It lists the PRs merged into `develop` since the last release tag, and the commits that reached `develop` without a PR. If it refuses a possibly truncated `gh` list, do what its message says and re-run this step.
 
-8. **Write the release notes**: read the data file at the path step 7 printed and follow [release-notes-format.md](release-notes-format.md), writing the notes to `.tmp/release-notes-v<VERSION>.md`, `<VERSION>` being the data file's `version`. The file becomes the GitHub Release's description in step 16; nothing is written into the repository. If the data file lists no PRs and no direct commits, there is nothing to release: `git checkout -- .cz.toml pyproject.toml README.md uv.lock`, `git checkout develop`, delete the release branch with `git branch -D`, and report.
+8. **Write the release notes**: read the data file at the path step 7 printed and follow [release-notes-format.md](release-notes-format.md), writing the notes to `.tmp/release-notes-v<VERSION>.md`, `<VERSION>` being the data file's `version`. The file becomes the GitHub Release's description in step 16; nothing is written into the repository. If the data file lists no PRs and no direct commits, there is nothing to release: `git checkout -- .cz.toml pyproject.toml uv.lock`, `git checkout develop`, delete the release branch with `git branch -D`, and report.
 
 9. **Commit the release and create the tag**:
    ```bash
    VERSION=$(cz version --project) &&
-     git add .cz.toml pyproject.toml README.md uv.lock &&
+     git add .cz.toml pyproject.toml uv.lock &&
      git commit -m "chore(release): bump version to v$VERSION" &&
      git tag "v$VERSION"
    ```

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from hc.api.models import Channel
 from hc.test import BaseTestCase, TestHttpResponse
 
@@ -16,7 +14,7 @@ class ListChannelsTestCase(BaseTestCase):
         self.url = "/api/v3/channels/"
 
     def get(self) -> TestHttpResponse:
-        return self.client.get(self.url, HTTP_X_API_KEY="X" * 32)
+        return self.client.get(self.url, HTTP_X_API_KEY=self.api_key)
 
     def test_it_works(self) -> None:
         r = self.get()
@@ -50,5 +48,5 @@ class ListChannelsTestCase(BaseTestCase):
         self.assertContains(r, "missing api key", status_code=401)
 
     def test_it_rejects_post(self) -> None:
-        r = self.csrf_client.post(self.url, HTTP_X_API_KEY="X" * 32)
+        r = self.csrf_client.post(self.url, HTTP_X_API_KEY=self.api_key)
         self.assertEqual(r.status_code, 405)

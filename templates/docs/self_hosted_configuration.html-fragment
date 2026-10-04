@@ -1,6 +1,27 @@
 <h1>Server Configuration</h1>
 <p>Healthchecks prepares its configuration in <code>hc/settings.py</code>. It reads configuration
 from environment variables. Below is a list of environment variables it reads and uses.</p>
+<p>How the values are read:</p>
+<ul>
+<li>A boolean setting accepts exactly <code>True</code> or <code>False</code> (case-sensitive). An empty
+  value counts as <code>False</code>, not as the default. Any other value stops startup with
+  <code>ImproperlyConfigured: Unexpected value NAME=..., use 'True' or 'False'</code>.</li>
+<li>An integer setting accepts a whole number or <code>None</code>. Anything else, an empty
+  value included, stops startup with a <code>ValueError</code>.</li>
+<li>A string setting set to an empty value is the empty string, not the default. For
+  <code>ADMINS</code>, <code>ALLOWED_HOSTS</code>, <code>EMAIL_HOST</code>, <code>METRICS_KEY</code>, <code>RP_ID</code>,
+  <code>SECURE_PROXY_SSL_HEADER</code>, <code>SLACK_CLIENT_ID</code> and <code>SUPPORT_EMAIL</code> that is the same
+  as unset; for the others, <code>SITE_ROOT</code>, <code>SITE_NAME</code> and <code>PING_ENDPOINT</code> among
+  them, delete the line to get the default.</li>
+<li>A <code>&lt;NAME&gt;_FILE</code> variable with a non-empty value names a file whose content is used
+  instead of <code>&lt;NAME&gt;</code>; an empty one counts as unset, and <code>&lt;NAME&gt;</code> is read. A
+  non-empty value that does not name an existing regular file stops startup with
+  <code>ImproperlyConfigured: Error reading &lt;NAME&gt;_FILE (&lt;path&gt;)</code>, and a file the process
+  may not read stops it with a <code>PermissionError</code>. Healthchecks strips whitespace
+  from both ends of the file's content.</li>
+<li>Settings in <code>hc/local_settings.py</code>, when that file exists, override the
+  environment.</li>
+</ul>
 <ul class="self-hosted-configuration-toc">
 <li><a href="#ADMINS">ADMINS</a></li>
 <li><a href="#ALLOWED_HOSTS">ALLOWED_HOSTS</a></li>
@@ -20,6 +41,7 @@ from environment variables. Below is a list of environment variables it reads an
 <li><a href="#EMAIL_HOST_PASSWORD">EMAIL_HOST_PASSWORD</a></li>
 <li><a href="#EMAIL_HOST_PASSWORD_FILE">EMAIL_HOST_PASSWORD_FILE</a></li>
 <li><a href="#EMAIL_HOST_USER">EMAIL_HOST_USER</a></li>
+<li><a href="#EMAIL_MAIL_FROM_TMPL">EMAIL_MAIL_FROM_TMPL</a></li>
 <li><a href="#EMAIL_PORT">EMAIL_PORT</a></li>
 <li><a href="#EMAIL_USE_TLS">EMAIL_USE_TLS</a></li>
 <li><a href="#EMAIL_USE_SSL">EMAIL_USE_SSL</a></li>
@@ -27,7 +49,7 @@ from environment variables. Below is a list of environment variables it reads an
 <li><a href="#http_proxy">http_proxy and https_proxy</a></li>
 <li><a href="#INTEGRATIONS_ALLOW_PRIVATE_IPS">INTEGRATIONS_ALLOW_PRIVATE_IPS</a></li>
 <li><a href="#LOG_FORMAT">LOG_FORMAT</a></li>
-<li><a href="#MASTER_BADGE_LABEL">MASTER_BADGE_LABEL</a></li>
+<li><a href="#METRICS_KEY">METRICS_KEY</a></li>
 <li><a href="#PING_BODY_LIMIT">PING_BODY_LIMIT</a></li>
 <li><a href="#PING_ENDPOINT">PING_ENDPOINT</a></li>
 <li><a href="#PROMETHEUS_ENABLED">PROMETHEUS_ENABLED</a></li>
@@ -41,6 +63,8 @@ from environment variables. Below is a list of environment variables it reads an
 <li><a href="#SLACK_CLIENT_SECRET">SLACK_CLIENT_SECRET</a></li>
 <li><a href="#SLACK_CLIENT_SECRET_FILE">SLACK_CLIENT_SECRET_FILE</a></li>
 <li><a href="#SLACK_ENABLED">SLACK_ENABLED</a></li>
+<li><a href="#SUPPORT_EMAIL">SUPPORT_EMAIL</a></li>
+<li><a href="#USE_GZIP_MIDDLEWARE">USE_GZIP_MIDDLEWARE</a></li>
 <li><a href="#WEBHOOKS_ENABLED">WEBHOOKS_ENABLED</a></li>
 </ul>
 
@@ -54,11 +78,22 @@ request/response cycle to the listed addresses. Example:</p>
 
 <p>Note: for error notifications to work, make sure you have also specified working
 SMTP credentials in the <code>EMAIL_...</code> environment variables.</p>
+<p>The <a href="../self_hosted/#sending-notifications"><code>sendlogs</code></a> management command also
+emails these addresses, with the count of log records written in the last 24
+hours. Django sends this mail with the subject prefix "[Django] " and from its
+<code>SERVER_EMAIL</code> setting, which no environment variable sets, so the sender is
+<code>root@localhost</code>; if your SMTP server rejects that sender, set <code>SERVER_EMAIL</code> in
+<code>hc/local_settings.py</code>.</p>
 <h2 id="ALLOWED_HOSTS"><code>ALLOWED_HOSTS</code></h2>
 <p>Default: the domain part of <code>SITE_ROOT</code></p>
 <p>The host/domain names that this site can serve. Healthchecks populates this setting
 automatically with the domain part of <a href="#SITE_ROOT">SITE_ROOT</a>. You do not need
 to set it unless you serve Healthchecks on more than one domain.</p>
+<p>When set, the list must include the host of <code>SITE_ROOT</code>. Otherwise the system check
+<code>hc.api.E002</code> fails, and every <code>manage.py</code> command that runs the system checks,
+<code>migrate</code> included (so also the Docker container's startup), stops with "The
+hostname in settings.SITE_ROOT is not found in settings.ALLOWED_HOSTS". A request
+whose <code>Host</code> header is not in the list gets 400 Bad Request.</p>
 <p>If you do serve the same Healthchecks instance on more than one domain, specify
 them all in <code>ALLOWED_HOSTS</code>, separated by commas:</p>
 <div class="highlight"><pre><span></span><code><span class="na">ALLOWED_HOSTS</span><span class="o">=</span><span class="s">first.example.org,second.example.org</span>
@@ -70,8 +105,15 @@ Read more about it in the
 <h2 id="DB"><code>DB</code></h2>
 <p>Default: <code>sqlite</code></p>
 <p>The database engine to use. Possible values: <code>sqlite</code>, <code>postgres</code>.</p>
+<p>Only the exact value <code>postgres</code> selects PostgreSQL; any other value, or none, means
+SQLite. <code>DB_HOST</code>, <code>DB_PORT</code>, <code>DB_USER</code>, <code>DB_PASSWORD</code> (or <code>DB_PASSWORD_FILE</code>),
+<code>DB_CONN_MAX_AGE</code>, <code>DB_SSLMODE</code> and <code>DB_TARGET_SESSION_ATTRS</code> are read only when
+<code>DB=postgres</code>. With SQLite, only <a href="#DB_NAME">DB_NAME</a>, a file path, applies.</p>
 <h2 id="DB_CONN_MAX_AGE"><code>DB_CONN_MAX_AGE</code></h2>
 <p>Default: <code>0</code></p>
+<p>The lifetime of a database connection, in seconds: an integer, <code>0</code> to close each
+connection at the end of its request, or <code>None</code> for unlimited persistent
+connections. PostgreSQL only.</p>
 <p>This is a standard Django setting, read more in
 <a href="https://docs.djangoproject.com/en/6.1/ref/settings/#conn-max-age">Django documentation</a>.</p>
 <h2 id="DB_HOST"><code>DB_HOST</code></h2>
@@ -118,26 +160,43 @@ precedence.</p>
 <a href="https://docs.djangoproject.com/en/6.1/ref/settings/#default-from-email">Django documentation</a>.</p>
 <h2 id="EMAIL_HOST"><code>EMAIL_HOST</code></h2>
 <p>Default: <code>""</code> (empty string)</p>
-<p>The hostname of a SMTP server to use for sending email. If this environment variable
-is not set, Healthchecks will not be able to send any email.</p>
+<p>The hostname of an SMTP server to use for sending email. If this environment variable
+is not set, Healthchecks will not be able to send any email, and
+<a href="#EMAIL_PORT"><code>EMAIL_PORT</code></a>, <a href="#EMAIL_USE_TLS"><code>EMAIL_USE_TLS</code></a>,
+<a href="#EMAIL_USE_SSL"><code>EMAIL_USE_SSL</code></a>, <a href="#EMAIL_HOST_USER"><code>EMAIL_HOST_USER</code></a> and
+<a href="#EMAIL_HOST_PASSWORD"><code>EMAIL_HOST_PASSWORD</code></a> are ignored. Without email, there is
+no login by link, no sudo mode (so Set Password, Change Email, Close Account, the
+two-factor changes and the password change in the administration panel show an
+"Email Needed" page; use <code>manage.py changepassword</code> instead), no email alerts,
+reports or <code>ADMINS</code> mail, and <code>manage.py</code> commands print the warnings
+<code>hc.api.W002</code> and <code>mail.W001</code>. See <a href="../self_hosted/#sending-emails">Sending Emails</a>.</p>
 <p><strong>On using <code>local_settings.py</code>:</strong>
 Healthchecks reads SMTP settings from the <code>EMAIL_*</code> environment variables,
 and uses them to construct the <code>settings.MAILERS</code> dictionary (a standard Django setting,
 read more in <a href="https://docs.djangoproject.com/en/6.1/ref/settings/#std-setting-MAILERS">Django documentation</a>).
 To configure SMTP server in the <code>local_settings.py</code> file, use the
-<code>MAILERS</code> setting, not the individual <code>EMAIL_*</code> settings:</p>
+<code>MAILERS</code> setting, not the individual <code>EMAIL_*</code> settings. A <code>MAILERS</code> defined there
+replaces the one built from the environment entirely, defaults included: without
+<code>port</code> and <code>use_tls</code>, Django connects in plain text on port 25, and without
+<code>timeout</code> it waits for the server indefinitely (the environment-built one uses 30
+seconds). For explicit TLS on port 587:</p>
 <div class="highlight"><pre><span></span><code><span class="n">MAILERS</span> <span class="o">=</span> <span class="p">{</span>
     <span class="s">"default"</span><span class="p">:</span> <span class="p">{</span>
         <span class="s">"BACKEND"</span><span class="p">:</span> <span class="s">"django.core.mail.backends.smtp.EmailBackend"</span><span class="p">,</span>
         <span class="s">"OPTIONS"</span><span class="p">:</span> <span class="p">{</span>
             <span class="s">"host"</span><span class="p">:</span> <span class="s">"smtp.example.org"</span><span class="p">,</span>
+            <span class="s">"port"</span><span class="p">:</span> <span class="mi">587</span><span class="p">,</span>
+            <span class="s">"use_tls"</span><span class="p">:</span> <span class="n">True</span><span class="p">,</span>
             <span class="s">"username"</span><span class="p">:</span> <span class="s">"example-username"</span><span class="p">,</span>
             <span class="s">"password"</span><span class="p">:</span> <span class="s">"example-password"</span><span class="p">,</span>
+            <span class="s">"timeout"</span><span class="p">:</span> <span class="mi">30</span><span class="p">,</span>
         <span class="p">},</span>
     <span class="p">},</span>
 <span class="p">}</span>
 </code></pre></div>
 
+<p>For implicit TLS, use <code>"port": 465, "use_ssl": True</code> instead of the <code>port</code> and
+<code>use_tls</code> lines.</p>
 <h2 id="EMAIL_HOST_PASSWORD"><code>EMAIL_HOST_PASSWORD</code></h2>
 <p>Default: <code>""</code> (empty string)</p>
 <p>Password to use for the SMTP server defined in <a href="#EMAIL_HOST">EMAIL_HOST</a>.</p>
@@ -150,26 +209,56 @@ are both set, <code>EMAIL_HOST_PASSWORD_FILE</code> takes precedence.</p>
 <h2 id="EMAIL_HOST_USER"><code>EMAIL_HOST_USER</code></h2>
 <p>Default: <code>""</code> (empty string)</p>
 <p>Username to use for the SMTP server defined in <a href="#EMAIL_HOST">EMAIL_HOST</a>.</p>
+<h2 id="EMAIL_MAIL_FROM_TMPL"><code>EMAIL_MAIL_FROM_TMPL</code></h2>
+<p>Default: <code>""</code> (empty string)</p>
+<p>A template for the envelope sender (the SMTP <code>MAIL FROM</code> address) of outgoing
+email, with one <code>%s</code>. Example:</p>
+<div class="highlight"><pre><span></span><code><span class="na">EMAIL_MAIL_FROM_TMPL</span><span class="o">=</span><span class="s">%s@bounces.example.org</span>
+</code></pre></div>
+
+<p>Healthchecks fills <code>%s</code> with a signed bounce ID for alert and report emails, and
+with <code>bounces</code> for other emails. The <code>From:</code> header stays
+<a href="#DEFAULT_FROM_EMAIL">DEFAULT_FROM_EMAIL</a>. When the setting is empty, the envelope
+sender is <code>DEFAULT_FROM_EMAIL</code> too.</p>
+<p>To act on bounces, have the mail service that receives mail for those addresses
+POST each bounce message, as a raw MIME message, to <code>/api/v3/bounces/</code> (see
+<a href="../api/#bounces">Receive Email Bounces</a>); Healthchecks reads the bounce ID from the
+local part of the bounce's <code>To:</code> header. Only bounces that arrive within 48 hours
+of the email are acted on:</p>
+<ul>
+<li>a permanent failure of an alert disables that email integration;</li>
+<li>a permanent failure of a report or reminder email turns reports off, whatever
+  their period (daily, weekly or monthly), and turns reminders off.</li>
+</ul>
 <h2 id="EMAIL_PORT"><code>EMAIL_PORT</code></h2>
 <p>Default: <code>587</code></p>
 <p>Port to use for the SMTP server defined in <a href="#EMAIL_HOST">EMAIL_HOST</a>.</p>
 <h2 id="EMAIL_USE_TLS"><code>EMAIL_USE_TLS</code></h2>
 <p>Default: <code>True</code></p>
-<p>hether to use a TLS (secure) connection when talking to the SMTP server.
-This is used for explicit TLS connections, generally on port 587.</p>
+<p>Whether to use a TLS (secure) connection when talking to the SMTP server.
+This is used for explicit TLS connections, generally on port 587.
+Set it to <code>False</code> when you set <a href="#EMAIL_USE_SSL">EMAIL_USE_SSL</a> to <code>True</code>: with
+both <code>True</code>, every email fails with Django's <code>InvalidMailer</code> error, and nothing
+reports it at startup.</p>
 <h2 id="EMAIL_USE_SSL"><code>EMAIL_USE_SSL</code></h2>
 <p>Default: <code>False</code></p>
 <p>Whether to use an implicit TLS (secure) connection when talking to the SMTP server.
-It is generally used on port 465.</p>
+It is generally used on port 465. Set <a href="#EMAIL_USE_TLS">EMAIL_USE_TLS</a>, which
+defaults to <code>True</code>, to <code>False</code> with it.</p>
 <h2 id="EMAIL_USE_VERIFICATION"><code>EMAIL_USE_VERIFICATION</code></h2>
 <p>Default: <code>True</code></p>
 <p>A boolean that turns on/off a verification step when adding an email integration.</p>
-<p>If enabled, whenever a user adds an email integration, Healthchecks emails a
-verification link to the new address. The new integration becomes active only
-after the user clicks the verification link.</p>
-<p>If you are setting up a private healthchecks instance where
-you trust your users, you can opt to disable the verification step. In that case,
-set <code>EMAIL_USE_VERIFICATION</code> to <code>False</code>.</p>
+<p>If enabled, adding an email integration, changing its address, or saving a disabled
+one emails a verification link to the address. The integration stays "Unconfirmed",
+and receives no alerts, until someone clicks the link. The account's own email
+address is never verified this way: it is confirmed at once.</p>
+<p>Verification needs email: with verification on and no <a href="#EMAIL_HOST">EMAIL_HOST</a>,
+the form refuses a new or changed address, or a disabled integration, unless the
+address is the account's own, so that no address receives alerts without having
+been confirmed.</p>
+<p>Set <code>EMAIL_USE_VERIFICATION</code> to <code>False</code> to confirm each address as it is saved.
+The setting does not change integrations already unconfirmed; to confirm one,
+change its address and back, or delete it and add it again.</p>
 <h2 id="http_proxy"><code>http_proxy</code> and <code>https_proxy</code></h2>
 <p>Default: <code>""</code> (empty string)</p>
 <p>Specifies the proxy server to use for outgoing HTTP and HTTPS requests.
@@ -189,8 +278,18 @@ set the <code>INTEGRATIONS_ALLOW_PRIVATE_IPS</code> setting to <code>True</code>
 <p>Default: <code>False</code></p>
 <p>A boolean that controls whether the integrations are allowed to make
 HTTP(S) requests to private IP addresses (127.0.0.1, 192.168.x.x, ...). This setting
-is set to <code>False</code> by default, because allowing users to define webhooks that probe
-internal addresses is a security risk.</p>
+is set to <code>False</code> by default, because a webhook could then make the server probe
+internal addresses: its URL is typed in the web UI, but placeholders in it, such as
+<code>$NAME</code>, take values that a read-write API key can set.</p>
+<p>An address is blocked when Python's <code>ipaddress</code> module marks it private. That
+covers 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16,
+0.0.0.0, the documentation and benchmarking ranges (192.0.2.0/24, 198.18.0.0/15,
+198.51.100.0/24, 203.0.113.0/24), 240.0.0.0/4, <code>::1</code>, <code>fc00::/7</code> and <code>fe80::/10</code>;
+100.64.0.0/10 (carrier-grade NAT) is not blocked. The check runs on the address of
+every connection, after DNS resolution and after each redirect, so a public
+hostname that resolves to a private address is blocked as well. A blocked request
+fails with the integration error "Connections to private IP addresses are not
+allowed".</p>
 <p>Only enable this setting if you run your Healthchecks instance in a trusted
 environment, and need to integrate with services running in your internal network.</p>
 <p>This setting affects all integration types that make HTTP requests, not just
@@ -208,23 +307,38 @@ name and the message; a multi-line message or a traceback continues on the lines
 after it. With <code>json</code>, each record is one JSON object on one line, with the keys
 <code>time</code> (ISO 8601, in UTC), <code>level</code>, <code>logger</code>, <code>message</code>, and <code>exception</code> (the
 formatted traceback) when the record carries one.</p>
+<p>Any value other than <code>json</code> (case-insensitive) means <code>text</code>. Text timestamps are in
+the process's local time (UTC in the Docker image).</p>
 <p>Neither <code>manage.py runserver</code> nor the Docker image's uWSGI writes a line per HTTP
 request. A uWSGI you run yourself does unless it is started with <code>--disable-logging</code>.</p>
-<h2 id="MASTER_BADGE_LABEL"><code>MASTER_BADGE_LABEL</code></h2>
-<p>Default: same as <code>SITE_NAME</code></p>
-<p>The label for the "Overall Status" status badge.</p>
+<p>Whatever this setting, records at WARNING and above from Healthchecks' own <code>hc</code>
+loggers, and the server errors (5xx) Django logs for requests, are also stored in
+the database and shown in Site Administration › Logs › Records. They are never
+pruned automatically; <a href="../self_hosted/#sending-notifications"><code>sendlogs</code></a> can email
+a daily count of them to <a href="#ADMINS">ADMINS</a>.</p>
+<h2 id="METRICS_KEY"><code>METRICS_KEY</code></h2>
+<p>Default: <code>None</code></p>
+<p>The secret that the <a href="../api/#metrics">Read Service Metrics</a> endpoint,
+<code>/api/v3/metrics/</code>, expects in its <code>X-Metrics-Key</code> request header. While it is
+unset, that endpoint answers 403 to every request.</p>
 <h2 id="PING_BODY_LIMIT"><code>PING_BODY_LIMIT</code></h2>
 <p>Default: <code>10000</code></p>
 <p>The upper size limit in bytes for logged ping request bodies.
-The default value is 10000 (10 kilobytes). You can adjust the limit or you can remove
-it altogether by setting this value to <code>None</code>.</p>
+The default value is 10000 (10 kilobytes). Healthchecks stores the first
+<code>PING_BODY_LIMIT</code> bytes of each ping's body and drops the rest without an error,
+and sends the value in the <code>Ping-Body-Limit</code> response header. With <code>None</code>, the body
+is stored whole and the header is omitted.</p>
+<p>Independently, a request whose body is larger than 2,621,440 bytes (2.5 MiB) is
+refused with 400 and not recorded, and <code>None</code> does not lift that cap. Only a limit
+above 2,621,440 raises the cap, to the limit itself. See
+<a href="../http_api/#request-body">Request Body</a>.</p>
 <p>Healthchecks stores each ping body in the database, with its ping. Keep
 <code>PING_BODY_LIMIT</code>, and the bodies your jobs send, no bigger than the output you
 actually need to read.</p>
 <h2 id="PING_ENDPOINT"><code>PING_ENDPOINT</code></h2>
 <p>Default: <code>SITE_ROOT</code> + <code>/ping/</code></p>
 <p>The base URL to use for constructing ping URLs for display. Healthchecks constructs ping
-URLs by appending either an UUID value or <code>&lt;ping-key&gt;/&lt;slug&gt;</code> value to <code>PING_ENDPOINT</code>.</p>
+URLs by appending either a UUID value or <code>&lt;ping-key&gt;/&lt;slug&gt;</code> value to <code>PING_ENDPOINT</code>.</p>
 <p>Notes:</p>
 <ul>
 <li>Make sure the <code>PING_ENDPOINT</code> value ends with a trailing slash. If a trailing slash
@@ -246,6 +360,10 @@ https://ping.my-hc.example.org/1fj9XWM6Ns8vLGTmnPGk9g/dummy-slug
 <h2 id="PROMETHEUS_ENABLED"><code>PROMETHEUS_ENABLED</code></h2>
 <p>Default: <code>True</code></p>
 <p>A boolean that turns on/off the Prometheus integration. Enabled by default.</p>
+<p>With <code>False</code>, Prometheus is hidden from the Integrations page, its page there
+answers 404, and so do the metrics endpoints (<code>/projects/&lt;uuid&gt;/metrics/</code> and
+<code>/projects/&lt;uuid&gt;/metrics/&lt;key&gt;</code>), so Prometheus scrapes fail. See
+<a href="../configuring_prometheus/">Configuring Prometheus</a>.</p>
 <h2 id="RP_ID"><code>RP_ID</code></h2>
 <p>Default: <code>None</code></p>
 <p>The <a href="https://www.w3.org/TR/webauthn-2/#relying-party-identifier">Relying Party identifier</a>,
@@ -254,10 +372,25 @@ required by the WebAuthn second-factor authentication feature.</p>
 standard. To enable WebAuthn support, set the <code>RP_ID</code> setting to a non-null value.
 Set its value to your site's domain without scheme and without port. For example,
 if your site runs on <code>https://my-hc.example.org</code>, set <code>RP_ID</code> to <code>my-hc.example.org</code>.</p>
+<p><code>RP_ID</code> turns on security keys (WebAuthn) only: the authenticator app (TOTP) second
+factor is available with or without it. An empty value counts as unset. Browsers
+allow WebAuthn only over HTTPS, or on <code>localhost</code>.</p>
 <h2 id="SECRET_KEY"><code>SECRET_KEY</code></h2>
 <p>Default: <code>---</code></p>
 <p>A secret key used for cryptographic signing. Should be set to a unique,
 unpredictable value.</p>
+<p>Set it once, before first use, and keep it. Changing it later:</p>
+<ul>
+<li>stops every Management API key (read-write and read-only) from working, because
+  the database stores only an HMAC of each key made with <code>SECRET_KEY</code>; Prometheus
+  scrapes with a read-only key stop too. Create new keys in the <strong>API Access</strong>
+  section of each project's Settings page (see <a href="../api/#authentication">Authentication</a>).</li>
+<li>invalidates every session, login link, device cookie, pending sudo code, email
+  verification link and unsubscribe link in emails already sent.</li>
+<li>resets the per-email <a href="../self_hosted/#login-lockout">login rate limits</a>.</li>
+</ul>
+<p>The Docker sample's <code>SECRET_KEY=---</code> must be replaced before the first API key is
+created.</p>
 <p>This is a standard Django setting, read more in
 <a href="https://docs.djangoproject.com/en/6.1/ref/settings/#secret-key">Django documentation</a>.</p>
 <h2 id="SECRET_KEY_FILE"><code>SECRET_KEY_FILE</code></h2>
@@ -282,6 +415,11 @@ with any dashes replaced with underscores, and prefixed with <code>HTTP_</code>.
 
 <p>You should <em>only</em> set this environment variable if you control your proxy or have some
 other guarantee that it sets/strips this header appropriately.</p>
+<p>The Docker image does not need this setting: its uWSGI already treats a request with
+<code>X-Forwarded-Proto: https</code> as secure (see
+<a href="../self_hosted_docker/#tls-termination">Reverse Proxy, TLS Termination, and CSRF Protection</a>).
+Set it for other WSGI servers. Independently of it, Healthchecks records each ping's
+scheme from <code>X-Forwarded-Proto</code>.</p>
 <p><strong>Note on using <code>local_settings.py</code>:</strong>
 When Healthchecks reads settings from environment variables, it expects
 <code>SECURE_PROXY_SSL_HEADER</code> to contain header name and value, separated with comma.
@@ -319,16 +457,22 @@ URL generation to static files (JS, CSS, images). <code>STATIC_URL</code> is a s
 setting, read more about it in
 <a href="https://docs.djangoproject.com/en/6.1/ref/settings/#static-url">Django documentation</a>.</li>
 </ul>
+<p>With a path, Healthchecks also serves every route under it (<code>/prefix/accounts/login/</code>,
+<code>/prefix/ping/&lt;uuid&gt;</code>, <code>/prefix/api/v3/...</code>), so the reverse proxy must forward the
+path unchanged, without stripping the prefix.</p>
+<p>A trailing slash is removed. A value that does not start with <code>http://</code> or
+<code>https://</code> triggers the warning <code>hc.api.W001</code>.</p>
 <p><strong>On using <code>local_settings.py</code>:</strong> Healthchecks only sets the above additional settings
 if you specify <code>SITE_ROOT</code> via an environment variable. If you instead specify it in
 <code>local_settings.py</code>, you will also need to set <code>ALLOWED_HOSTS</code>, <code>LOGIN_URL</code>, and
-<code>STATIC_URL</code> there.</p>
+<code>STATIC_URL</code> there. The route prefix follows <code>SITE_ROOT</code> wherever it is set.</p>
 <h2 id="SLACK_CLIENT_ID"><code>SLACK_CLIENT_ID</code></h2>
 <p>Default: <code>None</code></p>
 <p>The Slack Client ID, used by the Healthchecks integration for Slack.</p>
-<p>The integration can work with or without the Slack Client ID. If
-the Slack Client ID is not set, in the "Integrations - Add Slack" page,
-Healthchecks will ask the user to provide a webhook URL for posting notifications.</p>
+<p>The integration can work with or without the Slack Client ID. If the Slack Client
+ID is not set, the Slack row's "Add Integration" button on the Integrations page opens
+a form that asks for a "Webhook URL" (a Slack incoming-webhook URL). If it is set,
+the same button opens a page with an "Add to Slack" button instead.</p>
 <p>If the Slack Client ID <em>is</em> set, Healthchecks will use the OAuth2 flow
 to get the webhook URL from Slack. The OAuth2 flow is more user-friendly.
 To set it up, go to <a href="https://api.slack.com/apps/">https://api.slack.com/apps/</a>
@@ -353,6 +497,21 @@ setting. If <code>SLACK_CLIENT_SECRET</code> and <code>SLACK_CLIENT_SECRET_FILE<
 <h2 id="SLACK_ENABLED"><code>SLACK_ENABLED</code></h2>
 <p>Default: <code>True</code></p>
 <p>A boolean that turns on/off the Healthchecks integration for Slack. Enabled by default.</p>
+<p>With <code>False</code>, Slack is hidden from the Integrations page and its add pages answer
+404. Existing Slack integrations stay listed, but each notification through them
+fails with the error "Slack notifications are not enabled."</p>
+<h2 id="SUPPORT_EMAIL"><code>SUPPORT_EMAIL</code></h2>
+<p>Default: <code>None</code></p>
+<p>An email address to contact for help. When it is set, the login page's "Lost your
+password?" dialog shows it, and so does the email that
+<a href="../self_hosted/#sending-notifications"><code>sendflappingnotices</code></a> sends.</p>
+<h2 id="USE_GZIP_MIDDLEWARE"><code>USE_GZIP_MIDDLEWARE</code></h2>
+<p>Default: <code>False</code> (the Docker image sets <code>True</code>)</p>
+<p>A boolean that adds Django's <code>GZipMiddleware</code>, which compresses responses for
+clients that accept gzip.</p>
 <h2 id="WEBHOOKS_ENABLED"><code>WEBHOOKS_ENABLED</code></h2>
 <p>Default: <code>True</code></p>
 <p>A boolean that turns on/off the Webhooks integration. Enabled by default.</p>
+<p>With <code>False</code>, Webhook is hidden from the Integrations page, and its add and edit
+pages answer 404. Existing webhook integrations stay listed, but each notification
+through them fails with the error "Webhook notifications are not enabled."</p>

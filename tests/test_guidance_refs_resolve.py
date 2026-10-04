@@ -3,8 +3,6 @@
 Outside the scope, deliberately: the application under `hc/`, `templates/` and `static/`, whose own paths its own tests hold.
 """
 
-from __future__ import annotations
-
 import re
 import subprocess
 from pathlib import Path
@@ -285,9 +283,9 @@ def test_the_quiet_check_names_a_barren_prefix_and_not_a_citing_one(tmp_path):
     assert quiet_prefixes(tmp_path, listed, ("CLAUDE.md", "templates/")) == {"templates/"}, "the docs cite nothing walked"
     (tmp_path / "tests").mkdir()
     (tmp_path / "tests" / "test_m.py").write_text("# nothing here\n")
-    assert quiet_prefixes(tmp_path, listed + ["tests/test_m.py"], ("tests/",)) == {"tests/"}
+    assert quiet_prefixes(tmp_path, [*listed, "tests/test_m.py"], ("tests/",)) == {"tests/"}
     (tmp_path / "tests" / "test_m.py").write_text(f"# see `{_LIVE_RULE}`\n")
-    assert quiet_prefixes(tmp_path, listed + ["tests/test_m.py"], ("tests/",)) == set()
+    assert quiet_prefixes(tmp_path, [*listed, "tests/test_m.py"], ("tests/",)) == set()
 
 
 def test_a_code_span_path_resolves_to_a_tracked_file_or_directory(tmp_path):

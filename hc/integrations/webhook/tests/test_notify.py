@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 from datetime import timedelta as td
 from unittest.mock import Mock, patch

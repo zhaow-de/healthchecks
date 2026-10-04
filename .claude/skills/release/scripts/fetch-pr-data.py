@@ -5,8 +5,6 @@ Writes one JSON file and prints its path on stdout, alone, so whoever runs it re
 Everything a human reads goes to stderr; the path comes from `tempfile`, so two runs never collide.
 """
 
-from __future__ import annotations
-
 import json
 import re
 import subprocess
@@ -58,7 +56,7 @@ def parse_title(title: str) -> dict[str, str | bool]:
 
 
 new_version = run(["cz", "version", "--project"])
-release_date = datetime.now().strftime("%Y-%m-%d")
+release_date = datetime.now().astimezone().strftime("%Y-%m-%d")
 
 # The last release tag on main. There is none before the first release.
 tag_result = subprocess.run(["git", "describe", "--tags", "--abbrev=0", "origin/main"], capture_output=True, text=True)

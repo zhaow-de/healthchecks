@@ -37,7 +37,8 @@ def check(path: str) -> int:
     bad = 0
     try:
         # Universal-newline mode is load-bearing: `newline=""` lets a lone CR collapse an inbox to one line.
-        with open(path, encoding="utf-8") as fh:
+        # open(), not Path(): Path drops a trailing slash, so `main.jsonl/` would be read instead of refused.
+        with open(path, encoding="utf-8") as fh:  # noqa: PTH123
             text = fh.read()
     except (OSError, UnicodeDecodeError) as exc:
         # Acquiring the text, not examining it: nothing was read AS a record, so nothing here can be a

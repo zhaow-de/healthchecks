@@ -24,7 +24,7 @@
 
 .channels-table .unnamed {
     font-style: italic;
-    color: #999;
+    color: var(--bs-tertiary-color);
 }
 
 .edit-name,
@@ -35,7 +35,7 @@
 
 .edit-name .channel-details-mini {
     font-size: 11.7px;
-    color: #888;
+    color: var(--bs-tertiary-color);
     max-width: 500px;
     white-space: nowrap;
     overflow: hidden;
@@ -43,12 +43,12 @@
 }
 
 .channel-details-mini span {
-    color: var(--small-text-color);
+    color: var(--bs-body-color);
 }
 
 .channel-row:hover .edit-name,
 .channel-row:hover .edit-checks {
-    border: 1px dotted #aaa;
+    border: 1px dotted var(--bs-gray-500);
     cursor: pointer;
 }
 
@@ -94,7 +94,7 @@
     font-size: 24px;
     width: 48px;
     height: 48px;
-    background: #0091ea;
+    background: var(--link-color);
     border-radius: 32px;
     text-align: center;
     line-height: 48px;
@@ -115,7 +115,7 @@
 
 .ai-guide-screenshot {
     max-width: 100%;
-    border: 6px solid var(--border-color);
+    border: 6px solid var(--bs-border-color);
 }
 
 .page-channels .ic-delete {

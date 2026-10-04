@@ -1,0 +1,23 @@
+{% comment %}
+On a check's page (details, log), data-url is the URL of the check's ping #0, which
+ping_details.js opens pings with. log_link adds the checks list's "Show Earlier Events"
+button, whose href checks.js sets.
+{% endcomment %}
+<div id="ping-details-modal" class="modal" tabindex="-1"{% if check %} data-url="{% url 'hc-ping-details' check.code '0' %}"{% endif %}>
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div id="ping-details-body">Loading</div>
+            <div class="modal-footer">
+                {% if log_link %}
+                <a
+                    id="ping-details-log"
+                    href="#"
+                    class="btn btn-outline-secondary">
+                    Show Earlier Events
+                </a>
+                {% endif %}
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Got It!</button>
+            </div>
+        </div>
+    </div>
+</div>

@@ -16,39 +16,63 @@ termination.
   As a minimum, set the following fields:
     * `ALLOWED_HOSTS` – the domain name of your Healthchecks instance.
     Example: `ALLOWED_HOSTS=hc.example.org`.
+    * `DB_PASSWORD` – the PostgreSQL password. The `db` container applies it only
+    when it first creates its data volume, so changing it later breaks the
+    connection. Keep `DB_USER=postgres`: `docker-compose.yml` does not set
+    `POSTGRES_USER`.
+    * `PING_ENDPOINT` – the base of ping URLs. The sample sets it to
+    `http://localhost:8000/ping/`, so set it to your `SITE_ROOT` followed by
+    `/ping/`, or delete the line to derive it from `SITE_ROOT`.
+    * `SECRET_KEY` – secures HTTP sessions, set to a random value. Set it before
+    you create the first API key and keep it: changing it later invalidates the
+    API keys and more (see [SECRET_KEY](../self_hosted_configuration/#SECRET_KEY)).
+    * `SITE_ROOT` – The base public URL of your Healthchecks instance. Example:
+    `SITE_ROOT=https://hc.example.org`.
+
+    For email (see [Sending Emails](../self_hosted/#sending-emails)), also set:
+
     * `DEFAULT_FROM_EMAIL` – the "From:" address for outbound emails.
     * `EMAIL_HOST` – the SMTP server.
     * `EMAIL_HOST_PASSWORD` – the SMTP password.
     * `EMAIL_HOST_USER` – the SMTP username.
-    * `SECRET_KEY` – secures HTTP sessions, set to a random value.
-    * `SITE_ROOT` – The base public URL of your Healthchecks instance. Example:
-    `SITE_ROOT=https://hc.example.org`.
+    * For implicit TLS on port 465, `EMAIL_PORT=465`, `EMAIL_USE_SSL=True` (the
+    sample has no such line, so add it) and `EMAIL_USE_TLS=False`.
 
-* Create and start containers:
+* Create and start containers in the background:
 
         $ cd docker
-        $ docker compose up
+        $ docker compose up -d
+
+    Wait until `docker compose ps` shows the `web` container as healthy: by then
+    the database migrations have run.
 
 * Create a superuser:
 
-        $ docker compose run web /opt/healthchecks/manage.py createsuperuser
+        $ docker compose exec web /opt/healthchecks/manage.py createsuperuser
 
     This will trigger an interactive prompt.
 
     You can also provide credentials via parameters, bypassing the interactive prompt:
 
-        $ docker compose run web /opt/healthchecks/manage.py createsuperuser --email user@example.com --password correct-horse-battery-staple
+        $ docker compose exec web /opt/healthchecks/manage.py createsuperuser --email user@example.com --password correct-horse-battery-staple
 
-* Open [http://localhost:8000](http://localhost:8000) in your browser and log in with
-  the credentials from the previous step.
+    See [Setting Up for Development](../self_hosted/#setting-up-for-development)
+    for what `createsuperuser` creates and the password rules.
+
+* Open your `SITE_ROOT` in your browser, through your reverse proxy, and log in
+  with the credentials from the previous step.
+  [http://localhost:8000](http://localhost:8000) works only while `SITE_ROOT` and
+  `ALLOWED_HOSTS` keep their `localhost` sample values: with your own domain set, a
+  request to `localhost` gets 400 Bad Request.
 
 ## Login Lockout
 
 A browser that has completed a login gets login rate limits of its own, but a
 new browser shares them with everyone else, so a run of wrong passwords for the
-account's email, from anywhere, can lock it out. To get back in, wait for the
-limits to refill, use the login link sent by email if email is set up, or clear
-every rate limit record, the recent ones too:
+account's email, from anywhere, can lock it out ([Login Lockout](../self_hosted/#login-lockout)
+lists the limits). To get back in, wait for the limits to refill, use the login
+link sent by email if email is set up, or clear every rate limit record, the
+recent ones too:
 
 ```sh
 $ docker compose exec web /opt/healthchecks/manage.py prunetokenbucket --all
@@ -68,15 +92,77 @@ variables in `docker/.env`. For example, to adjust the number of uWSGI processes
 
 Read more about configuring uWSGI in [uWSGI documentation](https://uwsgi-docs.readthedocs.io/en/latest/Configuration.html#environment-variables).
 
+What `docker/uwsgi.ini` and the Dockerfile set:
+
+* Without `UWSGI_PROCESSES`, uWSGI runs 4 worker processes.
+* uWSGI listens on `:8000` (IPv4). When `LISTEN_IPV6` is set, to any value, even
+  `False`, it listens on `[::]:8000` instead.
+* uWSGI kills a worker whose request runs longer than 10 seconds
+  (`harakiri = 10`).
+* The image sets `USE_GZIP_MIDDLEWARE=True`.
+* The image's Docker `HEALTHCHECK` runs `fetchstatus.py`, which requests
+  `/api/v3/status/` on port 8000, under `SITE_ROOT`'s path, with `SITE_ROOT`'s host
+  as the `Host` header. `SITE_ROOT`'s host must therefore be in `ALLOWED_HOSTS`, or
+  the container reports unhealthy (and the `web` container never shows as healthy
+  in `docker compose ps`).
+
+## Running on SQLite {: #sqlite }
+
+The image can also run on SQLite, without the `db` container:
+
+* In `docker/.env`, set `DB=sqlite` (any value other than `postgres` selects
+  SQLite, which reads `DB_NAME` alone and ignores the other `DB_*` lines) and
+  `DB_NAME=/data/hc.sqlite`.
+  `/data` is the one directory in the image that its `hc` user can write to:
+  without `DB_NAME`, the database file would go under `/opt/healthchecks`, and the
+  migrations fail with "unable to open database file".
+* In `docker-compose.yml`, remove the `db` service and the `web` service's
+  `depends_on`, and mount a named volume at `/data`, so the database outlives the
+  container:
+
+```yaml
+volumes:
+  hc-data: {}
+
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - hc-data:/data
+```
+
+A new named volume takes its owner from the image's `/data`, so the `hc` user can
+write to it; a host directory mounted there instead must be writable by user ID 100.
+
 ## Reverse Proxy, TLS Termination, and CSRF Protection {: #tls-termination }
 
 If you plan to expose your Healthchecks instance to the public internet, make sure you
 put a TLS-terminating reverse proxy or a load balancer in front of it.
 
-**Important:** configure the reverse proxy to set the `X-Forwarded-For` request
-header. Healthchecks trusts it to determine the client's IP address. If the proxy
-does not set the `X-Forwarded-For` header, the clients can pass their own value and
-circumvent, among other things, the IP-based rate limiting in the login form.
+**Important:** configure the reverse proxy to replace the `X-Forwarded-For` request
+header with the client's address. Healthchecks trusts it to determine the client's
+IP address, and takes the first address in it, so appending to a value the client
+sent is not enough. In NGINX:
+
+```text
+proxy_set_header X-Forwarded-For $remote_addr;
+```
+
+(not `$proxy_add_x_forwarded_for`, which appends). In HAProxy:
+
+```text
+http-request set-header X-Forwarded-For %[src]
+```
+
+Otherwise a client can choose the IP address Healthchecks records for its pings,
+and can dodge the per-IP limit on login link requests from a new browser.
+Password attempts are limited per email address, not per IP address.
 
 **Important:** This Dockerfile uses uWSGI, which relies on the [X-Forwarded-Proto](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Forwarded-Proto)
 header to determine if a request is secure or not. Without this information you
@@ -128,13 +214,21 @@ volumes:
 Note: `/path/to/cert.pem` must be **an absolute path** in the host system pointing
 to the certificate.
 
-Then reload configuration and run `update-ca-certificates` inside the container
-as the root user:
+Then recreate the container with the certificate mounted, and run `update-ca-certificates`
+inside it as the root user:
 
 ```sh
-docker compose up
+docker compose up -d
 docker compose exec -u root web update-ca-certificates
 ```
+
+The updated trust store lives in the container, not in a volume, so run the
+`exec` command again after every recreate of the `web` container: after a change
+to `.env` or `docker-compose.yml`, an image update, or `docker compose down`.
+
+If the server's address is private (127.0.0.1, 192.168.x.x, ...), also set
+[INTEGRATIONS_ALLOW_PRIVATE_IPS](../self_hosted_configuration/#INTEGRATIONS_ALLOW_PRIVATE_IPS)
+to `True`; otherwise the request is refused before the certificate is checked.
 
 ## Upgrading Database
 
@@ -173,7 +267,7 @@ services:
       - db-data:/var/lib/postgresql
 ```
 
-* Start containers: `docker compose up`
+* Start containers: `docker compose up -d`
 * If the `db` container logs a warning that a database `has a collation version mismatch`,
   the database was created by a `postgres` image built on an older Debian release
   (such as bookworm). `pgautoupgrade` has already reindexed every database, so record
@@ -189,7 +283,11 @@ Pre-built Docker images are available
 [on the GitHub Container Registry](https://github.com/zhaow-de/healthchecks/pkgs/container/healthchecks)
 as `ghcr.io/zhaow-de/healthchecks`. They are published from the Dockerfile in the
 `/docker/` directory: every release as `vX.Y.Z`, every build of the `develop` and `main`
-branches as its commit sha, and the newest build of `main` as `latest`.
+branches as its full 40-character commit SHA, and the newest build of `main` as
+`latest`. The release and `latest` tags start with the first release after v4.5.0,
+which predates the image workflow; until then the registry holds only commit-SHA tags
+of `develop` builds, and the `latest` line commented out in `docker-compose.yml`
+cannot be pulled.
 
 The Docker images built from the Dockerfile in the `/docker/` directory:
 
@@ -209,4 +307,10 @@ replace the "build" section with:
 
 ```text
 image: ghcr.io/zhaow-de/healthchecks:vX.Y.Z
+```
+
+For a build of a commit, use its full commit SHA as the tag:
+
+```text
+image: ghcr.io/zhaow-de/healthchecks:<commit-sha>
 ```

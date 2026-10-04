@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import TYPE_CHECKING, Any, NoReturn
 
 from hc.lib import curl
@@ -8,15 +6,10 @@ if TYPE_CHECKING:
     from hc.api.models import Channel, Flip, Notification, Ping
 
 
-def get_ping_body_bytes(ping: Ping | None) -> bytes | None:
-    """Return ping body as bytes for a given Ping object."""
-    return ping.get_body_bytes() if ping else None
-
-
 def get_ping_body(ping: Ping | None, maxlen: int | None = None) -> str | None:
     """Return ping body for a given Ping object."""
     body = None
-    if body_bytes := get_ping_body_bytes(ping):
+    if ping and (body_bytes := ping.get_body_bytes()):
         body = body_bytes.decode(errors="replace")
         if maxlen and len(body) > maxlen:
             body = body[:maxlen] + "\n[truncated]"
@@ -26,12 +19,13 @@ def get_ping_body(ping: Ping | None, maxlen: int | None = None) -> str | None:
 
 class TransportError(Exception):
     def __init__(self, message: str, permanent: bool = False) -> None:
+        super().__init__(message)
         self.message = message
         self.permanent = permanent
 
 
 class Transport:
-    def __init__(self, channel: Channel):
+    def __init__(self, channel: Channel) -> None:
         self.channel = channel
 
     def notify(self, flip: Flip, notification: Notification) -> None:
@@ -98,7 +92,7 @@ class HttpTransport(Transport):
             if r.status_code not in (200, 201, 202, 204):
                 cls.raise_for_response(r)
         except curl.CurlError as e:
-            raise TransportError(e.message)
+            raise TransportError(e.message) from e
 
     @classmethod
     def request(
@@ -114,13 +108,14 @@ class HttpTransport(Transport):
         tries_left = 3 if retry else 1
         while True:
             try:
-                return cls._request(
+                cls._request(
                     method,
                     url,
                     data=data,
                     json=json,
                     headers=headers,
                 )
+                return
             except TransportError as e:
                 tries_left = 0 if e.permanent else tries_left - 1
                 # If we have no tries left then abort the retry loop by re-raising

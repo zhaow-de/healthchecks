@@ -1,8 +1,6 @@
 """merge-gate.py: the read line must be at the floor and name the head, with the exceptions the cases
 below drive, and every gh call it makes names this repository."""
 
-from __future__ import annotations
-
 import importlib.util
 import json
 import os
@@ -111,6 +109,22 @@ def _git(cwd: pathlib.Path, *args: str) -> str:
 CLOSED = "Refine-Round-Closed: 2026-09-23T00:00:00Z"
 
 
+def _feat_repo(root: pathlib.Path, *, notes: bool = False) -> None:
+    """A new repo whose develop, also origin/develop, holds code.py (and notes.txt "a", with `notes`), with branch feat
+    checked out one commit above it, "feat: code"."""
+    root.mkdir()
+    _git(root, "init", "-q", "-b", "develop")
+    (root / "code.py").write_text("x = 1\n")
+    if notes:
+        (root / "notes.txt").write_text("a\n")
+    _git(root, "add", "-A")
+    _git(root, "commit", "-q", "-m", "base")
+    _git(root, "update-ref", "refs/remotes/origin/develop", "HEAD")
+    _git(root, "checkout", "-q", "-b", "feat")
+    (root / "code.py").write_text("x = 2\n")
+    _git(root, "commit", "-q", "-am", "feat: code")
+
+
 def _rebased_repo(
     root: pathlib.Path,
     *,
@@ -126,16 +140,7 @@ def _rebased_repo(
     """A branch of two patches, the second a line in notes.txt, rebased onto — or, `merge_instead`, merged with — a base
     that moved in a file of its own, or with `collide` in notes.txt at the same place, resolved by hand; returns (the
     read's tip, the head). Each other flag varies the head."""
-    root.mkdir()
-    _git(root, "init", "-q", "-b", "develop")
-    (root / "code.py").write_text("x = 1\n")
-    (root / "notes.txt").write_text("a\n")
-    _git(root, "add", "-A")
-    _git(root, "commit", "-q", "-m", "base")
-    _git(root, "update-ref", "refs/remotes/origin/develop", "HEAD")
-    _git(root, "checkout", "-q", "-b", "feat")
-    (root / "code.py").write_text("x = 2\n")
-    _git(root, "commit", "-q", "-am", "feat: code")
+    _feat_repo(root, notes=True)
     (root / "notes.txt").write_text("a\nb\n")
     _git(root, "commit", "-q", "-am", "docs: note b")
     read = _git(root, "rev-parse", "HEAD")
@@ -186,15 +191,7 @@ def _unmoved_repo(root: pathlib.Path, extras: str, *, merge_above: bool = False)
     """The read on a base that has not moved, with `extras` above it in order (`e` a refine closing commit, `x` an
     empty commit that closes nothing); `merge_above` tops the head with a merge, which `git log --no-merges` drops
     from the message list, so only a tree check can refuse the file it adds."""
-    root.mkdir()
-    _git(root, "init", "-q", "-b", "develop")
-    (root / "code.py").write_text("x = 1\n")
-    _git(root, "add", "-A")
-    _git(root, "commit", "-q", "-m", "base")
-    _git(root, "update-ref", "refs/remotes/origin/develop", "HEAD")
-    _git(root, "checkout", "-q", "-b", "feat")
-    (root / "code.py").write_text("x = 2\n")
-    _git(root, "commit", "-q", "-am", "feat: code")
+    _feat_repo(root)
     read = _git(root, "rev-parse", "HEAD")
     for kind in extras:
         if kind == "e":
@@ -304,15 +301,7 @@ def test_the_arm_refuses_a_reworded_commit_and_names_what_it_could_not_compare(t
 
 def _amended_repo(root: pathlib.Path, kind: str) -> tuple[str, str]:
     """A branch of two patches on a base that did not move, its tip re-created as `kind` says; returns (the read's tip, the head)."""
-    root.mkdir()
-    _git(root, "init", "-q", "-b", "develop")
-    (root / "code.py").write_text("x = 1\n")
-    _git(root, "add", "-A")
-    _git(root, "commit", "-q", "-m", "base")
-    _git(root, "update-ref", "refs/remotes/origin/develop", "HEAD")
-    _git(root, "checkout", "-q", "-b", "feat")
-    (root / "code.py").write_text("x = 2\n")
-    _git(root, "commit", "-q", "-am", "feat: code")
+    _feat_repo(root)
     (root / "note.txt").write_text("n\n")
     _git(root, "add", "-A")
     _git(root, "commit", "-q", "-m", "feat: note\n\nProbe: SURVIVED")
@@ -447,7 +436,7 @@ def test_a_dependabot_bump_with_no_fix_commit_needs_no_read_line():
 
 def test_a_dependabot_pr_carrying_a_fix_commit_takes_every_arm():
     """The exemption is for a PR with NO fix commit; one commit of mine is what withdraws it."""
-    mine = BOT + [{"authors": [{"login": "claude"}]}]
+    mine = [*BOT, {"authors": [{"login": "claude"}]}]
     fails = _eval(_pr(**BUMP_PR, commits=mine))
     assert len(fails) == 1 and fails[0].startswith("no 'Read before push by:")
 
@@ -467,7 +456,7 @@ def test_a_dependabot_branch_with_an_empty_commit_list_is_not_exempt():
 def test_a_commit_with_no_author_entries_withdraws_the_dependabot_exemption():
     """Flattened, such a commit contributes nothing and vanishes; the exemption then survives a commit
     nothing is known about, which is not `every commit is the bot's`."""
-    fails = _eval(_pr(**BUMP_PR, commits=BOT + [{"authors": []}]))
+    fails = _eval(_pr(**BUMP_PR, commits=[*BOT, {"authors": []}]))
     assert len(fails) == 1 and fails[0].startswith("no 'Read before push by:")
 
 
@@ -672,8 +661,8 @@ def test_a_neutral_or_skipped_check_is_done_and_a_status_context_is_read_by_its_
     """A check run reports `conclusion`, a commit status (Coveralls posts one) reports `state`; both are read."""
     done = [{"conclusion": "SUCCESS"}, {"conclusion": "NEUTRAL"}, {"conclusion": "SKIPPED"}, {"state": "SUCCESS"}]
     assert _eval(_pr(statusCheckRollup=done)) == []
-    assert [f for f in _eval(_pr(statusCheckRollup=done + [{"state": "FAILURE"}])) if "failing" in f]
-    assert [f for f in _eval(_pr(statusCheckRollup=done + [{"state": "PENDING"}])) if "still running" in f]
+    assert [f for f in _eval(_pr(statusCheckRollup=[*done, {"state": "FAILURE"}])) if "failing" in f]
+    assert [f for f in _eval(_pr(statusCheckRollup=[*done, {"state": "PENDING"}])) if "still running" in f]
 
 
 @pytest.mark.parametrize("state", ["FAILURE", "ERROR", "PENDING", "EXPECTED", "SUCCESS"])

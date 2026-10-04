@@ -1,28 +1,40 @@
 hc.ready(function() {
-    var cm = hc.$("#checks-modal");
+    const cm = hc.$("#checks-modal");
 
+    // The URL of the form being loaded, so that a slower earlier load does not
+    // replace it
+    let loadingUrl = null;
     hc.on(".edit-checks", "click", function() {
-        var tip = bootstrap.Tooltip.getInstance(this);
+        const tip = bootstrap.Tooltip.getInstance(this);
         if (tip) tip.hide();
 
+        // Replace the previous integration's form at once: it carries that
+        // integration's code, and saving it would change that integration
+        const content = hc.$(".modal-content", cm);
+        content.innerHTML = "<div class='modal-body'>Loading&hellip;</div>";
         hc.showModal(cm);
-        hc.getText(this.dataset.url).then(function(html) {
-            hc.$(".modal-content", cm).innerHTML = html;
+
+        const url = this.dataset.url;
+        loadingUrl = url;
+        hc.getText(url).then(function(html) {
+            if (url === loadingUrl) content.innerHTML = html;
+        }).catch(function() {
+            if (url === loadingUrl) content.innerHTML = "<div class='modal-body'>Failed to load.</div>";
         });
 
         return false;
     });
 
     function updateNumAssigned() {
-        var boxes = hc.$$("input[type=checkbox]", cm);
-        var numAssigned = boxes.filter(function(box) { return box.checked; }).length;
-        var counter = hc.$("#num-assigned", cm);
+        const boxes = hc.$$("input[type=checkbox]", cm);
+        const numAssigned = boxes.filter(function(box) { return box.checked; }).length;
+        const counter = hc.$("#num-assigned", cm);
         if (counter) counter.textContent = numAssigned;
 
-        var selectAll = hc.$("#select-all", cm);
-        if (selectAll) selectAll.disabled = numAssigned == boxes.length;
-        var unselectAll = hc.$("#unselect-all", cm);
-        if (unselectAll) unselectAll.disabled = numAssigned == 0;
+        const selectAll = hc.$("#select-all", cm);
+        if (selectAll) selectAll.disabled = numAssigned === boxes.length;
+        const unselectAll = hc.$("#unselect-all", cm);
+        if (unselectAll) unselectAll.disabled = numAssigned === 0;
     }
 
     function setAll(checked) {
@@ -36,16 +48,16 @@ hc.ready(function() {
     hc.on(cm, "click", "#unselect-all", function() { setAll(false); });
     // When any checkbox changes its value, update the "(x of y)" in the title
     hc.on(cm, "change", "input", updateNumAssigned);
-    // Let the user to click anywhere in the row to toggle the checkbox
+    // Let the user click anywhere in the row to toggle the checkbox
     hc.on(cm, "click", "tr", function(event) {
         if (event.target.type !== "checkbox") {
-            var box = hc.$("input[type=checkbox]", this);
+            const box = hc.$("input[type=checkbox]", this);
             if (box) box.click();
         }
     });
 
     hc.on(".channel-remove", "click", function() {
-        var btn = this;
+        const btn = this;
         hc.$("#remove-channel-form").setAttribute("action", btn.dataset.url);
         hc.$$(".remove-channel-kind").forEach(function(el) {
             el.textContent = btn.dataset.kind;
@@ -56,7 +68,7 @@ hc.ready(function() {
     });
 
     hc.on(".channel-modal", "shown.bs.modal", function() {
-        var input = hc.$(".input-name", this);
+        const input = hc.$(".input-name", this);
         if (input) input.focus();
     });
 });

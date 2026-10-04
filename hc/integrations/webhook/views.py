@@ -1,10 +1,8 @@
-from __future__ import annotations
-
 import json
 from uuid import UUID
 
 from django.contrib.auth.decorators import login_required
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpResponse
 from django.shortcuts import redirect, render
 
 from hc.accounts.http import AuthenticatedHttpRequest
@@ -15,7 +13,7 @@ from hc.integrations.webhook import forms
 
 
 @require_setting("WEBHOOKS_ENABLED")
-def webhook_form(request: HttpRequest, channel: Channel) -> HttpResponse:
+def webhook_form(request: AuthenticatedHttpRequest, channel: Channel) -> HttpResponse:
     adding = channel._state.adding
     if request.method == "POST":
         form = forms.WebhookForm(request.POST)
@@ -33,7 +31,7 @@ def webhook_form(request: HttpRequest, channel: Channel) -> HttpResponse:
     else:
 
         def flatten(d: dict[str, str]) -> str:
-            return "\n".join("%s: %s" % pair for pair in d.items())
+            return "\n".join(f"{k}: {v}" for k, v in d.items())
 
         doc = json.loads(channel.value)
         doc["headers_down"] = flatten(doc["headers_down"])

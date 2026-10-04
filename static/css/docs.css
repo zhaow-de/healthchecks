@@ -10,7 +10,7 @@
 }
 
 .docs-nav li.nav-header {
-    color: var(--text-color);
+    color: var(--bs-body-color);
     font-weight: bold;
 }
 
@@ -23,14 +23,14 @@ li + li.nav-header {
 }
 
 h2.rule {
-    border-top: 3px solid var(--border-muted);
+    border-top: 3px solid var(--bs-secondary-bg);
     margin-top: 30px;
     padding-top: 30px;
 }
 
 .page-docs code {
     padding: 2px 4px;
-    background: var(--pre-bg);
+    background: var(--bs-tertiary-bg);
     border-radius: 4px;
 }
 
@@ -73,7 +73,7 @@ h2.rule {
 .docs-content img,
 .docs-content video {
     max-width: 66%;
-    border: 6px solid var(--border-color);
+    border: 6px solid var(--bs-border-color);
 }
 
 
@@ -91,14 +91,11 @@ h2.rule {
 }
 
 .docs-api th,
-.docs-http_api th {
-    display: none;
-}
-
+.docs-http_api th,
 .docs-api td,
 .docs-http_api td {
     padding: 8px;
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--bs-border-color);
 }
 
 /* Hide the TOC second column on small screens */
@@ -114,14 +111,8 @@ h2.rule {
     grid-template-columns: 180px auto;
 }
 
-.page-docs .docs-http_api dl {
-    grid-template-columns: 220px auto;
-}
-
 @media (max-width: 992px) {
-    .page-docs dl,
-    .page-docs .docs-http_api dl {
-        display: grid;
+    .page-docs dl {
         grid-template-columns: auto;
     }
 
@@ -141,7 +132,7 @@ h2.rule {
 }
 
 .page-docs dt, .page-docs dd {
-    border-top: 1px solid var(--border-color);
+    border-top: 1px solid var(--bs-border-color);
     padding: 8px 0;
     margin: 0;
     line-height: 1.8;

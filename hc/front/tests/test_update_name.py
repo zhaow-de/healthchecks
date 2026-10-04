@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from hc.api.models import Check
 from hc.test import BaseTestCase
 
@@ -22,6 +20,23 @@ class UpdateNameTestCase(BaseTestCase):
         self.assertEqual(self.check.name, "Alice Was Here")
         self.assertEqual(self.check.slug, "custom-slug")
         self.assertEqual(self.check.desc, "Hello")
+
+    def test_it_rejects_slug_the_ping_url_refuses(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        for slug in ("UpperCase", "a.b", "a b"):
+            r = self.client.post(self.url, data={"name": "Alice", "slug": slug})
+            self.assertEqual(r.status_code, 400, slug)
+
+        self.check.refresh_from_db()
+        self.assertEqual(self.check.slug, "")
+
+    def test_it_accepts_dashes_and_underscores_in_slug(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.post(self.url, data={"name": "Alice", "slug": "a-b_c-9"})
+        self.assertRedirects(r, self.redirect_url)
+
+        self.check.refresh_from_db()
+        self.assertEqual(self.check.slug, "a-b_c-9")
 
     def test_redirect_preserves_querystring(self) -> None:
         referer = self.redirect_url + "?tag=foo"

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from django.urls import include, path
 
 from hc.front import views
@@ -40,7 +38,6 @@ channel_urls = [
 
 # /projects/<code>/
 project_urls = [
-    path("badges/", views.badges, name="hc-badges"),
     path("checks/", views.checks, name="hc-checks"),
     path("checks/add/", views.add_check, name="hc-add-check"),
     path("checks/status/", views.status, name="hc-status"),

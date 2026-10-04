@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 from datetime import timedelta as td
 from unittest.mock import Mock, patch
@@ -40,6 +38,11 @@ class NotifySlackTestCase(BaseTestCase):
         self.flip.new_status = status
         self.flip.reason = "timeout"
 
+    def _fields(self, mock_post: Mock) -> dict[str, str]:
+        """Return the posted attachment's fields as a title-to-value dict."""
+        attachment = mock_post.call_args.kwargs["json"]["attachments"][0]
+        return {f["title"]: f["value"] for f in attachment["fields"]}
+
     @override_settings(SITE_ROOT="http://testserver")
     @patch("hc.api.transports.curl.request", autospec=True)
     def test_it_works(self, mock_post: Mock) -> None:
@@ -60,7 +63,7 @@ class NotifySlackTestCase(BaseTestCase):
         )
         self.assertEqual(attachment["fallback"], """The check "Foobar" is DOWN.""")
 
-        fields = {f["title"]: f["value"] for f in attachment["fields"]}
+        fields = self._fields(mock_post)
         self.assertEqual(fields["Last Ping"], "Success, 10 minutes ago")
         self.assertEqual(fields["Total Pings"], "112233")
         self.assertNotIn("Last Ping Body", fields)
@@ -146,9 +149,7 @@ class NotifySlackTestCase(BaseTestCase):
         mock_post.return_value.status_code = 200
 
         self.channel.notify(self.flip)
-        payload = mock_post.call_args.kwargs["json"]
-        attachment = payload["attachments"][0]
-        fields = {f["title"]: f["value"] for f in attachment["fields"]}
+        fields = self._fields(mock_post)
         self.assertEqual(fields["Schedule"], "\u034f* \u034f* \u034f* \u034f* \u034f*")
         self.assertEqual(fields["Time Zone"], "Europe/Riga")
 
@@ -162,9 +163,7 @@ class NotifySlackTestCase(BaseTestCase):
         mock_post.return_value.status_code = 200
 
         self.channel.notify(self.flip)
-        payload = mock_post.call_args.kwargs["json"]
-        attachment = payload["attachments"][0]
-        fields = {f["title"]: f["value"] for f in attachment["fields"]}
+        fields = self._fields(mock_post)
         self.assertEqual(fields["Schedule"], "Mon 2-29")
         self.assertEqual(fields["Time Zone"], "Europe/Riga")
 
@@ -238,8 +237,7 @@ class NotifySlackTestCase(BaseTestCase):
         self.channel.notify(self.flip)
         assert Notification.objects.count() == 1
 
-        attachment = mock_post.call_args.kwargs["json"]["attachments"][0]
-        fields = {f["title"]: f["value"] for f in attachment["fields"]}
+        fields = self._fields(mock_post)
         self.assertEqual(fields["Last Ping"], "Failure, 10 minutes ago")
 
     @override_settings(SITE_ROOT="http://testserver")
@@ -253,8 +251,7 @@ class NotifySlackTestCase(BaseTestCase):
         self.ping.save()
 
         self.channel.notify(self.flip)
-        attachment = mock_post.call_args.kwargs["json"]["attachments"][0]
-        fields = {f["title"]: f["value"] for f in attachment["fields"]}
+        fields = self._fields(mock_post)
         self.assertEqual(fields["Last Ping"], "Exit status 123, 10 minutes ago")
 
     @override_settings(SITE_ROOT="http://testserver")
@@ -268,8 +265,7 @@ class NotifySlackTestCase(BaseTestCase):
 
         self.channel.notify(self.flip)
 
-        attachment = mock_post.call_args.kwargs["json"]["attachments"][0]
-        fields = {f["title"]: f["value"] for f in attachment["fields"]}
+        fields = self._fields(mock_post)
         self.assertEqual(fields["Last Ping"], "Log, 10 minutes ago")
 
     @override_settings(SITE_ROOT="http://testserver")
@@ -285,8 +281,7 @@ class NotifySlackTestCase(BaseTestCase):
         self.channel.notify(self.flip)
         assert Notification.objects.count() == 1
 
-        attachment = mock_post.call_args.kwargs["json"]["attachments"][0]
-        fields = {f["title"]: f["value"] for f in attachment["fields"]}
+        fields = self._fields(mock_post)
         self.assertEqual(fields["Last Ping"], "Ignored, 10 minutes ago")
 
     @override_settings(SITE_ROOT="http://testserver")
@@ -301,8 +296,7 @@ class NotifySlackTestCase(BaseTestCase):
         self.channel.notify(self.flip)
         assert Notification.objects.count() == 1
 
-        attachment = mock_post.call_args.kwargs["json"]["attachments"][0]
-        fields = {f["title"]: f["value"] for f in attachment["fields"]}
+        fields = self._fields(mock_post)
         self.assertEqual(fields["Last Ping Body"], "```\nHello World\n```")
 
     @override_settings(SITE_ROOT="http://testserver")
@@ -317,8 +311,7 @@ class NotifySlackTestCase(BaseTestCase):
         self.channel.notify(self.flip)
         assert Notification.objects.count() == 1
 
-        attachment = mock_post.call_args.kwargs["json"]["attachments"][0]
-        fields = {f["title"]: f["value"] for f in attachment["fields"]}
+        fields = self._fields(mock_post)
         self.assertIn("[truncated]", fields["Last Ping Body"])
 
     @override_settings(SITE_ROOT="http://testserver")
@@ -333,8 +326,7 @@ class NotifySlackTestCase(BaseTestCase):
         self.channel.notify(self.flip)
         assert Notification.objects.count() == 1
 
-        attachment = mock_post.call_args.kwargs["json"]["attachments"][0]
-        fields = {f["title"]: f["value"] for f in attachment["fields"]}
+        fields = self._fields(mock_post)
         self.assertNotIn("Last Ping Body", fields)
 
     @patch("hc.api.transports.curl.request", autospec=True)
@@ -363,8 +355,7 @@ class NotifySlackTestCase(BaseTestCase):
 
         self.channel.notify(self.flip)
 
-        attachment = mock_post.call_args.kwargs["json"]["attachments"][0]
-        fields = {f["title"]: f["value"] for f in attachment["fields"]}
+        fields = self._fields(mock_post)
         self.assertEqual(fields["Total Pings"], "0")
         self.assertEqual(fields["Last Ping"], "Never")
         self.assertNotIn("Last Ping Body", fields)

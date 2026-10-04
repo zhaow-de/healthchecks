@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from unittest.mock import patch
 
 from django.contrib.auth.hashers import get_hasher

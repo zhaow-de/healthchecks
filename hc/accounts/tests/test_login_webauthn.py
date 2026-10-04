@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import time
 from unittest.mock import Mock, patch
 from urllib.parse import quote_plus
@@ -89,7 +87,7 @@ class LoginWebAuthnTestCase(BaseTestCase):
         self.assertEqual(payload["u"], self.alice.id)
 
         self.assertNotIn("state", self.client.session)
-        self.assertNotIn("2fa_user_id", self.client.session)
+        self.assertNotIn("2fa_user", self.client.session)
 
     @patch("hc.accounts.views.GetHelper.verify")
     def test_it_redirects_after_login(self, mock_verify: Mock) -> None:
@@ -110,6 +108,13 @@ class LoginWebAuthnTestCase(BaseTestCase):
 
         r = self.client.get(self.url)
         self.assertEqual(r.status_code, 400)
+
+    @patch("hc.accounts.views.GetHelper.verify")
+    def test_it_rejects_post_without_state(self, mock_verify: Mock) -> None:
+        r = self.client.post(self.url, {"response": "dummy response"})
+        self.assertEqual(r.status_code, 400)
+        self.assertFalse(mock_verify.called)
+        self.assertNotIn("_auth_user_id", self.client.session)
 
     @patch("hc.accounts.views.GetHelper.verify")
     def test_it_rejects_missing_response(self, mock_verify: Mock) -> None:

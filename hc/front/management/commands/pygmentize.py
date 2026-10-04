@@ -1,7 +1,6 @@
-from __future__ import annotations
-
 from typing import Any
 
+from django.conf import settings
 from django.core.management.base import BaseCommand
 
 try:
@@ -15,12 +14,11 @@ except ImportError:
 
 
 def _process(name: str, lexer: Lexer) -> None:
-    with open(f"templates/front/snippets/{name}.txt") as f:
-        source = f.read()
+    snippets = settings.BASE_DIR / "templates/front/snippets"
+    source = (snippets / f"{name}.txt").read_text(encoding="utf-8")
     processed = highlight(source, lexer, HtmlFormatter())
     processed = processed.replace("PING_URL", "{{ ping_url }}")
-    with open(f"templates/front/snippets/{name}.html", "w") as out:
-        out.write(processed)
+    (snippets / f"{name}.html").write_text(processed, encoding="utf-8")
 
 
 class Command(BaseCommand):
@@ -37,12 +35,7 @@ class Command(BaseCommand):
         _process("bash_curl", lexers.BashLexer())
         _process("bash_wget", lexers.BashLexer())
         _process("browser", lexers.JavascriptLexer())
-        _process("cs", lexers.CSharpLexer())
         _process("node", lexers.JavascriptLexer())
         _process("go", lexers.GoLexer())
         _process("python_urllib2", lexers.PythonLexer())
         _process("python_requests", lexers.PythonLexer())
-        _process("php", lexers.PhpLexer(startinline=True))
-        _process("powershell", lexers.shell.PowerShellLexer())
-        _process("powershell_inline", lexers.shell.BashLexer())
-        _process("ruby", lexers.RubyLexer())

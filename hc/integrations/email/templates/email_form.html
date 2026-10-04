@@ -21,6 +21,9 @@ Email Settings - {{ site_name }}
         <strong>Requires confirmation.</strong>
         After entering an email address, {{ site_name }} will send out a confirmation link.
         Only confirmed addresses receive notifications.
+        {% if not can_send_email %}
+        This server cannot send email, so only your account's own address can be added.
+        {% endif %}
     </p>
     {% endif %}
 

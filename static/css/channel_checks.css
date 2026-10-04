@@ -20,6 +20,6 @@
 }
 
 .channel-checks-table .unnamed {
-    color: #999;
+    color: var(--bs-tertiary-color);
     font-style: italic;
 }

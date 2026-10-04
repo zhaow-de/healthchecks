@@ -1,11 +1,10 @@
-from __future__ import annotations
-
 import logging
-from smtplib import SMTPDataError, SMTPServerDisconnected
+
+from django.conf import settings
 
 from hc.accounts.models import Profile
 from hc.api.models import Flip, Notification
-from hc.api.transports import Transport, TransportError, get_ping_body_bytes
+from hc.api.transports import Transport, TransportError, get_ping_body
 from hc.lib import emails
 from hc.lib.signing import sign_bounce_id
 
@@ -14,6 +13,11 @@ logger = logging.getLogger(__name__)
 
 class Email(Transport):
     def notify(self, flip: Flip, notification: Notification) -> None:
+        # Not permanent: a permanent error disables the channel, which would stay
+        # disabled after SMTP is configured
+        if not settings.MAILERS:
+            raise TransportError("No SMTP configuration")
+
         if not self.channel.email_verified:
             raise TransportError("Email not verified")
 
@@ -37,13 +41,11 @@ class Email(Transport):
             projects = None
 
         ping = self.last_ping(flip)
-        body_bytes = get_ping_body_bytes(ping)
-
         ctx = {
             "flip": flip,
             "check": flip.owner,
             "ping": ping,
-            "body": body_bytes.decode(errors="replace") if body_bytes else None,
+            "body": get_ping_body(ping),
             "projects": projects,
             "unsub_link": unsub_link,
             "tz": profile.tz,
@@ -51,12 +53,12 @@ class Email(Transport):
 
         try:
             emails.alert(self.channel.email.value, ctx, headers)
-        except SMTPServerDisconnected, SMTPDataError, ConnectionRefusedError:
+        except OSError as e:
+            # OSError covers SMTPException, socket timeouts and ssl errors
             logger.exception("Exception while sending email")
-            raise TransportError("SMTP connection error")
+            raise TransportError(f"SMTP error: {type(e).__name__}") from e
 
     def is_noop(self, status: str) -> bool:
         if status == "down":
             return not self.channel.email.notify_down
-        else:
-            return not self.channel.email.notify_up
+        return not self.channel.email.notify_up
