@@ -132,7 +132,7 @@ def _get_check_for_user(request: AuthenticatedHttpRequest, code: UUID, preload_o
 
 @contextmanager
 def _404_if_deleted() -> Iterator[None]:
-    """Answer 404 when the check or channel was deleted after the view read it."""
+    """Answer 404 when the object was deleted after the view read it."""
     try:
         yield
     except ObjectDoesNotExist, ObjectNotUpdated:
@@ -203,7 +203,8 @@ def checks(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
 
     if request.GET.get("urls") in ("uuid", "slug"):
         project.show_slugs = request.GET["urls"] == "slug"
-        project.save(update_fields=["show_slugs"])
+        with _404_if_deleted():
+            project.save(update_fields=["show_slugs"])
 
     if request.session.get("last_project_id") != project.id:
         request.session["last_project_id"] = project.id
@@ -876,7 +877,8 @@ def details(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
 
     if request.GET.get("urls") in ("uuid", "slug"):
         check.project.show_slugs = request.GET["urls"] == "slug"
-        check.project.save(update_fields=["show_slugs"])
+        with _404_if_deleted():
+            check.project.save(update_fields=["show_slugs"])
 
     all_channels = check.project.channel_set.order_by("created")
     regular_channels: list[Channel] = []
@@ -929,10 +931,12 @@ def transfer(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
             return HttpResponseBadRequest()
 
         target_project = _get_project_for_user(request, form.cleaned_data["project"])
-        check.project = target_project
-        with _404_if_deleted():
+        with _404_if_deleted(), transaction.atomic():
+            check.lock()
+            Project.objects.select_for_update().get(id=target_project.id)
+            check.project = target_project
             check.save(update_fields=("project",))
-        check.assign_all_channels()
+            check.assign_all_channels()
 
         messages.success(request, "Check transferred successfully!")
         return redirect("hc-details", code)
@@ -974,9 +978,11 @@ def copy(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
     copied.kind = check.kind
     copied.timeout, copied.grace = check.timeout, check.grace
     copied.schedule, copied.tz = check.schedule, check.tz
-    copied.save()
-
-    copied.channel_set.add(*check.channel_set.all())
+    with _404_if_deleted(), transaction.atomic():
+        check.lock()
+        copied.save()
+        # Locked, so no channel is deleted between this read and the link rows' commit
+        copied.channel_set.add(*check.channel_set.select_for_update(of=("self",)))
 
     url = reverse("hc-details", args=[copied.code], query={"copied": 1})
     return redirect(url)
@@ -1034,7 +1040,14 @@ def channels(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
                     return HttpResponseForbidden()
                 new_checks.append(check)
 
-        channel.checks.set(new_checks)
+        with _404_if_deleted(), transaction.atomic():
+            Channel.objects.select_for_update().get(id=channel.id)
+            ids = {check.id for check in new_checks}
+            locked = Check.objects.select_for_update().filter(id__in=ids).values_list("id", flat=True)
+            if set(locked) != ids:
+                raise Http404("not found")
+            channel.checks.set(new_checks)
+
         return redirect("hc-channels", project.code)
 
     channels = project.channel_set.annotate(n_checks=Count("checks"))

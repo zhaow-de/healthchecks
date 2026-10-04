@@ -95,3 +95,17 @@ class TransferTestCase(BaseTestCase):
         with patch("hc.front.views._get_check_for_user", get_and_delete):
             r = self.client.post(self.url, {"project": self.project.code})
         self.assertEqual(r.status_code, 404)
+
+    def test_it_handles_a_target_project_deleted_after_it_was_read(self) -> None:
+        def get_and_delete(*args: Any, **kwargs: Any) -> Project:
+            project = Project.objects.get(id=self.project.id)
+            Project.objects.filter(id=self.project.id).delete()
+            return project
+
+        self.client.login(username="alice@example.org", password="password")
+        with patch("hc.front.views._get_project_for_user", get_and_delete):
+            r = self.client.post(self.url, {"project": self.project.code})
+        self.assertEqual(r.status_code, 404)
+
+        self.check.refresh_from_db()
+        self.assertEqual(self.check.project, self.other)

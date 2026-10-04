@@ -1,6 +1,9 @@
 from datetime import timedelta as td
+from typing import Any
+from unittest.mock import patch
 
-from hc.api.models import Check
+from hc.accounts.models import Project
+from hc.api.models import Channel, Check
 from hc.test import BaseTestCase
 
 
@@ -54,6 +57,16 @@ class CopyCheckTestCase(BaseTestCase):
         self.assertEqual(copy.methods, "POST")
         self.assertTrue(copy.manual_resume)
 
+    def test_it_copies_channels(self) -> None:
+        channel = Channel.objects.create(project=self.project, kind="email")
+        self.check.channel_set.add(channel)
+
+        self.client.login(username="alice@example.org", password="password")
+        self.client.post(self.copy_url)
+
+        copy = Check.objects.get(name="Foo (copy)")
+        self.assertEqual(copy.channel_set.get(), channel)
+
     def test_it_has_no_check_limit(self) -> None:
         Check.objects.bulk_create([Check(project=self.project) for _ in range(25)])
 
@@ -97,3 +110,15 @@ class CopyCheckTestCase(BaseTestCase):
 
         copy = Check.objects.get(name="Foo (copy)")
         self.assertEqual(copy.slug, "")
+
+    def test_it_handles_a_project_deleted_after_it_was_read(self) -> None:
+        def get_and_delete(*args: Any, **kwargs: Any) -> Check:
+            check = Check.objects.select_related("project").get(id=self.check.id)
+            Project.objects.filter(id=self.project.id).delete()
+            return check
+
+        self.client.login(username="alice@example.org", password="password")
+        with patch("hc.front.views._get_check_for_user", get_and_delete):
+            r = self.client.post(self.copy_url)
+        self.assertEqual(r.status_code, 404)
+        self.assertFalse(Check.objects.exists())

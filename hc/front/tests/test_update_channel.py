@@ -1,5 +1,8 @@
+from unittest.mock import patch
+
 from hc.accounts.models import Project
 from hc.api.models import Channel, Check
+from hc.lib.string import is_valid_uuid_string
 from hc.test import BaseTestCase
 
 
@@ -80,3 +83,37 @@ class UpdateChannelTestCase(BaseTestCase):
         self.client.login(username="alice@example.org", password="password")
         r = self.client.post(self.channels_url, data=payload)
         self.assertEqual(r.status_code, 400)
+
+    def test_it_handles_a_channel_deleted_after_it_was_read(self) -> None:
+        # The view validates the check codes after it read the channel
+        def validate_and_delete(s: str) -> bool:
+            if s == str(self.check.code):
+                Channel.objects.filter(id=self.channel.id).delete()
+            return is_valid_uuid_string(s)
+
+        payload = {"channel": self.channel.code, f"check-{self.check.code}": True}
+        self.client.login(username="alice@example.org", password="password")
+        with patch("hc.front.views.is_valid_uuid_string", validate_and_delete):
+            r = self.client.post(self.channels_url, data=payload)
+        self.assertEqual(r.status_code, 404)
+        self.assertFalse(Channel.checks.through.objects.exists())
+
+    def test_it_handles_a_check_deleted_after_it_was_read(self) -> None:
+        other = Check.objects.create(project=self.project)
+
+        # The view validates each check code after it read the previous check
+        def validate_and_delete(s: str) -> bool:
+            if s == str(other.code):
+                Check.objects.filter(id=self.check.id).delete()
+            return is_valid_uuid_string(s)
+
+        payload = {
+            "channel": self.channel.code,
+            f"check-{self.check.code}": True,
+            f"check-{other.code}": True,
+        }
+        self.client.login(username="alice@example.org", password="password")
+        with patch("hc.front.views.is_valid_uuid_string", validate_and_delete):
+            r = self.client.post(self.channels_url, data=payload)
+        self.assertEqual(r.status_code, 404)
+        self.assertFalse(Channel.checks.through.objects.exists())

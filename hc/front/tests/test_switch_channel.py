@@ -1,6 +1,8 @@
 from typing import Any
 from unittest.mock import patch
 
+from django.shortcuts import get_object_or_404
+
 from hc.accounts.models import Project
 from hc.api.models import Channel, Check
 from hc.test import BaseTestCase
@@ -58,3 +60,16 @@ class SwitchChannelTestCase(BaseTestCase):
             r = self.client.post(self.url, {"state": "on"})
         self.assertEqual(r.status_code, 404)
         self.assertFalse(self.channel.checks.exists())
+
+    def test_it_handles_a_channel_deleted_after_it_was_read(self) -> None:
+        def get_and_delete(*args: Any, **kwargs: Any) -> Any:
+            obj = get_object_or_404(*args, **kwargs)
+            if isinstance(obj, Channel):
+                Channel.objects.filter(id=obj.id).delete()
+            return obj
+
+        self.client.login(username="alice@example.org", password="password")
+        with patch("hc.front.views.get_object_or_404", get_and_delete):
+            r = self.client.post(self.url, {"state": "on"})
+        self.assertEqual(r.status_code, 404)
+        self.assertFalse(Channel.checks.through.objects.exists())
