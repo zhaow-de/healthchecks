@@ -120,8 +120,17 @@ class TokenBucketTestCase(BaseTestCase):
         values = self.auth_ip_values("::ffff:192.0.2.1", "::ffff:192.0.2.2")
         self.assertEqual(values, ["auth-ip-192.0.2.1", "auth-ip-192.0.2.2"])
 
-    def test_it_keys_an_unparseable_address_as_given(self) -> None:
-        self.assertEqual(self.auth_ip_values("not-an-ip"), ["auth-ip-not-an-ip"])
+    def test_it_keys_every_unknown_address_alike(self) -> None:
+        self.assertEqual(self.auth_ip_values("not-an-ip", "", "x" * 100), ["auth-ip-unknown"])
+        self.assertAlmostEqual(TokenBucket.objects.get().tokens, 0.85, places=4)
+
+    def test_it_keys_a_forwarded_ipv6_client_by_its_64_network(self) -> None:
+        # Behind Caddy: one X-Forwarded-For entry, the client's, and REMOTE_ADDR the bridge gateway
+        for addr in ("2001:db8:1:2::1", "2001:db8:1:2::2"):
+            request = RequestFactory().get("/", REMOTE_ADDR="172.17.0.1", HTTP_X_FORWARDED_FOR=addr)
+            self.assertTrue(TokenBucket.authorize_auth_ip(request))
+
+        self.assertEqual(list(TokenBucket.objects.values_list("value", flat=True)), ["auth-ip-2001:db8:1:2::/64"])
 
     def test_str_shows_the_value(self) -> None:
         self.assertEqual(str(TokenBucket(value="em-" + ALICE_HASH)), "em-" + ALICE_HASH)

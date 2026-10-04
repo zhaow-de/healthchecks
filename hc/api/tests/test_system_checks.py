@@ -34,6 +34,16 @@ class SystemChecksCase(BaseTestCase):
         ids = [item.id for item in settings_check(None, None)]
         self.assertEqual(ids, ["hc.api.E003"])
 
+    def test_it_checks_trusted_proxy_hops(self) -> None:
+        for value in (-1, None):
+            with self.subTest(value=value), override_settings(TRUSTED_PROXY_HOPS=value):
+                ids = [item.id for item in settings_check(None, None)]
+                self.assertEqual(ids, ["hc.api.E005"])
+
+        for value in (0, 1, 2):
+            with self.subTest(value=value), override_settings(TRUSTED_PROXY_HOPS=value):
+                self.assertEqual(settings_check(None, None), [])
+
     @override_settings(DEBUG=False)
     def test_it_refuses_a_weak_secret_key(self) -> None:
         for key in ("---", STRONG_KEY[:-1], "abcd" * 20, "django-insecure-" + STRONG_KEY):

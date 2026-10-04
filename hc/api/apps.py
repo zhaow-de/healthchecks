@@ -42,7 +42,7 @@ class ApiConfig(AppConfig):
         connection_created.connect(set_up_sqlite_file, dispatch_uid="hc.api.sqlite_file")
 
 
-@checks.register()  # W001, W002, W005, E002, E003
+@checks.register()  # W001, W002, W005, E002, E003, E005
 def settings_check(
     app_configs: Sequence[AppConfig] | None,
     databases: Sequence[str] | None,
@@ -86,6 +86,16 @@ def settings_check(
                 "settings.SECURE_PROXY_SSL_HEADER is not 2-element tuple",
                 hint="See https://zcrypto-hc.zhaow.me/docs/self_hosted_configuration/#SECURE_PROXY_SSL_HEADER",
                 id="hc.api.W005",
+            )
+        )
+
+    hops = settings.TRUSTED_PROXY_HOPS
+    if not isinstance(hops, int) or hops < 0:
+        items.append(
+            checks.Error(
+                "settings.TRUSTED_PROXY_HOPS is not a whole number of 0 or more",
+                hint="Set it to the number of reverse proxies in front of Healthchecks: 0 for none, 1 for one",
+                id="hc.api.E005",
             )
         )
 

@@ -1,4 +1,8 @@
+from unittest import skipUnless
+
+from django.db import connection
 from django.test import Client
+from django.test.utils import CaptureQueriesContext
 
 from hc.api.models import Check, Ping
 from hc.test import BaseTestCase
@@ -68,6 +72,25 @@ class PingBySlugTestCase(BaseTestCase):
         ping = Ping.objects.get()
         self.assertEqual(ping.kind, "fail")
         self.assertEqual(ping.exitstatus, 123)
+
+    def test_it_answers_a_preflight_and_records_nothing(self) -> None:
+        for url in (self.url, self.url + "/fail", "/ping/rrrrrrrrrrrrrrrrrrrrrr/foo", f"/ping/{self.project.ping_key}/FOO"):
+            with self.subTest(url=url), self.assertNumQueries(0):
+                r = self.client.options(url, HTTP_ACCESS_CONTROL_REQUEST_METHOD="POST")
+                self.assertEqual(r.status_code, 204)
+                self.assertEqual(r.headers["Access-Control-Allow-Origin"], "*")
+                self.assertIn("no-cache", r.headers["Cache-Control"])
+
+        self.assertFalse(Ping.objects.exists())
+
+    @skipUnless(connection.features.has_select_for_update_of, "no row locks")
+    def test_it_locks_the_check_and_not_its_project(self) -> None:
+        with CaptureQueriesContext(connection) as ctx:
+            r = self.client.get(self.url)
+        self.assertEqual(r.status_code, 200)
+
+        (select,) = [q["sql"] for q in ctx.captured_queries if q["sql"].startswith("SELECT")]
+        self.assertTrue(select.endswith(' FOR UPDATE OF "api_check"'), select)
 
     def test_it_handles_duplicates(self) -> None:
         # Another check with the same slug:

@@ -1,5 +1,6 @@
 from datetime import timedelta as td
 
+from django.db.models import Q
 from django.utils.timezone import now
 
 from hc.api.models import Check, Ping
@@ -103,8 +104,8 @@ class PingDetailsTestCase(BaseTestCase):
 
     def test_it_accepts_n(self) -> None:
         # remote_addr, scheme, method, ua, body, action, rid:
-        self.check.ping("1.2.3.4", "http", "post", "tester", b"foo-123", "success", None)
-        self.check.ping("1.2.3.4", "http", "post", "tester", b"bar-456", "success", None)
+        Check.ping(Q(id=self.check.id), "1.2.3.4", "http", "post", "tester", b"foo-123", "success", None)
+        Check.ping(Q(id=self.check.id), "1.2.3.4", "http", "post", "tester", b"bar-456", "success", None)
 
         self.client.login(username="alice@example.org", password="password")
 

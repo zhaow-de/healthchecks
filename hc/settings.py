@@ -76,6 +76,9 @@ if admins := os.getenv("ADMINS"):
 if v := os.getenv("SECURE_PROXY_SSL_HEADER"):
     SECURE_PROXY_SSL_HEADER = tuple(v.split(",", maxsplit=1))
 
+# How many reverse proxies in front of the app write X-Forwarded-For: see hc.lib.ip.client_ip
+TRUSTED_PROXY_HOPS = envint("TRUSTED_PROXY_HOPS", "1")
+
 
 with (BASE_DIR / "pyproject.toml").open("rb") as f:
     VERSION = f"v{tomllib.load(f)['project']['version']}"

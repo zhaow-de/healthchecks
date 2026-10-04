@@ -3,8 +3,9 @@ from datetime import timedelta as td
 from unittest.mock import patch
 
 import time_machine
-from django.db import IntegrityError
-from django.db.models import QuerySet
+from django.db import IntegrityError, connection
+from django.db.models import Q, QuerySet
+from django.test.utils import CaptureQueriesContext
 from django.utils.timezone import now
 
 from hc.api.models import MAX_DURATION, Channel, Check, Flip, Notification, Ping
@@ -429,6 +430,17 @@ class CheckModelTestCase(BaseTestCase):
         self.assertEqual(check.prune(), (0, 0, 0))
         self.assertEqual(Notification.objects.count(), 1)
 
+    def test_prune_reads_only_the_oldest_pings_date(self) -> None:
+        check = Check.objects.create(project=self.project, n_pings=1)
+        Ping.objects.create(owner=check, n=1, body_raw=b"x" * 1000)
+
+        with CaptureQueriesContext(connection) as ctx:
+            check.prune()
+
+        (select,) = [q["sql"] for q in ctx.captured_queries if q["sql"].startswith("SELECT") and 'FROM "api_ping"' in q["sql"]]
+        self.assertNotIn("body_raw", select)
+        self.assertIn('"api_ping"."created"', select)
+
     @time_machine.travel(CURRENT_TIME)
     def test_it_keeps_flips_and_notifications_when_no_ping_is_retained(self) -> None:
         check = Check.objects.create(project=self.project, n_pings=101)
@@ -532,7 +544,7 @@ class CheckModelTestCase(BaseTestCase):
         Ping.objects.create(owner=check, n=1, created=CURRENT_TIME)
         Ping.objects.create(owner=check, n=95, created=CURRENT_TIME)
 
-        check.ping("1.2.3.4", "http", "get", "", b"", "success", None)
+        Check.ping(Q(id=check.id), "1.2.3.4", "http", "get", "", b"", "success", None)
 
         # Ping #100 triggers pruning: with the limit of 10, only n > 90 is kept
         self.assertEqual(sorted(check.ping_set.values_list("n", flat=True)), [95, 100])
@@ -544,7 +556,7 @@ class CheckModelTestCase(BaseTestCase):
         check = Check.objects.create(project=self.project, n_pings=98)
         Ping.objects.create(owner=check, n=1, created=CURRENT_TIME)
 
-        check.ping("1.2.3.4", "http", "get", "", b"", "success", None)
+        Check.ping(Q(id=check.id), "1.2.3.4", "http", "get", "", b"", "success", None)
 
         self.assertEqual(sorted(check.ping_set.values_list("n", flat=True)), [1, 99])
 

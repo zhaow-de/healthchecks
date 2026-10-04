@@ -18,7 +18,7 @@ from django.contrib.auth.models import User
 from django.contrib.humanize.templatetags.humanize import naturaltime
 from django.core.signing import TimestampSigner
 from django.db import IntegrityError, models, transaction
-from django.db.models import F, QuerySet
+from django.db.models import F, Q, QuerySet
 from django.http import HttpRequest
 from django.urls import reverse
 from django.utils.module_loading import import_string
@@ -31,6 +31,7 @@ from hc.api import transports
 from hc.lib import emails
 from hc.lib.date import month_boundaries, seconds_in_month
 from hc.lib.ip import client_ip
+from hc.lib.string import match_keywords
 from hc.lib.urls import absolute_reverse
 
 logger = logging.getLogger(__name__)
@@ -415,9 +416,33 @@ class Check(models.Model):
 
         return result
 
+    def ping_action(self, action: str, method: str, body: bytes) -> str:
+        """Return what a ping with this action, HTTP method and body is to this check."""
+        if self.status == "paused" and self.manual_resume:
+            return "ign"
+
+        if self.methods == "POST" and method != "POST":
+            return "ign"
+
+        if action != "ign" and self.filter_http_body:
+            # Undecodable bytes, a multibyte character cut by PING_BODY_LIMIT included,
+            # become U+FFFD, so the rest of the body is still matched
+            body_text = body.decode(errors="replace")
+            if self.failure_kw and match_keywords(body_text, self.failure_kw):
+                return "fail"
+            if self.success_kw and match_keywords(body_text, self.success_kw):
+                return "success"
+            if self.start_kw and match_keywords(body_text, self.start_kw):
+                return "start"
+            return "fail" if self.filter_default_fail else "ign"
+
+        return action
+
+    @classmethod
     def ping(
-        self,
-        remote_addr: str,
+        cls,
+        lookup: Q,
+        remote_addr: str | None,
         scheme: str,
         method: str,
         ua: str,
@@ -425,59 +450,71 @@ class Check(models.Model):
         action: str,
         rid: uuid.UUID | None,
         exitstatus: int | None = None,
-    ) -> None:
-        # The following block updates a Check object, then creates a Ping object.
-        # There's a possible race condition where the "sendalerts" command sees
-        # the updated Check object before the Ping object is created.
-        # To avoid this, put both operations inside a transaction:
-        with transaction.atomic():
-            # Lock the check's row, so concurrent pings to the same check apply
-            # one after another, each to the state the previous one left
-            self = Check.objects.select_for_update().get(id=self.id)
-            frozen_now = now()
+    ) -> Self:
+        """Record a ping to the one check `lookup` matches, and return that check.
 
-            if self.status == "paused" and self.manual_resume:
-                action = "ign"
+        Raises Check.DoesNotExist or Check.MultipleObjectsReturned, and then records nothing.
+        """
+        # The check is read once, under its row lock (PostgreSQL) or the IMMEDIATE
+        # transaction's write lock (SQLite): concurrent pings to it apply one after
+        # another, each to the state the previous one left, and "sendalerts" cannot see
+        # the updated check before its Ping row exists
+        with transaction.atomic():
+            check = cls.objects.select_for_update(of=("self",)).get(lookup)
+            frozen_now = now()
+            action = check.ping_action(action, method, body)
 
             if action == "start":
-                self.last_start = frozen_now
-                self.last_start_rid = rid
+                check.last_start = frozen_now
+                check.last_start_rid = rid
                 # Don't update "last_ping" field.
             elif action in ("success", "fail"):
-                self.last_ping = frozen_now
-                self.last_duration = None
-                if self.last_start:
-                    if self.last_start_rid == rid:
+                check.last_ping = frozen_now
+                check.last_duration = None
+                if check.last_start:
+                    if check.last_start_rid == rid:
                         # rid matches: calculate last_duration, clear last_start
-                        self.last_duration = self.last_ping - self.last_start
-                        self.last_start = None
+                        check.last_duration = check.last_ping - check.last_start
+                        check.last_start = None
                     elif action == "fail" or rid is None:
                         # clear last_start (exit the "running" state) on:
                         # - "success" event with no rid
                         # - "fail" event, regardless of rid mismatch
-                        self.last_start = None
+                        check.last_start = None
 
                 new_status = "down" if action == "fail" else "up"
-                if self.status != new_status:
+                if check.status != new_status:
                     reason = "fail" if action == "fail" else ""
-                    self.create_flip(new_status, reason=reason)
-                    self.status = new_status
+                    check.create_flip(new_status, reason=reason)
+                    check.status = new_status
 
-            self.alert_after = self.going_down_after()
-            self.n_pings = models.F("n_pings") + 1
+            check.alert_after = check.going_down_after()
+            check.n_pings = models.F("n_pings") + 1
             body_lowercase = body.decode(errors="replace").lower()
-            self.has_confirmation_link = "confirm" in body_lowercase
-            self.save()
+            check.has_confirmation_link = "confirm" in body_lowercase
+            # Every column a ping changes: one set above and missing here is not saved
+            check.save(
+                update_fields=(
+                    "last_ping",
+                    "last_start",
+                    "last_start_rid",
+                    "last_duration",
+                    "status",
+                    "alert_after",
+                    "n_pings",
+                    "has_confirmation_link",
+                )
+            )
 
-            ping = Ping(owner=self)
-            ping.n = self.n_pings
+            ping = Ping(owner=check)
+            ping.n = check.n_pings
             ping.created = frozen_now
             if action in ("start", "fail", "ign", "log"):
                 ping.kind = action
 
             ping.remote_addr = remote_addr
             ping.scheme = scheme
-            ping.method = method
+            ping.method = method[: Ping._meta.get_field("method").max_length]
             # If User-Agent is longer than 200 characters, truncate it:
             ping.ua = ua[:200]
             ping.body_raw = body
@@ -486,8 +523,10 @@ class Check(models.Model):
             ping.save()
 
         # Every 100 received pings, prune old pings and notifications:
-        if self.n_pings % 100 == 0:
-            self.prune()
+        if check.n_pings % 100 == 0:
+            check.prune()
+
+        return check
 
     def prune(self) -> tuple[int, int, int]:
         """Remove old pings, notifications and flips; return how many of each."""
@@ -498,12 +537,12 @@ class Check(models.Model):
         pings, _ = self.ping_set.filter(n__lte=threshold).delete()
 
         # By "n", not "created" or "id": see Ping.Meta
-        ping = self.ping_set.order_by("n").first()
-        if ping is None:
+        oldest = self.ping_set.order_by("n").values_list("created", flat=True).first()
+        if oldest is None:
             return pings, 0, 0
 
         # Delete notifications older than the oldest retained ping
-        notifications, _ = self.notification_set.filter(created__lt=ping.created).delete()
+        notifications, _ = self.notification_set.filter(created__lt=oldest).delete()
 
         # Delete flips older than the oldest retained ping *and*
         # older than 93 days. We need ~3 months of flips for calculating
@@ -511,7 +550,7 @@ class Check(models.Model):
         # "we need the current month and full two previous months of data".
         # We could calculate this precisely, but 3*31 is close enough and
         # much simpler.
-        flip_threshold = min(ping.created, now() - td(days=93))
+        flip_threshold = min(oldest, now() - td(days=93))
         # sendalerts has yet to send the alerts of an unprocessed flip
         flips, _ = self.flip_set.filter(created__lt=flip_threshold, processed__isnull=False).delete()
         return pings, notifications, flips
@@ -1150,17 +1189,13 @@ class TokenBucket(models.Model):
     @staticmethod
     def authorize_auth_ip(request: HttpRequest) -> bool:
         ip = client_ip(request)
-        try:
-            addr = ip_address(ip)
-        except ValueError:
-            addr = None
-
-        if isinstance(addr, IPv6Address):
+        if ip is None:
+            # The requests whose address is unknown share one bucket
+            ip = "unknown"
+        elif isinstance(ip_address(ip), IPv6Address):
             # A client usually holds a whole /64, so a bucket per address
-            # would let it open 2^64 of them. A dual-stack socket reports an
-            # IPv4 client as ::ffff:a.b.c.d, and those all share ::/64.
-            mapped = addr.ipv4_mapped
-            ip = str(mapped) if mapped else str(ip_network((addr, 64), strict=False))
+            # would let it open 2^64 of them
+            ip = str(ip_network((ip, 64), strict=False))
 
         # 20 login attempts for a single IP per hour:
         return TokenBucket.authorize(f"auth-ip-{ip}", 20, 3600)

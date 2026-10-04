@@ -3,6 +3,7 @@ import sqlite3
 import tempfile
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
+from types import ModuleType
 from typing import Any
 from unittest import skipUnless
 from unittest.mock import patch
@@ -13,8 +14,8 @@ from django.db.backends.sqlite3.base import DatabaseWrapper
 from django.test import SimpleTestCase, TestCase
 
 
-def database_settings(**env: str) -> dict[str, Any]:
-    """The default database's settings, as hc/settings.py builds them from env alone."""
+def settings_module(**env: str) -> ModuleType:
+    """hc/settings.py executed with env in place of the process's DB* variables."""
     environ = {k: v for k, v in os.environ.items() if not k.startswith("DB")}
     # A name in the hc package, so that its import of .local_settings resolves
     spec = spec_from_file_location("hc.settings_under_test", settings.BASE_DIR / "hc" / "settings.py")
@@ -22,7 +23,12 @@ def database_settings(**env: str) -> dict[str, Any]:
     module = module_from_spec(spec)
     with patch.dict(os.environ, {**environ, **env}, clear=True):
         spec.loader.exec_module(module)
-    return module.DATABASES["default"]
+    return module
+
+
+def database_settings(**env: str) -> dict[str, Any]:
+    """The default database's settings, as hc/settings.py builds them from env alone."""
+    return settings_module(**env).DATABASES["default"]
 
 
 class DatabaseSettingsTestCase(SimpleTestCase):

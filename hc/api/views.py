@@ -12,7 +12,7 @@ from cronsim import CronSim, CronSimError
 from django.conf import settings
 from django.core.signing import BadSignature
 from django.db import connection
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Q
 from django.db.models.functions import Length
 from django.http import (
     Http404,
@@ -37,7 +37,7 @@ from hc.api.forms import FlipsFiltersForm
 from hc.api.models import Channel, Check, Flip, Notification, Ping, find_by_unique_key, prepare_durations
 from hc.lib.ip import client_ip
 from hc.lib.signing import unsign_bounce_id
-from hc.lib.string import is_valid_uuid_string, match_keywords
+from hc.lib.string import is_valid_uuid_string
 from hc.lib.typealias import ViewFunc
 from hc.lib.tz import all_timezones, legacy_timezones
 
@@ -166,51 +166,27 @@ def format_first_error(exc: ValidationError) -> str:
     return "json validation error: " + tmpl % subject
 
 
-@csrf_exempt
-@never_cache
-def ping(
-    request: HttpRequest,
-    code: UUID,
-    check: Check | None = None,
-    action: str = "success",
-    exitstatus: int | None = None,
-) -> HttpResponse:
-    if check is None:
-        try:
-            check = Check.objects.get(code=code)
-        except Check.DoesNotExist:
-            return HttpResponseNotFound("not found")
+def _ping_preflight(view: ViewFunc) -> ViewFunc:
+    """Answer a browser's CORS preflight (OPTIONS) to a ping URL, recording no ping."""
 
+    @wraps(view)
+    def wrapper(request: HttpRequest, *args: Any, **kwds: Any) -> HttpResponse:
+        if request.method != "OPTIONS":
+            return view(request, *args, **kwds)
+
+        response = HttpResponse(status=204)
+        response["Access-Control-Allow-Origin"] = "*"
+        response["Access-Control-Allow-Methods"] = "GET, HEAD, POST, OPTIONS"
+        response["Access-Control-Allow-Headers"] = request.headers.get("Access-Control-Request-Headers", "Content-Type")
+        response["Access-Control-Max-Age"] = "600"
+        return response
+
+    return wrapper
+
+
+def _ping(request: HttpRequest, lookup: Q, action: str, exitstatus: int | None) -> HttpResponse:
     if exitstatus is not None and exitstatus > 255:
         return HttpResponseBadRequest("invalid url format")
-
-    headers = request.META
-    remote_addr = client_ip(request)
-    scheme = headers.get("HTTP_X_FORWARDED_PROTO", "http")
-    method = headers["REQUEST_METHOD"]
-    ua = headers.get("HTTP_USER_AGENT", "")
-    body = request.body[: settings.PING_BODY_LIMIT]
-
-    if exitstatus is not None and exitstatus > 0:
-        action = "fail"
-
-    if check.methods == "POST" and method != "POST":
-        action = "ign"
-
-    if action != "ign" and check.filter_http_body:
-        # Undecodable bytes, a multibyte character cut by PING_BODY_LIMIT included,
-        # become U+FFFD, so the rest of the body is still matched
-        body_text = body.decode(errors="replace")
-        if check.failure_kw and match_keywords(body_text, check.failure_kw):
-            action = "fail"
-        elif check.success_kw and match_keywords(body_text, check.success_kw):
-            action = "success"
-        elif check.start_kw and match_keywords(body_text, check.start_kw):
-            action = "start"
-        elif check.filter_default_fail:
-            action = "fail"
-        else:
-            action = "ign"
 
     rid, rid_str = None, request.GET.get("rid")
     if rid_str is not None:
@@ -218,16 +194,46 @@ def ping(
             return HttpResponseBadRequest("invalid uuid format")
         rid = UUID(rid_str)
 
-    check.ping(remote_addr, scheme, method, ua, body, action, rid, exitstatus)
+    if exitstatus is not None and exitstatus > 0:
+        action = "fail"
+
+    # Read before Check.ping takes the lock: the body may still be arriving
+    body = request.body[: settings.PING_BODY_LIMIT]
+    try:
+        Check.ping(
+            lookup,
+            remote_addr=client_ip(request),
+            scheme="https" if request.is_secure() else "http",
+            method=request.META["REQUEST_METHOD"],
+            ua=request.headers.get("User-Agent", ""),
+            body=body,
+            action=action,
+            rid=rid,
+            exitstatus=exitstatus,
+        )
+    except Check.DoesNotExist:
+        return HttpResponseNotFound("not found")
+    except Check.MultipleObjectsReturned:
+        return HttpResponse("ambiguous slug", status=409)
 
     response = HttpResponse("OK")
     if settings.PING_BODY_LIMIT is not None:
         response["Ping-Body-Limit"] = str(settings.PING_BODY_LIMIT)
     response["Access-Control-Allow-Origin"] = "*"
+    response["Access-Control-Expose-Headers"] = "Ping-Body-Limit"
     return response
 
 
 @csrf_exempt
+@never_cache
+@_ping_preflight
+def ping(request: HttpRequest, code: UUID, action: str = "success", exitstatus: int | None = None) -> HttpResponse:
+    return _ping(request, Q(code=code), action, exitstatus)
+
+
+@csrf_exempt
+@never_cache
+@_ping_preflight
 def ping_by_slug(
     request: HttpRequest,
     ping_key: str,
@@ -238,14 +244,7 @@ def ping_by_slug(
     if slug != slug.lower():
         return HttpResponseBadRequest("invalid url format")
 
-    try:
-        check = Check.objects.get(slug=slug, project__ping_key=ping_key)
-    except Check.DoesNotExist:
-        return HttpResponseNotFound("not found")
-    except Check.MultipleObjectsReturned:
-        return HttpResponse("ambiguous slug", status=409)
-
-    return ping(request, check.code, check, action, exitstatus)
+    return _ping(request, Q(slug=slug, project__ping_key=ping_key), action, exitstatus)
 
 
 def _with_check(view: Callable[..., HttpResponse]) -> ViewFunc:
