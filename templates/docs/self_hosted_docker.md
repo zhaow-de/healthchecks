@@ -142,8 +142,7 @@ write to it; a host directory mounted there instead must be writable by user ID 
 
 To run on PostgreSQL 18 instead, layer `docker-compose.postgres.yml` over
 `docker-compose.yml`. It adds a `db` service that runs `postgres:18` with its data in
-the `db-data` volume, makes `web` wait until `db` is healthy, and sets `DB=postgres`,
-`DB_HOST=db`, `DB_NAME=hc` and `DB_USER=postgres` for `web`.
+the `db-data` volume, makes `web` wait until `db` is healthy, and points `web` at it.
 
 * Copy `docker-compose.postgres.yml` beside `docker-compose.yml`.
 * In `.env`, set `DB_PASSWORD`, the PostgreSQL password: both services refuse to
@@ -436,22 +435,6 @@ If you are using haproxy, you can do the same like so:
 http-request set-header X-Forwarded-Proto https if { ssl_fc }
 http-request set-header X-Forwarded-Proto http unless { ssl_fc }
 ```
-
-## Login Lockout {: #login-lockout }
-
-A browser that has completed a login gets login rate limits of its own, but a
-new browser shares them with everyone else, so a run of wrong passwords for the
-account's email, from anywhere, can lock it out, and so can 20 login attempts in an
-hour from its own address ([Login Lockout](../self_hosted/#login-lockout) lists the
-limits). To get back in, wait for the limits to refill, use the login link sent by
-email if email is set up, or clear every rate limit record, the recent ones too:
-
-```sh
-$ docker compose exec web ./manage.py prunetokenbucket --all
-```
-
-If you have forgotten the password, set a new one with
-`docker compose exec web ./manage.py changepassword`.
 
 ## Making Healthchecks Trust Your Self-signed TLS Certificate
 

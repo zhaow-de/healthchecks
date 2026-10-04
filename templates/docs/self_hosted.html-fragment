@@ -185,7 +185,7 @@ policy starts the container again after a reboot. From source, run them as servi
 </ul>
 <p>What each table keeps:</p>
 <ul>
-<li><code>api_ping</code>: each check's newest pings, as many as the "Ping log limit", 100 by
+<li><code>api_ping</code>: each check's pings, up to 99 over the "Ping log limit", 100 by
   default. Each ping stores at most
   <a href="../self_hosted_configuration/#PING_BODY_LIMIT">PING_BODY_LIMIT</a> bytes of its body.</li>
 <li><code>api_notification</code>: each check's notifications no older than its oldest kept ping.
@@ -238,8 +238,7 @@ Python's logging is a JSON object on one line; uWSGI's own lines, <code>migrate<
 and <code>prune</code>'s summary stay plain text in the same stream.</p>
 <p>With email set up and <code>DEBUG=False</code>, the <a href="../self_hosted_configuration/#ADMINS">ADMINS</a>
 addresses also get an email for each error Django logs, such as a server error (5xx)
-while handling a request. Healthchecks' own warnings and errors go to the console
-only.</p>
+while handling a request.</p>
 <h2 id="login-lockout">Login Lockout</h2>
 <p>Logging in is rate limited:</p>
 <ul>
@@ -266,7 +265,6 @@ every rate limit record, the recent ones too:</p>
 <p>From source, that is <code>uv run ./manage.py prunetokenbucket --all</code>.</p>
 <p>Changing <a href="../self_hosted_configuration/#SECRET_KEY">SECRET_KEY</a> also resets the
 per-email limits, but not the per-IP one, and has other effects, listed there.</p>
-<p>If you have forgotten the password, set a new one with <code>manage.py changepassword</code>.</p>
 <h2 id="checklist">Before Going Live</h2>
 <ul>
 <li><code>DEBUG=False</code>. The default is <code>True</code>, and the Docker image does not change it; the

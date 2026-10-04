@@ -138,8 +138,7 @@ write to it; a host directory mounted there instead must be writable by user ID 
 <h2 id="postgresql">PostgreSQL</h2>
 <p>To run on PostgreSQL 18 instead, layer <code>docker-compose.postgres.yml</code> over
 <code>docker-compose.yml</code>. It adds a <code>db</code> service that runs <code>postgres:18</code> with its data in
-the <code>db-data</code> volume, makes <code>web</code> wait until <code>db</code> is healthy, and sets <code>DB=postgres</code>,
-<code>DB_HOST=db</code>, <code>DB_NAME=hc</code> and <code>DB_USER=postgres</code> for <code>web</code>.</p>
+the <code>db-data</code> volume, makes <code>web</code> wait until <code>db</code> is healthy, and points <code>web</code> at it.</p>
 <ul>
 <li>Copy <code>docker-compose.postgres.yml</code> beside <code>docker-compose.yml</code>.</li>
 <li>In <code>.env</code>, set <code>DB_PASSWORD</code>, the PostgreSQL password: both services refuse to
@@ -398,18 +397,6 @@ for more information.</p>
 http-request set-header X-Forwarded-Proto http unless { ssl_fc }
 </code></pre></div>
 
-<h2 id="login-lockout">Login Lockout</h2>
-<p>A browser that has completed a login gets login rate limits of its own, but a
-new browser shares them with everyone else, so a run of wrong passwords for the
-account's email, from anywhere, can lock it out, and so can 20 login attempts in an
-hour from its own address (<a href="../self_hosted/#login-lockout">Login Lockout</a> lists the
-limits). To get back in, wait for the limits to refill, use the login link sent by
-email if email is set up, or clear every rate limit record, the recent ones too:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>web<span class="w"> </span>./manage.py<span class="w"> </span>prunetokenbucket<span class="w"> </span>--all
-</code></pre></div>
-
-<p>If you have forgotten the password, set a new one with
-<code>docker compose exec web ./manage.py changepassword</code>.</p>
 <h2>Making Healthchecks Trust Your Self-signed TLS Certificate</h2>
 <p>If you configure Healthchecks to deliver notifications to a server that uses
 a self-signed TLS certificate, you may see a "TLS handshake failed" error

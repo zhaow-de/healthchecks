@@ -59,17 +59,12 @@ docker compose exec web ./manage.py createsuperuser
 The operator documentation is in [templates/docs/](templates/docs/), and every
 instance serves it under `SITE_ROOT/docs/`:
 
-* [Self-Hosted Healthchecks](https://zcrypto-hc.zhaow.me/docs/self_hosted/):
-  what runs, management commands, the administration panel, email, data retention,
-  logs, login lockout, and a checklist before going live.
-* [Running with Docker](https://zcrypto-hc.zhaow.me/docs/self_hosted_docker/):
-  the image, the compose files, PostgreSQL, the daily housekeeping, backups and
-  restore, upgrades, the reverse proxy.
+* [Self-Hosted Healthchecks](https://zcrypto-hc.zhaow.me/docs/self_hosted/): the overview.
+* [Running with Docker](https://zcrypto-hc.zhaow.me/docs/self_hosted_docker/): production.
 * [Configuration](https://zcrypto-hc.zhaow.me/docs/self_hosted_configuration/):
   every environment variable.
 * [Running from Source](https://zcrypto-hc.zhaow.me/docs/self_hosted_source/):
-  development, and production without Docker, with uWSGI, systemd and a daily
-  `prune`.
+  development, and production without Docker.
 
 ## Setting Up for Development
 

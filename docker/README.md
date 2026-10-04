@@ -13,15 +13,5 @@ This directory holds the files for running Healthchecks with
   `sendalerts`, `sendreports` and the daily `prune`;
 * `fetchstatus.py`: the image's health check.
 
-In short:
-
-```sh
-cp .env.example .env    # then set HC_IMAGE, SECRET_KEY, SITE_ROOT, ALLOWED_HOSTS, PING_ENDPOINT
-docker compose up -d
-docker compose exec web ./manage.py createsuperuser
-```
-
 The full guide is [Running with Docker](../templates/docs/self_hosted_docker.md),
-also served by every instance at `SITE_ROOT/docs/self_hosted_docker/`: the settings,
-the compose files, PostgreSQL, the daily housekeeping, backups and restore, upgrades
-and the reverse proxy.
+also served by every instance at `SITE_ROOT/docs/self_hosted_docker/`.

@@ -211,7 +211,7 @@ Every table that grows by itself has a bound. Two mechanisms delete the old rows
 
 What each table keeps:
 
-* `api_ping`: each check's newest pings, as many as the "Ping log limit", 100 by
+* `api_ping`: each check's pings, up to 99 over the "Ping log limit", 100 by
   default. Each ping stores at most
   [PING_BODY_LIMIT](../self_hosted_configuration/#PING_BODY_LIMIT) bytes of its body.
 * `api_notification`: each check's notifications no older than its oldest kept ping.
@@ -273,8 +273,7 @@ and `prune`'s summary stay plain text in the same stream.
 
 With email set up and `DEBUG=False`, the [ADMINS](../self_hosted_configuration/#ADMINS)
 addresses also get an email for each error Django logs, such as a server error (5xx)
-while handling a request. Healthchecks' own warnings and errors go to the console
-only.
+while handling a request.
 
 ## Login Lockout {: #login-lockout }
 
@@ -307,8 +306,6 @@ From source, that is `uv run ./manage.py prunetokenbucket --all`.
 
 Changing [SECRET_KEY](../self_hosted_configuration/#SECRET_KEY) also resets the
 per-email limits, but not the per-IP one, and has other effects, listed there.
-
-If you have forgotten the password, set a new one with `manage.py changepassword`.
 
 ## Before Going Live {: #checklist }
 

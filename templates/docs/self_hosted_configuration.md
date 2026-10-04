@@ -153,15 +153,9 @@ This is a standard Django setting, read more in
 Default: `hc` (PostgreSQL) or `/path/to/projectdir/hc.sqlite` (SQLite); the Docker
 image sets `/data/hc.sqlite`
 
-The PostgreSQL database name, or the path of the SQLite database file. The Docker
-image sets `DB_NAME=/data/hc.sqlite`, a file in its `/data` volume. With
+The PostgreSQL database name, or the path of the SQLite database file. With
 `DB=postgres`, set `DB_NAME` as well, as `docker-compose.postgres.yml` does: left as
 it is, the image's path names the PostgreSQL database.
-
-When SQLite creates the database file, Healthchecks sets it to incremental
-auto-vacuum, which lets the daily `prune` give the space of deleted rows back to the
-file system. A file that already exists keeps its auto-vacuum mode until a `VACUUM`
-changes it (see [Data Retention](../self_hosted/#database-cleanup)).
 
 This is a standard Django setting, read more in
 [Django documentation](https://docs.djangoproject.com/en/6.1/ref/settings/#name).
@@ -435,9 +429,6 @@ the process's local time (UTC in the Docker image).
 
 Neither `manage.py runserver` nor the Docker image's uWSGI writes a line per HTTP
 request. A uWSGI you run yourself does unless it is started with `--disable-logging`.
-
-The console is the only log: Healthchecks stores no log records (see
-[Logs](../self_hosted/#logs)).
 
 ## `METRICS_KEY` {: #METRICS_KEY }
 
