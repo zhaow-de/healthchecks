@@ -8,6 +8,7 @@ from unittest.mock import patch
 from django.conf import settings
 from django.core import mail, signing
 from django.core.mail import mail_admins
+from django.template.utils import get_app_template_dirs
 from django.test import SimpleTestCase
 from django.test.utils import override_settings
 
@@ -129,25 +130,29 @@ class SecuritySettingsTestCase(SimpleTestCase):
 
 class InlineCodeTestCase(SimpleTestCase):
     def test_inline_scripts_and_styles_carry_the_nonce(self) -> None:
-        root = settings.BASE_DIR / "templates"
+        # templates/, and the templates/ of each app under hc/: APP_DIRS renders pages from them
+        hc_dir = settings.BASE_DIR / "hc"
+        app_roots = [d for d in get_app_template_dirs("templates") if d.is_relative_to(hc_dir)]
+        self.assertIn(hc_dir / "integrations" / "email" / "templates", app_roots)
+
         found: list[str] = []
-        for path in sorted(root.rglob("*.html")):
-            # Mail bodies, never served as pages
-            if path.relative_to(root).parts[0] == "emails":
-                continue
-
-            text = path.read_text()
-            for tag in re.findall(r"<(?:script|style)\b[^>]*>", text):
-                # A type="data" block is data the browser does not run
-                if "src=" in tag or 'type="data"' in tag or "{% csp_nonce_attr %}" in tag:
+        for root in [settings.BASE_DIR / "templates", *app_roots]:
+            for path in sorted(root.rglob("*.html")):
+                # Mail bodies, never served as pages
+                if path.relative_to(root).parts[0] == "emails":
                     continue
-                found.append(f"{path.relative_to(root)}: {tag}")
 
-            found.extend(
-                f"{path.relative_to(root)}: {tag}"
-                for tag in re.findall(r"<[a-zA-Z][^>]*>", text)
-                if re.search(r"\s(style|on[a-z]+)=", tag)
-            )
+                name = path.relative_to(settings.BASE_DIR)
+                text = path.read_text()
+                for tag in re.findall(r"<(?:script|style)\b[^>]*>", text):
+                    # A type="data" block is data the browser does not run
+                    if "src=" in tag or 'type="data"' in tag or "{% csp_nonce_attr %}" in tag:
+                        continue
+                    found.append(f"{name}: {tag}")
+
+                found.extend(
+                    f"{name}: {tag}" for tag in re.findall(r"<[a-zA-Z][^>]*>", text) if re.search(r"\s(style|on[a-z]+)=", tag)
+                )
 
         self.assertEqual(found, [])
 

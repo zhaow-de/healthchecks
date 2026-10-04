@@ -64,6 +64,20 @@ class SwitchChannelTestCase(BaseTestCase):
         self.assertEqual(r.status_code, 404)
         self.assertFalse(self.channel.checks.exists())
 
+    def test_it_handles_a_check_transferred_after_it_was_read(self) -> None:
+        other_project = Project.objects.create(owner=self.alice)
+
+        def get_and_transfer(*args: Any, **kwargs: Any) -> Check:
+            check = Check.objects.get(id=self.check.id)
+            Check.objects.filter(id=self.check.id).update(project=other_project)
+            return check
+
+        self.client.login(username="alice@example.org", password="password")
+        with patch("hc.front.views._get_check_for_user", get_and_transfer):
+            r = self.client.post(self.url, {"state": "on"})
+        self.assertEqual(r.status_code, 400)
+        self.assertFalse(self.channel.checks.exists())
+
     def test_it_handles_a_channel_deleted_after_it_was_read(self) -> None:
         def get_and_delete(*args: Any, **kwargs: Any) -> Any:
             obj = get_object_or_404(*args, **kwargs)

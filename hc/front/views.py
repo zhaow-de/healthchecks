@@ -318,6 +318,9 @@ def switch_channel(request: AuthenticatedHttpRequest, code: UUID, channel_code: 
 
     with _404_if_deleted(), transaction.atomic():
         check.lock()
+        # A transfer may have moved the check to another project since it was read
+        if channel.project_id != check.project_id:
+            return HttpResponseBadRequest()
         Channel.objects.select_for_update(no_key=True).get(id=channel.id)
         if request.POST.get("state") == "on":
             channel.checks.add(check)
@@ -1044,8 +1047,13 @@ def channels(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
             # Checks in id order, then the channel, as switch_channel and copy lock them: this
             # POST cannot deadlock with either on PostgreSQL
             ids = {check.id for check in new_checks}
-            q = Check.objects.select_for_update(no_key=True).filter(id__in=ids).order_by("id")
-            if set(q.values_list("id", flat=True)) != ids:
+            q = Check.objects.select_for_update(no_key=True).filter(project=project, id__in=ids).order_by("id")
+            locked = set(q.values_list("id", flat=True))
+            if locked != ids:
+                # One still there was transferred to another project since it was read,
+                # and gets the answer above for a check of another project
+                if Check.objects.filter(id__in=ids - locked).exists():
+                    return HttpResponseForbidden()
                 raise Http404("not found")
             Channel.objects.select_for_update(no_key=True).get(id=channel.id)
             channel.checks.set(new_checks)
