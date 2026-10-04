@@ -48,3 +48,35 @@ class ApiAdminTestCase(BaseTestCase):
         r = self.client.get(reverse("admin:api_flip_changelist"))
         self.assertContains(r, '<td class="field-new_status">Down</td>', html=True)
         self.assertEqual(Flip.objects.count(), 1)
+
+    def test_a_ping_or_notification_keeps_its_check(self) -> None:
+        ping = Ping.objects.create(owner=self.check)
+        channel = Channel.objects.create(project=self.project, kind="webhook")
+        n = Notification.objects.create(owner=self.check, channel=channel, check_status="down")
+
+        for url in (
+            reverse("admin:api_ping_change", args=[ping.id]),
+            reverse("admin:api_notification_change", args=[n.id]),
+        ):
+            with self.subTest(url=url):
+                r = self.client.get(url)
+                self.assertContains(r, '<div class="readonly"><a href="')
+                self.assertNotContains(r, 'name="owner"')
+
+    def test_it_edits_relations_as_raw_ids(self) -> None:
+        channel = Channel.objects.create(project=self.project, kind="webhook")
+        n = Notification.objects.create(owner=self.check, channel=channel, check_status="down")
+        self.check.create_flip("down")
+        flip = Flip.objects.get()
+
+        for url, field, widget in (
+            (reverse("admin:api_check_change", args=[self.check.id]), "project", "vForeignKeyRawIdAdminField"),
+            (reverse("admin:api_channel_change", args=[channel.id]), "project", "vForeignKeyRawIdAdminField"),
+            (reverse("admin:api_channel_change", args=[channel.id]), "checks", "vManyToManyRawIdAdminField"),
+            (reverse("admin:api_notification_change", args=[n.id]), "channel", "vForeignKeyRawIdAdminField"),
+            (reverse("admin:api_flip_change", args=[flip.id]), "owner", "vForeignKeyRawIdAdminField"),
+        ):
+            with self.subTest(url=url, field=field):
+                r = self.client.get(url)
+                self.assertContains(r, f'name="{field}"')
+                self.assertContains(r, widget)

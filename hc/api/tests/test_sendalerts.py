@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock, call, patch
 
 import time_machine
+from django.core import mail
 from django.core.management import call_command
 from django.utils.timezone import now
 
@@ -266,6 +267,27 @@ class SendAlertsTestCase(BaseTestCase):
         self.assertEqual(errors, ["", "Unexpected error"])
         failed = Channel.objects.get(last_error="Unexpected error")
         self.assertFalse(failed.disabled)
+
+    def test_a_channel_without_a_transport_does_not_stop_the_others(self) -> None:
+        check = Check.objects.create(project=self.project, status="down")
+        flip = Flip.objects.create(owner=check, created=now(), old_status="up", new_status="down")
+        broken = Channel.objects.create(project=self.project, kind="unknown")
+        broken.checks.add(check)
+        email = Channel.objects.create(project=self.project, kind="email", value="bob@example.org", email_verified=True)
+        email.checks.add(check)
+
+        with self.assertLogs("hc.api.models", "ERROR") as logs:
+            log = notify(flip)
+
+        assert log is not None
+        self.assertIn(f"{str(broken.code)[:8]} (unknown) Error in", log)
+        self.assertIn(f"{str(email.code)[:8]} (email) OK in", log)
+        self.assertEqual(logs.records[0].getMessage(), "Unexpected error in unknown transport")
+        self.assertEqual(len(mail.outbox), 1)
+
+        broken.refresh_from_db()
+        self.assertEqual(broken.last_error, "Unexpected error")
+        self.assertFalse(broken.disabled)
 
     @patch("hc.api.management.commands.sendalerts.close_old_connections")
     @patch("hc.api.management.commands.sendalerts.connection")

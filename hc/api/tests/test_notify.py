@@ -26,11 +26,27 @@ class NotifyTestCase(TransactionTestCase):
         self.flip.old_status = "new"
         self.flip.new_status = status
 
-    def test_unexpected_channel_kind_raises_not_implemented(self) -> None:
+    def test_unexpected_channel_kind_records_an_error(self) -> None:
         self._setup_data("invalid", "dummy data")
 
-        with self.assertRaises(NotImplementedError):
-            self.channel.notify(self.flip)
+        with self.assertLogs("hc.api.models", "ERROR") as logs:
+            e = self.channel.notify(self.flip)
+
+        self.assertEqual(e, "Unexpected error")
+        self.assertIn("NotImplementedError: Unknown channel kind: invalid", logs.output[0])
+        self.channel.refresh_from_db()
+        self.assertEqual(self.channel.last_error, "Unexpected error")
+        self.assertFalse(self.channel.disabled)
+
+    def test_an_unparsable_value_records_an_error(self) -> None:
+        self._setup_data("webhook", "{}")
+
+        with self.assertLogs("hc.api.models", "ERROR"):
+            e = self.channel.notify(self.flip)
+
+        self.assertEqual(e, "Unexpected error")
+        self.channel.refresh_from_db()
+        self.assertEqual(self.channel.last_error, "Unexpected error")
 
     def test_it_handles_deleted_channel(self) -> None:
         self._setup_data("email", "foo@example.org")

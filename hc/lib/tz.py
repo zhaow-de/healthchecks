@@ -1,4 +1,4 @@
-from zoneinfo import available_timezones
+from importlib.resources import files
 
 # Each legacy name maps to the current name the API stores in its place
 legacy_timezones = {
@@ -117,6 +117,9 @@ legacy_timezones = {
     "Zulu": "Etc/UTC",
 }
 
-# Every zone ZoneInfo can load, from the host's zoneinfo or the tzdata package, less the
-# legacy names and Factory, tzdata's placeholder for a host with no zone set
-all_timezones = sorted(available_timezones() - legacy_timezones.keys() - {"Factory"})
+# Every zone of the pinned tzdata package, less the legacy names and Factory, tzdata's
+# placeholder for a host with no zone set. Not available_timezones(), which adds whatever the
+# host's zoneinfo holds ("localtime" on Debian): ZoneInfo falls back to the package for a zone
+# the host lacks, so each listed zone loads on every host.
+_tzdata_zones = files("tzdata").joinpath("zones").read_text(encoding="utf-8").split()
+all_timezones = sorted(set(_tzdata_zones) - legacy_timezones.keys() - {"Factory"})

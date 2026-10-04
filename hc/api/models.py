@@ -867,8 +867,15 @@ class Channel(models.Model):
         return _transport_class(path)(self)
 
     def notify(self, flip: Flip, is_test: bool = False) -> str:
-        if self.transport.is_noop(flip.new_status):
-            return "no-op"
+        try:
+            transport = self.transport
+            if transport.is_noop(flip.new_status):
+                return "no-op"
+        except Exception:
+            # An unknown kind, or a stored value its transport cannot parse
+            logger.exception("Unexpected error in %s transport", self.kind)
+            Channel.objects.filter(id=self.id).update(last_error="Unexpected error")
+            return "Unexpected error"
 
         n = Notification(channel=self)
         if is_test:
@@ -887,7 +894,7 @@ class Channel(models.Model):
 
         start, error, disabled = now(), "", self.disabled
         try:
-            self.transport.notify(flip, notification=n)
+            transport.notify(flip, notification=n)
 
         except transports.TransportError as e:
             disabled = True if e.permanent else disabled
@@ -1051,9 +1058,15 @@ class Flip(models.Model):
         if self.new_status not in ("up", "down"):
             raise NotImplementedError(f"Unexpected status: {self.new_status}")
 
+        def is_noop(ch: Channel) -> bool:
+            try:
+                return ch.transport.is_noop(self.new_status)
+            except Exception:  # noqa: BLE001
+                return False  # Channel.notify() logs the error and records it
+
         q = self.owner.channel_set.exclude(disabled=True)
         q = q.order_by(F("last_notify_duration").asc(nulls_last=True))
-        return [ch for ch in q if not ch.transport.is_noop(self.new_status)]
+        return [ch for ch in q if not is_noop(ch)]
 
     def reason_long(self) -> str | None:
         if self.reason == "timeout":
