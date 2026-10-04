@@ -18,7 +18,7 @@ class CreateCheckTestCase(BaseTestCase):
         expect_fragment: str | None = None,
     ) -> TestHttpResponse:
         if "api_key" not in data:
-            data["api_key"] = "X" * 32
+            data["api_key"] = self.api_key
 
         r = self.csrf_client.post(self.URL, data, content_type="application/json")
         if expect_fragment:
@@ -110,7 +110,7 @@ class CreateCheckTestCase(BaseTestCase):
 
     def test_it_accepts_api_key_in_header(self) -> None:
         payload = {"name": "Foo"}
-        r = self.client.post(self.URL, payload, content_type="application/json", HTTP_X_API_KEY="X" * 32)
+        r = self.client.post(self.URL, payload, content_type="application/json", HTTP_X_API_KEY=self.api_key)
 
         self.assertEqual(r.status_code, 201)
 
@@ -377,10 +377,10 @@ class CreateCheckTestCase(BaseTestCase):
         self.assertEqual(Check.objects.count(), 26)
 
     def test_it_rejects_readonly_key(self) -> None:
-        self.project.api_key_readonly = "R" * 32
+        ro_key = self.project.set_api_key_readonly()
         self.project.save()
 
-        r = self.post({"api_key": "R" * 32, "name": "Foo"})
+        r = self.post({"api_key": ro_key, "name": "Foo"})
         self.assertEqual(r.status_code, 401)
 
     def test_it_sets_manual_resume(self) -> None:

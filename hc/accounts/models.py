@@ -14,7 +14,7 @@ from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.models import User
 from django.core.signing import BadSignature, TimestampSigner
 from django.db import models
-from django.db.models import Q, QuerySet
+from django.db.models import QuerySet
 from django.db.models.functions import Lower
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -270,44 +270,18 @@ class ProjectManager(models.Manager["Project"]):
     def for_api_key(self, api_key: str, accept_rw: bool, accept_ro: bool) -> Project | None:
         """Look up project by API key.
 
-        This handles both the old plain text API keys, and the new hashed API keys.
-        For the hashed API keys, it looks up project by the first 8 characters of the
-        random part of the key, then calls Project.compare_api_key().
+        It looks up projects by the first 8 characters of the random part of the key,
+        then calls Project.compare_api_key().
         """
 
-        # Hashed keys
         if accept_rw and api_key.startswith("hcw_"):
-            secret8 = api_key[4:12]
-            for project in Project.objects.filter(api_key__startswith=secret8):
-                if project.compare_api_key(api_key):
-                    return project
+            q = Project.objects.filter(api_key__startswith=api_key[4:12])
+        elif accept_ro and api_key.startswith("hcr_"):
+            q = Project.objects.filter(api_key_readonly__startswith=api_key[4:12])
+        else:
+            return None
 
-        if accept_ro and api_key.startswith("hcr_"):
-            secret8 = api_key[4:12]
-            for project in Project.objects.filter(api_key_readonly__startswith=secret8):
-                if project.compare_api_key(api_key):
-                    return project
-
-        # Plain text keys
-        if accept_rw and accept_ro:
-            write_key_match = Q(api_key=api_key)
-            read_key_match = Q(api_key_readonly=api_key)
-            try:
-                return Project.objects.get(write_key_match | read_key_match)
-            except Project.DoesNotExist:
-                pass
-        elif accept_rw:
-            try:
-                return Project.objects.get(api_key=api_key)
-            except Project.DoesNotExist:
-                pass
-        elif accept_ro:
-            try:
-                return Project.objects.get(api_key_readonly=api_key)
-            except Project.DoesNotExist:
-                pass
-
-        return None
+        return next((project for project in q if project.compare_api_key(api_key)), None)
 
 
 class Project(models.Model):

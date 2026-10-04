@@ -17,25 +17,26 @@ class AuthTestCase(BaseTestCase):
             HTTP_X_API_KEY=key,
         )
 
-    def test_plain_text_api_key_works(self) -> None:
-        r = self.get(key="X" * 32)
-        self.assertEqual(r.status_code, 200)
+    def test_it_refuses_a_plain_text_key(self) -> None:
+        self.project.api_key = "X" * 32
+        self.project.save()
 
-    def test_plain_text_readonly_key_works(self) -> None:
+        r = self.get(key="X" * 32)
+        self.assertEqual(r.status_code, 401)
+
+    def test_it_refuses_a_plain_text_readonly_key(self) -> None:
         self.project.api_key_readonly = "R" * 32
         self.project.save()
 
         r = self.get(key="R" * 32)
-        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.status_code, 401)
 
     def test_it_rejects_wrong_key(self) -> None:
         r = self.get(key="W" * 32)
         self.assertEqual(r.status_code, 401)
 
     def test_ro_endpoint_accepts_hashed_api_key(self) -> None:
-        key = self.project.set_api_key()
-        self.project.save()
-        r = self.get(key=key)
+        r = self.get(key=self.api_key)
         self.assertEqual(r.status_code, 200)
 
     def test_ro_endpoint_accepts_hashed_readonly_key(self) -> None:
@@ -46,10 +47,7 @@ class AuthTestCase(BaseTestCase):
         self.assertEqual(r.status_code, 200)
 
     def test_rw_endpoint_accepts_hashed_api_key(self) -> None:
-        key = self.project.set_api_key()
-        self.project.save()
-
-        r = self.post(key=key)
+        r = self.post(key=self.api_key)
         self.assertEqual(r.status_code, 201)
 
     def test_rw_endpoint_rejects_hashed_readonly_key(self) -> None:
@@ -60,10 +58,10 @@ class AuthTestCase(BaseTestCase):
         self.assertEqual(r.status_code, 401)
 
     @patch("hc.accounts.models.hmac.compare_digest")
-    def test_it_does_not_compare_digest_to_plaintext_key(self, mock_compare: Mock) -> None:
-        # Database has a plain text API key "X" * 32
-        # We pass "hcw_" + "X" * 28.
-        # We should recognize that the DB has a plain text key not a hashed key,
-        # and we *should not* call hmac.compare_digest()
+    def test_it_does_not_compare_digest_to_a_stored_value_without_a_hash(self, mock_compare: Mock) -> None:
+        # A stored value with no "." holds no digest to compare with
+        self.project.api_key = "X" * 32
+        self.project.save()
+
         self.post(key="hcw_" + "X" * 28)
         self.assertFalse(mock_compare.called)

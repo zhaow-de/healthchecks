@@ -16,7 +16,6 @@ class PingTestCase(BaseTestCase):
         super().setUp()
         self.check = Check.objects.create(project=self.project)
         self.url = f"/ping/{self.check.code}"
-        self.project.api_key = "X" * 32
 
     @override_settings(PING_BODY_LIMIT=10000)
     def test_it_works(self) -> None:

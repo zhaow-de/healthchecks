@@ -31,8 +31,8 @@ class GetFlipsTestCase(BaseTestCase):
 
         self.url = f"/api/v3/checks/{self.a1.code}/flips/"
 
-    def get(self, api_key: str = "X" * 32, qs: str = "") -> TestHttpResponse:
-        return self.client.get(self.url + qs, HTTP_X_API_KEY=api_key)
+    def get(self, api_key: str | None = None, qs: str = "") -> TestHttpResponse:
+        return self.client.get(self.url + qs, HTTP_X_API_KEY=self.api_key if api_key is None else api_key)
 
     def test_it_works(self) -> None:
         r = self.get()
@@ -49,21 +49,21 @@ class GetFlipsTestCase(BaseTestCase):
 
     def test_it_works_with_unique_key(self) -> None:
         url = f"/api/v3/checks/{self.a1.unique_key}/flips/"
-        r = self.client.get(url, HTTP_X_API_KEY="X" * 32)
+        r = self.client.get(url, HTTP_X_API_KEY=self.api_key)
         self.assertEqual(r.status_code, 200)
 
         doc = r.json()
         self.assertEqual(len(doc["flips"]), 1)
 
     def test_readonly_key_is_allowed(self) -> None:
-        self.project.api_key_readonly = "R" * 32
+        ro_key = self.project.set_api_key_readonly()
         self.project.save()
 
-        r = self.get(api_key=self.project.api_key_readonly)
+        r = self.get(api_key=ro_key)
         self.assertEqual(r.status_code, 200)
 
     def test_it_rejects_post(self) -> None:
-        r = self.csrf_client.post(self.url, HTTP_X_API_KEY="X" * 32)
+        r = self.csrf_client.post(self.url, HTTP_X_API_KEY=self.api_key)
         self.assertEqual(r.status_code, 405)
 
     def test_it_rejects_non_integer_start(self) -> None:
@@ -120,10 +120,10 @@ class GetFlipsTestCase(BaseTestCase):
         charlies_check = Check.objects.create(project=self.charlies_project)
 
         url = f"/api/v3/checks/{charlies_check.code}/flips/"
-        r = self.client.get(url, HTTP_X_API_KEY="X" * 32)
+        r = self.client.get(url, HTTP_X_API_KEY=self.api_key)
         self.assertEqual(r.status_code, 403)
 
     def test_it_handles_missing_unique_key(self) -> None:
         url = f"/api/v3/checks/{'a' * 40}/flips/"
-        r = self.client.get(url, HTTP_X_API_KEY="X" * 32)
+        r = self.client.get(url, HTTP_X_API_KEY=self.api_key)
         self.assertEqual(r.status_code, 404)

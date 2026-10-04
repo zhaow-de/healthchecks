@@ -55,7 +55,8 @@ class BaseTestCase(TestCase):
         self.alice.set_password("password")
         self.alice.save()
 
-        self.project = Project(owner=self.alice, api_key="X" * 32)
+        self.project = Project(owner=self.alice)
+        self.api_key = self.project.set_api_key()
         self.project.name = "Alices Project"
         self.project.ping_key = "p" * 22
         self.project.save()

@@ -37,12 +37,12 @@ class ListChecksTestCase(BaseTestCase):
         self.a1.channel_set.add(self.c1)
 
     def get(self) -> TestHttpResponse:
-        return self.client.get("/api/v3/checks/", HTTP_X_API_KEY="X" * 32)
+        return self.client.get("/api/v3/checks/", HTTP_X_API_KEY=self.api_key)
 
     def test_it_does_not_serve_api_v1_or_v2(self) -> None:
         for prefix in ("/api/v1/", "/api/v2/"):
             with self.subTest(prefix=prefix):
-                r = self.client.get(prefix + "checks/", HTTP_X_API_KEY="X" * 32)
+                r = self.client.get(prefix + "checks/", HTTP_X_API_KEY=self.api_key)
                 self.assertEqual(r.status_code, 404)
 
     def test_it_works(self) -> None:
@@ -107,7 +107,7 @@ class ListChecksTestCase(BaseTestCase):
             self.assertNotEqual(check["name"], "Charlie 1")
 
     def test_it_works_with_tags_param(self) -> None:
-        r = self.client.get("/api/v3/checks/?tag=a2-tag", HTTP_X_API_KEY="X" * 32)
+        r = self.client.get("/api/v3/checks/?tag=a2-tag", HTTP_X_API_KEY=self.api_key)
         self.assertEqual(r.status_code, 200)
 
         doc = r.json()
@@ -120,7 +120,7 @@ class ListChecksTestCase(BaseTestCase):
         self.assertEqual(check["tags"], "a2-tag")
 
     def test_it_filters_with_multiple_tags_param(self) -> None:
-        r = self.client.get("/api/v3/checks/?tag=a1-tag&tag=a1-additional-tag", HTTP_X_API_KEY="X" * 32)
+        r = self.client.get("/api/v3/checks/?tag=a1-tag&tag=a1-additional-tag", HTTP_X_API_KEY=self.api_key)
         self.assertEqual(r.status_code, 200)
 
         doc = r.json()
@@ -133,7 +133,7 @@ class ListChecksTestCase(BaseTestCase):
         self.assertEqual(check["tags"], "a1-tag a1-additional-tag")
 
     def test_it_does_not_match_tag_partially(self) -> None:
-        r = self.client.get("/api/v3/checks/?tag=tag", HTTP_X_API_KEY="X" * 32)
+        r = self.client.get("/api/v3/checks/?tag=tag", HTTP_X_API_KEY=self.api_key)
         self.assertEqual(r.status_code, 200)
 
         doc = r.json()
@@ -143,7 +143,7 @@ class ListChecksTestCase(BaseTestCase):
     def test_non_existing_tags_filter_returns_empty_result(self) -> None:
         r = self.client.get(
             "/api/v3/checks/?tag=non_existing_tag_with_no_checks",
-            HTTP_X_API_KEY="X" * 32,
+            HTTP_X_API_KEY=self.api_key,
         )
         self.assertEqual(r.status_code, 200)
 
@@ -152,12 +152,12 @@ class ListChecksTestCase(BaseTestCase):
         self.assertEqual(len(doc["checks"]), 0)
 
     def test_readonly_key_works(self) -> None:
-        self.project.api_key_readonly = "R" * 32
+        ro_key = self.project.set_api_key_readonly()
         self.project.save()
 
         # Expect a query to check the API key, and a query to retrieve checks
         with self.assertNumQueries(2):
-            r = self.client.get("/api/v3/checks/", HTTP_X_API_KEY="R" * 32)
+            r = self.client.get("/api/v3/checks/", HTTP_X_API_KEY=ro_key)
 
         self.assertEqual(r.status_code, 200)
 
@@ -176,7 +176,7 @@ class ListChecksTestCase(BaseTestCase):
         self.assertTrue(a1["started"])
 
     def test_it_works_with_slug_param(self) -> None:
-        r = self.client.get("/api/v3/checks/?slug=alice-1", HTTP_X_API_KEY="X" * 32)
+        r = self.client.get("/api/v3/checks/?slug=alice-1", HTTP_X_API_KEY=self.api_key)
         self.assertEqual(r.status_code, 200)
 
         doc = r.json()

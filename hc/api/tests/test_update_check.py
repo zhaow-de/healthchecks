@@ -21,10 +21,12 @@ class UpdateCheckTestCase(BaseTestCase):
         self,
         code: uuid.UUID | str,
         data: JSONDict,
-        api_key: str = "X" * 32,
+        api_key: str | None = None,
     ) -> TestHttpResponse:
         url = f"/api/v3/checks/{code}"
-        return self.csrf_client.post(url, data, content_type="application/json", HTTP_X_API_KEY=api_key)
+        return self.csrf_client.post(
+            url, data, content_type="application/json", HTTP_X_API_KEY=self.api_key if api_key is None else api_key
+        )
 
     def test_it_works(self) -> None:
         self.check.last_ping = now()
@@ -293,10 +295,10 @@ class UpdateCheckTestCase(BaseTestCase):
         self.assertEqual(self.check.schedule, "5 * * * *")
 
     def test_it_rejects_readonly_key(self) -> None:
-        self.project.api_key_readonly = "R" * 32
+        ro_key = self.project.set_api_key_readonly()
         self.project.save()
 
-        r = self.post(self.check.code, {"name": "Foo"}, api_key="R" * 32)
+        r = self.post(self.check.code, {"name": "Foo"}, api_key=ro_key)
         self.assertEqual(r.status_code, 401)
 
     def test_it_sets_manual_resume_to_true(self) -> None:

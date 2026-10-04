@@ -34,9 +34,9 @@ class GetCheckTestCase(BaseTestCase):
         self.c1 = Channel.objects.create(project=self.project)
         self.a1.channel_set.add(self.c1)
 
-    def get(self, code: UUID | str, api_key: str = "X" * 32) -> TestHttpResponse:
+    def get(self, code: UUID | str, api_key: str | None = None) -> TestHttpResponse:
         url = f"/api/v3/checks/{code}"
-        return self.client.get(url, HTTP_X_API_KEY=api_key)
+        return self.client.get(url, HTTP_X_API_KEY=self.api_key if api_key is None else api_key)
 
     @override_settings(SITE_ROOT="http://testserver")
     def test_it_works(self) -> None:
@@ -102,10 +102,10 @@ class GetCheckTestCase(BaseTestCase):
         self.assertEqual(r.status_code, 405)
 
     def test_readonly_key_works(self) -> None:
-        self.project.api_key_readonly = "R" * 32
+        ro_key = self.project.set_api_key_readonly()
         self.project.save()
 
-        r = self.get(self.a1.code, api_key=self.project.api_key_readonly)
+        r = self.get(self.a1.code, api_key=ro_key)
         self.assertEqual(r.status_code, 200)
 
         # When using readonly keys, the ping URLs should not be exposed:
