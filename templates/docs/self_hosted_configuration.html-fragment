@@ -255,8 +255,7 @@ address is never verified this way: it is confirmed at once.</p>
 <p>Verification needs email: with verification on and no <a href="#EMAIL_HOST">EMAIL_HOST</a>,
 the form refuses a new or changed address, or a disabled integration, unless the
 address is the account's own, so that no address receives alerts without having
-been confirmed. An enabled integration whose address does not change keeps its
-confirmed or unconfirmed state, and only its up and down flags are saved.</p>
+been confirmed.</p>
 <p>Set <code>EMAIL_USE_VERIFICATION</code> to <code>False</code> to confirm each address as it is saved.
 The setting does not change integrations already unconfirmed; to confirm one,
 change its address and back, or delete it and add it again.</p>

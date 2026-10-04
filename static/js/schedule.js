@@ -1,6 +1,4 @@
-// The schedule inputs shared by the timeout dialog (update-timeout-modal.js), the add-check
-// dialog (add-check-modal.js) and the cron cheatsheet (docs_cron.js). makeSlider needs
-// nouislider.min.js on the page.
+// makeSlider needs nouislider.min.js on the page.
 /* exported makeSlider, bindDuration, schedulePreview */
 
 // Seconds as {value, unit}, in the largest of days, hours and minutes that divides them.
@@ -92,11 +90,7 @@ function bindDuration({value, unit, hidden, slider}) {
     };
 }
 
-// Loads url's preview of the schedule in `input`, in the time zone `tz` (a select, or a
-// zone name), into `target` whenever either changes. While the preview reports an error,
-// `submit`, when given, is disabled. Returns {update, refresh}: update() loads the preview
-// when the values changed, keeping the old one until the new one arrives; refresh()
-// replaces it with "Updating..." and loads it again even when the values have not changed.
+// update() reloads the preview only when the values change, keeping the old one meanwhile; refresh() clears it and reloads.
 function schedulePreview({input, tz, url, target, submit}) {
     // The values of the preview shown or loading, so an unchanged input loads nothing
     let current = "";

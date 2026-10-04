@@ -26,10 +26,7 @@ def email_form(request: AuthenticatedHttpRequest, channel: Channel) -> HttpRespo
                 # If the user is adding *their own* address we skip the verification step
                 verified = not settings.EMAIL_USE_VERIFICATION or form.cleaned_data["value"] == request.user.email
 
-            # Without mail no confirmation link can be sent. A new or changed address
-            # is refused rather than confirmed unasked, so an address nobody confirmed
-            # never receives alerts, not even after SMTP is configured. An unchanged
-            # one keeps its state, and only its flags are saved
+            # Without mail, a new or changed address is refused, not confirmed unasked, which would alert it once SMTP is set
             if changed and not verified and not settings.MAILERS:
                 form.add_error(
                     "value",

@@ -84,9 +84,8 @@ repos:
       - id: shellcheck
         types: [shell]
 
-  # ESLint over our own page scripts, not static/vendor, with the two rules eslint.config.js enables
-  # and no formatter. `language_version` pins the Node that pre-commit installs through nodeenv, so a
-  # clone needs no Node of its own, and one on PATH is not used.
+  # `language_version` pins the Node that pre-commit installs through nodeenv, so a clone needs no Node
+  # of its own, and one on PATH is not used.
   - repo: local
     hooks:
       - id: eslint

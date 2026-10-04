@@ -117,9 +117,6 @@ legacy_timezones = {
     "Zulu": "Etc/UTC",
 }
 
-# Every zone of the pinned tzdata package, less the legacy names and Factory, tzdata's
-# placeholder for a host with no zone set. Not available_timezones(), which adds whatever the
-# host's zoneinfo holds ("localtime" on Debian): ZoneInfo falls back to the package for a zone
-# the host lacks, so each listed zone loads on every host.
+# Not available_timezones(): it adds the host's own zone files. Factory is tzdata's no-zone placeholder.
 _tzdata_zones = files("tzdata").joinpath("zones").read_text(encoding="utf-8").split()
 all_timezones = sorted(set(_tzdata_zones) - legacy_timezones.keys() - {"Factory"})

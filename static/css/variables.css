@@ -1,5 +1,5 @@
-/* The status palette. The report and nag emails repeat it inline, and base_bare.html and
-   check_token_submit.html repeat --hc-confirm. Greys, borders and tints use Bootstrap's --bs-* tokens. */
+/* The status palette. The emails, base_bare.html and check_token_submit.html repeat its values inline.
+   Greys, borders and tints use Bootstrap's --bs-* tokens. */
 :root {
     color-scheme: light;
     --hc-up: #5cb85c;

@@ -1,6 +1,5 @@
-// The ESLint hook in .pre-commit-config.yaml lints our own page scripts with two rules and no
-// formatter. CommonJS, because pre-commit installs `globals` into its own Node environment,
-// which require() finds through NODE_PATH and an ES import does not.
+// CommonJS, because pre-commit installs `globals` into its own Node environment, which require() finds
+// through NODE_PATH and an ES import does not.
 const globals = require("globals");
 
 module.exports = [
