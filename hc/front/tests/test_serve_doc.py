@@ -1,3 +1,4 @@
+import re
 from unittest.mock import Mock, patch
 
 from django.test import TestCase
@@ -33,6 +34,15 @@ class ServeDocTestCase(TestCase):
     def test_it_does_not_replace_placeholders_in_self_hosted_docs(self) -> None:
         r = self.client.get("/docs/self_hosted_configuration/")
         self.assertContains(r, '<a href="#SITE_ROOT">SITE_ROOT</a>', status_code=200)
+
+    def test_it_serves_running_from_source(self) -> None:
+        r = self.client.get("/docs/self_hosted_source/")
+        self.assertContains(r, "<h1>Running from Source</h1>", status_code=200)
+
+    def test_it_lists_self_hosted_pages_docker_first(self) -> None:
+        r = self.client.get("/docs/self_hosted/")
+        slugs = re.findall(r'href="/docs/(self_hosted\w*)/"', r.content.decode())
+        self.assertEqual(slugs, ["self_hosted", "self_hosted_docker", "self_hosted_configuration", "self_hosted_source"])
 
     @override_settings(PING_BODY_LIMIT=1234)
     def test_it_formats_ping_body_limit_in_bytes(self) -> None:

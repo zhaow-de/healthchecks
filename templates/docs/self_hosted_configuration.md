@@ -2,6 +2,9 @@
 
 Healthchecks prepares its configuration in `hc/settings.py`. It reads configuration
 from environment variables. Below is a list of environment variables it reads and uses.
+With Docker, set them in `.env` beside `docker-compose.yml` (see
+[Running with Docker](../self_hosted_docker/#getting-started)); from source, in the
+environment of every process (see [Running from Source](../self_hosted_source/#production)).
 
 How the values are read:
 
@@ -85,12 +88,11 @@ ADMINS=alice@example.org,bob@example.org
 Note: for error notifications to work, make sure you have also specified working
 SMTP credentials in the `EMAIL_...` environment variables.
 
-The [`sendlogs`](../self_hosted/#sending-notifications) management command also
-emails these addresses, with the count of log records written in the last 24
-hours. Django sends this mail with the subject prefix "[Django] " and from its
+Django sends these emails with the subject prefix "[Django] " and from its
 `SERVER_EMAIL` setting, which no environment variable sets, so the sender is
 `root@localhost`; if your SMTP server rejects that sender, set `SERVER_EMAIL` in
-`hc/local_settings.py`.
+`hc/local_settings.py`. Healthchecks' own warnings and errors are not emailed: they
+go to the console only (see [Logs](../self_hosted/#logs)).
 
 ## `ALLOWED_HOSTS` {: #ALLOWED_HOSTS }
 
@@ -148,7 +150,18 @@ This is a standard Django setting, read more in
 
 ## `DB_NAME` {: #DB_NAME }
 
-Default: `hc` (PostgreSQL) or `/path/to/projectdir/hc.sqlite` (SQLite)
+Default: `hc` (PostgreSQL) or `/path/to/projectdir/hc.sqlite` (SQLite); the Docker
+image sets `/data/hc.sqlite`
+
+The PostgreSQL database name, or the path of the SQLite database file. The Docker
+image sets `DB_NAME=/data/hc.sqlite`, a file in its `/data` volume. With
+`DB=postgres`, set `DB_NAME` as well, as `docker-compose.postgres.yml` does: left as
+it is, the image's path names the PostgreSQL database.
+
+When SQLite creates the database file, Healthchecks sets it to incremental
+auto-vacuum, which lets the daily `prune` give the space of deleted rows back to the
+file system. A file that already exists keeps its auto-vacuum mode until a `VACUUM`
+changes it (see [Data Retention](../self_hosted/#database-cleanup)).
 
 This is a standard Django setting, read more in
 [Django documentation](https://docs.djangoproject.com/en/6.1/ref/settings/#name).
@@ -202,6 +215,9 @@ Default: `True`
 A boolean that turns on/off debug mode.
 
 _Never run a Healthchecks instance in production with the debug mode turned on!_
+
+The Docker image does not set it, so a container runs with `True` unless `.env`
+sets `DEBUG=False`, as the sample `.env.example` does.
 
 This is a standard Django setting, read more in
 [Django documentation](https://docs.djangoproject.com/en/6.1/ref/settings/#debug).
@@ -420,11 +436,8 @@ the process's local time (UTC in the Docker image).
 Neither `manage.py runserver` nor the Docker image's uWSGI writes a line per HTTP
 request. A uWSGI you run yourself does unless it is started with `--disable-logging`.
 
-Whatever this setting, records at WARNING and above from Healthchecks' own `hc`
-loggers, and the server errors (5xx) Django logs for requests, are also stored in
-the database and shown in Site Administration › Logs › Records. They are never
-pruned automatically; [`sendlogs`](../self_hosted/#sending-notifications) can email
-a daily count of them to [ADMINS](#ADMINS).
+The console is the only log: Healthchecks stores no log records (see
+[Logs](../self_hosted/#logs)).
 
 ## `METRICS_KEY` {: #METRICS_KEY }
 

@@ -1214,10 +1214,10 @@ flips for a given check. Filters given together all apply.
 
 Notes about flip retention: when a check prunes its old pings, SITE_NAME also removes
 the check's flips that are older than 93 days, enough for the current month and the
-two full months before it, and older than the check's oldest kept ping too. Pruning
-happens on every 100th ping and when the server's operator runs the `prunepingsslow`
-management command; until then, this API call returns these flips as well. Clearing a
-check's events in the web UI removes all of its flips at once.
+two full months before it, and older than the check's oldest kept ping too; a flip
+whose alerts have not been sent yet stays. Pruning happens on every 100th ping and in
+the server's daily cleanup; until then, this API call returns these flips as well.
+Clearing a check's events in the web UI removes all of its flips at once.
 
 **Authentication:** a read-write or a read-only key, in the `X-Api-Key` header.
 
