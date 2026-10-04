@@ -515,12 +515,10 @@ setting, read more about it in
 path unchanged, without stripping the prefix.</p>
 <p>A trailing slash is removed. A value that does not start with <code>http://</code> or
 <code>https://</code> triggers the warning <code>hc.api.W001</code>.</p>
-<p><strong>On using <code>local_settings.py</code>:</strong> Healthchecks only sets the above additional settings
-if you specify <code>SITE_ROOT</code> via an environment variable. If you instead specify it in
-<code>local_settings.py</code>, you will also need to set <code>ALLOWED_HOSTS</code>, <code>LOGIN_URL</code>,
-<code>STATIC_URL</code>, <code>SESSION_COOKIE_SECURE</code>, <code>CSRF_COOKIE_SECURE</code> and
-<code>CSRF_TRUSTED_ORIGINS</code> there. The route prefix follows <code>SITE_ROOT</code> wherever it is
-set.</p>
+<p><strong>On using <code>local_settings.py</code>:</strong> the settings above, the route prefix and the default
+of <a href="#PING_ENDPOINT">PING_ENDPOINT</a> follow <code>SITE_ROOT</code> wherever it is set, in the
+environment or in <code>local_settings.py</code>, and its trailing slash is removed either way.
+One of those settings that <code>local_settings.py</code> sets itself keeps that value.</p>
 <h2 id="SLACK_CLIENT_ID"><code>SLACK_CLIENT_ID</code></h2>
 <p>Default: <code>None</code></p>
 <p>The Slack Client ID, used by the Healthchecks integration for Slack.</p>

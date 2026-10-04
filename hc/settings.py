@@ -255,50 +255,69 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-SITE_ROOT = os.getenv("SITE_ROOT", "http://localhost:8000").removesuffix("/")
+# A trailing slash is removed after hc/local_settings.py, wherever SITE_ROOT is set
+SITE_ROOT = os.getenv("SITE_ROOT", "http://localhost:8000")
 SITE_NAME = os.getenv("SITE_NAME", "Healthchecks")
-PING_ENDPOINT = os.getenv("PING_ENDPOINT", SITE_ROOT + "/ping/")
+# Unset, it is SITE_ROOT + "/ping/", which site_root_settings() fills in
+PING_ENDPOINT = os.getenv("PING_ENDPOINT")
 PING_BODY_LIMIT = envint("PING_BODY_LIMIT", "10000")
 # If PING_BODY_LIMIT is higher than the default value for DATA_UPLOAD_MAX_MEMORY_SIZE,
 # then we need to bump up DATA_UPLOAD_MAX_MEMORY_SIZE too:
 if PING_BODY_LIMIT and PING_BODY_LIMIT > 2621440:
     DATA_UPLOAD_MAX_MEMORY_SIZE = PING_BODY_LIMIT
-_site_root_parts = urlparse(SITE_ROOT)
-LOGIN_URL = f"{_site_root_parts.path}/accounts/login/"
-STATIC_URL = f"{_site_root_parts.path}/static/"
-if v := os.getenv("ALLOWED_HOSTS"):
-    # If ALLOWED_HOSTS is set in environment, use it
-    ALLOWED_HOSTS = v.split(",")
-else:
-    # Otherwise, populate it with the domain from SITE_ROOT
-    domain, _ = split_domain_port(_site_root_parts.netloc)
-    ALLOWED_HOSTS = [domain]
-
-# On an https SITE_ROOT the session, messages, hc-device, auto-login and CSRF cookies are Secure
-SESSION_COOKIE_SECURE = CSRF_COOKIE_SECURE = _site_root_parts.scheme == "https"
-# A form posted from SITE_ROOT passes the CSRF origin check even when the proxy
-# does not tell Django the request came over https
-CSRF_TRUSTED_ORIGINS = [f"{_site_root_parts.scheme}://{_site_root_parts.netloc}"]
 SECURE_HSTS_SECONDS = envint("SECURE_HSTS_SECONDS", "0")
-# SECURE_SSL_REDIRECT stays off: pings may come over http, and docker/fetchstatus.py
-# does. Turned on in local_settings.py, it leaves these paths alone.
-_url_prefix = re.escape(f"{_site_root_parts.path.lstrip('/')}/") if _site_root_parts.path else ""
-SECURE_REDIRECT_EXEMPT = [rf"^{_url_prefix}ping/", rf"^{_url_prefix}api/v3/status/?$"]
-# An inline <script> or <style> needs {% csp_nonce_attr %}. The data: images are the
-# stylesheets' inline SVG icons and the TOTP QR code. The details page's "Ping Now!"
-# posts to PING_ENDPOINT, which may be on another origin.
-_ping_endpoint_parts = urlparse(PING_ENDPOINT)
-SECURE_CSP = {
-    "default-src": [CSP.SELF],
-    "script-src": [CSP.SELF, CSP.NONCE],
-    "style-src": [CSP.SELF, CSP.NONCE],
-    "img-src": [CSP.SELF, "data:"],
-    "connect-src": [CSP.SELF, f"{_ping_endpoint_parts.scheme}://{_ping_endpoint_parts.netloc}"],
-    "object-src": [CSP.NONE],
-    "base-uri": [CSP.SELF],
-    "form-action": [CSP.SELF],
-    "frame-ancestors": [CSP.NONE],
-}
+
+
+def site_root_settings(site_root: str, ping_endpoint: str | None, allowed_hosts: str | None) -> dict[str, Any]:
+    """The settings that follow SITE_ROOT and PING_ENDPOINT.
+
+    It runs after hc/local_settings.py, on the final values of both, so a SITE_ROOT
+    set there reaches them too; allowed_hosts is the ALLOWED_HOSTS environment variable.
+    """
+    site_root_parts = urlparse(site_root)
+    if ping_endpoint is None:
+        ping_endpoint = site_root + "/ping/"
+    ping_endpoint_parts = urlparse(ping_endpoint)
+    if allowed_hosts:
+        # If ALLOWED_HOSTS is set in environment, use it
+        hosts = allowed_hosts.split(",")
+    else:
+        # Otherwise, populate it with the domain from SITE_ROOT
+        domain, _ = split_domain_port(site_root_parts.netloc)
+        hosts = [domain]
+    # On an https SITE_ROOT the session, messages, hc-device, auto-login and CSRF cookies are Secure
+    secure = site_root_parts.scheme == "https"
+    url_prefix = re.escape(f"{site_root_parts.path.lstrip('/')}/") if site_root_parts.path else ""
+
+    return {
+        "PING_ENDPOINT": ping_endpoint,
+        "LOGIN_URL": f"{site_root_parts.path}/accounts/login/",
+        "STATIC_URL": f"{site_root_parts.path}/static/",
+        "ALLOWED_HOSTS": hosts,
+        "SESSION_COOKIE_SECURE": secure,
+        "CSRF_COOKIE_SECURE": secure,
+        # A form posted from SITE_ROOT passes the CSRF origin check even when the proxy
+        # does not tell Django the request came over https
+        "CSRF_TRUSTED_ORIGINS": [f"{site_root_parts.scheme}://{site_root_parts.netloc}"],
+        # SECURE_SSL_REDIRECT stays off: pings may come over http, and docker/fetchstatus.py
+        # does. Turned on in local_settings.py, it leaves these paths alone.
+        "SECURE_REDIRECT_EXEMPT": [rf"^{url_prefix}ping/", rf"^{url_prefix}api/v3/status/?$"],
+        # An inline <script> or <style> needs {% csp_nonce_attr %}. The data: images are the
+        # stylesheets' inline SVG icons and the TOTP QR code. The details page's "Ping Now!"
+        # posts to PING_ENDPOINT, which may be on another origin.
+        "SECURE_CSP": {
+            "default-src": [CSP.SELF],
+            "script-src": [CSP.SELF, CSP.NONCE],
+            "style-src": [CSP.SELF, CSP.NONCE],
+            "img-src": [CSP.SELF, "data:"],
+            "connect-src": [CSP.SELF, f"{ping_endpoint_parts.scheme}://{ping_endpoint_parts.netloc}"],
+            "object-src": [CSP.NONE],
+            "base-uri": [CSP.SELF],
+            "form-action": [CSP.SELF],
+            "frame-ancestors": [CSP.NONE],
+        },
+    }
+
 
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "static-collected"
@@ -371,8 +390,18 @@ INTEGRATIONS_ALLOW_PRIVATE_IPS = envbool("INTEGRATIONS_ALLOW_PRIVATE_IPS", "Fals
 
 # Read additional configuration from hc/local_settings.py if it exists. The star import
 # is the override: every name it defines replaces the one above.
+_local_names: set[str] = set()
 if (BASE_DIR / "hc/local_settings.py").exists():
+    from . import local_settings as _local_settings
     from .local_settings import *  # noqa: F403
+
+    _local_names = set(vars(_local_settings))
+
+SITE_ROOT = SITE_ROOT.removesuffix("/")
+# A setting that hc/local_settings.py sets itself keeps its value
+for _name, _value in site_root_settings(SITE_ROOT, PING_ENDPOINT, os.getenv("ALLOWED_HOSTS")).items():
+    if _name not in _local_names:
+        globals()[_name] = _value
 
 # Overrides for testing
 if sys.argv[1:2] == ["test"] or "pytest" in sys.modules:

@@ -1,5 +1,6 @@
 import os
 import sqlite3
+import sys
 import tempfile
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
@@ -13,15 +14,29 @@ from django.db import connection
 from django.db.backends.sqlite3.base import DatabaseWrapper
 from django.test import SimpleTestCase, TestCase
 
+import hc
 
-def settings_module(**env: str) -> ModuleType:
-    """hc/settings.py executed with env in place of the process's DB* variables."""
+
+def settings_module(local_settings: dict[str, Any] | None = None, **env: str) -> ModuleType:
+    """hc/settings.py executed with env in place of the process's DB* variables, and
+    with the names in local_settings, none by default, as hc/local_settings.py.
+    """
     environ = {k: v for k, v in os.environ.items() if not k.startswith("DB")}
-    # A name in the hc package, so that its import of .local_settings resolves
+    stub = ModuleType("hc.local_settings")
+    vars(stub).update(local_settings or {})
+    local_path = settings.BASE_DIR / "hc" / "local_settings.py"
+    exists = Path.exists
+
+    # A name in the hc package, so that its import of .local_settings resolves to the stub
     spec = spec_from_file_location("hc.settings_under_test", settings.BASE_DIR / "hc" / "settings.py")
     assert spec and spec.loader
     module = module_from_spec(spec)
-    with patch.dict(os.environ, {**environ, **env}, clear=True):
+    with (
+        patch.dict(os.environ, {**environ, **env}, clear=True),
+        patch.dict(sys.modules, {"hc.local_settings": stub}),
+        patch.object(hc, "local_settings", stub, create=True),
+        patch.object(Path, "exists", autospec=True, side_effect=lambda p: p == local_path or exists(p)),
+    ):
         spec.loader.exec_module(module)
     return module
 

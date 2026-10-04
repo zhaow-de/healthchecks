@@ -2,6 +2,7 @@ import os
 import re
 import time
 from types import ModuleType
+from typing import Any
 from unittest.mock import patch
 
 from django.conf import settings
@@ -12,6 +13,7 @@ from django.test.utils import override_settings
 
 from hc.api.models import Check
 from hc.api.tests.test_database import settings_module
+from hc.settings import site_root_settings
 from hc.test import BaseTestCase
 
 POLICY = (
@@ -21,11 +23,11 @@ POLICY = (
 )
 
 
-def without_env(name: str, **env: str) -> ModuleType:
-    """hc/settings.py executed with env and without the variable name."""
+def without_env(name: str, local_settings: dict[str, Any] | None = None, **env: str) -> ModuleType:
+    """hc/settings.py executed with env and local_settings, and without the variable name."""
     with patch.dict(os.environ):
         os.environ.pop(name, None)
-        return settings_module(**env)
+        return settings_module(local_settings, **env)
 
 
 class SecuritySettingsTestCase(SimpleTestCase):
@@ -54,6 +56,41 @@ class SecuritySettingsTestCase(SimpleTestCase):
 
         module = settings_module(SITE_ROOT="https://hc.example.org", PING_ENDPOINT="https://ping.example.org/p/")
         self.assertEqual(module.SECURE_CSP["connect-src"], ["'self'", "https://ping.example.org"])
+
+    def test_it_derives_the_site_root_settings(self) -> None:
+        derived = site_root_settings("https://hc.example.org:8443/hc", "https://ping.example.org/p/", None)
+        self.assertEqual(derived["PING_ENDPOINT"], "https://ping.example.org/p/")
+        self.assertEqual(derived["LOGIN_URL"], "/hc/accounts/login/")
+        self.assertEqual(derived["STATIC_URL"], "/hc/static/")
+        self.assertEqual(derived["ALLOWED_HOSTS"], ["hc.example.org"])
+        self.assertIs(derived["SESSION_COOKIE_SECURE"], True)
+        self.assertIs(derived["CSRF_COOKIE_SECURE"], True)
+        self.assertEqual(derived["CSRF_TRUSTED_ORIGINS"], ["https://hc.example.org:8443"])
+        self.assertEqual(derived["SECURE_REDIRECT_EXEMPT"], [r"^hc/ping/", r"^hc/api/v3/status/?$"])
+        self.assertEqual(derived["SECURE_CSP"]["connect-src"], ["'self'", "https://ping.example.org"])
+
+        derived = site_root_settings("https://hc.example.org:8443/hc", None, "a.example.org,b.example.org")
+        self.assertEqual(derived["PING_ENDPOINT"], "https://hc.example.org:8443/hc/ping/")
+        self.assertEqual(derived["SECURE_CSP"]["connect-src"], ["'self'", "https://hc.example.org:8443"])
+        self.assertEqual(derived["ALLOWED_HOSTS"], ["a.example.org", "b.example.org"])
+
+    def test_a_site_root_in_local_settings_reaches_the_derived_settings(self) -> None:
+        local = {"SITE_ROOT": "https://hc.example.org/hc/", "PING_ENDPOINT": "https://ping.example.org/p/"}
+        module = settings_module(local, SITE_ROOT="http://localhost:8000", ALLOWED_HOSTS="")
+        self.assertEqual(module.SITE_ROOT, "https://hc.example.org/hc")
+        derived = site_root_settings("https://hc.example.org/hc", "https://ping.example.org/p/", None)
+        self.assertEqual({name: getattr(module, name) for name in derived}, derived)
+
+        # PING_ENDPOINT's default follows a SITE_ROOT set there too
+        module = without_env("PING_ENDPOINT", local_settings={"SITE_ROOT": "https://hc.example.org"})
+        self.assertEqual(module.PING_ENDPOINT, "https://hc.example.org/ping/")
+
+    def test_a_derived_setting_in_local_settings_keeps_its_value(self) -> None:
+        local = {"SITE_ROOT": "https://hc.example.org", "LOGIN_URL": "/login/", "SECURE_CSP": {}}
+        module = settings_module(local)
+        self.assertEqual(module.LOGIN_URL, "/login/")
+        self.assertEqual(module.SECURE_CSP, {})
+        self.assertIs(module.SESSION_COOKIE_SECURE, True)
 
     def test_hsts_is_off_unless_set(self) -> None:
         self.assertEqual(without_env("SECURE_HSTS_SECONDS").SECURE_HSTS_SECONDS, 0)

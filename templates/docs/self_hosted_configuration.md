@@ -688,12 +688,10 @@ path unchanged, without stripping the prefix.
 A trailing slash is removed. A value that does not start with `http://` or
 `https://` triggers the warning `hc.api.W001`.
 
-**On using `local_settings.py`:** Healthchecks only sets the above additional settings
-if you specify `SITE_ROOT` via an environment variable. If you instead specify it in
-`local_settings.py`, you will also need to set `ALLOWED_HOSTS`, `LOGIN_URL`,
-`STATIC_URL`, `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE` and
-`CSRF_TRUSTED_ORIGINS` there. The route prefix follows `SITE_ROOT` wherever it is
-set.
+**On using `local_settings.py`:** the settings above, the route prefix and the default
+of [PING_ENDPOINT](#PING_ENDPOINT) follow `SITE_ROOT` wherever it is set, in the
+environment or in `local_settings.py`, and its trailing slash is removed either way.
+One of those settings that `local_settings.py` sets itself keeps that value.
 
 ## `SLACK_CLIENT_ID` {: #SLACK_CLIENT_ID }
 
