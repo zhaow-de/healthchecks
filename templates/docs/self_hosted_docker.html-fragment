@@ -528,7 +528,7 @@ turn it on with
 <a href="../self_hosted_configuration/#SECURE_HSTS_SECONDS">SECURE_HSTS_SECONDS</a>. It changes
 nothing for your jobs' pings: curl keeps no HSTS list unless it runs with <code>--hsts</code>,
 and a client that keeps one only moves its pings to HTTPS.</p>
-<p>Every response carries an enforced <code>Content-Security-Policy</code>, so the proxy needs to
+<p>Every page carries an enforced <code>Content-Security-Policy</code>, so the proxy needs to
 add none. If you customise a template, an inline <code>&lt;script&gt;</code> or <code>&lt;style&gt;</code> element
 needs <code>{% csp_nonce_attr %}</code> in its tag, and a <code>style</code> attribute or an inline event
 handler such as <code>onclick</code> has to move to a static file: the browser blocks them

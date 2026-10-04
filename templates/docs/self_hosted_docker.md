@@ -579,7 +579,7 @@ turn it on with
 nothing for your jobs' pings: curl keeps no HSTS list unless it runs with `--hsts`,
 and a client that keeps one only moves its pings to HTTPS.
 
-Every response carries an enforced `Content-Security-Policy`, so the proxy needs to
+Every page carries an enforced `Content-Security-Policy`, so the proxy needs to
 add none. If you customise a template, an inline `<script>` or `<style>` element
 needs `{% csp_nonce_attr %}` in its tag, and a `style` attribute or an inline event
 handler such as `onclick` has to move to a static file: the browser blocks them
