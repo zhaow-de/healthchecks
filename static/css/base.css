@@ -4,6 +4,12 @@ html {
     scrollbar-gutter: stable;
 }
 
+body.modal-open {
+    /* Bootstrap pads the body by the scrollbar's width while a modal hides the scrollbar;
+       the stable gutter already keeps that width, so the padding would shift the page */
+    padding-right: 0 !important;
+}
+
 #logo {
     max-height: 50px;
 }
