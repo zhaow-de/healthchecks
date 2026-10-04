@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import time
 from email.utils import make_msgid
 from smtplib import SMTPDataError, SMTPServerDisconnected
@@ -10,15 +11,25 @@ from django.conf import settings
 from django.core.mail import EmailMultiAlternatives as Message
 from django.template.loader import render_to_string as render
 
+logger = logging.getLogger(__name__)
+
 
 class EmailThread(Thread):
     MAX_TRIES = 3
 
     def __init__(self, message: Message) -> None:
-        Thread.__init__(self)
+        super().__init__()
         self.message = message
 
     def run(self) -> None:
+        # On the background thread no caller sees the exception, and threading's
+        # excepthook would only print it to stderr
+        try:
+            self.deliver()
+        except Exception:
+            logger.exception("Failed to send email")
+
+    def deliver(self) -> None:
         for attempt in range(self.MAX_TRIES):
             try:
                 self.message.send()
@@ -70,7 +81,7 @@ def send(message: Message, block: bool = False) -> None:
     if block or hasattr(settings, "BLOCKING_EMAILS"):
         # In tests, we send emails synchronously
         # so we can inspect the outgoing messages
-        t.run()
+        t.deliver()
     else:
         # Outside tests, we send emails on thread,
         # so there is no delay for the user.

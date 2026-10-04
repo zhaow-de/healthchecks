@@ -100,15 +100,20 @@ def add_complete(request: AuthenticatedHttpRequest) -> HttpResponse:
         "client_secret": settings.SLACK_CLIENT_SECRET,
         "code": request.GET.get("code"),
     }
-    result = curl.post("https://slack.com/api/oauth.v2.access", data)
+    try:
+        result = curl.post("https://slack.com/api/oauth.v2.access", data)
+        doc = result.json()
+        response: object = result.content
+    except (curl.CurlError, ValueError) as e:
+        # ValueError covers a body that is not JSON or not UTF-8
+        doc, response = None, e
 
-    doc = result.json()
     if not isinstance(doc, dict) or not doc.get("ok"):
         messages.warning(
             request,
             "Received an unexpected response from Slack. Integration not added.",
         )
-        logger.warning("Unexpected Slack OAuth response: %s", result.content)
+        logger.warning("Unexpected Slack OAuth response: %s", response)
         return redirect("hc-channels", project.code)
 
     channel = Channel(kind="slack", project=project)

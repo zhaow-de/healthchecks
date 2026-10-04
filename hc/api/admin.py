@@ -60,7 +60,7 @@ class ChecksAdmin(ModelAdmin[Check]):
     def name_tags(self, obj: Check) -> str:
         url = obj.get_absolute_url()
         name = obj.name or "unnamed"
-        tmpl = """<a href="{}"">{}</a>"""
+        tmpl = """<a href="{}">{}</a>"""
         args = [url, name]
         for tag in obj.tags_list():
             tmpl += " <span>{}</span>"

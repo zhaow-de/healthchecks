@@ -44,6 +44,7 @@ from hc.lib.tz import all_timezones, legacy_timezones
 
 class BadChannelError(Exception):
     def __init__(self, message: str):
+        super().__init__(message)
         self.message = message
 
 

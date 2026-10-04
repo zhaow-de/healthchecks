@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import shutil
 import tempfile
 from io import StringIO
@@ -9,6 +8,7 @@ from unittest.mock import patch
 
 from django.conf import settings
 from django.core.management import call_command
+from django.test.utils import override_settings
 
 from hc.test import BaseTestCase
 
@@ -27,22 +27,20 @@ class PygmentizeTestCase(BaseTestCase):
     def setUp(self) -> None:
         super().setUp()
 
-        # The command reads and writes templates/front/snippets relative to the
-        # working directory, so run it in a scratch copy of that directory.
+        # The command reads and writes templates/front/snippets under BASE_DIR,
+        # so run it against a scratch copy of that directory.
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
-        self.snippets = Path(tmp.name) / "templates" / "front" / "snippets"
+        self.base_dir = Path(tmp.name)
+        self.snippets = self.base_dir / "templates" / "front" / "snippets"
         self.snippets.mkdir(parents=True)
         for src in (settings.BASE_DIR / "templates" / "front" / "snippets").glob("*.txt"):
             shutil.copy(src, self.snippets / src.name)
 
-        cwd = Path.cwd()
-        os.chdir(tmp.name)
-        self.addCleanup(os.chdir, cwd)
-
     def run_command(self) -> str:
         stdout = StringIO()
-        call_command("pygmentize", stdout=stdout)
+        with override_settings(BASE_DIR=self.base_dir):
+            call_command("pygmentize", stdout=stdout)
         return stdout.getvalue()
 
     def test_it_highlights_every_snippet(self) -> None:

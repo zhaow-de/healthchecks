@@ -4,6 +4,7 @@ import re
 import sqlite3
 from collections import Counter, defaultdict
 from collections.abc import Iterable
+from contextlib import closing
 from datetime import datetime
 from datetime import timedelta as td
 from itertools import islice
@@ -417,10 +418,7 @@ def serve_doc(request: HttpRequest, doc: str = "introduction") -> HttpResponse:
     if not path.exists():
         raise Http404("not found")
 
-    with path.open("r", encoding="utf-8") as f:
-        content = f.read()
-
-    content = _replace_placeholders(doc, content)
+    content = _replace_placeholders(doc, path.read_text(encoding="utf-8"))
     ctx = {
         "page": "docs",
         "section": doc,
@@ -448,11 +446,9 @@ def docs_search(request: HttpRequest) -> HttpResponse:
     # Wrap the query in double quotes to get a valid FTS string
     # https://www.sqlite.org/fts5.html#full_text_query_syntax
     q = f'"{form.cleaned_data["q"]}"'
-    con = sqlite3.connect(settings.BASE_DIR / "search.db")
-    cur = con.cursor()
-    res = cur.execute(query, (q,))
+    with closing(sqlite3.connect(settings.BASE_DIR / "search.db")) as con:
+        ctx = {"results": con.execute(query, (q,)).fetchall()}
 
-    ctx = {"results": res.fetchall()}
     return render(request, "front/docs_search.html", ctx)
 
 
@@ -515,16 +511,18 @@ def filtering_rules(request: AuthenticatedHttpRequest, code: UUID) -> HttpRespon
     check = _get_check_for_user(request, code)
 
     form = forms.FilteringRulesForm(request.POST)
-    if form.is_valid():
-        update_fields = ["filter_http_body", "methods", "manual_resume"]
-        # The dialog disables the keyword inputs while HTTP body filtering is off, so they
-        # arrive empty. Clear the stored keywords then only if the inert API v3 email flags
-        # do not keep them: an API client may have set the keywords along with those flags.
-        if form.cleaned_data["filter_http_body"] or not (check.filter_subject or check.filter_body):
-            update_fields += ["filter_default_fail", "start_kw", "success_kw", "failure_kw"]
-        for field in update_fields:
-            setattr(check, field, form.cleaned_data[field])
-        check.save(update_fields=update_fields)
+    if not form.is_valid():
+        return HttpResponseBadRequest()
+
+    update_fields = ["filter_http_body", "methods", "manual_resume"]
+    # The dialog disables the keyword inputs while HTTP body filtering is off, so they
+    # arrive empty. Clear the stored keywords then only if the inert API v3 email flags
+    # do not keep them: an API client may have set the keywords along with those flags.
+    if form.cleaned_data["filter_http_body"] or not (check.filter_subject or check.filter_body):
+        update_fields += ["filter_default_fail", "start_kw", "success_kw", "failure_kw"]
+    for field in update_fields:
+        setattr(check, field, form.cleaned_data[field])
+    check.save(update_fields=update_fields)
 
     return redirect("hc-details", code)
 
@@ -562,6 +560,8 @@ def update_timeout(request: AuthenticatedHttpRequest, code: UUID) -> HttpRespons
         check.schedule = oncalendar_form.cleaned_data["schedule"]
         check.tz = oncalendar_form.cleaned_data["tz"]
         check.grace = oncalendar_form.cleaned_data["grace"]
+    else:
+        return HttpResponseBadRequest()
 
     check.alert_after = check.going_down_after()
     check_saved = False
@@ -1091,9 +1091,11 @@ def update_channel_name(request: AuthenticatedHttpRequest, code: UUID) -> HttpRe
     channel = _get_channel_for_user(request, code)
 
     form = forms.ChannelNameForm(request.POST)
-    if form.is_valid():
-        channel.name = form.cleaned_data["name"]
-        channel.save()
+    if not form.is_valid():
+        return HttpResponseBadRequest()
+
+    channel.name = form.cleaned_data["name"]
+    channel.save()
 
     return redirect("hc-channels", channel.project.code)
 

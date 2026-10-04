@@ -118,8 +118,8 @@ class SudoModeTestCase(BaseTestCase):
         self.client.login(username="alice@example.org", password="password")
 
         r = self.client.get(self.url)
-        self.assertContains(r, "has not set up email")
-        self.assertContains(r, "manage.py changepassword")
+        self.assertContains(r, "<p>This page needs a confirmation code sent by email, and this server cannot send email.</p>")
+        self.assertContains(r, "<p>To set a new password without it, run <code>manage.py changepassword</code> from the shell.</p>")
         self.assertNotContains(r, "Please pick a password")
         self.assertNotIn("sudo_code", self.client.session)
         self.assertFalse(TokenBucket.objects.filter(value=f"sudo-{self.alice.id}").exists())

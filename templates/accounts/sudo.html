@@ -7,11 +7,8 @@
             {% if no_mail %}
             <h1>Email Needed</h1>
             <br />
-            <p>
-                Confirming it is you takes a code sent by email, and this site
-                has not set up email. To set a new password, run
-                <code>manage.py changepassword</code> from the shell.
-            </p>
+            <p>This page needs a confirmation code sent by email, and this server cannot send email.</p>
+            <p>To set a new password without it, run <code>manage.py changepassword</code> from the shell.</p>
             {% else %}
             <h1>Enter a Confirmation Code</h1>
             <br />

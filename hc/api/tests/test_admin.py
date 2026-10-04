@@ -40,8 +40,8 @@ class ApiAdminTestCase(BaseTestCase):
         r = self.client.get(reverse("admin:api_check_changelist"))
 
         # The name and the tags, escaped
-        self.assertContains(r, ">Backup &amp; Restore</a> <span>foo</span> <span>bar</span>")
-        self.assertContains(r, self.check.get_absolute_url())
+        url = self.check.get_absolute_url()
+        self.assertContains(r, f'<a href="{url}">Backup &amp; Restore</a> <span>foo</span> <span>bar</span>')
         self.assertContains(r, ">unnamed</a>")
         self.assertContains(r, charlies_check.get_absolute_url())
 

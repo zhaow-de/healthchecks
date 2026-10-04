@@ -40,5 +40,5 @@ class Handler(logging.Handler):
                 message=record.getMessage(),
                 traceback=traceback,
             )
-        except Error as e:
-            print(e)
+        except Error:
+            self.handleError(record)

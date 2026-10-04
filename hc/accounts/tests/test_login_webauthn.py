@@ -112,6 +112,13 @@ class LoginWebAuthnTestCase(BaseTestCase):
         self.assertEqual(r.status_code, 400)
 
     @patch("hc.accounts.views.GetHelper.verify")
+    def test_it_rejects_post_without_state(self, mock_verify: Mock) -> None:
+        r = self.client.post(self.url, {"response": "dummy response"})
+        self.assertEqual(r.status_code, 400)
+        self.assertFalse(mock_verify.called)
+        self.assertNotIn("_auth_user_id", self.client.session)
+
+    @patch("hc.accounts.views.GetHelper.verify")
     def test_it_rejects_missing_response(self, mock_verify: Mock) -> None:
         session = self.client.session
         session["state"] = "dummy-state"

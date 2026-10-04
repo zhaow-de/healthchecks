@@ -22,6 +22,14 @@ class UpdateChannelNameTestCase(BaseTestCase):
         self.channel.refresh_from_db()
         self.assertEqual(self.channel.name, "My work email")
 
+    def test_it_rejects_invalid_name(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.post(self.url, data={"name": "x" * 101})
+        self.assertEqual(r.status_code, 400)
+
+        self.channel.refresh_from_db()
+        self.assertEqual(self.channel.name, "")
+
     def test_it_checks_ownership(self) -> None:
         payload = {"name": "Charlie Sent This"}
 

@@ -26,6 +26,7 @@ def get_ping_body(ping: Ping | None, maxlen: int | None = None) -> str | None:
 
 class TransportError(Exception):
     def __init__(self, message: str, permanent: bool = False) -> None:
+        super().__init__(message)
         self.message = message
         self.permanent = permanent
 

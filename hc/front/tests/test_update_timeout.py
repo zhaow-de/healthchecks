@@ -35,6 +35,16 @@ class UpdateTimeoutTestCase(BaseTestCase):
         expected_aa = self.check.last_ping + td(seconds=3600 + 60)
         self.assertEqual(self.check.alert_after, expected_aa)
 
+    def test_it_rejects_unknown_kind(self) -> None:
+        payload = {"kind": "surprise", "timeout": 3600, "grace": 60}
+
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.post(self.url, data=payload)
+        self.assertEqual(r.status_code, 400)
+
+        self.check.refresh_from_db()
+        self.assertIsNone(self.check.alert_after)
+
     def test_redirect_preserves_querystring(self) -> None:
         referer = self.redirect_url + "?tag=foo"
         payload = {"kind": "simple", "timeout": 3600, "grace": 60}

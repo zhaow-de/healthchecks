@@ -490,7 +490,11 @@ def add_webauthn(request: AuthenticatedHttpRequest) -> HttpResponse:
         if not form.is_valid():
             return HttpResponseBadRequest()
 
-        state = request.session["state"]
+        # A POST without the GET that stores the state: a stale tab or a crafted request
+        state = request.session.get("state")
+        if state is None:
+            return HttpResponseBadRequest()
+
         try:
             credential_bytes = helper.verify(state, form.cleaned_data["response"])
         except ValueError:
@@ -620,7 +624,8 @@ def login_webauthn(request: HttpRequest) -> HttpResponse:
         if not form.is_valid():
             return HttpResponseBadRequest()
 
-        if not helper.verify(request.session["state"], form.cleaned_data["response"]):
+        state = request.session.get("state")
+        if state is None or not helper.verify(state, form.cleaned_data["response"]):
             return HttpResponseBadRequest()
 
         request.session.pop("state")

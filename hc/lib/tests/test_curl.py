@@ -179,6 +179,16 @@ class CurlTestCase(SimpleTestCase):
                 self.assertEqual(cm.exception.message, message)
 
     @patch("hc.lib.curl.pycurl.Curl")
+    def test_it_closes_the_handle_on_error(self, mock: Mock) -> None:
+        mock.return_value.perform.side_effect = pycurl.error(pycurl.E_RECV_ERROR, "")
+        with self.assertRaises(CurlError) as cm:
+            request("get", "http://example.org")
+
+        # The message also shows in the exception's str and in tracebacks
+        self.assertEqual(str(cm.exception), f"HTTP request failed, code: {pycurl.E_RECV_ERROR}")
+        mock.return_value.close.assert_called_once_with()
+
+    @patch("hc.lib.curl.pycurl.Curl")
     def test_post_wrapper_passes_arguments(self, mock: Mock) -> None:
         mock.return_value = obj = FakeCurl()
         post("http://example.org", json={"foo": 1}, timeout=7)

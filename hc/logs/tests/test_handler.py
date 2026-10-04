@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import io
 import logging
 import socket
 import sys
-from contextlib import redirect_stdout
 from types import TracebackType
 from unittest.mock import patch
 
@@ -44,13 +42,13 @@ class HandlerTestCase(BaseTestCase):
         self.assertTrue(record.traceback.startswith("Traceback (most recent call last):"))
         self.assertTrue(record.traceback.endswith("ValueError: boom"))
 
-    def test_it_prints_database_error(self) -> None:
-        stdout = io.StringIO()
+    def test_it_reports_database_error_through_handle_error(self) -> None:
+        handler, record = Handler(), self.make_record()
         with (
             patch.object(Record.objects, "create", side_effect=DatabaseError("database is locked")),
-            redirect_stdout(stdout),
+            patch.object(handler, "handleError") as handle_error,
         ):
-            Handler().emit(self.make_record())
+            handler.emit(record)
 
-        self.assertEqual(stdout.getvalue(), "database is locked\n")
+        handle_error.assert_called_once_with(record)
         self.assertFalse(Record.objects.filter(name="hc.test").exists())

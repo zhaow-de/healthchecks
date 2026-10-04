@@ -138,9 +138,9 @@ class SearchForm(forms.Form):
 
 
 class LogFiltersForm(forms.Form):
-    # min_value is 2010-01-01, max_value is 2030-01-01
-    u = forms.FloatField(min_value=1262296800, max_value=1893448800, required=False)
-    end = forms.FloatField(min_value=1262296800, max_value=1893448800, required=False)
+    # min_value is 2009-12-31T22:00Z, max_value is 2100-01-01T00:00Z
+    u = forms.FloatField(min_value=1262296800, max_value=4102444800, required=False)
+    end = forms.FloatField(min_value=1262296800, max_value=4102444800, required=False)
     success = forms.BooleanField(required=False)
     fail = forms.BooleanField(required=False)
     start = forms.BooleanField(required=False)
