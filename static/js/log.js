@@ -48,7 +48,7 @@ hc.ready(function () {
             const data = await r.text();
             const tbody = document.createElement("tbody");
             tbody.innerHTML = data;
-            formatPingDates(tbody.querySelectorAll("tr"));
+            dateFormatter.formatRows(tbody.querySelectorAll("tr"));
             hc.$("#log").replaceChildren(tbody);
             updateNumHits();
             lastUpdated = r.headers.get("X-Last-Event-Timestamp");
@@ -66,21 +66,6 @@ hc.ready(function () {
     hc.on("#end", "change", applyFilters);
     hc.on("#filters input[type=checkbox]", "change", applyFilters);
 
-    hc.on("#log", "click", "tr.ok", function() {
-        const n = this.querySelector("td").textContent;
-        const tmpl = hc.$("#log").dataset.url.slice(0, -2);
-        loadPingDetails(tmpl + n + "/");
-        return false;
-    });
-
-    function formatPingDates(rows) {
-        rows.forEach(function(row) {
-            const dt = new Date(row.dataset.dt * 1000);
-            row.children[1].textContent = dateFormatter.formatDate(dt);
-            row.children[2].textContent = dateFormatter.formatTime(dt);
-        })
-    }
-
     hc.on("#tz-switcher", "click", "[data-tz]", function() {
         const button = this;
         hc.$$("#tz-switcher [data-tz]").forEach(function(el) {
@@ -89,12 +74,12 @@ hc.ready(function () {
         dateFormatter.setTimezone(button.dataset.tz);
         updateSliderPreview();
         formatDateSpans();
-        formatPingDates(document.querySelectorAll("#log tr"));
+        dateFormatter.formatRows(document.querySelectorAll("#log tr"));
     });
 
     updateSliderPreview();
     formatDateSpans();
-    formatPingDates(document.querySelectorAll("#log tr"));
+    dateFormatter.formatRows(document.querySelectorAll("#log tr"));
     // The table is initially hidden to avoid flickering as we convert dates.
     // Once it's ready, set it to visible:
     hc.$("#log").style.visibility = "visible";
@@ -124,7 +109,7 @@ hc.ready(function () {
             const tbody = document.createElement("tbody");
             tbody.setAttribute("class", "new");
             tbody.innerHTML = data;
-            formatPingDates(tbody.querySelectorAll("tr"));
+            dateFormatter.formatRows(tbody.querySelectorAll("tr"));
             document.getElementById("log").prepend(tbody);
             updateNumHits();
             lastUpdated = r.headers.get("X-Last-Event-Timestamp");

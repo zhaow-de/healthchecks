@@ -1,7 +1,4 @@
 hc.ready(function () {
-    const base = hc.base();
-    const favicon = document.querySelector('link[rel="icon"]');
-
     hc.on("#edit-name", "click", function() {
         hc.showModal("#update-name-modal");
         hc.$("#update-name-input").focus();
@@ -9,26 +6,8 @@ hc.ready(function () {
         return false;
     });
 
-    // Configure Tom-Select for entering tags
-    function toOption(tag) {
-        return {value: tag}
-    }
-
-    const allTags = document.getElementById("update-tags-input").getAttribute("data-all-tags");
-    const options = allTags ? allTags.split(" ").map(toOption) : [];
-    new TomSelect("#update-tags-input", {
-        create: true,
-        createOnBlur: true,
-        delimiter: " ",
-        diacritics: false,
-        hideSelected: true,
-        highlight: false,
-        labelField: "value",
-        options: options,
-        refreshThrottle: 0,
-        render: {no_results: () => ""},
-        searchField: ["value"],
-    });
+    const allTags = document.getElementById("update-tags-input").dataset.allTags;
+    hc.tagSelect("#update-tags-input", allTags ? allTags.split(" ") : []);
 
     hc.on("#new-check-alert a", "click", function() {
         const target = document.getElementById(this.dataset.target);
@@ -111,25 +90,13 @@ hc.ready(function () {
 
             if (document.title !== data.title) {
                 document.title = data.title;
-                const downPostfix = data.status === "down" ? "_down" : "";
-                favicon.href = `${base}/static/img/favicon${downPostfix}.svg`;
+                hc.setFavicon(data.status === "down");
             }
         }).catch(function() {});
     }, true);
 
-    hc.on("#events", "click", "tr.ok", function() {
-        const n = this.querySelector("td").textContent;
-        const tmpl = hc.$("#log").dataset.url.slice(0, -2);
-        loadPingDetails(tmpl + n + "/");
-        return false;
-    });
-
     function formatPingDates() {
-        document.querySelectorAll("#log tr").forEach(function(row) {
-            const dt = new Date(row.dataset.dt * 1000);
-            row.children[1].textContent = dateFormatter.formatDate(dt);
-            row.children[2].textContent = dateFormatter.formatTime(dt);
-        })
+        dateFormatter.formatRows(document.querySelectorAll("#log tr"));
 
         // The table is initially hidden to avoid flickering as we convert dates.
         // Once it's ready, set it to visible:
@@ -172,10 +139,7 @@ hc.ready(function () {
                 return;
             }
 
-            navigator.clipboard.writeText(el.textContent).then(
-                () => hc.flashTooltip(el, "Copied!", "Click to copy"),
-                () => hc.flashTooltip(el, "Copy failed", "Click to copy"),
-            );
+            hc.copy(el, el.textContent, "Click to copy");
         });
     });
 
@@ -193,11 +157,4 @@ hc.ready(function () {
             el.disabled = !enableInputs;
         });
     });
-
-    // If the URL hash is #ping-<number>,  open the "Ping Details" dialog
-    if (document.location.hash.indexOf("#ping-") === 0) {
-        const n = parseInt(document.location.hash.slice(6));
-        loadPingDetails(`../pings/${n}/`);
-    }
-
 });

@@ -6,16 +6,13 @@ hc.ready(function() {
     hc.$$(".highlight").forEach(function(el) {
         el.insertAdjacentHTML("beforeend", markup);
         const button = el.lastElementChild;
-        const tip = hc.tooltip(button, {title: "Copied", trigger: "manual"});
+        const tip = hc.tooltip(button, {title: "Copied!", trigger: "manual"});
 
         button.addEventListener("mouseleave", function() {
             tip.hide();
         });
         button.addEventListener("click", function() {
-            navigator.clipboard.writeText(el.innerText).then(
-                () => hc.flashTooltip(button, "Copied"),
-                () => hc.flashTooltip(button, "Copy failed"),
-            );
+            hc.copy(button, el.innerText);
         });
     });
 });

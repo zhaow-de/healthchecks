@@ -1,6 +1,5 @@
 hc.ready(function () {
     const base = hc.base();
-    const favicon = document.querySelector('link[rel="icon"]');
 
     // Check codes are UUIDs and may start with a digit, which is not a valid
     // "#id" CSS selector, so rows are looked up with getElementById.
@@ -354,8 +353,7 @@ hc.ready(function () {
 
             if (document.title !== data.title) {
                 document.title = data.title;
-                const downPostfix = data.title.includes("down") ? "_down" : "";
-                favicon.href = `${base}/static/img/favicon${downPostfix}.svg`;
+                hc.setFavicon(data.title.includes("down"));
             }
         }).catch(function () {});
     }
@@ -365,24 +363,7 @@ hc.ready(function () {
         adaptiveSetInterval(refreshStatus);
     }
 
-    // Configure TomSelect for entering tags
-    function divToOption(el) {
-        return { value: el.textContent };
-    }
-
-    new TomSelect("#update-tags-input", {
-        create: true,
-        createOnBlur: true,
-        delimiter: " ",
-        diacritics: false,
-        hideSelected: true,
-        highlight: false,
-        labelField: "value",
-        options: hc.$$("#my-checks-tags div").map(divToOption),
-        refreshThrottle: 0,
-        render: { no_results: () => "" },
-        searchField: ["value"],
-    });
+    hc.tagSelect("#update-tags-input", hc.$$("#my-checks-tags div").map((el) => el.textContent));
 
     hc.tooltip(".my-checks-url", { title: "Click to copy" });
     hc.on(".my-checks-url", "click", function () {
@@ -391,11 +372,7 @@ hc.ready(function () {
             return;
         }
 
-        const el = this;
-        navigator.clipboard.writeText(el.textContent).then(
-            () => hc.flashTooltip(el, "Copied!", "Click to copy"),
-            () => hc.flashTooltip(el, "Copy failed", "Click to copy"),
-        );
+        hc.copy(this, this.textContent, "Click to copy");
     });
 
     hc.on("#filters a[data-value]", "click", function () {

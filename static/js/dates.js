@@ -77,4 +77,12 @@ class DateFormatter {
         return this.timestampFmt.format(dt);
     }
 
+    // Fill the date and time cells (the 2nd and 3rd) of event log rows from their data-dt
+    formatRows(rows) {
+        rows.forEach((row) => {
+            const dt = new Date(row.dataset.dt * 1000);
+            row.children[1].textContent = this.formatDate(dt);
+            row.children[2].textContent = this.formatTime(dt);
+        });
+    }
 }

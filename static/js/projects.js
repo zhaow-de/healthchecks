@@ -1,6 +1,5 @@
 hc.ready(function () {
     const base = hc.base();
-    const favicon = document.querySelector('link[rel="icon"]');
 
     // Schedule refresh to run every 3s when tab is visible and user
     // is active, every 60s otherwise
@@ -32,8 +31,7 @@ hc.ready(function () {
                     lastStarted[code] = el.started;
                 }
             }
-            const downPostfix = anyDown ? "_down" : "";
-            favicon.href = `${base}/static/img/favicon${downPostfix}.svg`;
+            hc.setFavicon(anyDown);
         }).catch(function() {});
     }
 

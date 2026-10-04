@@ -8,23 +8,7 @@ hc.ready(function () {
     const grace = document.getElementById("add-check-grace");
     const graceUnit = document.getElementById("add-check-grace-unit");
 
-    function divToOption(el) {
-        return {value: el.textContent};
-    }
-
-    new TomSelect("#add-check-tags", {
-        create: true,
-        createOnBlur: true,
-        delimiter: " ",
-        diacritics: false,
-        hideSelected: true,
-        highlight: false,
-        labelField: "value",
-        options: hc.$$("#my-checks-tags div").map(divToOption),
-        refreshThrottle: 0,
-        render: {no_results: () => ""},
-        searchField: ["value"],
-    });
+    hc.tagSelect("#add-check-tags", hc.$$("#my-checks-tags div").map((el) => el.textContent));
 
     function selectedKind() {
         return hc.$("#add-check-modal input[name=kind]:checked").value;
@@ -54,25 +38,8 @@ hc.ready(function () {
         document.getElementById("add-check-tags").tomselect.setValue(selectedTags);
     });
 
-    // Update the hidden field when user changes period inputs
-    hc.on("#add-check-modal .period-input", "keyup change", function() {
-        const secs = Math.round(period.value * periodUnit.value);
-        period.setCustomValidity(secs <= 31536000 ? "" : "Must not exceed 365 days");
-
-        if (secs >= 60) {
-            hc.$("#add-check-modal input[name=timeout]").value = secs;
-        }
-    });
-
-    // Update the hidden field when user changes grace inputs
-    hc.on("#add-check-modal .grace-input", "keyup change", function() {
-        const secs = Math.round(grace.value * graceUnit.value);
-        grace.setCustomValidity(secs <= 31536000 ? "" : "Must not exceed 365 days");
-
-        if (secs >= 60) {
-            hc.$("#add-check-modal input[name=grace]").value = secs;
-        }
-    });
+    bindDuration({value: period, unit: periodUnit, hidden: hc.$("input[name=timeout]", modal)});
+    bindDuration({value: grace, unit: graceUnit, hidden: hc.$("input[name=grace]", modal)});
 
     let currentSchedule = "";
     async function validateSchedule() {

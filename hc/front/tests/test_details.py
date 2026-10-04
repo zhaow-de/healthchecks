@@ -46,6 +46,12 @@ class DetailsTestCase(BaseTestCase):
         self.assertContains(r, "Europe/Riga")
         self.assertContains(r, "Europe/Berlin")
 
+    def test_it_gives_the_ping_dialog_the_check_s_ping_url(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(self.url)
+        # ping_details.js opens a ping from #log and from a #ping-<n> hash with this URL
+        self.assertContains(r, f'data-url="/checks/{self.check.code}/pings/0/"')
+
     @override_settings(PING_ENDPOINT="http://ping.example.org/")
     def test_it_shows_no_ping_email_address(self) -> None:
         self.client.login(username="alice@example.org", password="password")

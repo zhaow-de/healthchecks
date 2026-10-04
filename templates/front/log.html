@@ -27,7 +27,6 @@
         <table
             class="table"
             id="log"
-            data-url="{% url 'hc-ping-details' check.code '0' %}"
             data-refresh-url="{% url 'hc-log-events' check.code %}">
             <tbody>{% include "front/log_rows.html" %}</tbody>
         </table>
@@ -91,7 +90,7 @@
     </div>
 </div>
 
-<div id="ping-details-modal" class="modal" tabindex="-1">
+<div id="ping-details-modal" class="modal" tabindex="-1" data-url="{% url 'hc-ping-details' check.code '0' %}">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div id="ping-details-body">Loading</div>

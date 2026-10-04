@@ -22,3 +22,25 @@ async function loadPingDetails(url) {
         el.innerText = dateFormatter.formatDateTime(created);
     });
 }
+
+// On the details and log pages, the dialog's data-url is the URL of the check's
+// ping #0: a click on a ping in the event log (#log, which the details page
+// replaces as it refreshes) opens that ping, and so does a #ping-<n> hash, which
+// the alert emails link to.
+hc.ready(function() {
+    const modal = document.getElementById("ping-details-modal");
+    const url = modal && modal.dataset.url;
+    if (!url) return;
+
+    function open(n) {
+        loadPingDetails(url.replace(/0\/$/, n + "/"));
+    }
+
+    hc.on(document, "click", "#log tr.ok", function() {
+        open(this.querySelector("td").textContent);
+        return false;
+    });
+
+    const m = window.location.hash.match(/^#ping-(\d+)$/);
+    if (m) open(m[1]);
+});

@@ -98,8 +98,7 @@
     // A same-origin request carries X-Requested-With (the pause view answers it
     // differently), and a same-origin POST carries X-CSRFToken. A cross-origin request
     // carries neither, so it stays a simple request with no CORS preflight.
-    function request(url, opts) {
-        opts = opts || {};
+    function request(url, opts = {}) {
         const method = (opts.method || "GET").toUpperCase();
         const headers = Object.assign({}, opts.headers);
         const init = {method: method, headers: headers};
@@ -234,6 +233,39 @@
         return tip;
     }
 
+    // Copy text to the clipboard and say in el's tooltip whether that worked; `resting` as
+    // in flashTooltip.
+    function copy(el, text, resting) {
+        return navigator.clipboard.writeText(text).then(
+            () => flashTooltip(el, "Copied!", resting),
+            () => flashTooltip(el, "Copy failed", resting),
+        );
+    }
+
+    // Point the page's favicon at the "down" icon or the normal one.
+    function setFavicon(down) {
+        const link = document.querySelector('link[rel="icon"]');
+        if (link) link.href = base() + "/static/img/favicon" + (down ? "_down" : "") + ".svg";
+    }
+
+    // A Tom Select on a check's space-separated tags input, offering `tags` (strings) and
+    // accepting new ones. The page loads tom-select itself.
+    function tagSelect(selector, tags) {
+        return new TomSelect(selector, {
+            create: true,
+            createOnBlur: true,
+            delimiter: " ",
+            diacritics: false,
+            hideSelected: true,
+            highlight: false,
+            labelField: "value",
+            options: tags.map((tag) => ({value: tag})),
+            refreshThrottle: 0,
+            render: {no_results: () => ""},
+            searchField: ["value"],
+        });
+    }
+
     // Every element with data-bs-toggle="tooltip" and a title gets a tooltip, also when it
     // is added later. Per-element options go in data-bs-* attributes (data-bs-html,
     // data-bs-placement).
@@ -250,7 +282,6 @@
         $$: function(selector, root) { return all(selector, root); },
         on: on,
         base: base,
-        csrfToken: csrfToken,
         serialize: serialize,
         request: request,
         get: get,
@@ -265,6 +296,9 @@
         showModal: showModal,
         tooltip: tooltip,
         tooltips: tooltips,
-        flashTooltip: flashTooltip
+        flashTooltip: flashTooltip,
+        copy: copy,
+        setFavicon: setFavicon,
+        tagSelect: tagSelect
     };
 })();
