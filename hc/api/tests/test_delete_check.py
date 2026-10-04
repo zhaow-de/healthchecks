@@ -52,7 +52,6 @@ class DeleteCheckTestCase(BaseTestCase):
 
         self.assertEqual(r.status_code, 403)
         self.assertEqual(r["Access-Control-Allow-Origin"], "*")
-        # Still there, under its own code
         self.assertTrue(Check.objects.filter(code=self.check.code, project=other_project).exists())
 
     def test_it_handles_options(self) -> None:

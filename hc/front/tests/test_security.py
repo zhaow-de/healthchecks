@@ -130,7 +130,6 @@ class SecuritySettingsTestCase(SimpleTestCase):
         self.assertEqual(settings_module(PING_BODY_LIMIT="5000000").DATA_UPLOAD_MAX_MEMORY_SIZE, 5000000)
         self.assertNotIn("DATA_UPLOAD_MAX_MEMORY_SIZE", vars(settings_module(PING_BODY_LIMIT="2621440")))
 
-        # A limit in local_settings.py raises it, or leaves Django's default
         module = settings_module({"PING_BODY_LIMIT": 5000000}, PING_BODY_LIMIT="10000")
         self.assertEqual(module.DATA_UPLOAD_MAX_MEMORY_SIZE, 5000000)
         module = settings_module({"PING_BODY_LIMIT": 2621440}, PING_BODY_LIMIT="5000000")

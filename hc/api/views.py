@@ -266,7 +266,6 @@ def _with_check(view: Callable[..., HttpResponse]) -> ViewFunc:
         try:
             return view(request, check, **kwds)
         except Check.DoesNotExist:
-            # Deleted, or moved to another project, between this read and a write
             if Check.objects.filter(id=check.id).exists():
                 return HttpResponseForbidden()
             return HttpResponseNotFound()

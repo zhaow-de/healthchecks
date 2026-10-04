@@ -100,7 +100,7 @@ class LoggingConfigTestCase(BaseTestCase):
         self.assertEqual(result.stderr, "")
 
     def test_a_log_format_in_local_settings_reaches_the_console_handler(self) -> None:
-        # As outside a test run: a test run's overrides at the end of hc/settings.py replace the handler
+        # As outside a test run, where the console handler is not replaced
         with patch.object(sys, "argv", ["manage.py"]), patch.dict(sys.modules):
             sys.modules.pop("pytest", None)
             module = settings_module({"LOG_FORMAT": " JSON "}, LOG_FORMAT="text")
