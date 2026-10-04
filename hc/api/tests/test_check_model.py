@@ -507,3 +507,17 @@ class CheckModelTestCase(BaseTestCase):
         check.ping("1.2.3.4", "http", "get", "", b"", "success", None)
 
         self.assertEqual(sorted(check.ping_set.values_list("n", flat=True)), [1, 99])
+
+    def test_str_shows_the_name_and_the_id(self) -> None:
+        check = Check.objects.create(project=self.project, name="Foo")
+        self.assertEqual(str(check), f"Foo ({check.id})")
+
+    def test_str_handles_an_unsaved_check(self) -> None:
+        check = Check(name="Foo")
+        self.assertEqual(str(check), "Foo (None)")
+
+    def test_notification_str_shows_the_code_and_the_status(self) -> None:
+        check = Check.objects.create(project=self.project)
+        channel = Channel.objects.create(project=self.project, kind="email")
+        n = Notification.objects.create(owner=check, channel=channel, check_status="down")
+        self.assertEqual(str(n), f"Notification {n.code} (down)")

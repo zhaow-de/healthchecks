@@ -106,3 +106,6 @@ class FlipModelTestCase(BaseTestCase):
 
         self.flip.reason = ""
         self.assertIsNone(self.flip.reason_long())
+
+    def test_str_shows_the_transition(self) -> None:
+        self.assertEqual(str(self.flip), "Flip from up to down")

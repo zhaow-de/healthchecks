@@ -48,6 +48,10 @@ class PingModelTestCase(BaseTestCase):
             p = Ping(kind=kind, exitstatus=exitstatus)
             self.assertEqual(p.get_kind_display(), expected)
 
+    def test_str_shows_the_number_and_the_kind(self) -> None:
+        self.assertEqual(str(Ping(owner=self.check, n=3)), "Ping #3 (success)")
+        self.assertEqual(str(Ping(owner=self.check, n=4, kind="fail")), "Ping #4 (fail)")
+
 
 class PrepareDurationsTestCase(BaseTestCase):
     def test_it_works(self) -> None:

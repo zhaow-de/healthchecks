@@ -10,7 +10,7 @@ from django.core import mail
 from django.test.utils import override_settings
 from django.utils.timezone import now
 
-from hc.accounts.models import Project
+from hc.accounts.models import Credential, Project
 from hc.api.models import Check, Flip
 from hc.test import BaseTestCase
 
@@ -337,3 +337,7 @@ class ProfileModelTestCase(BaseTestCase):
         other = Check.objects.create(project=second)
         Check.objects.create(project=self.charlies_project)
         self.assertEqual(set(self.profile.checks_from_all_projects()), {self.check, other})
+
+    def test_credential_str_shows_the_name(self) -> None:
+        credential = Credential(user=self.alice, name="Alices Key", data=b"")
+        self.assertEqual(str(credential), "Alices Key")

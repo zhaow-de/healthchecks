@@ -98,3 +98,6 @@ class TokenBucketTestCase(BaseTestCase):
             self.assertTrue(TokenBucket.authorize_login_password(f"user{i}@example.org"))
 
         self.assertTrue(TokenBucket.authorize_login_password("alice@example.org"))
+
+    def test_str_shows_the_value(self) -> None:
+        self.assertEqual(str(TokenBucket(value="em-" + ALICE_HASH)), "em-" + ALICE_HASH)

@@ -17,8 +17,9 @@ the next version number is computed from them. Every pull request runs the
 ## Code Style
 
 * Run the commit gate, `uv run pre-commit run -a`, before every commit. It
-  formats Python with [ruff](https://docs.astral.sh/ruff/) and checks file
-  hygiene and YAML.
+  formats and lints Python with [ruff](https://docs.astral.sh/ruff/), refusing
+  the commit over a lint finding it cannot fix itself (the rule set is in
+  `ruff.toml`), and checks file hygiene and YAML.
 * Prefer simplicity over cleverness.
 * If you are fixing a bug or adding a feature, add a test. Run
   `uv run pytest hc -n auto` (the Django suite) and `uv run pytest -n auto` (the
