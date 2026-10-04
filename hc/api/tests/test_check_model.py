@@ -380,6 +380,7 @@ class CheckModelTestCase(BaseTestCase):
         f = Flip(owner=check)
         # older than the earliest ping, but not older than 93 days
         f.created = CURRENT_TIME - td(days=92)
+        f.processed = f.created
         f.old_status = "new"
         f.new_status = "down"
         f.save()
@@ -407,6 +408,7 @@ class CheckModelTestCase(BaseTestCase):
         f = Flip(owner=check)
         # older than 93 days, but not older than the earliest ping
         f.created = CURRENT_TIME - td(days=94)
+        f.processed = f.created
         f.old_status = "new"
         f.new_status = "down"
         f.save()
@@ -414,6 +416,18 @@ class CheckModelTestCase(BaseTestCase):
         check.prune()
 
         self.assertEqual(Flip.objects.count(), 1)
+
+    @time_machine.travel(CURRENT_TIME)
+    def test_it_measures_from_the_oldest_retained_ping(self) -> None:
+        check = Check.objects.create(project=self.project, n_pings=3)
+        for n, days in ((1, 60), (2, 30), (3, 1)):
+            Ping.objects.create(owner=check, n=n, created=CURRENT_TIME - td(days=days))
+        channel = Channel.objects.create(project=self.project, kind="email")
+        # newer than the oldest retained ping, older than the newest
+        Notification.objects.create(owner=check, channel=channel, check_status="down", created=CURRENT_TIME - td(days=40))
+
+        self.assertEqual(check.prune(), (0, 0, 0))
+        self.assertEqual(Notification.objects.count(), 1)
 
     @time_machine.travel(CURRENT_TIME)
     def test_it_keeps_flips_and_notifications_when_no_ping_is_retained(self) -> None:

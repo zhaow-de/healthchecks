@@ -126,6 +126,17 @@ class PruneTestCase(BaseTestCase):
         self.assert_summary(out, DELETED_NOTHING.replace("api_notification 0", "api_notification 1"))
         self.assertEqual(list(Notification.objects.all()), [recent])
 
+    def test_it_keeps_a_checks_notifications_past_30_days(self) -> None:
+        check = Check.objects.create(project=self.project)
+        self.add_pings(check, 1, CURRENT_TIME - td(days=60))
+        owned = self.add_notification(check, td(days=40))
+        self.add_notification(None, td(days=40))
+
+        out = self.run_prune()
+
+        self.assert_summary(out, DELETED_NOTHING.replace("api_notification 0", "api_notification 1"))
+        self.assertEqual(list(Notification.objects.all()), [owned])
+
     def test_it_prunes_token_buckets_idle_for_a_day(self) -> None:
         TokenBucket.objects.create(value="old", updated=CURRENT_TIME - td(days=1, seconds=1))
         TokenBucket.objects.create(value="recent", updated=CURRENT_TIME - td(hours=23))
