@@ -118,6 +118,27 @@ class SecuritySettingsTestCase(SimpleTestCase):
         module = settings_module(SERVER_EMAIL="errors@example.org")
         self.assertEqual(module.SERVER_EMAIL, "errors@example.org")
 
+    def test_a_default_from_email_in_local_settings_reaches_server_email(self) -> None:
+        local = {"DEFAULT_FROM_EMAIL": "hc@example.org"}
+        module = without_env("SERVER_EMAIL", local, DEFAULT_FROM_EMAIL="env@example.org")
+        self.assertEqual(module.SERVER_EMAIL, "hc@example.org")
+
+        module = without_env("SERVER_EMAIL", {**local, "SERVER_EMAIL": "errors@example.org"})
+        self.assertEqual(module.SERVER_EMAIL, "errors@example.org")
+
+    def test_a_ping_body_limit_above_the_upload_limit_raises_it(self) -> None:
+        self.assertEqual(settings_module(PING_BODY_LIMIT="5000000").DATA_UPLOAD_MAX_MEMORY_SIZE, 5000000)
+        self.assertNotIn("DATA_UPLOAD_MAX_MEMORY_SIZE", vars(settings_module(PING_BODY_LIMIT="2621440")))
+
+        # A limit in local_settings.py raises it, or leaves Django's default
+        module = settings_module({"PING_BODY_LIMIT": 5000000}, PING_BODY_LIMIT="10000")
+        self.assertEqual(module.DATA_UPLOAD_MAX_MEMORY_SIZE, 5000000)
+        module = settings_module({"PING_BODY_LIMIT": 2621440}, PING_BODY_LIMIT="5000000")
+        self.assertNotIn("DATA_UPLOAD_MAX_MEMORY_SIZE", vars(module))
+
+        module = settings_module({"PING_BODY_LIMIT": 5000000, "DATA_UPLOAD_MAX_MEMORY_SIZE": 6000000})
+        self.assertEqual(module.DATA_UPLOAD_MAX_MEMORY_SIZE, 6000000)
+
     def test_gzip_comes_right_after_whitenoise(self) -> None:
         gzip = "django.middleware.gzip.GZipMiddleware"
         middleware = settings_module(USE_GZIP_MIDDLEWARE="True").MIDDLEWARE

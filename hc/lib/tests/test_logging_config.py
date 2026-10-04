@@ -3,11 +3,13 @@ import logging
 import os
 import subprocess
 import sys
+from unittest.mock import patch
 
 from django.conf import settings
 from django.core import mail
 from django.test.utils import override_settings
 
+from hc.api.tests.test_database import settings_module
 from hc.test import BaseTestCase
 
 # Runs outside the test run, where the console handler is not replaced
@@ -96,6 +98,15 @@ class LoggingConfigTestCase(BaseTestCase):
             rf"{ts} WARNING concurrent.futures Careful\n\Z",
         )
         self.assertEqual(result.stderr, "")
+
+    def test_a_log_format_in_local_settings_reaches_the_console_handler(self) -> None:
+        # As outside a test run: a test run's overrides at the end of hc/settings.py replace the handler
+        with patch.object(sys, "argv", ["manage.py"]), patch.dict(sys.modules):
+            sys.modules.pop("pytest", None)
+            module = settings_module({"LOG_FORMAT": " JSON "}, LOG_FORMAT="text")
+            kept = settings_module({"LOG_FORMAT": "json", "LOGGING": {"version": 1}})
+        self.assertEqual(module.LOGGING["handlers"]["console"]["formatter"], "json")
+        self.assertEqual(kept.LOGGING, {"version": 1})
 
     def test_console_writes_json(self) -> None:
         # The value should be read case-insensitively, without the whitespace

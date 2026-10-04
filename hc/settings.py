@@ -70,10 +70,8 @@ def envsecret(s: str, default: str | None = None) -> str | None:
 SECRET_KEY = envsecret("SECRET_KEY", "---")
 METRICS_KEY = os.getenv("METRICS_KEY")
 DEBUG = envbool("DEBUG", "True")
+# SERVER_EMAIL, which defaults to it, is set after hc/local_settings.py
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "healthchecks@example.org")
-# The sender of Django's error mails to ADMINS; Django's own default, root@localhost,
-# is one an SMTP service that sends only from verified addresses refuses
-SERVER_EMAIL = os.getenv("SERVER_EMAIL", DEFAULT_FROM_EMAIL)
 SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL")
 if admins := os.getenv("ADMINS"):
     ADMINS = admins.split(",")
@@ -153,8 +151,9 @@ TEMPLATES = [
     }
 ]
 
-# uWSGI's line per request is off in docker/uwsgi.ini (disable-logging)
-LOG_FORMAT = os.getenv("LOG_FORMAT", "text").strip().lower()
+# uWSGI's line per request is off in docker/uwsgi.ini (disable-logging). LOG_FORMAT
+# picks the console handler's formatter after hc/local_settings.py.
+LOG_FORMAT = os.getenv("LOG_FORMAT", "text")
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -170,7 +169,6 @@ LOGGING = {
             "level": "INFO",
             "class": "logging.StreamHandler",
             "stream": "ext://sys.stdout",
-            "formatter": "json" if LOG_FORMAT == "json" else "text",
         },
         # Django's default handler for ADMINS, which configuring the "django"
         # logger here would otherwise drop
@@ -255,25 +253,18 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-# A trailing slash is removed after hc/local_settings.py, wherever SITE_ROOT is set
+# Its trailing slash is removed after hc/local_settings.py
 SITE_ROOT = os.getenv("SITE_ROOT", "http://localhost:8000")
 SITE_NAME = os.getenv("SITE_NAME", "Healthchecks")
 # Unset, it is SITE_ROOT + "/ping/", which site_root_settings() fills in
 PING_ENDPOINT = os.getenv("PING_ENDPOINT")
+# A limit above DATA_UPLOAD_MAX_MEMORY_SIZE's default raises that, after hc/local_settings.py
 PING_BODY_LIMIT = envint("PING_BODY_LIMIT", "10000")
-# If PING_BODY_LIMIT is higher than the default value for DATA_UPLOAD_MAX_MEMORY_SIZE,
-# then we need to bump up DATA_UPLOAD_MAX_MEMORY_SIZE too:
-if PING_BODY_LIMIT and PING_BODY_LIMIT > 2621440:
-    DATA_UPLOAD_MAX_MEMORY_SIZE = PING_BODY_LIMIT
 SECURE_HSTS_SECONDS = envint("SECURE_HSTS_SECONDS", "0")
 
 
 def site_root_settings(site_root: str, ping_endpoint: str | None, allowed_hosts: str | None) -> dict[str, Any]:
-    """The settings that follow SITE_ROOT and PING_ENDPOINT.
-
-    It runs after hc/local_settings.py, on the final values of both, so a SITE_ROOT
-    set there reaches them too; allowed_hosts is the ALLOWED_HOSTS environment variable.
-    """
+    """The settings that follow SITE_ROOT and PING_ENDPOINT; allowed_hosts is the ALLOWED_HOSTS environment variable."""
     site_root_parts = urlparse(site_root)
     if ping_endpoint is None:
         ping_endpoint = site_root + "/ping/"
@@ -398,10 +389,19 @@ if (BASE_DIR / "hc/local_settings.py").exists():
     _local_names = set(vars(_local_settings))
 
 SITE_ROOT = SITE_ROOT.removesuffix("/")
-# A setting that hc/local_settings.py sets itself keeps its value
-for _name, _value in site_root_settings(SITE_ROOT, PING_ENDPOINT, os.getenv("ALLOWED_HOSTS")).items():
+_derived = site_root_settings(SITE_ROOT, PING_ENDPOINT, os.getenv("ALLOWED_HOSTS"))
+# The sender of Django's error mails to ADMINS; Django's own default, root@localhost,
+# is one an SMTP service that sends only from verified addresses refuses
+_derived["SERVER_EMAIL"] = os.getenv("SERVER_EMAIL", DEFAULT_FROM_EMAIL)
+# If PING_BODY_LIMIT is higher than the default value for DATA_UPLOAD_MAX_MEMORY_SIZE,
+# then we need to bump up DATA_UPLOAD_MAX_MEMORY_SIZE too:
+if PING_BODY_LIMIT and PING_BODY_LIMIT > 2621440:
+    _derived["DATA_UPLOAD_MAX_MEMORY_SIZE"] = PING_BODY_LIMIT
+for _name, _value in _derived.items():
     if _name not in _local_names:
         globals()[_name] = _value
+if "LOGGING" not in _local_names:
+    LOGGING["handlers"]["console"]["formatter"] = "json" if LOG_FORMAT.strip().lower() == "json" else "text"
 
 # Overrides for testing
 if sys.argv[1:2] == ["test"] or "pytest" in sys.modules:

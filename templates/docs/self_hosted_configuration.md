@@ -689,9 +689,8 @@ A trailing slash is removed. A value that does not start with `http://` or
 `https://` triggers the warning `hc.api.W001`.
 
 **On using `local_settings.py`:** the settings above, the route prefix and the default
-of [PING_ENDPOINT](#PING_ENDPOINT) follow `SITE_ROOT` wherever it is set, in the
-environment or in `local_settings.py`, and its trailing slash is removed either way.
-One of those settings that `local_settings.py` sets itself keeps that value.
+of [PING_ENDPOINT](#PING_ENDPOINT) follow a `SITE_ROOT` set there too. One of those
+settings that `local_settings.py` sets itself keeps that value.
 
 ## `SLACK_CLIENT_ID` {: #SLACK_CLIENT_ID }
 

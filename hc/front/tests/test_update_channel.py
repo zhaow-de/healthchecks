@@ -125,7 +125,6 @@ class UpdateChannelTestCase(BaseTestCase):
         other = Check.objects.create(project=self.project)
         other_project = Project.objects.create(owner=self.alice)
 
-        # The view validates each check code after it read the previous check
         def validate_and_transfer(s: str) -> bool:
             if s == str(other.code):
                 Check.objects.filter(id=self.check.id).update(project=other_project)
