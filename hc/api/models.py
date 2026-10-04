@@ -647,12 +647,11 @@ class Ping(models.Model):
 
     class Meta:
         indexes = (
-            # The one index on api_ping besides the primary key. A query over one check's
-            # pings filters by owner and orders by "n", which this index serves; ordering
-            # by "created" or "id" instead sorts every ping of the check, or makes
-            # PostgreSQL walk api_ping_pkey. Check.ping numbers a check's pings under its
-            # row lock, so n and id rise together, and created with them unless the clock
-            # steps back.
+            # A query over one check's pings filters by owner and orders by "n", which this
+            # index serves; ordering by "created" or "id" instead sorts every ping of the
+            # check, or makes PostgreSQL walk api_ping_pkey. Check.ping numbers a check's
+            # pings under its row lock, so n and id rise together, and created with them
+            # unless the clock steps back.
             models.Index(fields=["owner", "n"], name="api_ping_owner_n"),
         )
 

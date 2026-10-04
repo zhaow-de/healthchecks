@@ -195,9 +195,7 @@ DATABASES: Mapping[str, Any] = {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": os.getenv("DB_NAME", BASE_DIR / "hc.sqlite"),
         "OPTIONS": {
-            # auto_vacuum is not set here: on an existing file that PRAGMA writes the
-            # header on every connection. hc.api's connection_created receiver sets it
-            # on a file SQLite has just created.
+            # auto_vacuum is set in hc/api/apps.py: here it would write the header on every connection
             "init_command": "PRAGMA busy_timeout = 5000;",
             "transaction_mode": "IMMEDIATE",
         },
