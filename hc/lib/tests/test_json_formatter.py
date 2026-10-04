@@ -4,7 +4,7 @@ import sys
 from datetime import UTC, datetime
 from types import TracebackType
 
-from hc.logs import JsonFormatter
+from hc.lib.logs import JsonFormatter
 from hc.test import BaseTestCase
 
 type ExcInfo = tuple[type[BaseException], BaseException, TracebackType | None]

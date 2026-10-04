@@ -8,7 +8,6 @@ from django.conf import settings
 from django.core import mail
 from django.test.utils import override_settings
 
-from hc.logs.models import Record
 from hc.test import BaseTestCase
 
 # Runs outside the test run, where the console handler is not replaced
@@ -26,6 +25,7 @@ logging.getLogger("django").debug("debug line")
 logging.getLogger("django").info("Hello %s", "World")
 logging.getLogger("hc").debug("debug line")
 logging.getLogger("hc").info("Sending")
+logging.getLogger("hc").warning("Retrying")
 logging.getLogger("concurrent.futures").info("info line")
 logging.getLogger("concurrent.futures").warning("Careful")
 """
@@ -50,26 +50,20 @@ def run_script(log_format: str | None = None) -> subprocess.CompletedProcess[str
 
 
 class LoggingConfigTestCase(BaseTestCase):
-    def test_hc_logs_info_to_console_and_warnings_to_db(self) -> None:
+    def test_hc_logs_info_to_console_alone(self) -> None:
         self.assertEqual(
             settings.LOGGING["loggers"]["hc"],
-            {"level": "INFO", "handlers": ["console", "db"], "propagate": False},
+            {"level": "INFO", "handlers": ["console"], "propagate": False},
         )
 
         logger = logging.getLogger("hc")
         self.assertTrue(logger.isEnabledFor(logging.INFO))
         self.assertFalse(logger.isEnabledFor(logging.DEBUG))
 
-        # Only problems should reach the database
-        logging.getLogger("hc.test").info("Sent monthly report")
-        self.assertFalse(Record.objects.exists())
-        logging.getLogger("hc.test").warning("Careful")
-        self.assertEqual(Record.objects.get().message, "Careful")
-
     def test_django_request_logs_errors_only(self) -> None:
         self.assertEqual(
             settings.LOGGING["loggers"]["django.request"],
-            {"level": "ERROR", "handlers": ["console", "db", "mail_admins"], "propagate": False},
+            {"level": "ERROR", "handlers": ["console", "mail_admins"], "propagate": False},
         )
 
     @override_settings(ADMINS=["admin@example.org"])
@@ -98,7 +92,8 @@ class LoggingConfigTestCase(BaseTestCase):
         ts = r"\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3}"
         self.assertRegex(
             result.stdout,
-            rf"\A{ts} INFO django Hello World\n{ts} INFO hc Sending\n{ts} WARNING concurrent.futures Careful\n\Z",
+            rf"\A{ts} INFO django Hello World\n{ts} INFO hc Sending\n{ts} WARNING hc Retrying\n"
+            rf"{ts} WARNING concurrent.futures Careful\n\Z",
         )
         self.assertEqual(result.stderr, "")
 
@@ -114,6 +109,7 @@ class LoggingConfigTestCase(BaseTestCase):
                     [
                         ("INFO", "django", "Hello World"),
                         ("INFO", "hc", "Sending"),
+                        ("WARNING", "hc", "Retrying"),
                         ("WARNING", "concurrent.futures", "Careful"),
                     ],
                 )
