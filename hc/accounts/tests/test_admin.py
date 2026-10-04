@@ -8,6 +8,7 @@ from django.contrib.auth.models import User
 from django.contrib.messages import get_messages
 from django.core import mail
 from django.test import RequestFactory
+from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils.timezone import now
 
@@ -126,6 +127,21 @@ class AccountsAdminTestCase(BaseTestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, ["alice@example.org"])
         self.assertEqual(mail.outbox[0].subject, "Reminder: 1 check still down")
+
+    @override_settings(MAILERS={})
+    def test_report_actions_send_nothing_without_smtp(self) -> None:
+        self.profile.nag_period = td(hours=1)
+        self.profile.save()
+        Check.objects.create(project=self.project, name="Foo", status="down", last_ping=now())
+
+        self.client.login(username="alice@example.org", password="password")
+        for action in ("send_report", "send_nag"):
+            payload = {"action": action, "_selected_action": [self.profile.id]}
+            r = self.client.post(reverse("admin:accounts_profile_changelist"), payload)
+            self.assertEqual(r.status_code, 302)
+            self.assertEqual(self.messages(r)[-1], "0 email(s) sent")
+
+        self.assertEqual(len(mail.outbox), 0)
 
     def test_it_has_no_remove_totp_action(self) -> None:
         self.profile.totp = "0" * 32

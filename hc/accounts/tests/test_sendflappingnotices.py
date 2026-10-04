@@ -42,3 +42,9 @@ class SendFlappingNoticesTestCase(BaseTestCase):
         Command(stdout=Mock()).handle()
         self.assertEmailNotContains("reach out")
         self.assertEmailNotContains("None")
+
+    @override_settings(MAILERS={})
+    def test_it_sends_nothing_without_smtp(self) -> None:
+        result = Command(stdout=Mock()).handle()
+        self.assertEqual(result, "No SMTP configuration, no notices sent\n")
+        self.assertEqual(len(mail.outbox), 0)

@@ -10,6 +10,7 @@ from unittest.mock import Mock, call, patch
 import time_machine
 from django.core import mail
 from django.core.management import call_command
+from django.test.utils import override_settings
 from django.utils.timezone import now
 
 from hc.api.management.commands.sendreports import Command
@@ -153,6 +154,20 @@ class SendReportsTestCase(BaseTestCase):
 
         # next_nag_date should now be unset
         self.profile.refresh_from_db()
+        self.assertIsNone(self.profile.next_nag_date)
+
+    @override_settings(MAILERS={})
+    def test_it_sends_nothing_without_smtp(self) -> None:
+        cmd = Command(stdout=Mock())
+        self.assertTrue(cmd.handle_one_report())
+        self.assertTrue(cmd.handle_one_nag())
+        self.assertEqual(len(mail.outbox), 0)
+
+        # The report date moves on and the nag date is cleared, so the
+        # loop does not pick the same profile again
+        self.profile.refresh_from_db()
+        assert self.profile.next_report_date
+        self.assertEqual(self.profile.next_report_date.date(), date(2020, 2, 1))
         self.assertIsNone(self.profile.next_nag_date)
 
     def test_it_skips_report_sent_by_another_process(self) -> None:

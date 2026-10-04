@@ -341,8 +341,10 @@ and receives no alerts, until someone clicks the link. The account's own email
 address is never verified this way: it is confirmed at once.
 
 Verification needs email: with verification on and no [EMAIL_HOST](#EMAIL_HOST),
-the form refuses any address other than the account's own and saves nothing, so
-that no address receives alerts without having been confirmed.
+the form refuses a new or changed address, or a disabled integration, unless the
+address is the account's own, so that no address receives alerts without having
+been confirmed. An enabled integration whose address does not change keeps its
+confirmed or unconfirmed state, and only its up and down flags are saved.
 
 Set `EMAIL_USE_VERIFICATION` to `False` to confirm each address as it is saved.
 The setting does not change integrations already unconfirmed; to confirm one,

@@ -4,7 +4,7 @@ import email
 import json
 from datetime import UTC, datetime
 from datetime import timedelta as td
-from smtplib import SMTPDataError, SMTPServerDisconnected
+from smtplib import SMTPDataError, SMTPRecipientsRefused, SMTPServerDisconnected
 from unittest.mock import Mock, patch
 
 import time_machine
@@ -342,7 +342,7 @@ class NotifyEmailTestCase(BaseTestCase):
     def test_it_handles_server_disconnected(self, logger: Mock) -> None:
         self.channel.notify(self.flip)
         n = Notification.objects.get()
-        self.assertEqual(n.error, "SMTP connection error")
+        self.assertEqual(n.error, "SMTP error: SMTPServerDisconnected")
         self.assertTrue(logger.exception.called)
 
     @patch("hc.integrations.email.transport.logger")
@@ -350,7 +350,7 @@ class NotifyEmailTestCase(BaseTestCase):
     def test_it_handles_data_error(self, logger: Mock) -> None:
         self.channel.notify(self.flip)
         n = Notification.objects.get()
-        self.assertEqual(n.error, "SMTP connection error")
+        self.assertEqual(n.error, "SMTP error: SMTPDataError")
         self.assertTrue(logger.exception.called)
 
     @patch("hc.integrations.email.transport.logger")
@@ -358,5 +358,17 @@ class NotifyEmailTestCase(BaseTestCase):
     def test_it_handles_connection_refused_error(self, logger: Mock) -> None:
         self.channel.notify(self.flip)
         n = Notification.objects.get()
-        self.assertEqual(n.error, "SMTP connection error")
+        self.assertEqual(n.error, "SMTP error: ConnectionRefusedError")
         self.assertTrue(logger.exception.called)
+
+    @patch("hc.integrations.email.transport.logger")
+    @patch("hc.lib.emails.send", Mock(side_effect=SMTPRecipientsRefused({"alice@example.org": (550, b"no")})))
+    def test_it_handles_recipients_refused(self, logger: Mock) -> None:
+        self.channel.notify(self.flip)
+        n = Notification.objects.get()
+        self.assertEqual(n.error, "SMTP error: SMTPRecipientsRefused")
+        self.assertTrue(logger.exception.called)
+
+        self.channel.refresh_from_db()
+        self.assertEqual(self.channel.last_error, "SMTP error: SMTPRecipientsRefused")
+        self.assertFalse(self.channel.disabled)

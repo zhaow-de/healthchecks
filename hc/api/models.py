@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -31,6 +32,8 @@ from hc.api import transports
 from hc.lib import emails
 from hc.lib.date import month_boundaries, seconds_in_month
 from hc.lib.urls import absolute_reverse
+
+logger = logging.getLogger(__name__)
 
 STATUSES = (("up", "Up"), ("down", "Down"), ("new", "New"), ("paused", "Paused"))
 DEFAULT_TIMEOUT = td(days=1)
@@ -856,6 +859,11 @@ class Channel(models.Model):
         except transports.TransportError as e:
             disabled = True if e.permanent else disabled
             error = e.message
+        except Exception:
+            # A bug in one transport must not stop the flip's other channels,
+            # a group's members, or the Test button
+            logger.exception("Unexpected error in %s transport", self.kind)
+            error = "Unexpected error"
 
         Notification.objects.filter(id=n.id).update(error=error)
         Channel.objects.filter(id=self.id).update(

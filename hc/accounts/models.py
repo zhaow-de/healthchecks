@@ -138,6 +138,9 @@ class Profile(models.Model):
         return Check.objects.filter(project__owner_id=self.user_id)
 
     def send_report(self, nag: bool = False) -> bool:
+        if not settings.MAILERS:
+            return False
+
         q = self.checks_from_all_projects()
 
         # Has there been a ping in last 6 months?

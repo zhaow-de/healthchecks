@@ -164,16 +164,12 @@ class ProfileAdmin(ModelAdmin[Profile]):
         return format_html(tmpl, obj.num_checks)
 
     def send_report(self, request: HttpRequest, qs: QuerySet[Profile]) -> None:
-        for profile in qs:
-            profile.send_report()
-
-        self.message_user(request, f"{len(qs)} email(s) sent")
+        sent = sum(profile.send_report() for profile in qs)
+        self.message_user(request, f"{sent} email(s) sent")
 
     def send_nag(self, request: HttpRequest, qs: QuerySet[Profile]) -> None:
-        for profile in qs:
-            profile.send_report(nag=True)
-
-        self.message_user(request, f"{len(qs)} email(s) sent")
+        sent = sum(profile.send_report(nag=True) for profile in qs)
+        self.message_user(request, f"{sent} email(s) sent")
 
 
 class ProjectAnnotations(TypedDict):

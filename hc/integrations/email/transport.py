@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from smtplib import SMTPDataError, SMTPServerDisconnected
 
 from django.conf import settings
 
@@ -58,9 +57,10 @@ class Email(Transport):
 
         try:
             emails.alert(self.channel.email.value, ctx, headers)
-        except (SMTPServerDisconnected, SMTPDataError, ConnectionRefusedError) as e:
+        except OSError as e:
+            # OSError covers SMTPException, socket timeouts and ssl errors
             logger.exception("Exception while sending email")
-            raise TransportError("SMTP connection error") from e
+            raise TransportError(f"SMTP error: {type(e).__name__}") from e
 
     def is_noop(self, status: str) -> bool:
         if status == "down":

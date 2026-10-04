@@ -14,7 +14,7 @@ from django.core.management import call_command
 from django.utils.timezone import now
 
 from hc.api.management.commands.sendalerts import Command, notify
-from hc.api.models import Channel, Check, Flip
+from hc.api.models import Channel, Check, Flip, Notification
 from hc.api.transports import TransportError
 from hc.test import BaseTestCase, updated_concurrently
 
@@ -244,6 +244,31 @@ class SendAlertsTestCase(BaseTestCase):
         self.assertIn(f"{str(channel.code)[:8]} (webhook) Error in", log)
         self.assertIn("Test error message", log)
 
+    def test_a_raising_channel_does_not_stop_the_others(self) -> None:
+        check = Check.objects.create(project=self.project, status="down")
+        flip = Flip.objects.create(owner=check, created=now(), old_status="up", new_status="down")
+        for _ in range(2):
+            Channel.objects.create(project=self.project, kind="webhook").checks.add(check)
+
+        with (
+            patch("hc.api.models.Channel.transport") as mock_transport,
+            self.assertLogs("hc.api.models", "ERROR") as logs,
+        ):
+            mock_transport.is_noop.return_value = False
+            mock_transport.notify.side_effect = [RuntimeError("boom"), None]
+            log = notify(flip)
+
+        assert log is not None
+        self.assertIn(") Error in", log)
+        self.assertIn(") OK in", log)
+        self.assertEqual(logs.records[0].getMessage(), "Unexpected error in webhook transport")
+
+        # The error is recorded, and the channel stays enabled
+        errors = sorted(Notification.objects.values_list("error", flat=True))
+        self.assertEqual(errors, ["", "Unexpected error"])
+        failed = Channel.objects.get(last_error="Unexpected error")
+        self.assertFalse(failed.disabled)
+
     @patch("hc.api.management.commands.sendalerts.close_old_connections")
     @patch("hc.api.management.commands.sendalerts.connection")
     def test_notify_refreshes_stale_db_connection(self, connection: Mock, close_old_connections: Mock) -> None:
@@ -258,7 +283,7 @@ class SendAlertsTestCase(BaseTestCase):
         self.assertIsNone(notify(flip))
         close_old_connections.assert_called_once_with()
 
-    def test_it_reraises_and_logs_notify_exceptions(self) -> None:
+    def test_it_logs_notify_exceptions(self) -> None:
         cmd = Command(stdout=Mock())
         cmd.seats = BoundedSemaphore(1)
         cmd.seats.acquire()
@@ -266,7 +291,8 @@ class SendAlertsTestCase(BaseTestCase):
         future: Future[str | None] = Future()
         future.set_exception(ValueError("boom"))
 
-        with self.assertLogs("hc", "ERROR") as logs, self.assertRaisesRegex(ValueError, "boom"):
+        # The callback does not re-raise: concurrent.futures would log it again
+        with self.assertLogs("hc", "ERROR") as logs:
             cmd.on_notify_done(future)
 
         [record] = logs.records

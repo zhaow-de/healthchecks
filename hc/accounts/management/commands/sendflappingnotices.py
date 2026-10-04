@@ -22,6 +22,9 @@ class Command(BaseCommand):
         time.sleep(1)
 
     def handle(self, **options: Any) -> str:
+        if not settings.MAILERS:
+            return "No SMTP configuration, no notices sent\n"
+
         q = Check.objects.only("name")
         q = q.filter(flip__created__gt=now() - td(hours=24))
         q = q.annotate(num_flips=Count("flip"))
