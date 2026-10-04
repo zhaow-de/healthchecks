@@ -214,10 +214,9 @@ DATABASES: Mapping[str, Any] = {
         "CONN_HEALTH_CHECKS": True,
         "OPTIONS": {
             # auto_vacuum and WAL are set by the connection_created receiver in hc/api/apps.py,
-            # which runs after init_command: here, auto_vacuum would write the header on every
-            # connection, and WAL would write page 1 of a new file before auto_vacuum could
-            # take effect. In WAL mode, synchronous NORMAL can lose the last commits to a power
-            # loss or an OS crash, not to a crash of the process.
+            # which runs after init_command; its docstring says why. In WAL mode, synchronous
+            # NORMAL can lose the last commits to a power loss or an OS crash, not to a crash
+            # of the process.
             "init_command": "PRAGMA busy_timeout = 5000; PRAGMA synchronous = NORMAL; PRAGMA journal_size_limit = 16777216;",
             "transaction_mode": "IMMEDIATE",
         },
