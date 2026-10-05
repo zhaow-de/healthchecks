@@ -1,7 +1,7 @@
 [project]
 name = "healthchecks"
 # Bumped by cz bump (see .cz.toml), never by hand; hc/settings.py reads it.
-version = "6.1.0"
+version = "6.2.0"
 requires-python = "==3.14.*"
 dependencies = [
     "cronsim>=2.7",
