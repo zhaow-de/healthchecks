@@ -2215,7 +2215,7 @@ get the same objects, which carry no webhook URL, token or address.</p>
 <tr>
 <td><code>disabled</code></td>
 <td>boolean</td>
-<td><code>true</code> once a delivery failure that will not recover, such as Slack answering 404, a hard email bounce, or an unsubscribe has stopped the integration's own alerts; nothing is logged when an alert skips it. A group that includes it still sends to it.</td>
+<td><code>true</code> once a delivery failure that will not recover, such as Slack answering 404, a hard email bounce, or an unsubscribe has stopped the integration's own alerts; a group that includes it still sends to it.</td>
 </tr>
 </tbody>
 </table>

@@ -1331,7 +1331,7 @@ Field | Type | Meaning
 `id` | string | The integration's UUID.
 `name` | string | The integration's name; `""` when it has none.
 `kind` | string | `email`, `group`, `slack` or `webhook`.
-`disabled` | boolean | `true` once a delivery failure that will not recover, such as Slack answering 404, a hard email bounce, or an unsubscribe has stopped the integration's own alerts; nothing is logged when an alert skips it. A group that includes it still sends to it.
+`disabled` | boolean | `true` once a delivery failure that will not recover, such as Slack answering 404, a hard email bounce, or an unsubscribe has stopped the integration's own alerts; a group that includes it still sends to it.
 
 ### Errors
 
