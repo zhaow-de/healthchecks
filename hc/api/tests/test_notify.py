@@ -1,3 +1,6 @@
+from smtplib import SMTPServerDisconnected
+from unittest.mock import Mock, patch
+
 from django.contrib.auth.models import User
 from django.test import TransactionTestCase
 from django.utils.timezone import now
@@ -47,6 +50,74 @@ class NotifyTestCase(TransactionTestCase):
         self.assertEqual(e, "Unexpected error")
         self.channel.refresh_from_db()
         self.assertEqual(self.channel.last_error, "Unexpected error")
+
+    @patch("hc.api.transports.curl.request", autospec=True)
+    def test_a_failed_dispatch_is_logged_as_an_error(self, mock_request: Mock) -> None:
+        url = "https://hooks.slack.com/services/T0/B0/secret-token"
+        self._setup_data("slack", url)
+        self.check.name = "Nightly\nbackup"
+        self.check.save()
+        mock_request.return_value.status_code = 404
+
+        with self.assertLogs("hc.api.models", "ERROR") as logs:
+            e = self.channel.notify(self.flip)
+
+        self.assertEqual(e, "Received status code 404")
+        (record,) = logs.records
+        self.assertEqual(record.levelname, "ERROR")
+        self.assertEqual(
+            record.getMessage(),
+            f"Notification failed: check 'Nightly\\nbackup', slack channel {str(self.channel.code)[:8]}: Received status code 404",
+        )
+
+    @patch("hc.api.transports.curl.request", autospec=True)
+    def test_an_unnamed_check_is_logged_by_its_slug(self, mock_request: Mock) -> None:
+        self._setup_data("slack", "https://hooks.slack.com/services/T0/B0/secret-token")
+        self.check.slug = "nightly-backup"
+        self.check.save()
+        mock_request.return_value.status_code = 500
+
+        with self.assertLogs("hc.api.models", "ERROR") as logs:
+            self.channel.notify(self.flip)
+
+        (record,) = logs.records
+        self.assertIn("check 'nightly-backup', slack channel", record.getMessage())
+
+    @patch("hc.api.transports.curl.request", autospec=True)
+    def test_a_failed_test_notification_is_not_logged(self, mock_request: Mock) -> None:
+        self._setup_data("slack", "https://hooks.slack.com/services/T0/B0/secret-token")
+        mock_request.return_value.status_code = 500
+
+        with self.assertNoLogs("hc.api.models", "ERROR"):
+            e = self.channel.notify(self.flip, is_test=True)
+
+        self.assertEqual(e, "Received status code 500")
+
+    @patch("hc.api.transports.curl.request", autospec=True)
+    def test_a_group_logs_its_failed_member_alone(self, mock_request: Mock) -> None:
+        self._setup_data("slack", "https://hooks.slack.com/services/T0/B0/secret-token")
+        member = self.channel
+        group = Channel.objects.create(project=self.project, kind="group", value=str(member.code))
+        group.checks.add(self.check)
+        mock_request.return_value.status_code = 500
+
+        with self.assertLogs("hc.api.models", "ERROR") as logs:
+            e = group.notify(self.flip)
+
+        self.assertEqual(e, "1 out of 1 notifications failed")
+        (record,) = logs.records
+        self.assertIn(f"slack channel {str(member.code)[:8]}: Received status code 500", record.getMessage())
+
+    @patch("hc.lib.emails.send", Mock(side_effect=SMTPServerDisconnected))
+    def test_a_failed_email_logs_one_error(self) -> None:
+        self._setup_data("email", "alice@example.org")
+
+        with self.assertLogs("hc", "WARNING") as logs:
+            e = self.channel.notify(self.flip)
+
+        self.assertEqual(e, "SMTP error: SMTPServerDisconnected")
+        levels = [(r.name, r.levelname) for r in logs.records]
+        self.assertEqual(levels, [("hc.integrations.email.transport", "WARNING"), ("hc.api.models", "ERROR")])
 
     def test_it_handles_deleted_channel(self) -> None:
         self._setup_data("email", "foo@example.org")
