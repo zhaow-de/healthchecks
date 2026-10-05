@@ -1,3 +1,4 @@
+from smtplib import SMTPServerDisconnected
 from unittest.mock import Mock, patch
 
 from django.contrib.auth.models import User
@@ -95,6 +96,17 @@ class NotifyTestCase(TransactionTestCase):
         self.assertEqual(e, "1 out of 1 notifications failed")
         (record,) = logs.records
         self.assertIn(f"slack channel {str(member.code)[:8]}: Received status code 500", record.getMessage())
+
+    @patch("hc.lib.emails.send", Mock(side_effect=SMTPServerDisconnected))
+    def test_a_failed_email_logs_one_error(self) -> None:
+        self._setup_data("email", "alice@example.org")
+
+        with self.assertLogs("hc", "WARNING") as logs:
+            e = self.channel.notify(self.flip)
+
+        self.assertEqual(e, "SMTP error: SMTPServerDisconnected")
+        levels = [(r.name, r.levelname) for r in logs.records]
+        self.assertEqual(levels, [("hc.integrations.email.transport", "WARNING"), ("hc.api.models", "ERROR")])
 
     def test_it_handles_deleted_channel(self) -> None:
         self._setup_data("email", "foo@example.org")

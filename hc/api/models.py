@@ -965,11 +965,7 @@ class Channel(models.Model):
         return _transport_class(path)(self)
 
     def _failure_log(self, flip: Flip, error: str) -> tuple[str, str, str, str, str]:
-        """The format and arguments of the ERROR line for a dispatch that failed.
-
-        It names the check by its name, never its code, which is the secret part of the
-        check's ping URL; no transport's error message holds a URL, a key or an address.
-        """
+        """Names the check by its name, never its code: the code is the secret part of its ping URL."""
         return ("Notification failed: check %r, %s channel %s: %s", flip.owner.name, self.kind, str(self.code)[:8], error)
 
     def notify(self, flip: Flip, is_test: bool = False) -> str:
