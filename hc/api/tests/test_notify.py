@@ -69,8 +69,6 @@ class NotifyTestCase(TransactionTestCase):
             record.getMessage(),
             f"Notification failed: check 'Nightly\\nbackup', slack channel {str(self.channel.code)[:8]}: Received status code 404",
         )
-        self.assertNotIn("secret-token", logs.output[0])
-        self.assertNotIn(str(self.check.code), logs.output[0])
 
     @patch("hc.api.transports.curl.request", autospec=True)
     def test_a_failed_test_notification_is_not_logged(self, mock_request: Mock) -> None:

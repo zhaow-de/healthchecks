@@ -341,7 +341,7 @@ class NotifyEmailTestCase(BaseTestCase):
         self.channel.notify(self.flip)
         n = Notification.objects.get()
         self.assertEqual(n.error, "SMTP error: SMTPServerDisconnected")
-        self.assertTrue(logger.warning.called)
+        logger.warning.assert_called_once_with("Exception while sending email", exc_info=True)
 
     @patch("hc.integrations.email.transport.logger")
     @patch("hc.lib.emails.send", Mock(side_effect=SMTPDataError(123, "oh no")))
@@ -349,7 +349,7 @@ class NotifyEmailTestCase(BaseTestCase):
         self.channel.notify(self.flip)
         n = Notification.objects.get()
         self.assertEqual(n.error, "SMTP error: SMTPDataError")
-        self.assertTrue(logger.warning.called)
+        logger.warning.assert_called_once_with("Exception while sending email", exc_info=True)
 
     @patch("hc.integrations.email.transport.logger")
     @patch("hc.lib.emails.send", Mock(side_effect=ConnectionRefusedError))
@@ -357,7 +357,7 @@ class NotifyEmailTestCase(BaseTestCase):
         self.channel.notify(self.flip)
         n = Notification.objects.get()
         self.assertEqual(n.error, "SMTP error: ConnectionRefusedError")
-        self.assertTrue(logger.warning.called)
+        logger.warning.assert_called_once_with("Exception while sending email", exc_info=True)
 
     @patch("hc.integrations.email.transport.logger")
     @patch("hc.lib.emails.send", Mock(side_effect=SMTPRecipientsRefused({"alice@example.org": (550, b"no")})))
@@ -365,7 +365,7 @@ class NotifyEmailTestCase(BaseTestCase):
         self.channel.notify(self.flip)
         n = Notification.objects.get()
         self.assertEqual(n.error, "SMTP error: SMTPRecipientsRefused")
-        self.assertTrue(logger.warning.called)
+        logger.warning.assert_called_once_with("Exception while sending email", exc_info=True)
 
         self.channel.refresh_from_db()
         self.assertEqual(self.channel.last_error, "SMTP error: SMTPRecipientsRefused")
