@@ -1,3 +1,4 @@
+from hc.accounts.models import Project
 from hc.api.models import Channel
 from hc.test import BaseTestCase, TestHttpResponse
 
@@ -24,7 +25,7 @@ class ListChannelsTestCase(BaseTestCase):
         doc = r.json()
         self.assertEqual(len(doc["channels"]), 1)
 
-        # Every key: a read-only key gets this object too, so a new field must not carry a URL or token
+        # A read-only key gets this object too, so a new field must not carry a URL or token
         c = doc["channels"][0]
         self.assertEqual(c, {"id": str(self.c1.code), "name": "Email to Alice", "kind": "email", "disabled": False})
 
@@ -44,12 +45,14 @@ class ListChannelsTestCase(BaseTestCase):
         self.assertEqual(r.json(), self.get().json())
 
     def test_a_readonly_key_gets_only_its_projects_channels(self) -> None:
-        charlies = Channel.objects.create(project=self.charlies_project, kind="email", name="Charlie")
-        ro_key = self.charlies_project.set_api_key_readonly()
-        self.charlies_project.save()
+        # Another project of the same owner, not charlie's: the key's project bounds the list, not its owner
+        other = Project.objects.create(owner=self.alice)
+        others = Channel.objects.create(project=other, kind="email", name="Other")
+        ro_key = other.set_api_key_readonly()
+        other.save()
 
         r = self.client.get(self.url, HTTP_X_API_KEY=ro_key)
-        self.assertEqual([c["id"] for c in r.json()["channels"]], [str(charlies.code)])
+        self.assertEqual([c["id"] for c in r.json()["channels"]], [str(others.code)])
 
     def test_it_handles_options(self) -> None:
         r = self.client.options(self.url)
