@@ -202,7 +202,7 @@ class SendAlertsTestCase(BaseTestCase):
             self.assertEqual(args[0].owner.status, "down")
 
     def test_it_logs_a_successful_notification(self) -> None:
-        check = Check(project=self.project, status="down")
+        check = Check(project=self.project, name="Backups", status="down")
         check.last_ping = now() - td(days=2)
         check.save()
 
@@ -219,6 +219,8 @@ class SendAlertsTestCase(BaseTestCase):
             log = notify(flip)
 
         assert log is not None
+        self.assertEqual(log.splitlines()[0], "'Backups' goes down")
+        self.assertNotIn(str(check.code), log)
         self.assertIn(f"{str(channel.code)[:8]} (webhook) OK in", log)
 
     def test_it_logs_a_failed_notification(self) -> None:
