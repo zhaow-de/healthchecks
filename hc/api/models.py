@@ -969,7 +969,6 @@ class Channel(models.Model):
         return _transport_class(path)(self)
 
     def _failure_log(self, flip: Flip, error: str) -> tuple[str, str, str, str, str]:
-        """The format and arguments of the ERROR line for a dispatch that failed."""
         return (
             "Notification failed: check %r, %s channel %s: %s",
             flip.owner.name_then_slug(),
