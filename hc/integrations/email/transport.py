@@ -54,8 +54,9 @@ class Email(Transport):
         try:
             emails.alert(self.channel.email.value, ctx, headers)
         except OSError as e:
-            # OSError covers SMTPException, socket timeouts and ssl errors
-            logger.exception("Exception while sending email")
+            # OSError covers SMTPException, socket timeouts and ssl errors. Channel.notify()
+            # logs an alert's failure at ERROR, so the traceback goes at WARNING.
+            logger.warning("Exception while sending email", exc_info=True)
             raise TransportError(f"SMTP error: {type(e).__name__}") from e
 
     def is_noop(self, status: str) -> bool:

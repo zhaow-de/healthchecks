@@ -202,7 +202,7 @@ class SendAlertsTestCase(BaseTestCase):
             self.assertEqual(args[0].owner.status, "down")
 
     def test_it_logs_a_successful_notification(self) -> None:
-        check = Check(project=self.project, status="down")
+        check = Check(project=self.project, name="Backups", status="down")
         check.last_ping = now() - td(days=2)
         check.save()
 
@@ -219,10 +219,12 @@ class SendAlertsTestCase(BaseTestCase):
             log = notify(flip)
 
         assert log is not None
+        self.assertEqual(log.splitlines()[0], "'Backups' goes down")
+        self.assertNotIn(str(check.code), log)
         self.assertIn(f"{str(channel.code)[:8]} (webhook) OK in", log)
 
     def test_it_logs_a_failed_notification(self) -> None:
-        check = Check(project=self.project, status="down")
+        check = Check(project=self.project, slug="nightly-backup", status="down")
         check.last_ping = now() - td(days=2)
         check.save()
 
@@ -240,6 +242,7 @@ class SendAlertsTestCase(BaseTestCase):
             log = notify(flip)
 
         assert log is not None
+        self.assertEqual(log.splitlines()[0], "'nightly-backup' goes down")
         self.assertIn(f"{str(channel.code)[:8]} (webhook) Error in", log)
         self.assertIn("Test error message", log)
 
@@ -260,13 +263,16 @@ class SendAlertsTestCase(BaseTestCase):
         assert log is not None
         self.assertIn(") Error in", log)
         self.assertIn(") OK in", log)
-        self.assertEqual(logs.records[0].getMessage(), "Unexpected error in webhook transport")
 
         # The error is recorded, and the channel stays enabled
         errors = sorted(Notification.objects.values_list("error", flat=True))
         self.assertEqual(errors, ["", "Unexpected error"])
         failed = Channel.objects.get(last_error="Unexpected error")
         self.assertFalse(failed.disabled)
+        self.assertEqual(
+            logs.records[0].getMessage(),
+            f"Notification failed: check '', webhook channel {str(failed.code)[:8]}: Unexpected error",
+        )
 
     def test_a_channel_without_a_transport_does_not_stop_the_others(self) -> None:
         check = Check.objects.create(project=self.project, status="down")
@@ -282,7 +288,10 @@ class SendAlertsTestCase(BaseTestCase):
         assert log is not None
         self.assertIn(f"{str(broken.code)[:8]} (unknown) Error in", log)
         self.assertIn(f"{str(email.code)[:8]} (email) OK in", log)
-        self.assertEqual(logs.records[0].getMessage(), "Unexpected error in unknown transport")
+        self.assertEqual(
+            logs.records[0].getMessage(),
+            f"Notification failed: check '', unknown channel {str(broken.code)[:8]}: Unexpected error",
+        )
         self.assertEqual(len(mail.outbox), 1)
 
         broken.refresh_from_db()

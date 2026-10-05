@@ -33,7 +33,7 @@ def notify(flip: Flip) -> str | None:
     if not channels:
         return None
 
-    logs = [f"{check.code} goes {flip.new_status}"]
+    logs = [f"{check.name_then_slug()!r} goes {flip.new_status}"]
     for ch in channels:
         notify_start = time.time()
         error = ch.notify(flip)
