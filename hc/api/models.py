@@ -964,6 +964,14 @@ class Channel(models.Model):
         _, path = TRANSPORTS[self.kind]
         return _transport_class(path)(self)
 
+    def _failure_log(self, flip: Flip, error: str) -> tuple[str, str, str, str, str]:
+        """The format and arguments of the ERROR line for a dispatch that failed.
+
+        It names the check by its name, never its code, which is the secret part of the
+        check's ping URL; no transport's error message holds a URL, a key or an address.
+        """
+        return ("Notification failed: check %r, %s channel %s: %s", flip.owner.name, self.kind, str(self.code)[:8], error)
+
     def notify(self, flip: Flip, is_test: bool = False) -> str:
         try:
             transport = self.transport
@@ -971,7 +979,7 @@ class Channel(models.Model):
                 return "no-op"
         except Exception:
             # An unknown kind, or a stored value its transport cannot parse
-            logger.exception("Unexpected error in %s transport", self.kind)
+            logger.exception(*self._failure_log(flip, "Unexpected error"))
             Channel.objects.filter(id=self.id).update(last_error="Unexpected error")
             return "Unexpected error"
 
@@ -997,10 +1005,14 @@ class Channel(models.Model):
         except transports.TransportError as e:
             disabled = True if e.permanent else disabled
             error = e.message
+            # The Test button shows its error on the page. A group's error counts its
+            # members' failures, each logged by its own notify().
+            if not is_test and self.kind != "group":
+                logger.error(*self._failure_log(flip, error))
         except Exception:
             # A bug in one transport must not stop the flip's other channels,
             # a group's members, or the Test button
-            logger.exception("Unexpected error in %s transport", self.kind)
+            logger.exception(*self._failure_log(flip, "Unexpected error"))
             error = "Unexpected error"
 
         Notification.objects.filter(id=n.id).update(error=error)
