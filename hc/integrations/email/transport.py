@@ -55,7 +55,7 @@ class Email(Transport):
             emails.alert(self.channel.email.value, ctx, headers)
         except OSError as e:
             # OSError covers SMTPException, socket timeouts and ssl errors. Channel.notify()
-            # logs the failure at ERROR; the traceback stays below it, at WARNING.
+            # logs an alert's failure at ERROR, so the traceback goes at WARNING.
             logger.warning("Exception while sending email", exc_info=True)
             raise TransportError(f"SMTP error: {type(e).__name__}") from e
 
