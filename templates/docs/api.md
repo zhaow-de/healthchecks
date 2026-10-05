@@ -13,11 +13,10 @@ report success, start, failure and log events: the Management API records no pin
 Every endpoint lives under `SITE_ROOT/api/v3/`; v3 is the only version. Paths are
 matched exactly:
 
-* A collection path ends with a slash: `checks/`, `checks/<uuid>/pings/`,
-  `checks/<uuid>/flips/`, `channels/`, `status/`, `metrics/`. Send the
-  slash. Without it, a GET gets a 301 redirect to the slashed path, and so does a POST
-  while the server runs with `DEBUG` off; with `DEBUG` on, the setting's default,
-  a POST, PUT or PATCH gets a 500, since Django will not redirect those.
+* A collection path is written with a trailing slash: `checks/`,
+  `checks/<uuid>/pings/`, `checks/<uuid>/flips/`, `channels/`, `status/`,
+  `metrics/`, `bounces/`. Each answers without the slash as well, the same way and
+  for every method: nothing is redirected.
 * A path that names one check has no trailing slash: `checks/<uuid>`,
   `checks/<uuid>/pause`, `checks/<uuid>/resume`, `checks/<uuid>/pings/<n>/body`.
   With one, it gets 404.
@@ -47,8 +46,10 @@ curl --header "X-Api-Key: your-api-key" SITE_ROOT/api/v3/checks/
 ```
 
 A POST request with a JSON body may carry the key in an `api_key` field of the body
-instead; the header wins when both are present. GET and DELETE requests read the
-header only, and no request reads the key from the query string.
+instead; the header wins when both are present. A key in the header is checked
+before the body is read, so a wrong one gets 401 even when the body is not JSON. GET
+and DELETE requests read the header only, and no request reads the key from the
+query string.
 
 A read-only key receives check objects without the `uuid`, `ping_url`, `update_url`,
 `pause_url`, `resume_url` and `channels` fields and with an extra `unique_key` field,
@@ -61,7 +62,8 @@ POST requests (create, update, pause, resume) carry a JSON object as the body.
 SITE_NAME parses the body as JSON whatever the `Content-Type` header says, so
 `curl --data '{...}'` works; a `multipart/form-data` or URL-encoded form gets
 "400 could not parse request body". An empty body counts as `{}`. Fields the
-endpoint does not know are ignored.
+endpoint does not know are ignored. A body larger than 64 KiB (65,536 bytes) gets
+"413 request body too large" before anything else is checked.
 
 Field types are strict: `timeout` and `grace` are JSON integers (not strings, and not
 numbers with a fraction or a decimal point such as `300.0`), booleans are `true` or
@@ -79,11 +81,18 @@ responses the table below marks as text, HTML or empty. Timestamps are ISO 8601 
 UTC (`2020-03-24T14:02:03+00:00`), and durations are integers in seconds. Every
 endpoint that returns a check returns the same [check object](#check-object).
 
+Every response but the HTML error pages, those of status, metrics and bounces
+included, carries
+`Cache-Control: max-age=0, no-cache, no-store, must-revalidate, private`: check
+objects hold ping URLs, which no cache should keep.
+
 Every endpoint except status, metrics and bounces answers an OPTIONS request with
 "204 No Content", and puts `Access-Control-Allow-Origin: *`,
-`Access-Control-Allow-Headers: X-Api-Key` and `Access-Control-Allow-Methods` on its
-responses, the 4xx ones included, so a browser page on another origin can call the
-API. A 301 redirect and an HTML 404 page carry none of them.
+`Access-Control-Allow-Headers: X-Api-Key, Content-Type`,
+`Access-Control-Allow-Methods` (the endpoint's methods, then `OPTIONS`) and
+`Access-Control-Max-Age: 600` on its responses, the 4xx ones included, so a browser
+page on another origin can call the API. Only the HTML 404 page of a path that
+matches no endpoint carries none of them.
 
 ### Status Codes and Errors {: #status-codes }
 
@@ -92,17 +101,18 @@ Status | Body | Meaning
 200 | JSON | The request succeeded. Create returns 200 when `unique` found an existing check and updated it.
 201 | JSON | Create made a new check.
 204 | empty | The answer to an OPTIONS request.
-301 | empty | The path lacks its trailing slash; the `Location` header holds the right path. A POST gets this only while `DEBUG` is off.
 400 | `{"error": "<message>"}` | The request body was refused; the messages are listed below.
 400 | empty | [List flips](#list-flips): a query parameter is not valid.
 401 | `{"error": "missing api key"}` | No key was found, or the key is not 32 characters long.
 401 | `{"error": "wrong api key"}` | The key matches no project, or a read-only key was sent to an endpoint that needs a read-write key.
 403 | empty | The check belongs to another project than the key; or, for [metrics](#metrics), the metrics key is missing or wrong.
 403 | HTML page | A request to [status](#status) or [metrics](#metrics) with a method other than GET, HEAD, OPTIONS or TRACE: it fails Django's CSRF check.
-404 | HTML page or empty | The check, the ping or the ping's body does not exist, or the path matches no endpoint (a misspelled UUID, a wrong trailing slash).
-405 | empty | The endpoint does not take this method (HEAD included).
+404 | empty | The check, the ping or the ping's body does not exist.
+404 | HTML page | The path matches no endpoint (a misspelled UUID, a trailing slash after a path that names one check).
+405 | empty | The endpoint does not take this method (HEAD included); the `Allow` header lists the methods it takes.
 409 | the text `check is not paused` | [Resume](#resume-check) was called on a check that is not paused.
-500 | HTML page | A server error; [status](#status) returns it when the database query fails. Also a POST, PUT or PATCH to a collection path without its trailing slash while `DEBUG` is on, and a `tags` value over 500 characters on PostgreSQL.
+413 | `{"error": "request body too large"}` | A POST body is larger than 64 KiB (65,536 bytes).
+500 | HTML page | A server error; [status](#status) returns it when the database query fails.
 
 The `error` messages of a 400 response:
 
@@ -223,8 +233,8 @@ the check's UUID can construct them itself.
 GET SITE_ROOT/api/v3/checks/
 ```
 
-Returns a list of the project's checks, optionally filtered by slug and by one or
-more tags.
+Returns a list of the project's checks, in the order they were created, optionally
+filtered by slug and by one or more tags.
 
 **Authentication:** a read-write or a read-only key, in the `X-Api-Key` header.
 
@@ -454,7 +464,7 @@ The response to a read-only key omits `uuid`, `ping_url`, `update_url`, `pause_u
 Status | Body | When
 -------|------|-----
 403 | empty | The check (by UUID) belongs to another project.
-404 | HTML page or empty | No check has this UUID, or the key's project has no check with this `unique_key`.
+404 | empty | No check has this UUID, or the key's project has no check with this `unique_key`.
 
 Plus the errors every endpoint can return; see [Status codes](#status-codes).
 
@@ -488,8 +498,8 @@ Name | In | Type and allowed values | Required | Default | Meaning
 -----|----|-------------------------|----------|---------|--------
 `name` | body | string, at most 100 characters | no | `""` | The check's name. The slug is not generated from it.
 `slug` | body | string of `a-z`, `0-9`, `-` and `_`, at most 100 characters | no | `""` | The slug for [slug ping URLs](../http_api/#uuids-and-slugs); `""` for none.
-`tags` | body | string, at most 500 characters; the API does not check the length, and a longer value is stored whole on SQLite and gets a 500 on PostgreSQL | no | `""` | Space-separated tags, for example `"reports staging"`.
-`desc` | body | string | no | `""` | The description.
+`tags` | body | string, at most 500 characters | no | `""` | Space-separated tags, for example `"reports staging"`.
+`desc` | body | string, at most 10,000 characters | no | `""` | The description.
 `timeout` | body | integer, 60 to 31536000 (one minute to 365 days) | no | {{ default_timeout }} | The expected period in seconds. Makes the check Simple. Ignored when `schedule` is given too.
 `grace` | body | integer, 60 to 31536000 | no | {{ default_grace }} | The grace time in seconds.
 `schedule` | body | string, a cron or OnCalendar expression, at most 100 characters | no | none | Makes the check a Cron or OnCalendar check; see [schedule](#field-schedule).
@@ -805,7 +815,7 @@ Status | Body | When
 400 | `{"error": "..."}` | The body is not a JSON object, a field breaks its rule, or `channels` names an unknown or ambiguous integration; see [Status codes](#status-codes) for the messages.
 401 | `{"error": "wrong api key"}` | The key is a read-only key.
 403 | empty | The check belongs to another project.
-404 | HTML page or empty | No check has this UUID, or it was deleted during the update.
+404 | empty | No check has this UUID, or it was deleted during the update.
 
 Plus the errors every endpoint can return; see [Status codes](#status-codes).
 
@@ -887,7 +897,7 @@ Status | Body | When
 -------|------|-----
 401 | `{"error": "wrong api key"}` | The key is a read-only key.
 403 | empty | The check belongs to another project.
-404 | HTML page | No check has this UUID.
+404 | empty | No check has this UUID.
 
 Plus the errors every endpoint can return; see [Status codes](#status-codes).
 
@@ -966,7 +976,7 @@ Status | Body | When
 -------|------|-----
 401 | `{"error": "wrong api key"}` | The key is a read-only key.
 403 | empty | The check belongs to another project.
-404 | HTML page | No check has this UUID.
+404 | empty | No check has this UUID.
 409 | the text `check is not paused` | The check is not in the paused state.
 
 Plus the errors every endpoint can return; see [Status codes](#status-codes).
@@ -1037,7 +1047,7 @@ Status | Body | When
 401 | `{"error": "missing api key"}` | The key was sent in the body instead of the header.
 401 | `{"error": "wrong api key"}` | The key is a read-only key.
 403 | empty | The check belongs to another project.
-404 | HTML page | No check has this UUID, or it is already deleted.
+404 | empty | No check has this UUID, or it is already deleted.
 
 Plus the errors every endpoint can return; see [Status codes](#status-codes).
 
@@ -1130,9 +1140,9 @@ Field | Type | Meaning
 `type` | string | `success`, `start`, `fail`, `log`, or `ign` (ignored: the check's settings discarded it; see [how SITE_NAME interprets a ping](../http_api/#interpreting-pings)). A ping to the exit status endpoint counts as `success` for 0 and `fail` otherwise, unless the check's settings make it `ign` or a keyword filter decides.
 `date` | string | When SITE_NAME received the ping, ISO 8601 in UTC with microseconds.
 `n` | integer | The ping's number within the check, counting from 1; the [ping body](#ping-body) call takes it.
-`scheme` | string | `http` or `https`, from the `X-Forwarded-Proto` request header; `http` when it is absent.
-`remote_addr` | string | The client's IP address (the first address in `X-Forwarded-For` when present).
-`method` | string | The HTTP method of the ping.
+`scheme` | string | `https` when the ping reached the server over HTTPS, as its reverse proxy reports in the `X-Forwarded-Proto` request header; `http` otherwise.
+`remote_addr` | string or null | The client's IP address: the `X-Forwarded-For` entry that the server's `TRUSTED_PROXY_HOPS` setting selects from the right, or the address of the connection. `null` when that is not an IP address.
+`method` | string | The HTTP method of the ping, cut to 10 characters.
 `ua` | string | The first 200 characters of the `User-Agent` header.
 `rid` | string or null | The [run ID](../http_api/#run-ids) the ping carried.
 `body_url` | string or null | The URL of the ping's body; `null` when the ping had no body.
@@ -1147,7 +1157,7 @@ Status | Body | When
 -------|------|-----
 401 | `{"error": "wrong api key"}` | The key is a read-only key.
 403 | empty | The check belongs to another project.
-404 | HTML page | No check has this UUID.
+404 | empty | No check has this UUID.
 
 Plus the errors every endpoint can return; see [Status codes](#status-codes).
 
@@ -1192,7 +1202,7 @@ Status | Body | When
 -------|------|-----
 401 | `{"error": "wrong api key"}` | The key is a read-only key.
 403 | empty | The check belongs to another project.
-404 | HTML page | The check does not exist, the ping does not exist or is older than the ping log limit, or the ping has no body data.
+404 | empty | The check does not exist, the ping does not exist or is older than the ping log limit, or the ping has no body data.
 
 Plus the errors every endpoint can return; see [Status codes](#status-codes).
 
@@ -1203,7 +1213,8 @@ GET SITE_ROOT/api/v3/checks/<uuid>/flips/
 GET SITE_ROOT/api/v3/checks/<unique_key>/flips/
 ```
 
-Returns a list of "flips" this check has experienced, most recent first. A flip is a
+Returns a list of "flips" this check has experienced, most recent first, by the
+time of the flip (`timestamp`). A flip is a
 change of status: the check going up or down, and also the changes that pausing and
 resuming make. `up` is `1` when the check became up and `0` for every other new
 status, paused and new included.
@@ -1214,10 +1225,10 @@ flips for a given check. Filters given together all apply.
 
 Notes about flip retention: when a check prunes its old pings, SITE_NAME also removes
 the check's flips that are older than 93 days, enough for the current month and the
-two full months before it, and older than the check's oldest kept ping too. Pruning
-happens on every 100th ping and when the server's operator runs the `prunepingsslow`
-management command; until then, this API call returns these flips as well. Clearing a
-check's events in the web UI removes all of its flips at once.
+two full months before it, and older than the check's oldest kept ping too; a flip
+whose alerts have not been sent yet stays. Pruning happens on every 100th ping and in
+the server's daily cleanup; until then, this API call returns these flips as well.
+Clearing a check's events in the web UI removes all of its flips at once.
 
 **Authentication:** a read-write or a read-only key, in the `X-Api-Key` header.
 
@@ -1270,7 +1281,7 @@ Status | Body | When
 -------|------|-----
 400 | empty | `seconds`, `start` or `end` is not an integer or is out of range.
 403 | empty | The check (by UUID) belongs to another project.
-404 | HTML page or empty | No check has this UUID, or the key's project has no check with this `unique_key`.
+404 | empty | No check has this UUID, or the key's project has no check with this `unique_key`.
 
 Plus the errors every endpoint can return; see [Status codes](#status-codes).
 
@@ -1355,6 +1366,7 @@ curl SITE_ROOT/api/v3/status/
 ```http
 HTTP/1.1 200 OK
 Content-Type: text/html; charset=utf-8
+Cache-Control: max-age=0, no-cache, no-store, must-revalidate, private
 
 OK
 ```

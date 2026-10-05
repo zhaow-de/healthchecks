@@ -1,8 +1,8 @@
 import re
 import sqlite3
 from collections import Counter, defaultdict
-from collections.abc import Iterable
-from contextlib import closing
+from collections.abc import Iterable, Iterator
+from contextlib import closing, contextmanager
 from datetime import datetime
 from datetime import timedelta as td
 from itertools import islice
@@ -15,7 +15,8 @@ from cronsim import CronSim
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ObjectDoesNotExist, ObjectNotUpdated, ValidationError
+from django.db import transaction
 from django.db.models import BinaryField, Case, Count, F, Q, When
 from django.db.models.functions import Substr
 from django.http import (
@@ -129,6 +130,15 @@ def _get_check_for_user(request: AuthenticatedHttpRequest, code: UUID, preload_o
     return get_object_or_404(q, code=code, project__owner_id=request.user.id)
 
 
+@contextmanager
+def _404_if_deleted() -> Iterator[None]:
+    """Answer 404 when the object was deleted after the view read it."""
+    try:
+        yield
+    except ObjectDoesNotExist, ObjectNotUpdated:
+        raise Http404("not found") from None
+
+
 def _get_channel_for_user(request: AuthenticatedHttpRequest, code: UUID) -> Channel:
     """Return specified channel if current user owns its project."""
 
@@ -193,7 +203,8 @@ def checks(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
 
     if request.GET.get("urls") in ("uuid", "slug"):
         project.show_slugs = request.GET["urls"] == "slug"
-        project.save(update_fields=["show_slugs"])
+        with _404_if_deleted():
+            project.save(update_fields=["show_slugs"])
 
     if request.session.get("last_project_id") != project.id:
         request.session["last_project_id"] = project.id
@@ -305,10 +316,16 @@ def switch_channel(request: AuthenticatedHttpRequest, code: UUID, channel_code: 
     if channel.project_id != check.project_id:
         return HttpResponseBadRequest()
 
-    if request.POST.get("state") == "on":
-        channel.checks.add(check)
-    else:
-        channel.checks.remove(check)
+    with _404_if_deleted(), transaction.atomic():
+        check.lock()
+        # A transfer may have moved the check to another project since it was read
+        if channel.project_id != check.project_id:
+            return HttpResponseBadRequest()
+        Channel.objects.select_for_update(no_key=True).get(id=channel.id)
+        if request.POST.get("state") == "on":
+            channel.checks.add(check)
+        else:
+            channel.checks.remove(check)
 
     return HttpResponse()
 
@@ -503,7 +520,8 @@ def update_name(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
     check.slug = form.cleaned_data["slug"]
     check.tags = form.cleaned_data["tags"]
     check.desc = form.cleaned_data["desc"]
-    check.save(update_fields=("name", "slug", "tags", "desc"))
+    with _404_if_deleted():
+        check.save(update_fields=("name", "slug", "tags", "desc"))
 
     return _redirect_back(request, check)
 
@@ -525,7 +543,8 @@ def filtering_rules(request: AuthenticatedHttpRequest, code: UUID) -> HttpRespon
         update_fields += ["filter_default_fail", "start_kw", "success_kw", "failure_kw"]
     for field in update_fields:
         setattr(check, field, form.cleaned_data[field])
-    check.save(update_fields=update_fields)
+    with _404_if_deleted():
+        check.save(update_fields=update_fields)
 
     return redirect("hc-details", code)
 
@@ -536,64 +555,56 @@ def update_timeout(request: AuthenticatedHttpRequest, code: UUID) -> HttpRespons
     check = _get_check_for_user(request, code)
     fields = ("kind", "timeout", "grace", "schedule", "tz", "alert_after")
 
-    match request.POST.get("kind"):
+    form: forms.TimeoutForm | forms.CronForm | forms.OnCalendarForm
+    kind = request.POST.get("kind")
+    match kind:
         case "simple":
-            simple_form = forms.TimeoutForm(request.POST)
-            if not simple_form.is_valid():
-                return HttpResponseBadRequest()
-
-            check.kind = "simple"
-            check.timeout = simple_form.cleaned_data["timeout"]
-            check.grace = simple_form.cleaned_data["grace"]
+            form = forms.TimeoutForm(request.POST)
         case "cron":
-            cron_form = forms.CronForm(request.POST)
-            if not cron_form.is_valid():
-                return HttpResponseBadRequest()
-
-            check.kind = "cron"
-            check.schedule = cron_form.cleaned_data["schedule"]
-            check.tz = cron_form.cleaned_data["tz"]
-            check.grace = cron_form.cleaned_data["grace"]
+            form = forms.CronForm(request.POST)
         case "oncalendar":
-            oncalendar_form = forms.OnCalendarForm(request.POST)
-            if not oncalendar_form.is_valid():
-                return HttpResponseBadRequest()
-
-            check.kind = "oncalendar"
-            check.schedule = oncalendar_form.cleaned_data["schedule"]
-            check.tz = oncalendar_form.cleaned_data["tz"]
-            check.grace = oncalendar_form.cleaned_data["grace"]
+            form = forms.OnCalendarForm(request.POST)
         case _:
             return HttpResponseBadRequest()
 
-    check.alert_after = check.going_down_after()
-    check_saved = False
-    if check.status == "up":
-        assert check.alert_after
-        if check.alert_after < now():
-            # Checks can flip from "up" to "down" state as a result of changing check's
-            # schedule.  We don't want to send notifications when changing schedule
-            # interactively in the web UI. So we update the `alert_after` and `status`
-            # fields, and create a Flip object here the same way as `sendalerts` would
-            # do, but without sending an actual alert.
-            #
-            # We need to create the Flip object because otherwise the calculation
-            # in Check.downtimes() will come out wrong (when this check later comes up,
-            # we will have no record of when it went down).
-            check.create_flip("down", mark_as_processed=True)
+    if not form.is_valid():
+        return HttpResponseBadRequest()
 
-            check.alert_after = None
-            check.status = "down"
+    with _404_if_deleted(), transaction.atomic():
+        check.lock()
+        check.kind = kind
+        # Each field of the three forms is a Check field of the same name
+        for field, value in form.cleaned_data.items():
+            setattr(check, field, value)
 
-            # Kick off nags. This would normally happen in the sendalerts management
-            # command while processing a flip, but we have already marked the flip
-            # as processed
-            check.save(update_fields=(*fields, "status"))
-            check_saved = True
-            check.project.update_next_nag_dates()
+        check.alert_after = check.going_down_after()
+        check_saved = False
+        if check.status == "up":
+            assert check.alert_after
+            if check.alert_after < now():
+                # Checks can flip from "up" to "down" state as a result of changing check's
+                # schedule.  We don't want to send notifications when changing schedule
+                # interactively in the web UI. So we update the `alert_after` and `status`
+                # fields, and create a Flip object here the same way as `sendalerts` would
+                # do, but without sending an actual alert.
+                #
+                # We need to create the Flip object because otherwise the calculation
+                # in Check.downtimes() will come out wrong (when this check later comes up,
+                # we will have no record of when it went down).
+                check.create_flip("down", mark_as_processed=True)
 
-    if not check_saved:
-        check.save(update_fields=fields)
+                check.alert_after = None
+                check.status = "down"
+
+                # Kick off nags. This would normally happen in the sendalerts management
+                # command while processing a flip, but we have already marked the flip
+                # as processed
+                check.save(update_fields=(*fields, "status"))
+                check_saved = True
+                check.project.update_next_nag_dates()
+
+        if not check_saved:
+            check.save(update_fields=fields)
 
     return _redirect_back(request, check)
 
@@ -709,7 +720,8 @@ def ping_body(request: AuthenticatedHttpRequest, code: UUID, n: int) -> HttpResp
 @login_required
 def pause(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
     check = _get_check_for_user(request, code)
-    check.pause()
+    with _404_if_deleted():
+        check.pause()
 
     # Don't redirect after an AJAX request:
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
@@ -722,7 +734,9 @@ def pause(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
 @login_required
 def resume(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
     check = _get_check_for_user(request, code)
-    if not check.resume():
+    with _404_if_deleted():
+        resumed = check.resume()
+    if not resumed:
         return HttpResponseBadRequest()
 
     return redirect("hc-details", code)
@@ -743,26 +757,30 @@ def remove_check(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
 def clear_events(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
     check = _get_check_for_user(request, code)
 
-    check.status = "new"
-    check.last_ping = None
-    check.last_start = None
-    check.last_duration = None
-    check.has_confirmation_link = False
-    check.alert_after = None
-    check.save(
-        update_fields=(
-            "status",
-            "last_ping",
-            "last_start",
-            "last_duration",
-            "has_confirmation_link",
-            "alert_after",
+    # One transaction under the row lock: a ping lands either before the clear, and is
+    # cleared with the rest, or after it, and then keeps its Ping row
+    with _404_if_deleted(), transaction.atomic():
+        check.lock()
+        check.status = "new"
+        check.last_ping = None
+        check.last_start = None
+        check.last_duration = None
+        check.has_confirmation_link = False
+        check.alert_after = None
+        check.save(
+            update_fields=(
+                "status",
+                "last_ping",
+                "last_start",
+                "last_duration",
+                "has_confirmation_link",
+                "alert_after",
+            )
         )
-    )
 
-    check.ping_set.all().delete()
-    check.notification_set.all().delete()
-    check.flip_set.all().delete()
+        check.ping_set.all().delete()
+        check.notification_set.all().delete()
+        check.flip_set.all().delete()
 
     return redirect("hc-details", code)
 
@@ -778,10 +796,7 @@ def _get_events(
     end: datetime,
     kinds: tuple[str, ...] | None = None,
 ) -> list[Notification | WithAnnotations[Ping, PingAnnotations] | Flip]:
-    # Sorting by "n" instead of "id" is important here. Both give the same
-    # query results, but sorting by "id" can cause postgres to pick
-    # api_ping.id index (slow if the api_ping table is big). Sorting by
-    # "n" works around the problem--postgres picks the api_ping.owner_id index.
+    # By "n", not "created" or "id": see Ping.Meta
     pq = check.visible_pings.order_by("-n")
     pq = pq.filter(created__gte=start, created__lte=end)
     if kinds is not None:
@@ -865,7 +880,8 @@ def details(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
 
     if request.GET.get("urls") in ("uuid", "slug"):
         check.project.show_slugs = request.GET["urls"] == "slug"
-        check.project.save(update_fields=["show_slugs"])
+        with _404_if_deleted():
+            check.project.save(update_fields=["show_slugs"])
 
     all_channels = check.project.channel_set.order_by("created")
     regular_channels: list[Channel] = []
@@ -918,9 +934,12 @@ def transfer(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
             return HttpResponseBadRequest()
 
         target_project = _get_project_for_user(request, form.cleaned_data["project"])
-        check.project = target_project
-        check.save(update_fields=("project",))
-        check.assign_all_channels()
+        with _404_if_deleted(), transaction.atomic():
+            check.lock()
+            Project.objects.select_for_update(no_key=True).get(id=target_project.id)
+            check.project = target_project
+            check.save(update_fields=("project",))
+            check.assign_all_channels()
 
         messages.success(request, "Check transferred successfully!")
         return redirect("hc-details", code)
@@ -943,7 +962,7 @@ def copy(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
     if len(new_slug) > 100:
         new_slug = ""
 
-    copied = Check(project=check.project)
+    copied = Check()
     copied.name = new_name
     copied.slug = new_slug
     copied.desc, copied.tags = check.desc, check.tags
@@ -962,9 +981,14 @@ def copy(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
     copied.kind = check.kind
     copied.timeout, copied.grace = check.timeout, check.grace
     copied.schedule, copied.tz = check.schedule, check.tz
-    copied.save()
-
-    copied.channel_set.add(*check.channel_set.all())
+    with _404_if_deleted(), transaction.atomic():
+        check.lock()
+        # The project the check is in now, whose channels it copies: a transfer may have
+        # moved it since it was read
+        copied.project = check.project
+        copied.save()
+        # Locked, so no channel is deleted between this read and the link rows' commit
+        copied.channel_set.add(*check.channel_set.select_for_update(of=("self",), no_key=True).order_by("id"))
 
     url = reverse("hc-details", args=[copied.code], query={"copied": 1})
     return redirect(url)
@@ -1022,7 +1046,21 @@ def channels(request: AuthenticatedHttpRequest, code: UUID) -> HttpResponse:
                     return HttpResponseForbidden()
                 new_checks.append(check)
 
-        channel.checks.set(new_checks)
+        with _404_if_deleted(), transaction.atomic():
+            # Checks in id order, then the channel, as switch_channel and copy lock them: this
+            # POST cannot deadlock with either on PostgreSQL
+            ids = {check.id for check in new_checks}
+            q = Check.objects.select_for_update(no_key=True).filter(project=project, id__in=ids).order_by("id")
+            locked = set(q.values_list("id", flat=True))
+            if locked != ids:
+                # One still there was transferred to another project since it was read,
+                # and gets the answer above for a check of another project
+                if Check.objects.filter(id__in=ids - locked).exists():
+                    return HttpResponseForbidden()
+                raise Http404("not found")
+            Channel.objects.select_for_update(no_key=True).get(id=channel.id)
+            channel.checks.set(new_checks)
+
         return redirect("hc-channels", project.code)
 
     channels = project.channel_set.annotate(n_checks=Count("checks"))
@@ -1065,7 +1103,8 @@ def update_channel_name(request: AuthenticatedHttpRequest, code: UUID) -> HttpRe
         return HttpResponseBadRequest()
 
     channel.name = form.cleaned_data["name"]
-    channel.save(update_fields=["name"])
+    with _404_if_deleted():
+        channel.save(update_fields=["name"])
 
     return redirect("hc-channels", channel.project.code)
 

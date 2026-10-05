@@ -1,3 +1,11 @@
+from typing import Any
+from unittest import skipUnless
+from unittest.mock import patch
+
+from django.db import connection
+from django.shortcuts import get_object_or_404
+from django.test.utils import CaptureQueriesContext
+
 from hc.accounts.models import Project
 from hc.api.models import Channel, Check
 from hc.test import BaseTestCase
@@ -43,3 +51,51 @@ class SwitchChannelTestCase(BaseTestCase):
         self.client.login(username="charlie@example.org", password="password")
         r = self.client.post(self.url, {"state": "on"})
         self.assertEqual(r.status_code, 400)
+
+    def test_it_handles_a_check_deleted_after_it_was_read(self) -> None:
+        def get_and_delete(*args: Any, **kwargs: Any) -> Check:
+            check = Check.objects.get(id=self.check.id)
+            self.check.delete()
+            return check
+
+        self.client.login(username="alice@example.org", password="password")
+        with patch("hc.front.views._get_check_for_user", get_and_delete):
+            r = self.client.post(self.url, {"state": "on"})
+        self.assertEqual(r.status_code, 404)
+        self.assertFalse(self.channel.checks.exists())
+
+    def test_it_handles_a_check_transferred_after_it_was_read(self) -> None:
+        other_project = Project.objects.create(owner=self.alice)
+
+        def get_and_transfer(*args: Any, **kwargs: Any) -> Check:
+            check = Check.objects.get(id=self.check.id)
+            Check.objects.filter(id=self.check.id).update(project=other_project)
+            return check
+
+        self.client.login(username="alice@example.org", password="password")
+        with patch("hc.front.views._get_check_for_user", get_and_transfer):
+            r = self.client.post(self.url, {"state": "on"})
+        self.assertEqual(r.status_code, 400)
+        self.assertFalse(self.channel.checks.exists())
+
+    def test_it_handles_a_channel_deleted_after_it_was_read(self) -> None:
+        def get_and_delete(*args: Any, **kwargs: Any) -> Any:
+            obj = get_object_or_404(*args, **kwargs)
+            if isinstance(obj, Channel):
+                Channel.objects.filter(id=obj.id).delete()
+            return obj
+
+        self.client.login(username="alice@example.org", password="password")
+        with patch("hc.front.views.get_object_or_404", get_and_delete):
+            r = self.client.post(self.url, {"state": "on"})
+        self.assertEqual(r.status_code, 404)
+        self.assertFalse(Channel.checks.through.objects.exists())
+
+    @skipUnless(connection.features.has_select_for_update, "no row locks")
+    def test_it_locks_the_channel_for_no_key_update(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        with CaptureQueriesContext(connection) as ctx:
+            self.client.post(self.url, {"state": "on"})
+        locks = [q["sql"] for q in ctx.captured_queries if 'FROM "api_channel"' in q["sql"] and " FOR " in q["sql"]]
+        self.assertEqual(len(locks), 1, locks)
+        self.assertIn(" FOR NO KEY UPDATE", locks[0])

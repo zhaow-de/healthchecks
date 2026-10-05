@@ -3,10 +3,13 @@ from datetime import timedelta as td
 from unittest.mock import patch
 
 import time_machine
-from django.db import IntegrityError
-from django.db.models import QuerySet
+from cronsim import CronSim
+from django.db import IntegrityError, connection
+from django.db.models import Q, QuerySet
+from django.test.utils import CaptureQueriesContext
 from django.utils.timezone import now
 
+from hc.accounts.models import Project
 from hc.api.models import MAX_DURATION, Channel, Check, Flip, Notification, Ping
 from hc.test import BaseTestCase
 
@@ -182,6 +185,29 @@ class CheckModelTestCase(BaseTestCase):
         d = check.to_dict()
         self.assertEqual(d["next_ping"], "2000-01-01T01:00:00+00:00")
 
+    @time_machine.travel(datetime(2000, 1, 1, 0, 30, tzinfo=UTC))
+    def test_to_dict_iterates_a_cron_schedule_once(self) -> None:
+        check = Check(project=self.project, kind="cron", schedule="0 * * * *", status="up")
+        check.last_ping = datetime(2000, 1, 1, tzinfo=UTC)
+
+        with patch("hc.api.models.CronSim", wraps=CronSim) as cronsim:
+            d = check.to_dict(readonly=True)
+
+        self.assertEqual(cronsim.call_count, 1)
+        self.assertEqual(d["status"], "up")
+        self.assertEqual(d["next_ping"], "2000-01-01T01:00:00+00:00")
+
+    def test_to_dict_takes_the_channel_codes_it_is_given(self) -> None:
+        check = Check.objects.create(project=self.project)
+        c1, c2 = Channel.objects.create(project=self.project), Channel.objects.create(project=self.project)
+        check.channel_set.add(c1, c2)
+        expected = ",".join(sorted([str(c1.code), str(c2.code)]))
+
+        self.assertEqual(check.to_dict()["channels"], expected)
+        with self.assertNumQueries(0):
+            self.assertEqual(check.to_dict(channel_codes=[c2.code, c1.code])["channels"], expected)
+            self.assertEqual(check.to_dict(channel_codes=[])["channels"], "")
+
     @time_machine.travel(CURRENT_TIME)
     def test_downtimes_handles_no_flips(self) -> None:
         check = Check(project=self.project)
@@ -352,6 +378,7 @@ class CheckModelTestCase(BaseTestCase):
         f = Flip(owner=check)
         # older than the earliest ping, and also older than 93 days
         f.created = CURRENT_TIME - td(days=93, seconds=1)
+        f.processed = f.created
         f.old_status = "new"
         f.new_status = "down"
         f.save()
@@ -362,7 +389,8 @@ class CheckModelTestCase(BaseTestCase):
         n.created = CURRENT_TIME - td(minutes=10)
         n.save()
 
-        check.prune()
+        # One ping, one notification, one flip
+        self.assertEqual(check.prune(), (1, 1, 1))
 
         self.assertTrue(Ping.objects.filter(n=101).exists())
         self.assertFalse(Ping.objects.filter(n=1).exists())
@@ -378,12 +406,23 @@ class CheckModelTestCase(BaseTestCase):
         f = Flip(owner=check)
         # older than the earliest ping, but not older than 93 days
         f.created = CURRENT_TIME - td(days=92)
+        f.processed = f.created
         f.old_status = "new"
         f.new_status = "down"
         f.save()
 
         check.prune()
 
+        self.assertEqual(Flip.objects.count(), 1)
+
+    @time_machine.travel(CURRENT_TIME)
+    def test_it_does_not_prune_unprocessed_flips(self) -> None:
+        check = Check.objects.create(project=self.project, n_pings=101)
+        Ping.objects.create(owner=check, n=101)
+        # older than the earliest ping and than 93 days, but its alerts are not sent yet
+        Flip.objects.create(owner=check, created=CURRENT_TIME - td(days=100), old_status="up", new_status="down")
+
+        self.assertEqual(check.prune(), (0, 0, 0))
         self.assertEqual(Flip.objects.count(), 1)
 
     @time_machine.travel(CURRENT_TIME)
@@ -395,6 +434,7 @@ class CheckModelTestCase(BaseTestCase):
         f = Flip(owner=check)
         # older than 93 days, but not older than the earliest ping
         f.created = CURRENT_TIME - td(days=94)
+        f.processed = f.created
         f.old_status = "new"
         f.new_status = "down"
         f.save()
@@ -402,6 +442,43 @@ class CheckModelTestCase(BaseTestCase):
         check.prune()
 
         self.assertEqual(Flip.objects.count(), 1)
+
+    @time_machine.travel(CURRENT_TIME)
+    def test_it_measures_from_the_oldest_retained_ping(self) -> None:
+        check = Check.objects.create(project=self.project, n_pings=3)
+        for n, days in ((1, 60), (2, 30), (3, 1)):
+            Ping.objects.create(owner=check, n=n, created=CURRENT_TIME - td(days=days))
+        channel = Channel.objects.create(project=self.project, kind="email")
+        # newer than the oldest retained ping, older than the newest
+        Notification.objects.create(owner=check, channel=channel, check_status="down", created=CURRENT_TIME - td(days=40))
+
+        self.assertEqual(check.prune(), (0, 0, 0))
+        self.assertEqual(Notification.objects.count(), 1)
+
+    def test_prune_reads_only_the_oldest_pings_date(self) -> None:
+        check = Check.objects.create(project=self.project, n_pings=1)
+        Ping.objects.create(owner=check, n=1, body_raw=b"x" * 1000)
+
+        with CaptureQueriesContext(connection) as ctx:
+            check.prune()
+
+        (select,) = [q["sql"] for q in ctx.captured_queries if q["sql"].startswith("SELECT") and 'FROM "api_ping"' in q["sql"]]
+        self.assertNotIn("body_raw", select)
+        self.assertIn('"api_ping"."created"', select)
+
+    @time_machine.travel(CURRENT_TIME)
+    def test_it_keeps_flips_and_notifications_when_no_ping_is_retained(self) -> None:
+        check = Check.objects.create(project=self.project, n_pings=101)
+        Ping.objects.create(owner=check, n=1)
+        Flip.objects.create(owner=check, created=CURRENT_TIME - td(days=100), old_status="new", new_status="down")
+        channel = Channel.objects.create(project=self.project, kind="email")
+        Notification.objects.create(owner=check, channel=channel, check_status="down", created=CURRENT_TIME - td(days=1))
+
+        self.assertEqual(check.prune(), (1, 0, 0))
+
+        self.assertFalse(Ping.objects.exists())
+        self.assertEqual(Flip.objects.count(), 1)
+        self.assertEqual(Notification.objects.count(), 1)
 
     def test_get_grace_start_returns_utc(self) -> None:
         check = Check(project=self.project)
@@ -484,6 +561,34 @@ class CheckModelTestCase(BaseTestCase):
         check.last_duration = None
         self.assertNotIn("last_duration", check.to_dict())
 
+    def test_pause_writes_nothing_if_a_step_fails(self) -> None:
+        check = Check.objects.create(project=self.project, status="up", last_ping=now())
+
+        with (
+            patch.object(Project, "update_next_nag_dates", side_effect=RuntimeError("boom")),
+            self.assertRaises(RuntimeError),
+        ):
+            check.pause()
+
+        check.refresh_from_db()
+        self.assertEqual(check.status, "up")
+        self.assertFalse(Flip.objects.exists())
+
+    def test_pause_and_resume_read_the_row_they_lock(self) -> None:
+        check = Check.objects.create(project=self.project, status="up", last_ping=now())
+        # sendalerts marks it down after this instance was read
+        Check.objects.filter(id=check.id).update(status="down")
+
+        check.pause()
+        flip = Flip.objects.get()
+        self.assertEqual(flip.old_status, "down")
+
+        stale = Check.objects.get(id=check.id)
+        Check.objects.filter(id=check.id).update(status="up")
+        # The row is not paused any longer, whatever the instance says
+        self.assertFalse(stale.resume())
+        self.assertEqual(Flip.objects.count(), 1)
+
     def test_every_hundredth_ping_prunes_old_pings(self) -> None:
         self.profile.ping_log_limit = 10
         self.profile.save()
@@ -492,7 +597,7 @@ class CheckModelTestCase(BaseTestCase):
         Ping.objects.create(owner=check, n=1, created=CURRENT_TIME)
         Ping.objects.create(owner=check, n=95, created=CURRENT_TIME)
 
-        check.ping("1.2.3.4", "http", "get", "", b"", "success", None)
+        Check.ping(Q(id=check.id), "1.2.3.4", "http", "get", "", b"", "success", None)
 
         # Ping #100 triggers pruning: with the limit of 10, only n > 90 is kept
         self.assertEqual(sorted(check.ping_set.values_list("n", flat=True)), [95, 100])
@@ -504,7 +609,7 @@ class CheckModelTestCase(BaseTestCase):
         check = Check.objects.create(project=self.project, n_pings=98)
         Ping.objects.create(owner=check, n=1, created=CURRENT_TIME)
 
-        check.ping("1.2.3.4", "http", "get", "", b"", "success", None)
+        Check.ping(Q(id=check.id), "1.2.3.4", "http", "get", "", b"", "success", None)
 
         self.assertEqual(sorted(check.ping_set.values_list("n", flat=True)), [1, 99])
 

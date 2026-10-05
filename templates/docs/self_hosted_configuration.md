@@ -2,6 +2,9 @@
 
 Healthchecks prepares its configuration in `hc/settings.py`. It reads configuration
 from environment variables. Below is a list of environment variables it reads and uses.
+With Docker, set them in `.env` beside `docker-compose.yml` (see
+[Running with Docker](../self_hosted_docker/#getting-started)); from source, in the
+environment of every process (see [Running from Source](../self_hosted_source/#production)).
 
 How the values are read:
 
@@ -11,10 +14,11 @@ How the values are read:
 * An integer setting accepts a whole number or `None`. Anything else, an empty
   value included, stops startup with a `ValueError`.
 * A string setting set to an empty value is the empty string, not the default. For
-  `ADMINS`, `ALLOWED_HOSTS`, `EMAIL_HOST`, `METRICS_KEY`, `RP_ID`,
-  `SECURE_PROXY_SSL_HEADER`, `SLACK_CLIENT_ID` and `SUPPORT_EMAIL` that is the same
-  as unset; for the others, `SITE_ROOT`, `SITE_NAME` and `PING_ENDPOINT` among
-  them, delete the line to get the default.
+  `ADMINS`, `ALLOWED_HOSTS`, `EMAIL_HOST`, `METRICS_KEY`, `RP_ID`, `SLACK_CLIENT_ID`
+  and `SUPPORT_EMAIL` that is the same as unset; for the others, `SITE_ROOT`,
+  `SITE_NAME`, `PING_ENDPOINT` and `SERVER_EMAIL` among them, delete the line to get
+  the default. An empty `SECURE_PROXY_SSL_HEADER` turns that setting off, while
+  unset it has its default.
 * A `<NAME>_FILE` variable with a non-empty value names a file whose content is used
   instead of `<NAME>`; an empty one counts as unset, and `<NAME>` is read. A
   non-empty value that does not name an existing regular file stops startup with
@@ -58,7 +62,9 @@ How the values are read:
 <li><a href="#RP_ID">RP_ID</a></li>
 <li><a href="#SECRET_KEY">SECRET_KEY</a></li>
 <li><a href="#SECRET_KEY_FILE">SECRET_KEY_FILE</a></li>
+<li><a href="#SECURE_HSTS_SECONDS">SECURE_HSTS_SECONDS</a></li>
 <li><a href="#SECURE_PROXY_SSL_HEADER">SECURE_PROXY_SSL_HEADER</a></li>
+<li><a href="#SERVER_EMAIL">SERVER_EMAIL</a></li>
 <li><a href="#SITE_NAME">SITE_NAME</a></li>
 <li><a href="#SITE_ROOT">SITE_ROOT</a></li>
 <li><a href="#SLACK_CLIENT_ID">SLACK_CLIENT_ID</a></li>
@@ -66,6 +72,7 @@ How the values are read:
 <li><a href="#SLACK_CLIENT_SECRET_FILE">SLACK_CLIENT_SECRET_FILE</a></li>
 <li><a href="#SLACK_ENABLED">SLACK_ENABLED</a></li>
 <li><a href="#SUPPORT_EMAIL">SUPPORT_EMAIL</a></li>
+<li><a href="#TRUSTED_PROXY_HOPS">TRUSTED_PROXY_HOPS</a></li>
 <li><a href="#USE_GZIP_MIDDLEWARE">USE_GZIP_MIDDLEWARE</a></li>
 <li><a href="#WEBHOOKS_ENABLED">WEBHOOKS_ENABLED</a></li>
 </ul>
@@ -85,12 +92,10 @@ ADMINS=alice@example.org,bob@example.org
 Note: for error notifications to work, make sure you have also specified working
 SMTP credentials in the `EMAIL_...` environment variables.
 
-The [`sendlogs`](../self_hosted/#sending-notifications) management command also
-emails these addresses, with the count of log records written in the last 24
-hours. Django sends this mail with the subject prefix "[Django] " and from its
-`SERVER_EMAIL` setting, which no environment variable sets, so the sender is
-`root@localhost`; if your SMTP server rejects that sender, set `SERVER_EMAIL` in
-`hc/local_settings.py`.
+Django sends these emails with the subject prefix "[Django] " and from
+[SERVER_EMAIL](#SERVER_EMAIL), which defaults to
+[DEFAULT_FROM_EMAIL](#DEFAULT_FROM_EMAIL). Healthchecks' own warnings and errors are
+not emailed: they go to the console only (see [Logs](../self_hosted/#logs)).
 
 ## `ALLOWED_HOSTS` {: #ALLOWED_HOSTS }
 
@@ -125,16 +130,21 @@ The database engine to use. Possible values: `sqlite`, `postgres`.
 
 Only the exact value `postgres` selects PostgreSQL; any other value, or none, means
 SQLite. `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD` (or `DB_PASSWORD_FILE`),
-`DB_CONN_MAX_AGE`, `DB_SSLMODE` and `DB_TARGET_SESSION_ATTRS` are read only when
-`DB=postgres`. With SQLite, only [DB_NAME](#DB_NAME), a file path, applies.
+`DB_SSLMODE` and `DB_TARGET_SESSION_ATTRS` are read only when `DB=postgres`. With
+SQLite, only [DB_NAME](#DB_NAME), a file path, and
+[DB_CONN_MAX_AGE](#DB_CONN_MAX_AGE) apply.
 
 ## `DB_CONN_MAX_AGE` {: #DB_CONN_MAX_AGE }
 
-Default: `0`
+Default: `600`
 
 The lifetime of a database connection, in seconds: an integer, `0` to close each
 connection at the end of its request, or `None` for unlimited persistent
-connections. PostgreSQL only.
+connections. It applies to SQLite and PostgreSQL alike. With the default, each web
+server process, and each of `sendalerts` and `sendreports`, keeps its connection for
+up to 10 minutes. Before a request reuses a connection, Django checks that it still
+works (`CONN_HEALTH_CHECKS`, on), and replaces one that a PostgreSQL restart closed
+without failing the request; on SQLite the check does nothing.
 
 This is a standard Django setting, read more in
 [Django documentation](https://docs.djangoproject.com/en/6.1/ref/settings/#conn-max-age).
@@ -148,7 +158,12 @@ This is a standard Django setting, read more in
 
 ## `DB_NAME` {: #DB_NAME }
 
-Default: `hc` (PostgreSQL) or `/path/to/projectdir/hc.sqlite` (SQLite)
+Default: `hc` (PostgreSQL) or `/path/to/projectdir/hc.sqlite` (SQLite); the Docker
+image sets `/data/hc.sqlite`
+
+The PostgreSQL database name, or the path of the SQLite database file. With
+`DB=postgres`, set `DB_NAME` as well, as `docker-compose.postgres.yml` does: left as
+it is, the image's path names the PostgreSQL database.
 
 This is a standard Django setting, read more in
 [Django documentation](https://docs.djangoproject.com/en/6.1/ref/settings/#name).
@@ -203,12 +218,22 @@ A boolean that turns on/off debug mode.
 
 _Never run a Healthchecks instance in production with the debug mode turned on!_
 
+The Docker image sets `DEBUG=False`; from source, set it yourself. With
+`DEBUG=False`, a weak [SECRET_KEY](#SECRET_KEY) stops startup.
+
 This is a standard Django setting, read more in
 [Django documentation](https://docs.djangoproject.com/en/6.1/ref/settings/#debug).
 
 ## `DEFAULT_FROM_EMAIL` {: #DEFAULT_FROM_EMAIL }
 
 Default: `healthchecks@example.org`
+
+The `From:` address of every email Healthchecks sends, and its envelope sender (the
+SMTP `MAIL FROM` address) unless [EMAIL_MAIL_FROM_TMPL](#EMAIL_MAIL_FROM_TMPL) is set.
+It is also the sender of the `ADMINS` error emails unless
+[SERVER_EMAIL](#SERVER_EMAIL) is set. With an SMTP service that sends only from
+verified addresses, such as Amazon SES, make it one of those (see
+[Example: Amazon SES](../self_hosted/#ses)).
 
 This is a standard Django setting, read more in
 [Django documentation](https://docs.djangoproject.com/en/6.1/ref/settings/#default-from-email).
@@ -226,7 +251,8 @@ no login by link, no sudo mode (so Set Password, Change Email, Close Account, th
 two-factor changes and the password change in the administration panel show an
 "Email Needed" page; use `manage.py changepassword` instead), no email alerts,
 reports or `ADMINS` mail, and `manage.py` commands print the warnings
-`hc.api.W002` and `mail.W001`. See [Sending Emails](../self_hosted/#sending-emails).
+`hc.api.W002` and `mail.W001`. See [Sending Emails](../self_hosted/#sending-emails),
+and [Example: Amazon SES](../self_hosted/#ses).
 
 **On using `local_settings.py`:**
 Healthchecks reads SMTP settings from the `EMAIL_*` environment variables,
@@ -420,12 +446,6 @@ the process's local time (UTC in the Docker image).
 Neither `manage.py runserver` nor the Docker image's uWSGI writes a line per HTTP
 request. A uWSGI you run yourself does unless it is started with `--disable-logging`.
 
-Whatever this setting, records at WARNING and above from Healthchecks' own `hc`
-loggers, and the server errors (5xx) Django logs for requests, are also stored in
-the database and shown in Site Administration › Logs › Records. They are never
-pruned automatically; [`sendlogs`](../self_hosted/#sending-notifications) can email
-a daily count of them to [ADMINS](#ADMINS).
-
 ## `METRICS_KEY` {: #METRICS_KEY }
 
 Default: `None`
@@ -445,8 +465,11 @@ and sends the value in the `Ping-Body-Limit` response header. With `None`, the b
 is stored whole and the header is omitted.
 
 Independently, a request whose body is larger than 2,621,440 bytes (2.5 MiB) is
-refused with 400 and not recorded, and `None` does not lift that cap. Only a limit
-above 2,621,440 raises the cap, to the limit itself. See
+refused and not recorded, and `None` does not lift that cap: the Docker image's
+uWSGI closes the connection without an HTTP response, and under a server without
+that limit Django answers 400. Only a limit above 2,621,440 raises the cap, to the
+limit itself; in the Docker image, set `UWSGI_LIMIT_POST` to the same value too (see
+[uWSGI Configuration](../self_hosted_docker/#uwsgi)). See
 [Request Body](../http_api/#request-body).
 
 Healthchecks stores each ping body in the database, with its ping. Keep
@@ -513,8 +536,17 @@ allow WebAuthn only over HTTPS, or on `localhost`.
 
 Default: `---`
 
-A secret key used for cryptographic signing. Should be set to a unique,
-unpredictable value.
+A secret key used for cryptographic signing. Set it to a unique, unpredictable value
+of at least 50 characters, with at least 5 different ones, that does not start with
+`django-insecure-`, for example the output of:
+
+```sh
+python3 -c 'import secrets; print(secrets.token_urlsafe(50))'
+```
+
+With `DEBUG=False`, a key that breaks this rule, the default `---` included, fails
+the system check `hc.api.E004`, which stops every `manage.py` command that runs the
+system checks, `migrate` included, and so the Docker container's start.
 
 Set it once, before first use, and keep it. Changing it later:
 
@@ -525,9 +557,6 @@ Set it once, before first use, and keep it. Changing it later:
 * invalidates every session, login link, device cookie, pending sudo code, email
   verification link and unsubscribe link in emails already sent.
 * resets the per-email [login rate limits](../self_hosted/#login-lockout).
-
-The Docker sample's `SECRET_KEY=---` must be replaced before the first API key is
-created.
 
 This is a standard Django setting, read more in
 [Django documentation](https://docs.djangoproject.com/en/6.1/ref/settings/#secret-key).
@@ -541,40 +570,57 @@ read the contents of the file into the [SECRET_KEY](#SECRET_KEY) setting.
 If `SECRET_KEY` and `SECRET_KEY_FILE` are both set, `SECRET_KEY_FILE` takes
 precedence.
 
+## `SECURE_HSTS_SECONDS` {: #SECURE_HSTS_SECONDS }
+
+Default: `0`
+
+The `max-age`, in seconds, of the `Strict-Transport-Security` (HSTS) header that
+Healthchecks sends on every response to a request it sees as HTTPS (see
+[SECURE_PROXY_SSL_HEADER](#SECURE_PROXY_SSL_HEADER)); `0` sends no header. A browser
+that has seen the header uses only HTTPS for the host until the `max-age` runs out,
+even if you go back to plain HTTP: turn it on once HTTPS works, with a small value
+first, such as `3600`, then `31536000` (a year). The header carries neither
+`includeSubDomains` nor `preload`. See
+[HSTS and the Content Security Policy](../self_hosted_docker/#hsts).
+
+`manage.py check --deploy` reports the warning `security.W004` while it is `0`.
+
+This is a standard Django setting, read more in
+[Django documentation](https://docs.djangoproject.com/en/6.1/ref/settings/#secure-hsts-seconds).
+
 ## `SECURE_PROXY_SSL_HEADER` {: #SECURE_PROXY_SSL_HEADER }
 
-Default: `None`
+Default: `HTTP_X_FORWARDED_PROTO,https`
 
-Comma-separated HTTP header name and value that signifies a request is secure
-(made over https://). This information is important for CSRF protection.
+The request header, and its value, that mark a request as made over HTTPS: the header
+name and the value, separated with a comma. With the default, Healthchecks treats a
+request as HTTPS when the first comma-separated item of its `X-Forwarded-Proto`
+header is exactly `https`. That decides the scheme Healthchecks records with each
+ping, whether it sends [HSTS](#SECURE_HSTS_SECONDS), and which of Django's CSRF checks
+a form gets.
 
-If Healthchecks is running behind a proxy, the proxy may be "swallowing" whether the original
-request uses HTTPS or not. In this case, you may see HTTP 403 errors when submitting
-forms (for example, trying to log in).
+The default fits a reverse proxy that sets `X-Forwarded-Proto` itself, replacing
+what the client sent, as Caddy does, and NGINX with
+`proxy_set_header X-Forwarded-Proto $scheme` (see
+[Reverse Proxy and TLS](../self_hosted_docker/#tls-termination)). If nothing in front
+of Healthchecks replaces that header, a client could claim HTTPS: set the variable to
+an empty value, `SECURE_PROXY_SSL_HEADER=`, to turn the setting off. In the Docker
+image, uWSGI then still treats a request with exactly `X-Forwarded-Proto: https` as
+HTTPS.
 
-If set, the value should contain the name of the header to look for and the required
-value, separated with comma. The header name must be specified in upper-case,
-with any dashes replaced with underscores, and prefixed with `HTTP_`. Example:
+The header name is written in upper case, with any dashes replaced with underscores,
+and prefixed with `HTTP_`. Example:
 
 ```ini
 # environment variable
 SECURE_PROXY_SSL_HEADER=HTTP_X_FORWARDED_PROTO,https
 ```
 
-You should *only* set this environment variable if you control your proxy or have some
-other guarantee that it sets/strips this header appropriately.
-
-The Docker image does not need this setting: its uWSGI already treats a request with
-`X-Forwarded-Proto: https` as secure (see
-[Reverse Proxy, TLS Termination, and CSRF Protection](../self_hosted_docker/#tls-termination)).
-Set it for other WSGI servers. Independently of it, Healthchecks records each ping's
-scheme from `X-Forwarded-Proto`.
-
 **Note on using `local_settings.py`:**
 When Healthchecks reads settings from environment variables, it expects
 `SECURE_PROXY_SSL_HEADER` to contain header name and value, separated with comma.
 If you set `SECURE_PROXY_SSL_HEADER` in `local_settings.py`, it should be a tuple
-with two elements instead:
+with two elements instead, or `None` to turn it off:
 
 ```ini
 # in local_settings.py
@@ -583,6 +629,18 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 This environment variable maps to a standard Django setting, read more in
 [Django documentation](https://docs.djangoproject.com/en/6.1/ref/settings/#secure-proxy-ssl-header).
+
+## `SERVER_EMAIL` {: #SERVER_EMAIL }
+
+Default: the value of [DEFAULT_FROM_EMAIL](#DEFAULT_FROM_EMAIL)
+
+The sender of the error emails Django sends to [ADMINS](#ADMINS). Leave it unset to
+send them from `DEFAULT_FROM_EMAIL`. Django's own default, `root@localhost`, is a
+sender that an SMTP service sending only from verified addresses, such as Amazon SES,
+refuses.
+
+This is a standard Django setting, read more in
+[Django documentation](https://docs.djangoproject.com/en/6.1/ref/settings/#server-email).
 
 ## `SITE_NAME` {: #SITE_NAME }
 
@@ -604,6 +662,12 @@ automatically populates it with the domain part of `SITE_ROOT`. Under typical sc
 you can use the automatically populated value and do not need to set
 `ALLOWED_HOSTS` yourself.
 
+With an `https://` `SITE_ROOT`, the session, CSRF, messages, device and auto-login
+cookies are marked `Secure`, so a browser sends them over HTTPS only: log in through
+the HTTPS URL. `SITE_ROOT`'s origin is also trusted for CSRF
+(`CSRF_TRUSTED_ORIGINS`), so a form posted from it passes Django's origin check even
+when the proxy does not mark the request as HTTPS.
+
 If the SITE_ROOT contains a path (for example, <code>http://localhost:8000<b>/prefix</b></code>),
 then Healthchecks automatically sets the following additional Django settings:
 
@@ -624,10 +688,9 @@ path unchanged, without stripping the prefix.
 A trailing slash is removed. A value that does not start with `http://` or
 `https://` triggers the warning `hc.api.W001`.
 
-**On using `local_settings.py`:** Healthchecks only sets the above additional settings
-if you specify `SITE_ROOT` via an environment variable. If you instead specify it in
-`local_settings.py`, you will also need to set `ALLOWED_HOSTS`, `LOGIN_URL`, and
-`STATIC_URL` there. The route prefix follows `SITE_ROOT` wherever it is set.
+**On using `local_settings.py`:** the settings above, the route prefix and the default
+of [PING_ENDPOINT](#PING_ENDPOINT) follow a `SITE_ROOT` set there too. One of those
+settings that `local_settings.py` sets itself keeps that value.
 
 ## `SLACK_CLIENT_ID` {: #SLACK_CLIENT_ID }
 
@@ -684,6 +747,31 @@ Default: `None`
 An email address to contact for help. When it is set, the login page's "Lost your
 password?" dialog shows it, and so does the email that
 [`sendflappingnotices`](../self_hosted/#sending-notifications) sends.
+
+## `TRUSTED_PROXY_HOPS` {: #TRUSTED_PROXY_HOPS }
+
+Default: `1`
+
+The number of reverse proxies in front of Healthchecks that write the
+`X-Forwarded-For` request header. Healthchecks records the client's address with each
+ping, and limits login attempts per client address. It takes that address from the
+`TRUSTED_PROXY_HOPS`-th entry of `X-Forwarded-For` from the right, the one the
+outermost of those proxies wrote, whatever the client put to the left of it:
+
+* `0`: clients connect to Healthchecks directly. The header is ignored, and the
+  address of the connection is used.
+* `1`: one proxy, such as Caddy or NGINX in front of the Docker container.
+* `2` or more: a chain of that many proxies that each append to the header, such as a
+  CDN or a load balancer in front of your proxy.
+
+For a request with fewer entries than that, or no header, the address of the
+connection is used. An entry that is not an IP address gives none: the ping's
+`remote_addr` is `null`, and such login attempts share one limit.
+
+A value below `0`, or `None`, fails the system check `hc.api.E005`, which stops every
+`manage.py` command that runs the system checks, the Docker container's start
+included. See [TRUSTED_PROXY_HOPS](../self_hosted_docker/#trusted-proxy-hops) on the
+Docker page.
 
 ## `USE_GZIP_MIDDLEWARE` {: #USE_GZIP_MIDDLEWARE }
 

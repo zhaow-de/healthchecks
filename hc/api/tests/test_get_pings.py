@@ -85,10 +85,20 @@ class GetPingsTestCase(BaseTestCase):
         self.a1.ping_set.create(n=3, rid=a, created=EPOCH + m * 2)
         self.a1.ping_set.create(n=4, rid=b, created=EPOCH + m * 6)
 
-        with self.assertNumQueries(4):
+        with self.assertNumQueries(3):
             doc = self.get().json()
             self.assertEqual(doc["pings"][0]["duration"], 300.0)
             self.assertEqual(doc["pings"][1]["duration"], 120.0)
+
+    def test_it_returns_the_pings_by_n_descending(self) -> None:
+        self.ping.delete()
+        # n=3 has the lower id
+        self.a1.ping_set.create(n=1, created=EPOCH)
+        self.a1.ping_set.create(n=3, created=EPOCH + td(minutes=2))
+        self.a1.ping_set.create(n=2, created=EPOCH + td(minutes=1))
+
+        doc = self.get().json()
+        self.assertEqual([p["n"] for p in doc["pings"]], [3, 2, 1])
 
     def test_it_disables_duration_calculation(self) -> None:
         self.ping.delete()
@@ -98,7 +108,7 @@ class GetPingsTestCase(BaseTestCase):
             self.a1.ping_set.create(n=i, rid=uuid4(), created=EPOCH + td(minutes=i))
 
         # Make sure we don't run Ping.duration() per ping:
-        with self.assertNumQueries(4):
+        with self.assertNumQueries(3):
             doc = self.get().json()
             for d in doc["pings"]:
                 self.assertNotIn("duration", d)

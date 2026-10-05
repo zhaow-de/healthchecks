@@ -1,4 +1,4 @@
-"""The postgres leg of `.github/workflows/tests.yml` tests the PostgreSQL image `docker/docker-compose.yml` deploys."""
+"""The postgres leg of `.github/workflows/tests.yml` tests the PostgreSQL image `docker/docker-compose.postgres.yml` deploys."""
 
 import re
 from pathlib import Path
@@ -7,7 +7,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 SUITE = ROOT / ".github" / "workflows" / "tests.yml"
-COMPOSE = ROOT / "docker" / "docker-compose.yml"
+COMPOSE = ROOT / "docker" / "docker-compose.postgres.yml"
 
 
 def test_the_postgres_leg_runs_the_image_compose_deploys():

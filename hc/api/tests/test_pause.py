@@ -1,7 +1,10 @@
 from datetime import timedelta as td
+from typing import Any
+from unittest.mock import patch
 
 from django.utils.timezone import now
 
+from hc.accounts.models import Project
 from hc.api.models import Check, Flip
 from hc.test import BaseTestCase
 
@@ -106,4 +109,42 @@ class PauseTestCase(BaseTestCase):
         self.assertEqual(self.check.status, "paused")
 
         # It should not create a Flip object, as the check was already paused
+        self.assertFalse(Flip.objects.exists())
+
+    def test_it_runs_one_transaction_without_rereading_the_project(self) -> None:
+        # The key's project, the check, then in a savepoint the locked check with
+        # its project, the flip, the update and the nag profiles; then the channel
+        # codes for the response
+        with self.assertNumQueries(9):
+            r = self.client.post(self.url, "", content_type="application/json", HTTP_X_API_KEY=self.api_key)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["status"], "paused")
+
+    def test_it_handles_a_check_deleted_after_it_was_read(self) -> None:
+        def get_and_delete(*args: Any, **kwargs: Any) -> Check:
+            check = Check.objects.get(id=self.check.id)
+            self.check.delete()
+            return check
+
+        with patch("hc.api.views.get_object_or_404", get_and_delete):
+            r = self.client.post(self.url, "", content_type="application/json", HTTP_X_API_KEY=self.api_key)
+
+        self.assertEqual(r.status_code, 404)
+        self.assertEqual(r["Access-Control-Allow-Origin"], "*")
+
+    def test_it_handles_a_check_transferred_after_it_was_read(self) -> None:
+        other_project = Project.objects.create(owner=self.alice)
+
+        def get_and_transfer(*args: Any, **kwargs: Any) -> Check:
+            check = Check.objects.get(id=self.check.id)
+            Check.objects.filter(id=self.check.id).update(project=other_project)
+            return check
+
+        with patch("hc.api.views.get_object_or_404", get_and_transfer):
+            r = self.client.post(self.url, "", content_type="application/json", HTTP_X_API_KEY=self.api_key)
+
+        self.assertEqual(r.status_code, 403)
+        self.assertEqual(r["Access-Control-Allow-Origin"], "*")
+        self.check.refresh_from_db()
+        self.assertEqual(self.check.status, "up")
         self.assertFalse(Flip.objects.exists())

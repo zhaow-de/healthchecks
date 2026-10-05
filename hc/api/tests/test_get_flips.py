@@ -45,6 +45,19 @@ class GetFlipsTestCase(BaseTestCase):
         self.assertEqual(flip["timestamp"], "2020-06-01T12:24:32+00:00")
         self.assertEqual(flip["up"], 1)
 
+    def test_it_returns_the_most_recent_flip_first(self) -> None:
+        # Created later, for an earlier time, as sendalerts back-dates a down flip
+        Flip.objects.create(
+            owner=self.a1,
+            created=datetime(2020, 6, 1, 12, 0, tzinfo=UTC),
+            old_status="up",
+            new_status="down",
+        )
+
+        doc = self.get().json()
+        timestamps = [flip["timestamp"] for flip in doc["flips"]]
+        self.assertEqual(timestamps, ["2020-06-01T12:24:32+00:00", "2020-06-01T12:00:00+00:00"])
+
     def test_it_works_with_unique_key(self) -> None:
         url = f"/api/v3/checks/{self.a1.unique_key}/flips/"
         r = self.client.get(url, HTTP_X_API_KEY=self.api_key)

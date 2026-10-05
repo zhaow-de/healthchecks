@@ -1,5 +1,9 @@
+from typing import Any
+from unittest.mock import patch
+
 from django.utils.timezone import now
 
+from hc.accounts.models import Project
 from hc.api.models import Check
 from hc.test import BaseTestCase
 
@@ -22,6 +26,33 @@ class DeleteCheckTestCase(BaseTestCase):
         self.check.delete()
         r = self.client.delete(self.url, HTTP_X_API_KEY=self.api_key)
         self.assertEqual(r.status_code, 404)
+
+    def test_it_handles_a_check_deleted_after_it_was_read(self) -> None:
+        def get_and_delete(*args: Any, **kwargs: Any) -> Check:
+            check = Check.objects.get(id=self.check.id)
+            self.check.delete()
+            return check
+
+        with patch("hc.api.views.get_object_or_404", get_and_delete):
+            r = self.client.delete(self.url, HTTP_X_API_KEY=self.api_key)
+
+        self.assertEqual(r.status_code, 404)
+        self.assertEqual(r["Access-Control-Allow-Origin"], "*")
+
+    def test_it_handles_a_check_transferred_after_it_was_read(self) -> None:
+        other_project = Project.objects.create(owner=self.alice)
+
+        def get_and_transfer(*args: Any, **kwargs: Any) -> Check:
+            check = Check.objects.get(id=self.check.id)
+            Check.objects.filter(id=self.check.id).update(project=other_project)
+            return check
+
+        with patch("hc.api.views.get_object_or_404", get_and_transfer):
+            r = self.client.delete(self.url, HTTP_X_API_KEY=self.api_key)
+
+        self.assertEqual(r.status_code, 403)
+        self.assertEqual(r["Access-Control-Allow-Origin"], "*")
+        self.assertTrue(Check.objects.filter(code=self.check.code, project=other_project).exists())
 
     def test_it_handles_options(self) -> None:
         r = self.client.options(self.url)

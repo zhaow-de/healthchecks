@@ -9,4 +9,7 @@ class DashboardTestCase(BaseTestCase):
         r = self.client.get("/tv/")
         self.assertContains(r, "<title>Mychecks</title>", status_code=200)
         self.assertContains(r, '<div id="panel"></div>')
-        self.assertContains(r, 'await fetch("/api/v3/checks/", {headers: {"X-Api-Key": key}});')
+        self.assertContains(r, 'data-checks-url="/api/v3/checks/"')
+        self.assertContains(r, '<script src="/static/js/dashboard.js"></script>')
+        self.assertNotContains(r, "<script>")
+        self.assertNotContains(r, "<style>")

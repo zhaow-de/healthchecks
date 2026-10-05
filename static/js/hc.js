@@ -53,7 +53,7 @@
         });
     }
 
-    // The href of #base-url (the navbar's "All Projects" link or the logo) without its
+    // The href of #base-url (the navbar's logo link) without its
     // trailing slash: SITE_ROOT's path, or "" at the domain root.
     function base() {
         const el = document.getElementById("base-url");

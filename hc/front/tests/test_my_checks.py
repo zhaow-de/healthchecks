@@ -1,8 +1,11 @@
 from datetime import timedelta as td
+from typing import Any
+from unittest.mock import patch
 
 from django.test.utils import override_settings
 from django.utils.timezone import now
 
+from hc.accounts.models import Project
 from hc.api.models import Check
 from hc.test import BaseTestCase
 
@@ -46,6 +49,18 @@ class MyChecksTestCase(BaseTestCase):
         # last_active_date should have been set
         self.profile.refresh_from_db()
         self.assertTrue(self.profile.last_active_date)
+
+    def test_it_shows_the_same_header_and_footer_as_other_pages(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(self.url)
+        html = r.content.decode()
+        self.assertLess(html.index('id="logo"'), html.index('id="project-menu"'))
+        self.assertEqual(html.count('id="base-url"'), 1)
+        nav = html[html.index("<nav") : html.index("</nav>")]
+        self.assertNotIn("container-fluid", nav)
+        # The content's container and the footer's
+        self.assertContains(r, '<div class="container-fluid">', count=2)
+        self.assertContains(r, '(<a href="https://github.com/zhaow-de/healthchecks">github</a>)')
 
     def test_it_bumps_last_active_date(self) -> None:
         self.profile.last_active_date = now() - td(days=10)
@@ -186,12 +201,37 @@ class MyChecksTestCase(BaseTestCase):
         self.assertContains(r, "alice-was-here")
         self.assertContains(r, "(not unique)")
 
+    def test_it_shows_slug_urls_by_default(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.get(self.url)
+        self.assertContains(r, f"{self.project.ping_key}/alice-was-here")
+        self.assertNotContains(r, f"/ping/{self.check.code}")
+
     def test_it_saves_url_format_preference(self) -> None:
         self.client.login(username="alice@example.org", password="password")
-        self.client.get(self.url + "?urls=slug")
+        self.client.get(self.url + "?urls=uuid")
+        self.project.refresh_from_db()
+        self.assertFalse(self.project.show_slugs)
 
+        self.client.get(self.url + "?urls=slug")
         self.project.refresh_from_db()
         self.assertTrue(self.project.show_slugs)
+
+    def test_it_handles_a_project_deleted_after_it_was_read(self) -> None:
+        def get_and_delete(*args: Any, **kwargs: Any) -> Project:
+            project = Project.objects.get(id=self.project.id)
+            Project.objects.filter(id=self.project.id).delete()
+            return project
+
+        # The failed save marks the test's transaction for rollback, so the session
+        # must stay unmodified: its save would fail and answer 400
+        self.profile.last_active_date = now()
+        self.profile.save()
+
+        self.client.login(username="alice@example.org", password="password")
+        with patch("hc.front.views._get_project_for_user", get_and_delete):
+            r = self.client.get(self.url + "?urls=slug")
+        self.assertEqual(r.status_code, 404)
 
     def test_it_outputs_period_grace_as_integers(self) -> None:
         self.check.timeout = td(seconds=123)

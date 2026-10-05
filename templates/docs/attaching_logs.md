@@ -52,8 +52,9 @@ curl -fsS -m 10 --retry 5 --data-binary @/tmp/certbot-renew.log PING_URL/$?
 SITE_NAME stores at most the first PING_BODY_LIMIT_FORMATTED and drops the rest
 silently (with the server's body limit setting `None`, it stores the body whole),
 but it refuses a request whose body is larger than 2.5 MiB (2,621,440 bytes, or the
-body limit when that is higher) with 400 and records nothing, so the success or
-failure signal is lost too (see [Request Body](../http_api/#request-body)). When the
+body limit when that is higher), possibly without any response, and records nothing,
+so the success or failure signal is lost too (see
+[Request Body](../http_api/#request-body)). When the
 output can be that large, send only its end, keeping the exit status in a variable
 first:
 

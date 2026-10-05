@@ -44,9 +44,14 @@ RUN \
     DEBUG=False SECRET_KEY=build-key ./manage.py compress
 
 RUN mkdir /data && chown hc /data
+# SQLite on the /data volume. With DB=postgres, set DB_NAME as well: left as
+# it is, this path names the PostgreSQL database.
+ENV DB_NAME=/data/hc.sqlite
 
 USER hc
 
+# hc/settings.py defaults DEBUG to True for runserver
+ENV DEBUG=False
 ENV USE_GZIP_MIDDLEWARE=True
 HEALTHCHECK --start-period=20s --start-interval=5s --interval=60s --retries=1 CMD ./fetchstatus.py
 CMD [ "uwsgi", "/opt/healthchecks/docker/uwsgi.ini"]

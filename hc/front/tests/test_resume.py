@@ -1,4 +1,6 @@
 from datetime import UTC, datetime
+from typing import Any
+from unittest.mock import patch
 
 from hc.api.models import Check, Flip
 from hc.test import BaseTestCase
@@ -62,3 +64,14 @@ class ResumeTestCase(BaseTestCase):
         self.check.refresh_from_db()
         self.assertEqual(self.check.status, "paused")
         self.assertFalse(Flip.objects.exists())
+
+    def test_it_handles_a_check_deleted_after_it_was_read(self) -> None:
+        def get_and_delete(*args: Any, **kwargs: Any) -> Check:
+            check = Check.objects.get(id=self.check.id)
+            self.check.delete()
+            return check
+
+        self.client.login(username="alice@example.org", password="password")
+        with patch("hc.front.views._get_check_for_user", get_and_delete):
+            r = self.client.post(self.url)
+        self.assertEqual(r.status_code, 404)

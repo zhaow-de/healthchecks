@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from datetime import timedelta as td
 from functools import cache, cached_property
+from ipaddress import IPv6Address, ip_address, ip_network
 from typing import NotRequired, Self, TypedDict
 from zoneinfo import ZoneInfo
 
@@ -17,7 +18,7 @@ from django.contrib.auth.models import User
 from django.contrib.humanize.templatetags.humanize import naturaltime
 from django.core.signing import TimestampSigner
 from django.db import IntegrityError, models, transaction
-from django.db.models import F, QuerySet
+from django.db.models import F, Q, QuerySet
 from django.http import HttpRequest
 from django.urls import reverse
 from django.utils.module_loading import import_string
@@ -30,6 +31,7 @@ from hc.api import transports
 from hc.lib import emails
 from hc.lib.date import month_boundaries, seconds_in_month
 from hc.lib.ip import client_ip
+from hc.lib.string import match_keywords
 from hc.lib.urls import absolute_reverse
 
 logger = logging.getLogger(__name__)
@@ -145,7 +147,8 @@ class Check(models.Model):
     tags = models.CharField(max_length=500, blank=True)
     code = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     desc = models.TextField(blank=True)
-    project = models.ForeignKey(Project, models.CASCADE)
+    # No index of its own: api_check_project_slug in Meta leads with project_id
+    project = models.ForeignKey(Project, models.CASCADE, db_index=False)
     created = models.DateTimeField(default=now)
     kind = models.CharField(max_length=10, default="simple", choices=CHECK_KINDS)
     timeout = models.DurationField(default=DEFAULT_TIMEOUT)
@@ -232,6 +235,10 @@ class Check(models.Model):
 
         If the check is currently new, paused or down, return None.
         """
+        return self._grace_start(self._scheduled_grace_start(), with_started=with_started)
+
+    def _scheduled_grace_start(self) -> datetime:
+        """Return when the grace period starts by the schedule alone, NEVER if not up."""
         # NEVER is a constant sentinel value (year 3000).
         # Using None instead would make the min() logic clunky.
         result = NEVER
@@ -261,6 +268,11 @@ class Check(models.Model):
             except StopIteration:
                 result = NEVER
 
+        return result
+
+    def _grace_start(self, scheduled: datetime, *, with_started: bool) -> datetime | None:
+        """Return get_grace_start() from the _scheduled_grace_start() result."""
+        result = scheduled
         if with_started and self.last_start and self.status != "down":
             result = min(result, self.last_start)
 
@@ -284,6 +296,10 @@ class Check(models.Model):
 
     def get_status(self) -> str:
         """Return current status for display."""
+        return self._status(self._scheduled_grace_start())
+
+    def _status(self, scheduled: datetime) -> str:
+        """Return get_status() from the _scheduled_grace_start() result."""
         frozen_now = now()
 
         if self.last_start and frozen_now >= self.last_start + self.grace:
@@ -292,7 +308,7 @@ class Check(models.Model):
         if self.status in ("new", "paused", "down"):
             return self.status
 
-        grace_start = self.get_grace_start(with_started=False)
+        grace_start = self._grace_start(scheduled, with_started=False)
         if grace_start is None:
             # next elapse is "never", so this check will stay up indefinitely
             return "up"
@@ -306,7 +322,7 @@ class Check(models.Model):
 
         return "up"
 
-    def rename_and_delete(self) -> None:
+    def rename_and_delete(self, *, project: Project | None = None) -> None:
         """Change check's code and slug, then delete the check.
 
         Without changing code and slug first, the check can get pinged during
@@ -319,14 +335,19 @@ class Check(models.Model):
            a ping between steps 1 and 2.
         3. If delete fails, retries it once. This can *still* fail, but is less likely.
 
+        With `project`, step 1 renames the check only while it is in that project, and
+        raises Check.DoesNotExist, deleting nothing, if it is gone or in another project.
         """
 
         throwaway_uuid = uuid.uuid4()
         q = Check.objects.filter(id=self.id)
 
         # Rename so it cannot be pinged any longer
-        q.update(code=throwaway_uuid, slug=str(throwaway_uuid))
+        renamed = q if project is None else q.filter(project=project)
+        if not renamed.update(code=throwaway_uuid, slug=str(throwaway_uuid)) and project is not None:
+            raise Check.DoesNotExist
 
+        # By id alone: once renamed in `project`, the check is deleted even if a transfer moves it
         try:
             q.delete()
         except IntegrityError:
@@ -343,17 +364,19 @@ class Check(models.Model):
     def matches_tag_set(self, tag_set: set[str]) -> bool:
         return tag_set.issubset(self.tags_list())
 
-    def channels_str(self) -> str:
-        """Return a comma-separated string of assigned channel codes."""
+    def channels_str(self, codes: Iterable[uuid.UUID] | None = None) -> str:
+        """Return a comma-separated string of assigned channel codes.
 
-        # Is this an unsaved instance?
-        if not self.id:
-            return ""
+        Pass `codes` if they have been read already; otherwise this reads them.
+        """
+        if codes is None:
+            # Is this an unsaved instance?
+            if not self.id:
+                return ""
 
-        # self.channel_set may already be prefetched.
-        # Sort in python to make sure we don't run additional queries
-        codes = [str(channel.code) for channel in self.channel_set.all()]
-        return ",".join(sorted(codes))
+            codes = self.channel_set.values_list("code", flat=True)
+
+        return ",".join(sorted(str(code) for code in codes))
 
     @property
     def unique_key(self) -> str:
@@ -363,7 +386,10 @@ class Check(models.Model):
     def filter_any(self) -> bool:
         return self.filter_http_body
 
-    def to_dict(self, *, readonly: bool = False) -> CheckDict:
+    def to_dict(self, *, readonly: bool = False, channel_codes: Iterable[uuid.UUID] | None = None) -> CheckDict:
+        """Return the API's check object; `channel_codes` as for channels_str()."""
+        # Computed once: for cron and OnCalendar checks it iterates the schedule
+        scheduled = self._scheduled_grace_start()
         result: CheckDict = {
             "name": self.name,
             "slug": self.slug,
@@ -371,10 +397,10 @@ class Check(models.Model):
             "desc": self.desc,
             "grace": int(self.grace.total_seconds()),
             "n_pings": self.n_pings,
-            "status": self.get_status(),
+            "status": self._status(scheduled),
             "started": self.last_start is not None,
             "last_ping": isostring(self.last_ping),
-            "next_ping": isostring(self.get_grace_start()),
+            "next_ping": isostring(self._grace_start(scheduled, with_started=True)),
             "manual_resume": self.manual_resume,
             "methods": self.methods,
             "subject": self.success_kw if self.filter_subject else "",
@@ -403,7 +429,7 @@ class Check(models.Model):
             result["update_url"] = update_url
             result["pause_url"] = update_url + "/pause"
             result["resume_url"] = update_url + "/resume"
-            result["channels"] = self.channels_str()
+            result["channels"] = self.channels_str(channel_codes)
 
         if self.kind == "simple":
             result["timeout"] = int(self.timeout.total_seconds())
@@ -413,9 +439,33 @@ class Check(models.Model):
 
         return result
 
+    def ping_action(self, action: str, method: str, body: bytes) -> str:
+        """Return what a ping with this action, HTTP method and body is to this check."""
+        if self.status == "paused" and self.manual_resume:
+            return "ign"
+
+        if self.methods == "POST" and method != "POST":
+            return "ign"
+
+        if action != "ign" and self.filter_http_body:
+            # Undecodable bytes, a multibyte character cut by PING_BODY_LIMIT included,
+            # become U+FFFD, so the rest of the body is still matched
+            body_text = body.decode(errors="replace")
+            if self.failure_kw and match_keywords(body_text, self.failure_kw):
+                return "fail"
+            if self.success_kw and match_keywords(body_text, self.success_kw):
+                return "success"
+            if self.start_kw and match_keywords(body_text, self.start_kw):
+                return "start"
+            return "fail" if self.filter_default_fail else "ign"
+
+        return action
+
+    @classmethod
     def ping(
-        self,
-        remote_addr: str,
+        cls,
+        lookup: Q,
+        remote_addr: str | None,
         scheme: str,
         method: str,
         ua: str,
@@ -423,59 +473,71 @@ class Check(models.Model):
         action: str,
         rid: uuid.UUID | None,
         exitstatus: int | None = None,
-    ) -> None:
-        # The following block updates a Check object, then creates a Ping object.
-        # There's a possible race condition where the "sendalerts" command sees
-        # the updated Check object before the Ping object is created.
-        # To avoid this, put both operations inside a transaction:
-        with transaction.atomic():
-            # Lock the check's row, so concurrent pings to the same check apply
-            # one after another, each to the state the previous one left
-            self = Check.objects.select_for_update().get(id=self.id)
-            frozen_now = now()
+    ) -> Self:
+        """Record a ping to the one check `lookup` matches, and return that check.
 
-            if self.status == "paused" and self.manual_resume:
-                action = "ign"
+        Raises Check.DoesNotExist or Check.MultipleObjectsReturned, and then records nothing.
+        """
+        # The check is read once, under its row lock (PostgreSQL) or the IMMEDIATE
+        # transaction's write lock (SQLite): concurrent pings to it apply one after
+        # another, each to the state the previous one left, and "sendalerts" cannot see
+        # the updated check before its Ping row exists
+        with transaction.atomic():
+            check = cls.objects.select_for_update(of=("self",), no_key=True).get(lookup)
+            frozen_now = now()
+            action = check.ping_action(action, method, body)
 
             if action == "start":
-                self.last_start = frozen_now
-                self.last_start_rid = rid
+                check.last_start = frozen_now
+                check.last_start_rid = rid
                 # Don't update "last_ping" field.
             elif action in ("success", "fail"):
-                self.last_ping = frozen_now
-                self.last_duration = None
-                if self.last_start:
-                    if self.last_start_rid == rid:
+                check.last_ping = frozen_now
+                check.last_duration = None
+                if check.last_start:
+                    if check.last_start_rid == rid:
                         # rid matches: calculate last_duration, clear last_start
-                        self.last_duration = self.last_ping - self.last_start
-                        self.last_start = None
+                        check.last_duration = check.last_ping - check.last_start
+                        check.last_start = None
                     elif action == "fail" or rid is None:
                         # clear last_start (exit the "running" state) on:
                         # - "success" event with no rid
                         # - "fail" event, regardless of rid mismatch
-                        self.last_start = None
+                        check.last_start = None
 
                 new_status = "down" if action == "fail" else "up"
-                if self.status != new_status:
+                if check.status != new_status:
                     reason = "fail" if action == "fail" else ""
-                    self.create_flip(new_status, reason=reason)
-                    self.status = new_status
+                    check.create_flip(new_status, reason=reason)
+                    check.status = new_status
 
-            self.alert_after = self.going_down_after()
-            self.n_pings = models.F("n_pings") + 1
+            check.alert_after = check.going_down_after()
+            check.n_pings = models.F("n_pings") + 1
             body_lowercase = body.decode(errors="replace").lower()
-            self.has_confirmation_link = "confirm" in body_lowercase
-            self.save()
+            check.has_confirmation_link = "confirm" in body_lowercase
+            # Every column a ping changes: one set above and missing here is not saved
+            check.save(
+                update_fields=(
+                    "last_ping",
+                    "last_start",
+                    "last_start_rid",
+                    "last_duration",
+                    "status",
+                    "alert_after",
+                    "n_pings",
+                    "has_confirmation_link",
+                )
+            )
 
-            ping = Ping(owner=self)
-            ping.n = self.n_pings
+            ping = Ping(owner=check)
+            ping.n = check.n_pings
             ping.created = frozen_now
             if action in ("start", "fail", "ign", "log"):
                 ping.kind = action
 
             ping.remote_addr = remote_addr
             ping.scheme = scheme
-            ping.method = method
+            ping.method = method[: Ping._meta.get_field("method").max_length]
             # If User-Agent is longer than 200 characters, truncate it:
             ping.ua = ua[:200]
             ping.body_raw = body
@@ -484,36 +546,37 @@ class Check(models.Model):
             ping.save()
 
         # Every 100 received pings, prune old pings and notifications:
-        if self.n_pings % 100 == 0:
-            self.prune()
+        if check.n_pings % 100 == 0:
+            check.prune()
 
-    def prune(self) -> None:
-        """Remove old pings and notifications."""
+        return check
+
+    def prune(self) -> tuple[int, int, int]:
+        """Remove old pings, notifications and flips; return how many of each."""
 
         threshold = self.n_pings - self.project.owner_profile.ping_log_limit
 
         # Remove ping objects from db
-        self.ping_set.filter(n__lte=threshold).delete()
+        pings, _ = self.ping_set.filter(n__lte=threshold).delete()
 
-        try:
-            # Important: sort by "created", not by "id". Sorting by id
-            # may cause Postgres to use the "api_ping_pkey" index, and scan
-            # a huge number of rows.
-            ping = self.ping_set.earliest("created")
+        # By "n", not "created" or "id": see Ping.Meta
+        oldest = self.ping_set.order_by("n").values_list("created", flat=True).first()
+        if oldest is None:
+            return pings, 0, 0
 
-            # Delete notifications older than the oldest retained ping
-            self.notification_set.filter(created__lt=ping.created).delete()
+        # Delete notifications older than the oldest retained ping
+        notifications, _ = self.notification_set.filter(created__lt=oldest).delete()
 
-            # Delete flips older than the oldest retained ping *and*
-            # older than 93 days. We need ~3 months of flips for calculating
-            # downtime statistics. The precise requirement is
-            # "we need the current month and full two previous months of data".
-            # We could calculate this precisely, but 3*31 is close enough and
-            # much simpler.
-            flip_threshold = min(ping.created, now() - td(days=93))
-            self.flip_set.filter(created__lt=flip_threshold).delete()
-        except Ping.DoesNotExist:
-            pass
+        # Delete flips older than the oldest retained ping *and*
+        # older than 93 days. We need ~3 months of flips for calculating
+        # downtime statistics. The precise requirement is
+        # "we need the current month and full two previous months of data".
+        # We could calculate this precisely, but 3*31 is close enough and
+        # much simpler.
+        flip_threshold = min(oldest, now() - td(days=93))
+        # sendalerts has yet to send the alerts of an unprocessed flip
+        flips, _ = self.flip_set.filter(created__lt=flip_threshold, processed__isnull=False).delete()
+        return pings, notifications, flips
 
     @property
     def visible_pings(self) -> QuerySet[Ping]:
@@ -578,36 +641,59 @@ class Check(models.Model):
         flip.reason = reason
         flip.save()
 
-    def pause(self) -> None:
-        """Pause the check, unless it is paused already."""
-        if self.status == "paused":
-            return
+    def lock(self, *, project: Project | None = None) -> None:
+        """Reload the check and its project, and lock the check's row until the transaction ends.
 
-        # Track the status change for correct downtime calculation in Check.downtimes()
-        self.create_flip("paused", mark_as_processed=True)
+        Call it inside transaction.atomic(), before reading what a write depends on:
+        a ping may have changed the row since this instance was read. Raises
+        Check.DoesNotExist if the check is gone or, with `project`, in another project:
+        a transfer may have moved it since it was read. On PostgreSQL a transfer that
+        commits while this waits for the lock raises it even without `project`: the join
+        to the project is re-checked against the project row read before the wait.
 
-        self.status = "paused"
-        self.last_start = None
-        self.alert_after = None
-        self.save(update_fields=("status", "last_start", "alert_after"))
+        On PostgreSQL the lock is FOR NO KEY UPDATE, as is every row lock on a check,
+        channel or project: a ping to the check, another write or a delete of the row waits
+        for it; an insert that only references the row, such as a notification, does not.
+        """
+        q = Check.objects.select_for_update(of=("self",), no_key=True).select_related("project")
+        if project is not None:
+            q = q.filter(project=project)
+        self.refresh_from_db(from_queryset=q)
 
-        # After pausing a check we must check if all checks are up,
-        # and Profile.next_nag_date needs to be cleared out:
-        self.project.update_next_nag_dates()
+    def pause(self, *, project: Project | None = None) -> None:
+        """Pause the check, unless it is paused already; `project` is passed to lock()."""
+        with transaction.atomic():
+            self.lock(project=project)
+            if self.status == "paused":
+                return
 
-    def resume(self) -> bool:
-        """Resume a paused check as new; return False if it is not paused."""
-        if self.status != "paused":
-            return False
+            # Track the status change for correct downtime calculation in Check.downtimes()
+            self.create_flip("paused", mark_as_processed=True)
 
-        self.create_flip("new", mark_as_processed=True)
+            self.status = "paused"
+            self.last_start = None
+            self.alert_after = None
+            self.save(update_fields=("status", "last_start", "alert_after"))
 
-        self.status = "new"
-        self.last_start = None
-        self.last_ping = None
-        self.alert_after = None
-        self.save(update_fields=("status", "last_start", "last_ping", "alert_after"))
-        return True
+            # After pausing a check we must check if all checks are up,
+            # and Profile.next_nag_date needs to be cleared out:
+            self.project.update_next_nag_dates()
+
+    def resume(self, *, project: Project | None = None) -> bool:
+        """Resume a paused check as new; return False if it is not paused. `project` is passed to lock()."""
+        with transaction.atomic():
+            self.lock(project=project)
+            if self.status != "paused":
+                return False
+
+            self.create_flip("new", mark_as_processed=True)
+
+            self.status = "new"
+            self.last_start = None
+            self.last_ping = None
+            self.alert_after = None
+            self.save(update_fields=("status", "last_start", "last_ping", "alert_after"))
+            return True
 
 
 def find_by_unique_key(checks: Iterable[Check], unique_key: str) -> Check | None:
@@ -630,7 +716,8 @@ class PingDict(TypedDict):
 class Ping(models.Model):
     id = models.BigAutoField(primary_key=True)
     n = models.IntegerField(null=True)
-    owner = models.ForeignKey(Check, models.CASCADE)
+    # No index of its own: api_ping_owner_n in Meta leads with owner
+    owner = models.ForeignKey(Check, models.CASCADE, db_index=False)
     created = models.DateTimeField(default=now)
     # NULL is a success ping: Check.ping leaves kind unset for one, and the readers
     # compare with None.
@@ -642,6 +729,16 @@ class Ping(models.Model):
     body_raw = models.BinaryField(null=True)
     exitstatus = models.SmallIntegerField(null=True)
     rid = models.UUIDField(null=True)
+
+    class Meta:
+        indexes = (
+            # A query over one check's pings filters by owner and orders by "n", which this
+            # index serves; ordering by "created" or "id" instead sorts every ping of the
+            # check, or makes PostgreSQL walk api_ping_pkey. Check.ping numbers a check's
+            # pings under its row lock, so n and id rise together, and created with them
+            # unless the clock steps back.
+            models.Index(fields=["owner", "n"], name="api_ping_owner_n"),
+        )
 
     def __str__(self) -> str:
         return f"Ping #{self.n} ({self.kind or 'success'})"
@@ -712,11 +809,12 @@ class Ping(models.Model):
             return None
 
         pings = Ping.objects.filter(owner=self.owner_id)
-        # only look backwards but don't look further than MAX_DURATION in the past
-        pings = pings.filter(id__lt=self.id, created__gte=self.created - MAX_DURATION)
+        # only look backwards, by "n" (see Meta), but don't look further than
+        # MAX_DURATION in the past
+        pings = pings.filter(n__lt=self.n, created__gte=self.created - MAX_DURATION)
 
         # Look for a "start" event, with no success/fail event in between:
-        for ping in pings.order_by("-id").only("created", "kind", "rid"):
+        for ping in pings.order_by("-n").only("created", "kind", "rid"):
             if ping.kind == "start" and ping.rid == self.rid:
                 return self.created - ping.created
             if ping.kind in (None, "fail") and ping.rid == self.rid:
@@ -990,8 +1088,8 @@ class Channel(models.Model):
 class Notification(models.Model):
     code = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     # owner is null for test notifications, produced by the "Test!" button
-    # in the Integrations page
-    owner = models.ForeignKey(Check, models.CASCADE, null=True)
+    # in the Integrations page. No index of its own: the one in Meta leads with it.
+    owner = models.ForeignKey(Check, models.CASCADE, null=True, db_index=False)
     check_status = models.CharField(max_length=6)
     channel = models.ForeignKey(Channel, models.CASCADE)
     created = models.DateTimeField(default=now)
@@ -999,6 +1097,10 @@ class Notification(models.Model):
 
     class Meta:
         get_latest_by = "created"
+        indexes = (
+            # Check.prune and the event log select a check's notifications by created
+            models.Index(fields=["owner", "created"], name="api_notification_owner_created"),
+        )
 
     def __str__(self) -> str:
         return f"Notification {self.code} ({self.check_status})"
@@ -1010,7 +1112,8 @@ class FlipDict(TypedDict):
 
 
 class Flip(models.Model):
-    owner = models.ForeignKey(Check, models.CASCADE)
+    # No index of its own: api_flip_owner_created in Meta leads with owner
+    owner = models.ForeignKey(Check, models.CASCADE, db_index=False)
     created = models.DateTimeField()
     processed = models.DateTimeField(null=True, blank=True)
     old_status = models.CharField(max_length=8, choices=STATUSES)
@@ -1131,9 +1234,17 @@ class TokenBucket(models.Model):
 
     @staticmethod
     def authorize_auth_ip(request: HttpRequest) -> bool:
-        value = f"auth-ip-{client_ip(request)}"
+        ip = client_ip(request)
+        if ip is None:
+            # The requests whose address is unknown share one bucket
+            ip = "unknown"
+        elif isinstance(ip_address(ip), IPv6Address):
+            # A client usually holds a whole /64, so a bucket per address
+            # would let it open 2^64 of them
+            ip = str(ip_network((ip, 64), strict=False))
+
         # 20 login attempts for a single IP per hour:
-        return TokenBucket.authorize(value, 20, 3600)
+        return TokenBucket.authorize(f"auth-ip-{ip}", 20, 3600)
 
     @staticmethod
     def authorize_login_email(email: str, device: str = "") -> bool:

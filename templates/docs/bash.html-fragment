@@ -79,7 +79,8 @@ curl<span class="w"> </span>-m<span class="w"> </span><span class="m">10</span><
 at most the first PING_BODY_LIMIT_FORMATTED of it, as bytes whatever the encoding,
 and drops the rest (with the server's body limit setting <code>None</code>, it stores the body
 whole). A body larger than 2.5 MiB, or than the body limit when that is higher, is
-refused with 400 and the ping is not recorded. See
+refused and the ping is not recorded: the server may close the connection without a
+response, and curl then exits with code 52. See
 <a href="../http_api/#request-body">Request Body</a>.</p>
 <p>In the below example, certbot's output is captured and submitted via HTTP POST,
 together with certbot's exit status:</p>

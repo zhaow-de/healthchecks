@@ -1,10 +1,8 @@
 ---
 name: release
 description: Cut a release of zhaow-de/healthchecks — bump the version on a release branch cut from develop, open a PR into main, merge it, push the v<version> tag, create the GitHub Release with its notes, and back-merge main into develop
-allowed-tools: Bash(git add:*), Bash(git checkout:*), Bash(git tag:*), Bash(git status:*), Bash(git commit:*), Bash(git push:*), Bash(git pull:*), Bash(git fetch:*), Bash(git merge:*), Bash(git merge-base:*), Bash(git log:*), Bash(git branch:*), Bash(git rev-parse:*), Bash(git remote get-url:*), Bash(gh auth status:*), Bash(gh pr create --repo zhaow-de/healthchecks:*), Bash(gh pr view --repo zhaow-de/healthchecks:*), Bash(gh pr merge --repo zhaow-de/healthchecks:*), Bash(gh release create --repo zhaow-de/healthchecks:*), Bash(gh api repos/zhaow-de/healthchecks/:*), Bash(cz:*), Bash(uv:*), Bash(timeout:*), Bash(which:*), Bash(sed:*), Bash(grep:*), Bash(echo:*), Read, Edit, Write, AskUserQuestion
+allowed-tools: Bash(git add:*), Bash(git checkout:*), Bash(git tag:*), Bash(git status:*), Bash(git commit:*), Bash(git push:*), Bash(git pull:*), Bash(git fetch:*), Bash(git merge:*), Bash(git merge-base:*), Bash(git log:*), Bash(git branch:*), Bash(git rev-parse:*), Bash(git remote get-url:*), Bash(gh auth status:*), Bash(gh pr create --repo zhaow-de/healthchecks:*), Bash(gh pr view --repo zhaow-de/healthchecks:*), Bash(gh pr merge --repo zhaow-de/healthchecks:*), Bash(gh release create --repo zhaow-de/healthchecks:*), Bash(gh api repos/zhaow-de/healthchecks/:*), Bash(cz:*), Bash(uv:*), Bash(export:*), Bash(timeout:*), Bash(which:*), Bash(sed:*), Bash(grep:*), Bash(echo:*), Read, Edit, Write, AskUserQuestion
 ---
-
-> **This skill has never been run end to end.** Its steps are verified against the tree, not against a real cut, so read what each one prints rather than assuming it worked. After the first real release, re-read the whole skill against what actually happened and correct it in the same branch — that read is owed once and is the only thing a first cut can give.
 
 ## Every `gh` call names `zhaow-de/healthchecks`
 
@@ -16,16 +14,15 @@ allowed-tools: Bash(git add:*), Bash(git checkout:*), Bash(git tag:*), Bash(git 
 - Current version: !`cz version --project 2>/dev/null || echo "(cz not installed yet — step 1 installs it)"`
 - Origin: !`git remote get-url origin`
 - Prerequisites: !`which gh && which uv && echo "all found" || echo "MISSING tools"`
-- `cz` present already: !`which cz || echo "(absent — step 1 installs it)"`
 
 ## Instructions
 
-1. **Verify prerequisites and install `cz`** from the context above. If not on `develop`, ask the user to switch branches first. If `gh` or `uv` is missing, report and stop — those two are the environment's, not this skill's to install. The origin above must name `zhaow-de/healthchecks`, or stop.
+1. **Verify prerequisites and install `cz`** from the context above. If not on `develop`, ask the user to switch branches first. If `gh` or `uv` is missing, report and stop — those two are the environment's, not this skill's to install. A `uv` reported missing while `$HOME/.local/bin/uv` exists is hidden by `PATH`, as by an entry spelled `~/.local/bin`, which zsh does not expand: tell the user, and start every block below with `export PATH="$HOME/.local/bin:$PATH"`. The origin above must name `zhaow-de/healthchecks`, or stop.
 
-   `cz` is deliberately not a project dependency — a release is the only thing that uses it. Install it, then prove it answers:
+   `cz` is deliberately not a project dependency — a release is the only thing that uses it.
 
    ```bash
-   uv tool install commitizen
+   cz version --project 2>/dev/null || uv tool install commitizen
    cz version --project
    ```
 
@@ -72,7 +69,7 @@ allowed-tools: Bash(git add:*), Bash(git checkout:*), Bash(git tag:*), Bash(git 
    cz bump --yes --version-files-only
    ```
 
-   This computes the new version from the commit types since the last tag (rules in `.cz.toml`) and rewrites it in `.cz.toml` and `pyproject.toml`. This repository has no `CHANGELOG.md` and gets none: never add `--changelog`. If `cz` stops with `NO_COMMITS_FOUND` or `NO_COMMITS_TO_BUMP`, there is nothing to release: switch back to `develop`, delete the release branch, and report.
+   This computes the new version from the commit types since the last tag (rules in `.cz.toml`) and rewrites it in `.cz.toml` and `pyproject.toml`. This repository has no `CHANGELOG.md` and gets none: never add `--changelog`. The `tag to create: v<VERSION>` it prints is step 9's to make. If `cz` stops with `NO_COMMITS_FOUND` or `NO_COMMITS_TO_BUMP`, there is nothing to release: switch back to `develop`, delete the release branch, and report.
 
 5. **Refresh `uv.lock` to record the new version**:
    ```bash
@@ -142,9 +139,9 @@ allowed-tools: Bash(git add:*), Bash(git checkout:*), Bash(git tag:*), Bash(git 
     git checkout develop
     ```
 
-14. **Auto-merge the release PR** with a merge commit (preserving the tagged bump commit on `main`). Releases run end to end without pausing to ask. Stop only if something is genuinely worth attention: the PR has conflicts, or it was closed without merging.
+14. **Auto-merge the release PR** with a merge commit (preserving the tagged bump commit on `main`). Releases run end to end without pausing to ask.
 
-    **Read the suite's verdict first, by name, on the release branch's own head sha.** `.github/settings.yml` requires the `Full test suite` context on `main`, so this read is the same verdict the merge below waits on, not a second opinion. Run it as its OWN command, re-read every ~45 s, and never as one long foreground loop:
+    **Read the suite's verdict first, by name, on the release branch's own head sha.** `.github/settings.yml` requires the `Full test suite` context on `main`, so the merge below waits on this same verdict, save a `skipped` run, which branch protection counts as passed and this read does not. Run it as its OWN command, re-read every ~45 s, and never as one long foreground loop:
 
     ```bash
     SHA=$(git rev-parse "v<VERSION>")
@@ -161,11 +158,11 @@ allowed-tools: Bash(git add:*), Bash(git checkout:*), Bash(git tag:*), Bash(git 
         print("pending (not registered yet)"); raise SystemExit
     if run["s"] != "completed":
         print(f"pending ({run["s"]})"); raise SystemExit
-    print("success" if run["c"] in ("success", "neutral", "skipped") else f"failed ({run["c"]})")
+    print("success" if run["c"] in ("success", "neutral") else f"failed ({run["c"]})")
     '
     ```
 
-    A `pending` reading is this poll working: re-read it; a `pending` or a no-reading still repeating 30 minutes after the PR opened is stalled and worth attention. A `failed` reading stops the release, as do conflicts and a PR closed unmerged; before a re-cut, delete the local tag (`git tag -d v<VERSION>`), or step 9 fails on it. Only once it prints `success`, read the PR's state with per-call timeouts, as its OWN command re-issued every ~30 s, and merge as soon as GitHub reports it mergeable and not blocked by branch protection:
+    A skip means no tests ran: the job runs under `always()`. A `pending` reading is this poll working: re-read it; a `pending` or a no-reading still repeating 30 minutes after the PR opened is stalled and worth attention. A `failed` reading stops the release, as do conflicts and a PR closed unmerged; before a re-cut, delete the local tag (`git tag -d v<VERSION>`), or step 9 fails on it. Only once it prints `success`, read the PR's state with per-call timeouts, as its OWN command re-issued every ~30 s, and merge as soon as GitHub reports it mergeable and not blocked by branch protection:
     ```bash
     PR_NUMBER=<the PR number from step 12>
 
@@ -180,10 +177,14 @@ allowed-tools: Bash(git add:*), Bash(git checkout:*), Bash(git tag:*), Bash(git 
         echo "PR has conflicts — stop, do not merge"
     elif [ "$pr_mergeable" = "MERGEABLE" ] && [ "$pr_state_status" != "BLOCKED" ]; then
         timeout 60 gh pr merge --repo zhaow-de/healthchecks "$PR_NUMBER" --merge --delete-branch
+        rc=$?
+        echo "gh pr merge exited $rc; the PR is now $(timeout 30 gh pr view --repo zhaow-de/healthchecks "$PR_NUMBER" --json state -q .state)"
     else
         echo "PR not ready (state: $pr_state, mergeable: $pr_mergeable, status: $pr_state_status) — re-run this block in ~30 s"
     fi
     ```
+
+    `gh pr merge` succeeds silently outside a terminal, hence the last line. `MERGED` is done; a non-zero exit with the PR not merged is a failed step, stopped and reported with gh's error; a zero exit that does not read `MERGED` yet is a re-run in ~30 s.
 
 15. **Push the release tag**, after checking that the bump commit it points at is on `main`. The tag was created in step 9 and persists across the branch switch.
     ```bash

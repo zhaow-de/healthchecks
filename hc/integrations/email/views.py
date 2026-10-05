@@ -3,7 +3,7 @@ from uuid import UUID
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.core import signing
-from django.http import HttpRequest, HttpResponse
+from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.csrf import csrf_exempt
 
@@ -81,7 +81,10 @@ def verify(request: HttpRequest, code: UUID, token: str) -> HttpResponse:
     channel = get_object_or_404(Channel, code=code)
     if channel.make_token() == token:
         channel.email_verified = True
-        channel.save(update_fields=["email_verified"])
+        try:
+            channel.save(update_fields=["email_verified"])
+        except Channel.NotUpdated:
+            raise Http404("not found") from None
         return render(request, "front/verify_email_success.html")
 
     return render(request, "bad_link.html")

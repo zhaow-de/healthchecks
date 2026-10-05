@@ -1,4 +1,5 @@
 import email.policy
+import hmac
 import time
 from collections.abc import Callable, Iterable
 from datetime import UTC, datetime
@@ -11,8 +12,8 @@ from uuid import UUID
 from cronsim import CronSim, CronSimError
 from django.conf import settings
 from django.core.signing import BadSignature
-from django.db import connection
-from django.db.models import Prefetch
+from django.db import connection, transaction
+from django.db.models import Q
 from django.db.models.functions import Length
 from django.http import (
     Http404,
@@ -37,7 +38,7 @@ from hc.api.forms import FlipsFiltersForm
 from hc.api.models import Channel, Check, Flip, Notification, Ping, find_by_unique_key, prepare_durations
 from hc.lib.ip import client_ip
 from hc.lib.signing import unsign_bounce_id
-from hc.lib.string import is_valid_uuid_string, match_keywords
+from hc.lib.string import is_valid_uuid_string
 from hc.lib.typealias import ViewFunc
 from hc.lib.tz import all_timezones, legacy_timezones
 
@@ -58,7 +59,7 @@ def guess_kind(schedule: str) -> str:
 
 class Spec(BaseModel):
     channels: str | None = None
-    desc: str | None = None
+    desc: str | None = Field(None, max_length=10_000)
     failure_kw: str | None = Field(None, max_length=200)
     filter_subject: bool | None = None
     filter_body: bool | None = None
@@ -74,7 +75,7 @@ class Spec(BaseModel):
     subject: str | None = Field(None, max_length=200)
     subject_fail: str | None = Field(None, max_length=200)
     success_kw: str | None = Field(None, max_length=200)
-    tags: str | None = None
+    tags: str | None = Field(None, max_length=500)
     timeout: td | None = Field(None, ge=60, le=31536000)
     tz: str | None = None
     unique: list[Literal["name", "slug", "tags", "timeout", "grace"]] | None = None
@@ -166,51 +167,27 @@ def format_first_error(exc: ValidationError) -> str:
     return "json validation error: " + tmpl % subject
 
 
-@csrf_exempt
-@never_cache
-def ping(
-    request: HttpRequest,
-    code: UUID,
-    check: Check | None = None,
-    action: str = "success",
-    exitstatus: int | None = None,
-) -> HttpResponse:
-    if check is None:
-        try:
-            check = Check.objects.get(code=code)
-        except Check.DoesNotExist:
-            return HttpResponseNotFound("not found")
+def _ping_preflight(view: ViewFunc) -> ViewFunc:
+    """Answer a browser's CORS preflight (OPTIONS) to a ping URL, recording no ping."""
 
+    @wraps(view)
+    def wrapper(request: HttpRequest, *args: Any, **kwds: Any) -> HttpResponse:
+        if request.method != "OPTIONS":
+            return view(request, *args, **kwds)
+
+        response = HttpResponse(status=204)
+        response["Access-Control-Allow-Origin"] = "*"
+        response["Access-Control-Allow-Methods"] = "GET, HEAD, POST, OPTIONS"
+        response["Access-Control-Allow-Headers"] = request.headers.get("Access-Control-Request-Headers", "Content-Type")
+        response["Access-Control-Max-Age"] = "600"
+        return response
+
+    return wrapper
+
+
+def _ping(request: HttpRequest, lookup: Q, action: str, exitstatus: int | None) -> HttpResponse:
     if exitstatus is not None and exitstatus > 255:
         return HttpResponseBadRequest("invalid url format")
-
-    headers = request.META
-    remote_addr = client_ip(request)
-    scheme = headers.get("HTTP_X_FORWARDED_PROTO", "http")
-    method = headers["REQUEST_METHOD"]
-    ua = headers.get("HTTP_USER_AGENT", "")
-    body = request.body[: settings.PING_BODY_LIMIT]
-
-    if exitstatus is not None and exitstatus > 0:
-        action = "fail"
-
-    if check.methods == "POST" and method != "POST":
-        action = "ign"
-
-    if action != "ign" and check.filter_http_body:
-        # Undecodable bytes, a multibyte character cut by PING_BODY_LIMIT included,
-        # become U+FFFD, so the rest of the body is still matched
-        body_text = body.decode(errors="replace")
-        if check.failure_kw and match_keywords(body_text, check.failure_kw):
-            action = "fail"
-        elif check.success_kw and match_keywords(body_text, check.success_kw):
-            action = "success"
-        elif check.start_kw and match_keywords(body_text, check.start_kw):
-            action = "start"
-        elif check.filter_default_fail:
-            action = "fail"
-        else:
-            action = "ign"
 
     rid, rid_str = None, request.GET.get("rid")
     if rid_str is not None:
@@ -218,16 +195,46 @@ def ping(
             return HttpResponseBadRequest("invalid uuid format")
         rid = UUID(rid_str)
 
-    check.ping(remote_addr, scheme, method, ua, body, action, rid, exitstatus)
+    if exitstatus is not None and exitstatus > 0:
+        action = "fail"
+
+    # Read before Check.ping takes the lock: the body may still be arriving
+    body = request.body[: settings.PING_BODY_LIMIT]
+    try:
+        Check.ping(
+            lookup,
+            remote_addr=client_ip(request),
+            scheme="https" if request.is_secure() else "http",
+            method=request.META["REQUEST_METHOD"],
+            ua=request.headers.get("User-Agent", ""),
+            body=body,
+            action=action,
+            rid=rid,
+            exitstatus=exitstatus,
+        )
+    except Check.DoesNotExist:
+        return HttpResponseNotFound("not found")
+    except Check.MultipleObjectsReturned:
+        return HttpResponse("ambiguous slug", status=409)
 
     response = HttpResponse("OK")
     if settings.PING_BODY_LIMIT is not None:
         response["Ping-Body-Limit"] = str(settings.PING_BODY_LIMIT)
     response["Access-Control-Allow-Origin"] = "*"
+    response["Access-Control-Expose-Headers"] = "Ping-Body-Limit"
     return response
 
 
 @csrf_exempt
+@never_cache
+@_ping_preflight
+def ping(request: HttpRequest, code: UUID, action: str = "success", exitstatus: int | None = None) -> HttpResponse:
+    return _ping(request, Q(code=code), action, exitstatus)
+
+
+@csrf_exempt
+@never_cache
+@_ping_preflight
 def ping_by_slug(
     request: HttpRequest,
     ping_key: str,
@@ -238,20 +245,15 @@ def ping_by_slug(
     if slug != slug.lower():
         return HttpResponseBadRequest("invalid url format")
 
-    try:
-        check = Check.objects.get(slug=slug, project__ping_key=ping_key)
-    except Check.DoesNotExist:
-        return HttpResponseNotFound("not found")
-    except Check.MultipleObjectsReturned:
-        return HttpResponse("ambiguous slug", status=409)
-
-    return ping(request, check.code, check, action, exitstatus)
+    return _ping(request, Q(slug=slug, project__ping_key=ping_key), action, exitstatus)
 
 
 def _with_check(view: Callable[..., HttpResponse]) -> ViewFunc:
     """Pass the view the check `code` names: 404 if there is none, 403 if another project owns it.
 
-    The 403 is returned, not raised, so it keeps its empty body and the cors headers.
+    The 403 is returned, not raised, so it keeps its empty body and the cors headers. A
+    write passes project=request.project to the Check method that locks or renames the
+    check, which raises Check.DoesNotExist if a transfer has moved it since this read.
     """
 
     @wraps(view)
@@ -260,12 +262,23 @@ def _with_check(view: Callable[..., HttpResponse]) -> ViewFunc:
         if check.project_id != request.project.id:
             return HttpResponseForbidden()
 
-        return view(request, check, **kwds)
+        check.project = request.project
+        try:
+            return view(request, check, **kwds)
+        except Check.DoesNotExist:
+            if Check.objects.filter(id=check.id).exists():
+                return HttpResponseForbidden()
+            return HttpResponseNotFound()
 
     return wrapper
 
 
 def _lookup(project: Project, spec: Spec) -> Check | None:
+    """Return the first check of the project that the spec's `unique` fields match.
+
+    Call it inside transaction.atomic(): the check is read under the lock Check.lock()
+    takes, so it stays in the project until the transaction ends.
+    """
     if not spec.unique:
         return None
 
@@ -287,10 +300,12 @@ def _lookup(project: Project, spec: Spec) -> Check | None:
     if "grace" in spec.unique:
         existing_checks = existing_checks.filter(grace=spec.grace)
 
-    return existing_checks.first()
+    q = existing_checks.select_for_update(of=("self",), no_key=True).select_related("project")
+    return q.first()
 
 
 def _update(check: Check, spec: Spec) -> None:
+    """Apply the spec to a new check, or to one locked in the caller's transaction."""
     new_channels: Iterable[Channel] | None
     # First, validate the supplied channel codes/names
     match spec.channels:
@@ -320,6 +335,11 @@ def _update(check: Check, spec: Spec) -> None:
 
                 new_channels.add(matches[0])
 
+    _apply(check, spec, new_channels)
+
+
+def _apply(check: Check, spec: Spec, new_channels: Iterable[Channel] | None) -> None:
+    """Set the spec's fields and alert_after on the check, save it, then set its channels."""
     update_fields = set()
 
     if spec.name is not None:
@@ -375,8 +395,6 @@ def _update(check: Check, spec: Spec) -> None:
     if check._state.adding:
         check.save()
     else:
-        # Update only the fields that were in the spec. Updating all fields risks
-        # overwriting concurrent changes with older values.
         check.save(update_fields=update_fields)
 
     # This needs to be done after saving the check, because of
@@ -387,11 +405,7 @@ def _update(check: Check, spec: Spec) -> None:
 
 @authorize_read
 def get_checks(request: ApiRequest) -> JsonResponse:
-    q = Check.objects.filter(project=request.project)
-    if not request.readonly:
-        # Use QuerySet.only() and Prefetch() to prefetch channel codes only:
-        channel_q = Channel.objects.only("code")
-        q = q.prefetch_related(Prefetch("channel_set", queryset=channel_q))
+    q = Check.objects.filter(project=request.project).order_by("created", "id")
 
     tags = set(request.GET.getlist("tag"))
     for tag in tags:
@@ -402,9 +416,17 @@ def get_checks(request: ApiRequest) -> JsonResponse:
         q = q.filter(slug=slug)
 
     # precise, final filtering
-    checks = [check.to_dict(readonly=request.readonly) for check in q if not tags or check.matches_tag_set(tags)]
+    checks = [check for check in q if not tags or check.matches_tag_set(tags)]
+    if request.readonly:
+        return JsonResponse({"checks": [check.to_dict(readonly=True) for check in checks]})
 
-    return JsonResponse({"checks": checks})
+    # Codes from the link table, not channel_set: building Channel instances for them costs more
+    codes: dict[int, list[UUID]] = {}
+    links = Channel.checks.through.objects.filter(check__project=request.project)
+    for check_id, code in links.values_list("check_id", "channel__code"):
+        codes.setdefault(check_id, []).append(code)
+
+    return JsonResponse({"checks": [check.to_dict(channel_codes=codes.get(check.id, [])) for check in checks]})
 
 
 @authorize
@@ -414,14 +436,13 @@ def create_check(request: ApiRequest) -> HttpResponse:
     except ValidationError as e:
         return JsonResponse({"error": format_first_error(e)}, status=400)
 
-    created = False
-    check = _lookup(request.project, spec)
-    if check is None:
-        check = Check(project=request.project)
-        created = True
-
     try:
-        _update(check, spec)
+        with transaction.atomic():
+            check = _lookup(request.project, spec)
+            created = check is None
+            if check is None:
+                check = Check(project=request.project)
+            _update(check, spec)
     except BadChannelError as e:
         return JsonResponse({"error": e.message}, status=400)
 
@@ -472,11 +493,11 @@ def update_check(request: ApiRequest, check: Check) -> HttpResponse:
         return JsonResponse({"error": format_first_error(e)}, status=400)
 
     try:
-        _update(check, spec)
+        with transaction.atomic():
+            check.lock(project=request.project)
+            _update(check, spec)
     except BadChannelError as e:
         return JsonResponse({"error": e.message}, status=400)
-    except Check.NotUpdated:
-        return HttpResponseNotFound()
 
     return JsonResponse(check.to_dict())
 
@@ -484,12 +505,12 @@ def update_check(request: ApiRequest, check: Check) -> HttpResponse:
 @authorize
 @_with_check
 def delete_check(request: ApiRequest, check: Check) -> HttpResponse:
-    check.rename_and_delete()
+    check.rename_and_delete(project=request.project)
     return JsonResponse(check.to_dict())
 
 
 @csrf_exempt
-@cors("POST", "DELETE", "GET")
+@cors("GET", "POST", "DELETE")
 def single(request: HttpRequest, code: UUID) -> HttpResponse:
     if request.method == "POST":
         return update_check(request, code)
@@ -505,7 +526,7 @@ def single(request: HttpRequest, code: UUID) -> HttpResponse:
 @authorize
 @_with_check
 def pause(request: ApiRequest, check: Check) -> HttpResponse:
-    check.pause()
+    check.pause(project=request.project)
     return JsonResponse(check.to_dict())
 
 
@@ -514,7 +535,7 @@ def pause(request: ApiRequest, check: Check) -> HttpResponse:
 @authorize
 @_with_check
 def resume(request: ApiRequest, check: Check) -> HttpResponse:
-    if not check.resume():
+    if not check.resume(project=request.project):
         return HttpResponse("check is not paused", status=409)
 
     return JsonResponse(check.to_dict())
@@ -532,8 +553,8 @@ def pings(request: ApiRequest, check: Check) -> HttpResponse:
     limit = min(request.project.owner_profile.ping_log_limit, 1000)
 
     # Query in descending order so we're sure to get the most recent
-    # pings, regardless of the limit restriction
-    q = Ping.objects.filter(owner=check).order_by("-id")
+    # pings, regardless of the limit restriction. By "n", not "id": see Ping.Meta
+    q = Ping.objects.filter(owner=check).order_by("-n")
     # Optimization: query just the length of body_raw instead of body_raw itself.
     q = q.defer("body_raw").annotate(body_raw_length=Length("body_raw"))
     pings = list(q[:limit])
@@ -568,7 +589,8 @@ def flips(request: ApiRequest, check: Check) -> HttpResponse:
     if not form.is_valid():
         return HttpResponseBadRequest()
 
-    flips = Flip.objects.filter(owner=check).order_by("-id")
+    # api_flip_owner_created serves this order; sendalerts back-dates a down flip, so by id it would differ
+    flips = Flip.objects.filter(owner=check).order_by("-created")
 
     if form.cleaned_data["start"]:
         flips = flips.filter(created__gte=form.cleaned_data["start"])
@@ -602,12 +624,13 @@ def flips_by_unique_key(request: ApiRequest, unique_key: str) -> HttpResponse:
     return flips(request, check)
 
 
+@never_cache
 def metrics(request: HttpRequest) -> HttpResponse:
     if not settings.METRICS_KEY:
         return HttpResponseForbidden()
 
-    key = request.headers.get("X-Metrics-Key")
-    if key != settings.METRICS_KEY:
+    key = request.headers.get("X-Metrics-Key", "")
+    if not hmac.compare_digest(key.encode(), settings.METRICS_KEY.encode()):
         return HttpResponseForbidden()
 
     doc = {
@@ -620,6 +643,7 @@ def metrics(request: HttpRequest) -> HttpResponse:
     return JsonResponse(doc)
 
 
+@never_cache
 def status(request: HttpRequest) -> HttpResponse:
     with connection.cursor() as c:
         c.execute("SELECT 1")
@@ -629,6 +653,7 @@ def status(request: HttpRequest) -> HttpResponse:
 
 
 @csrf_exempt
+@never_cache
 def bounces(request: HttpRequest) -> HttpResponse:
     msg = message_from_bytes(request.body, policy=email.policy.SMTP)
     to_local = msg.get("To", "").split("@")[0]

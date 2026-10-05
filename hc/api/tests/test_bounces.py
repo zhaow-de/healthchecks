@@ -74,6 +74,7 @@ To: foo@example.com
     def test_it_handles_permanent_notification_bounce(self) -> None:
         r = self.post()
         self.assertEqual(r.status_code, 200)
+        self.assertIn("no-store", r["Cache-Control"])
 
         self.n.refresh_from_db()
         self.assertEqual(self.n.error, "Delivery failed (SMTP status code: 5.0.0)")

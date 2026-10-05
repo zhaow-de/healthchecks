@@ -1,5 +1,11 @@
+from unittest.mock import patch
+
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
+
 from hc.accounts.models import Project
 from hc.api.models import Channel, Check
+from hc.lib.string import is_valid_uuid_string
 from hc.test import BaseTestCase
 
 
@@ -80,3 +86,76 @@ class UpdateChannelTestCase(BaseTestCase):
         self.client.login(username="alice@example.org", password="password")
         r = self.client.post(self.channels_url, data=payload)
         self.assertEqual(r.status_code, 400)
+
+    def test_it_handles_a_channel_deleted_after_it_was_read(self) -> None:
+        # The view validates the check codes after it read the channel
+        def validate_and_delete(s: str) -> bool:
+            if s == str(self.check.code):
+                Channel.objects.filter(id=self.channel.id).delete()
+            return is_valid_uuid_string(s)
+
+        payload = {"channel": self.channel.code, f"check-{self.check.code}": True}
+        self.client.login(username="alice@example.org", password="password")
+        with patch("hc.front.views.is_valid_uuid_string", validate_and_delete):
+            r = self.client.post(self.channels_url, data=payload)
+        self.assertEqual(r.status_code, 404)
+        self.assertFalse(Channel.checks.through.objects.exists())
+
+    def test_it_handles_a_check_deleted_after_it_was_read(self) -> None:
+        other = Check.objects.create(project=self.project)
+
+        # The view validates each check code after it read the previous check
+        def validate_and_delete(s: str) -> bool:
+            if s == str(other.code):
+                Check.objects.filter(id=self.check.id).delete()
+            return is_valid_uuid_string(s)
+
+        payload = {
+            "channel": self.channel.code,
+            f"check-{self.check.code}": True,
+            f"check-{other.code}": True,
+        }
+        self.client.login(username="alice@example.org", password="password")
+        with patch("hc.front.views.is_valid_uuid_string", validate_and_delete):
+            r = self.client.post(self.channels_url, data=payload)
+        self.assertEqual(r.status_code, 404)
+        self.assertFalse(Channel.checks.through.objects.exists())
+
+    def test_it_handles_a_check_transferred_after_it_was_read(self) -> None:
+        other = Check.objects.create(project=self.project)
+        other_project = Project.objects.create(owner=self.alice)
+
+        def validate_and_transfer(s: str) -> bool:
+            if s == str(other.code):
+                Check.objects.filter(id=self.check.id).update(project=other_project)
+            return is_valid_uuid_string(s)
+
+        payload = {
+            "channel": self.channel.code,
+            f"check-{self.check.code}": True,
+            f"check-{other.code}": True,
+        }
+        self.client.login(username="alice@example.org", password="password")
+        with patch("hc.front.views.is_valid_uuid_string", validate_and_transfer):
+            r = self.client.post(self.channels_url, data=payload)
+        self.assertEqual(r.status_code, 403)
+        self.assertFalse(Channel.checks.through.objects.exists())
+
+    def test_it_locks_the_checks_before_the_channel(self) -> None:
+        payload = {"channel": self.channel.code, f"check-{self.check.code}": True}
+
+        self.client.login(username="alice@example.org", password="password")
+        with CaptureQueriesContext(connection) as ctx:
+            self.client.post(self.channels_url, data=payload)
+
+        sqls = [q["sql"] for q in ctx.captured_queries]
+        # The view's transaction, a savepoint inside the test's own
+        locked = sqls[next(i for i, sql in enumerate(sqls) if sql.startswith("SAVEPOINT")) :]
+        check_read = next(i for i, sql in enumerate(locked) if sql.startswith("SELECT") and 'FROM "api_check"' in sql)
+        channel_read = next(i for i, sql in enumerate(locked) if sql.startswith("SELECT") and 'FROM "api_channel"' in sql)
+        self.assertLess(check_read, channel_read)
+        if connection.vendor == "postgresql":
+            # values_list("id") orders by the position of the id it selects, column 1
+            sql = r'^SELECT "api_check"\."id" AS "id" FROM .* ORDER BY 1 ASC FOR NO KEY UPDATE$'
+            self.assertRegex(locked[check_read], sql)
+            self.assertIn("FOR NO KEY UPDATE", locked[channel_read])

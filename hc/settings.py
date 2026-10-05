@@ -6,6 +6,7 @@ https://docs.djangoproject.com/en/6.1/ref/settings/
 """
 
 import os
+import re
 import sys
 import tomllib
 from collections.abc import Mapping
@@ -16,6 +17,7 @@ from urllib.parse import urlparse
 import django_stubs_ext
 from django.core.exceptions import ImproperlyConfigured
 from django.http.request import split_domain_port
+from django.utils.csp import CSP
 
 django_stubs_ext.monkeypatch()
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -68,13 +70,19 @@ def envsecret(s: str, default: str | None = None) -> str | None:
 SECRET_KEY = envsecret("SECRET_KEY", "---")
 METRICS_KEY = os.getenv("METRICS_KEY")
 DEBUG = envbool("DEBUG", "True")
+# SERVER_EMAIL, which defaults to it, is set after hc/local_settings.py
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "healthchecks@example.org")
 SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL")
 if admins := os.getenv("ADMINS"):
     ADMINS = admins.split(",")
 
-if v := os.getenv("SECURE_PROXY_SSL_HEADER"):
+# On by default: the reverse proxy in front of the app sets X-Forwarded-Proto, replacing
+# what the client sent. An empty value turns it off.
+if v := os.getenv("SECURE_PROXY_SSL_HEADER", "HTTP_X_FORWARDED_PROTO,https"):
     SECURE_PROXY_SSL_HEADER = tuple(v.split(",", maxsplit=1))
+
+# How many reverse proxies in front of the app write X-Forwarded-For: see hc.lib.ip.client_ip
+TRUSTED_PROXY_HOPS = envint("TRUSTED_PROXY_HOPS", "1")
 
 
 with (BASE_DIR / "pyproject.toml").open("rb") as f:
@@ -93,7 +101,6 @@ INSTALLED_APPS = (
     "compressor",
     "hc.api",
     "hc.front",
-    "hc.logs",
     "hc.integrations.email",
     "hc.integrations.group",
     "hc.integrations.prometheus",
@@ -105,6 +112,11 @@ INSTALLED_APPS = (
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
+    # Outside every middleware below, so it compresses the body they leave. Not above
+    # WhiteNoise, which serves the build's .gz files itself: there it would compress
+    # every other static file, fonts and images included, on each request.
+    *(["django.middleware.gzip.GZipMiddleware"] if envbool("USE_GZIP_MIDDLEWARE", "False") else []),
+    "django.middleware.csp.ContentSecurityPolicyMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -113,9 +125,6 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "hc.accounts.middleware.ProfileMiddleware",
 ]
-
-if envbool("USE_GZIP_MIDDLEWARE", "False"):
-    MIDDLEWARE.append("django.middleware.gzip.GZipMiddleware")
 
 AUTHENTICATION_BACKENDS = [
     "hc.accounts.backends.EmailBackend",
@@ -135,14 +144,16 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "django.template.context_processors.csp",
                 "hc.front.context_processors.branding",
             ]
         },
     }
 ]
 
-# uWSGI's line per request is off in docker/uwsgi.ini (disable-logging)
-LOG_FORMAT = os.getenv("LOG_FORMAT", "text").strip().lower()
+# uWSGI's line per request is off in docker/uwsgi.ini (disable-logging). LOG_FORMAT
+# picks the console handler's formatter after hc/local_settings.py.
+LOG_FORMAT = os.getenv("LOG_FORMAT", "text")
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -151,18 +162,13 @@ LOGGING = {
     },
     "formatters": {
         "text": {"format": "%(asctime)s %(levelname)s %(name)s %(message)s"},
-        "json": {"()": "hc.logs.JsonFormatter"},
+        "json": {"()": "hc.lib.logs.JsonFormatter"},
     },
     "handlers": {
         "console": {
             "level": "INFO",
             "class": "logging.StreamHandler",
             "stream": "ext://sys.stdout",
-            "formatter": "json" if LOG_FORMAT == "json" else "text",
-        },
-        "db": {
-            "level": "WARNING",
-            "class": "hc.logs.Handler",
         },
         # Django's default handler for ADMINS, which configuring the "django"
         # logger here would otherwise drop
@@ -180,12 +186,15 @@ LOGGING = {
         "django": {"level": "INFO", "handlers": ["console", "mail_admins"], "propagate": False},
         "django.request": {
             "level": "ERROR",
-            "handlers": ["console", "db", "mail_admins"],
+            "handlers": ["console", "mail_admins"],
             "propagate": False,
         },
         # Without a handler, its 4xx and 5xx lines would reach logging.lastResort
         "django.server": {"handlers": ["null"], "propagate": False},
-        "hc": {"level": "INFO", "handlers": ["console", "db"], "propagate": False},
+        # A request with a Host outside ALLOWED_HOSTS still gets 400; scanners send them,
+        # and each would otherwise log a traceback and email ADMINS
+        "django.security.DisallowedHost": {"handlers": ["null"], "propagate": False},
+        "hc": {"level": "INFO", "handlers": ["console"], "propagate": False},
     },
 }
 
@@ -199,8 +208,14 @@ DATABASES: Mapping[str, Any] = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": os.getenv("DB_NAME", BASE_DIR / "hc.sqlite"),
+        "CONN_MAX_AGE": envint("DB_CONN_MAX_AGE", "600"),
+        "CONN_HEALTH_CHECKS": True,
         "OPTIONS": {
-            "init_command": "PRAGMA busy_timeout = 5000;",
+            # auto_vacuum and WAL are set by the connection_created receiver in hc/api/apps.py,
+            # which runs after init_command; its docstring says why. In WAL mode, synchronous
+            # NORMAL can lose the last commits to a power loss or an OS crash, not to a crash
+            # of the process.
+            "init_command": "PRAGMA busy_timeout = 5000; PRAGMA synchronous = NORMAL; PRAGMA journal_size_limit = 16777216;",
             "transaction_mode": "IMMEDIATE",
         },
     }
@@ -215,7 +230,8 @@ if os.getenv("DB") == "postgres":
             "NAME": os.getenv("DB_NAME", "hc"),
             "USER": os.getenv("DB_USER", "postgres"),
             "PASSWORD": envsecret("DB_PASSWORD", ""),
-            "CONN_MAX_AGE": envint("DB_CONN_MAX_AGE", "0"),
+            "CONN_MAX_AGE": envint("DB_CONN_MAX_AGE", "600"),
+            "CONN_HEALTH_CHECKS": True,
             "TEST": {"CHARSET": "UTF8"},
             "OPTIONS": {
                 "application_name": "hc",
@@ -237,24 +253,62 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-SITE_ROOT = os.getenv("SITE_ROOT", "http://localhost:8000").removesuffix("/")
+# Its trailing slash is removed after hc/local_settings.py
+SITE_ROOT = os.getenv("SITE_ROOT", "http://localhost:8000")
 SITE_NAME = os.getenv("SITE_NAME", "Healthchecks")
-PING_ENDPOINT = os.getenv("PING_ENDPOINT", SITE_ROOT + "/ping/")
+# Unset, it is SITE_ROOT + "/ping/", which site_root_settings() fills in
+PING_ENDPOINT = os.getenv("PING_ENDPOINT")
+# A limit above DATA_UPLOAD_MAX_MEMORY_SIZE's default raises that, after hc/local_settings.py
 PING_BODY_LIMIT = envint("PING_BODY_LIMIT", "10000")
-# If PING_BODY_LIMIT is higher than the default value for DATA_UPLOAD_MAX_MEMORY_SIZE,
-# then we need to bump up DATA_UPLOAD_MAX_MEMORY_SIZE too:
-if PING_BODY_LIMIT and PING_BODY_LIMIT > 2621440:
-    DATA_UPLOAD_MAX_MEMORY_SIZE = PING_BODY_LIMIT
-_site_root_parts = urlparse(SITE_ROOT)
-LOGIN_URL = f"{_site_root_parts.path}/accounts/login/"
-STATIC_URL = f"{_site_root_parts.path}/static/"
-if v := os.getenv("ALLOWED_HOSTS"):
-    # If ALLOWED_HOSTS is set in environment, use it
-    ALLOWED_HOSTS = v.split(",")
-else:
-    # Otherwise, populate it with the domain from SITE_ROOT
-    domain, _ = split_domain_port(_site_root_parts.netloc)
-    ALLOWED_HOSTS = [domain]
+SECURE_HSTS_SECONDS = envint("SECURE_HSTS_SECONDS", "0")
+
+
+def site_root_settings(site_root: str, ping_endpoint: str | None, allowed_hosts: str | None) -> dict[str, Any]:
+    """The settings that follow SITE_ROOT and PING_ENDPOINT; allowed_hosts is the ALLOWED_HOSTS environment variable."""
+    site_root_parts = urlparse(site_root)
+    if ping_endpoint is None:
+        ping_endpoint = site_root + "/ping/"
+    ping_endpoint_parts = urlparse(ping_endpoint)
+    if allowed_hosts:
+        # If ALLOWED_HOSTS is set in environment, use it
+        hosts = allowed_hosts.split(",")
+    else:
+        # Otherwise, populate it with the domain from SITE_ROOT
+        domain, _ = split_domain_port(site_root_parts.netloc)
+        hosts = [domain]
+    # On an https SITE_ROOT the session, messages, hc-device, auto-login and CSRF cookies are Secure
+    secure = site_root_parts.scheme == "https"
+    url_prefix = re.escape(f"{site_root_parts.path.lstrip('/')}/") if site_root_parts.path else ""
+
+    return {
+        "PING_ENDPOINT": ping_endpoint,
+        "LOGIN_URL": f"{site_root_parts.path}/accounts/login/",
+        "STATIC_URL": f"{site_root_parts.path}/static/",
+        "ALLOWED_HOSTS": hosts,
+        "SESSION_COOKIE_SECURE": secure,
+        "CSRF_COOKIE_SECURE": secure,
+        # A form posted from SITE_ROOT passes the CSRF origin check even when the proxy
+        # does not tell Django the request came over https
+        "CSRF_TRUSTED_ORIGINS": [f"{site_root_parts.scheme}://{site_root_parts.netloc}"],
+        # SECURE_SSL_REDIRECT stays off: pings may come over http, and docker/fetchstatus.py
+        # does. Turned on in local_settings.py, it leaves these paths alone.
+        "SECURE_REDIRECT_EXEMPT": [rf"^{url_prefix}ping/", rf"^{url_prefix}api/v3/status/?$"],
+        # An inline <script> or <style> needs {% csp_nonce_attr %}. The data: images are the
+        # stylesheets' inline SVG icons and the TOTP QR code. The details page's "Ping Now!"
+        # posts to PING_ENDPOINT, which may be on another origin.
+        "SECURE_CSP": {
+            "default-src": [CSP.SELF],
+            "script-src": [CSP.SELF, CSP.NONCE],
+            "style-src": [CSP.SELF, CSP.NONCE],
+            "img-src": [CSP.SELF, "data:"],
+            "connect-src": [CSP.SELF, f"{ping_endpoint_parts.scheme}://{ping_endpoint_parts.netloc}"],
+            "object-src": [CSP.NONE],
+            "base-uri": [CSP.SELF],
+            "form-action": [CSP.SELF],
+            "frame-ancestors": [CSP.NONE],
+        },
+    }
+
 
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "static-collected"
@@ -327,13 +381,34 @@ INTEGRATIONS_ALLOW_PRIVATE_IPS = envbool("INTEGRATIONS_ALLOW_PRIVATE_IPS", "Fals
 
 # Read additional configuration from hc/local_settings.py if it exists. The star import
 # is the override: every name it defines replaces the one above.
+_local_names: set[str] = set()
 if (BASE_DIR / "hc/local_settings.py").exists():
+    from . import local_settings as _local_settings
     from .local_settings import *  # noqa: F403
+
+    _local_names = set(vars(_local_settings))
+
+SITE_ROOT = SITE_ROOT.removesuffix("/")
+_derived = site_root_settings(SITE_ROOT, PING_ENDPOINT, os.getenv("ALLOWED_HOSTS"))
+# The sender of Django's error mails to ADMINS; Django's own default, root@localhost,
+# is one an SMTP service that sends only from verified addresses refuses
+_derived["SERVER_EMAIL"] = os.getenv("SERVER_EMAIL", DEFAULT_FROM_EMAIL)
+# If PING_BODY_LIMIT is higher than the default value for DATA_UPLOAD_MAX_MEMORY_SIZE,
+# then we need to bump up DATA_UPLOAD_MAX_MEMORY_SIZE too:
+if PING_BODY_LIMIT and PING_BODY_LIMIT > 2621440:
+    _derived["DATA_UPLOAD_MAX_MEMORY_SIZE"] = PING_BODY_LIMIT
+for _name, _value in _derived.items():
+    if _name not in _local_names:
+        globals()[_name] = _value
+if "LOGGING" not in _local_names:
+    LOGGING["handlers"]["console"]["formatter"] = "json" if LOG_FORMAT.strip().lower() == "json" else "text"
 
 # Overrides for testing
 if sys.argv[1:2] == ["test"] or "pytest" in sys.modules:
     # For speed:
     PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+    # The test runner sets DEBUG to False, so hc.api.E004 would refuse a weak key
+    SECRET_KEY = "test-only-secret-key-0123456789abcdefghijklmnopqrstuvwxyz"
     # Send emails synchronously
     BLOCKING_EMAILS = True
     # Keep log records out of the test output, assertLogs captures them anyway;

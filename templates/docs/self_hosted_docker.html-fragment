@@ -1,34 +1,84 @@
 <h1>Running with Docker</h1>
-<p>In the Healthchecks source code, <a href="https://github.com/zhaow-de/healthchecks/tree/main/docker">/docker/ directory</a>,
-you can find a sample configuration for running the project with
-<a href="https://www.docker.com">Docker</a> and <a href="https://docs.docker.com/compose/">Docker Compose</a>.</p>
-<p>Note: For the sake of simplicity, the sample configuration starts a single database
-node and a single web server node, both on the same host. It does not handle TLS
-termination.</p>
-<h2>Getting Started</h2>
+<p>The way to run Healthchecks in production is the published Docker image,
+<code>ghcr.io/zhaow-de/healthchecks</code>, under <a href="https://docs.docker.com/compose/">Docker Compose</a>.
+The repository's <a href="https://github.com/zhaow-de/healthchecks/tree/main/docker">docker/ directory</a>
+holds the files this page uses:</p>
 <ul>
-<li>Grab the Healthchecks source code
-  <a href="https://github.com/zhaow-de/healthchecks">from the GitHub repository</a>.</li>
+<li><code>docker-compose.yml</code>: one <code>web</code> service that runs the image, with its SQLite
+  database in the <code>hc-data</code> volume;</li>
+<li><code>docker-compose.postgres.yml</code>: an override that adds a PostgreSQL 18 <code>db</code> service
+  and points <code>web</code> at it;</li>
+<li><code>.env.example</code>: the settings, to copy to <code>.env</code>;</li>
+<li><code>Dockerfile</code> and <code>uwsgi.ini</code>: how the image is built, and what it runs.</li>
+</ul>
+<p>The container serves plain HTTP on port 8000, published on the Docker host's
+loopback address alone. Put a reverse proxy in front of it that terminates TLS (see
+<a href="#tls-termination">Reverse Proxy and TLS</a>); <a href="#debian-vps">Example: Debian 13 on a VPS</a>
+puts the pieces together, with Caddy in front.</p>
+<h2 id="image">The Image</h2>
+<p>The images are published
+<a href="https://github.com/zhaow-de/healthchecks/pkgs/container/healthchecks">on the GitHub Container Registry</a>
+as <code>ghcr.io/zhaow-de/healthchecks</code>, built from <code>docker/Dockerfile</code>, with these tags:</p>
+<ul>
+<li><code>vX.Y.Z</code> for each release: pin one of these in production;</li>
+<li><code>latest</code> for the newest build of <code>main</code> or of a release tag;</li>
+<li>the full 40-character commit SHA for each build of the <code>develop</code> and <code>main</code>
+  branches.</li>
+</ul>
+<p>The image:</p>
+<ul>
+<li>supports the amd64 architecture only;</li>
+<li>runs as the user <code>hc</code> (user ID 100, group ID 101), in <code>/opt/healthchecks</code>;</li>
+<li>keeps its SQLite database at <code>/data/hc.sqlite</code>: it sets <code>DB_NAME=/data/hc.sqlite</code>,
+  and <code>/data</code> is the one directory <code>hc</code> can write to;</li>
+<li>sets <code>DEBUG=False</code>, and does not start without a strong <code>SECRET_KEY</code> (see
+  <a href="#getting-started">Getting Started</a>);</li>
+<li>runs uWSGI, which applies the database migrations at every start, serves the web
+  application, and runs <code>sendalerts</code>, <code>sendreports</code> and the daily housekeeping (see
+  <a href="#processes">What Runs in the Container</a>);</li>
+<li>serves its static files itself, collected and compressed when the image is built;</li>
+<li>ships the PostgreSQL driver, but no <code>sqlite3</code>, <code>psql</code>, <code>pg_dump</code> or <code>curl</code>
+  program;</li>
+<li>runs in UTC;</li>
+<li>does <em>not</em> handle TLS termination.</li>
+</ul>
+<h2 id="getting-started">Getting Started</h2>
+<ul>
+<li>Copy <code>docker-compose.yml</code> and <code>.env.example</code> from the repository's <code>docker/</code>
+  directory into a directory on the Docker host, or clone the repository and work
+  in its <code>docker/</code> directory. Every <code>docker compose</code> command on this page runs in
+  that directory.</li>
 <li>
-<p>Copy <code>docker/.env.example</code> to <code>docker/.env</code> and add your configuration in it.
-  As a minimum, set the following fields:</p>
+<p>Copy <code>.env.example</code> to <code>.env</code> and add your configuration in it. Docker Compose
+  passes every line of <code>.env</code> to the container, and reads <code>HC_IMAGE</code> from it. As a
+  minimum, set the following fields:</p>
 <ul>
-<li><code>ALLOWED_HOSTS</code> – the domain name of your Healthchecks instance.
-Example: <code>ALLOWED_HOSTS=hc.example.org</code>.</li>
-<li><code>DB_PASSWORD</code> – the PostgreSQL password. The <code>db</code> container applies it only
-when it first creates its data volume, so changing it later breaks the
-connection. Keep <code>DB_USER=postgres</code>: <code>docker-compose.yml</code> does not set
-<code>POSTGRES_USER</code>.</li>
-<li><code>PING_ENDPOINT</code> – the base of ping URLs. The sample sets it to
-<code>http://localhost:8000/ping/</code>, so set it to your <code>SITE_ROOT</code> followed by
-<code>/ping/</code>, or delete the line to derive it from <code>SITE_ROOT</code>.</li>
-<li><code>SECRET_KEY</code> – secures HTTP sessions, set to a random value. Set it before
+<li><code>HC_IMAGE</code> – the image to run, a release. Example:
+<code>HC_IMAGE=ghcr.io/zhaow-de/healthchecks:vX.Y.Z</code>. Without it, the compose file
+runs <code>latest</code>.</li>
+<li><code>SECRET_KEY</code> – secures HTTP sessions, set to a random value of at least 50
+characters, with at least 5 different ones, that does not start with
+<code>django-insecure-</code>.
+The sample's <code>---</code> does not pass: with it, or any weaker key, the container does
+not start. Generate one with
+<code>python3 -c 'import secrets; print(secrets.token_urlsafe(50))'</code>. Set it before
 you create the first API key and keep it: changing it later invalidates the
 API keys and more (see <a href="../self_hosted_configuration/#SECRET_KEY">SECRET_KEY</a>).</li>
 <li><code>SITE_ROOT</code> – The base public URL of your Healthchecks instance. Example:
-<code>SITE_ROOT=https://hc.example.org</code>.</li>
+<code>SITE_ROOT=https://hc.example.org</code>. With an <code>https://</code> URL, the console's
+cookies are marked Secure, so you log in over HTTPS only.</li>
+<li><code>ALLOWED_HOSTS</code> – the sample sets <code>localhost</code>. Set it to the host of
+<code>SITE_ROOT</code>, or delete the line to derive it from <code>SITE_ROOT</code>: when the host of
+<code>SITE_ROOT</code> is not in it, the container does not start.</li>
+<li><code>PING_ENDPOINT</code> – the base of ping URLs. The sample sets it to
+<code>http://localhost:8000/ping/</code>, so set it to your <code>SITE_ROOT</code> followed by
+<code>/ping/</code>, or delete the line to derive it from <code>SITE_ROOT</code>.</li>
 </ul>
-<p>For email (see <a href="../self_hosted/#sending-emails">Sending Emails</a>), also set:</p>
+<p>The image sets <code>DEBUG=False</code>, as does the sample; keep it so. Leave out <code>DB</code>
+and <code>DB_NAME</code>: the image's SQLite path is the default (see
+<a href="#sqlite">SQLite and the /data Volume</a>).</p>
+<p>For email (see <a href="../self_hosted/#sending-emails">Sending Emails</a>, and
+<a href="../self_hosted/#ses">Example: Amazon SES</a>), also set:</p>
 <ul>
 <li><code>DEFAULT_FROM_EMAIL</code> – the "From:" address for outbound emails.</li>
 <li><code>EMAIL_HOST</code> – the SMTP server.</li>
@@ -39,52 +89,161 @@ sample has no such line, so add it) and <code>EMAIL_USE_TLS=False</code>.</li>
 </ul>
 </li>
 <li>
-<p>Create and start containers in the background:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span><span class="nb">cd</span><span class="w"> </span>docker
-$<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d
+<p>Create and start the container in the background:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d
 </code></pre></div>
 
 <p>Wait until <code>docker compose ps</code> shows the <code>web</code> container as healthy: by then
-the database migrations have run.</p>
+the database file exists and the migrations have run. A container that keeps
+restarting instead, which <code>docker compose up -d --wait</code> reports as unhealthy,
+refused to start: <code>docker compose logs web</code> shows why, such as <code>hc.api.E004</code>
+for a weak <code>SECRET_KEY</code>, or <code>hc.api.E002</code> for a <code>SITE_ROOT</code> host missing from
+<code>ALLOWED_HOSTS</code>.</p>
 </li>
 <li>
-<p>Create a superuser:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>web<span class="w"> </span>/opt/healthchecks/manage.py<span class="w"> </span>createsuperuser
+<p>Create the superuser:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>web<span class="w"> </span>./manage.py<span class="w"> </span>createsuperuser
 </code></pre></div>
 
-<p>This will trigger an interactive prompt.</p>
-<p>You can also provide credentials via parameters, bypassing the interactive prompt:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>web<span class="w"> </span>/opt/healthchecks/manage.py<span class="w"> </span>createsuperuser<span class="w"> </span>--email<span class="w"> </span>user@example.com<span class="w"> </span>--password<span class="w"> </span>correct-horse-battery-staple
-</code></pre></div>
-
-<p>See <a href="../self_hosted/#setting-up-for-development">Setting Up for Development</a>
-for what <code>createsuperuser</code> creates and the password rules.</p>
+<p>This will trigger an interactive prompt. See
+<a href="../self_hosted/#superuser">Creating the Superuser</a> for the parameters, what
+<code>createsuperuser</code> creates and the password rules.</p>
 </li>
 <li>
 <p>Open your <code>SITE_ROOT</code> in your browser, through your reverse proxy, and log in
-  with the credentials from the previous step.
-  <a href="http://localhost:8000">http://localhost:8000</a> works only while <code>SITE_ROOT</code> and
+  with the credentials from the previous step. On the Docker host itself,
+  <a href="http://localhost:8000">http://localhost:8000</a> works while <code>SITE_ROOT</code> and
   <code>ALLOWED_HOSTS</code> keep their <code>localhost</code> sample values: with your own domain set, a
   request to <code>localhost</code> gets 400 Bad Request.</p>
 </li>
 </ul>
-<h2>Login Lockout</h2>
-<p>A browser that has completed a login gets login rate limits of its own, but a
-new browser shares them with everyone else, so a run of wrong passwords for the
-account's email, from anywhere, can lock it out (<a href="../self_hosted/#login-lockout">Login Lockout</a>
-lists the limits). To get back in, wait for the limits to refill, use the login
-link sent by email if email is set up, or clear every rate limit record, the
-recent ones too:</p>
-<div class="highlight"><pre><span></span><code>$<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>web<span class="w"> </span>/opt/healthchecks/manage.py<span class="w"> </span>prunetokenbucket<span class="w"> </span>--all
+<h2 id="compose">The Compose File</h2>
+<p><code>docker-compose.yml</code> is set up for production:</p>
+<ul>
+<li><code>image: ${HC_IMAGE:-ghcr.io/zhaow-de/healthchecks:latest}</code> runs the image <code>HC_IMAGE</code>
+  names in <code>.env</code>.</li>
+<li><code>env_file: .env</code> passes every line of <code>.env</code> to the container.</li>
+<li><code>volumes: hc-data:/data</code> keeps the database in a named volume, so it outlives the
+  container. <code>docker compose down</code> keeps the volume; <code>docker compose down -v</code> deletes
+  it, and the database with it.</li>
+<li><code>ports: "127.0.0.1:8000:8000"</code> publishes the port on the Docker host's loopback
+  address, for a reverse proxy on the same host. For a proxy on another host,
+  publish it on an address that proxy reaches, and keep every other client away from
+  it: a client that reaches port 8000 directly, a process on the Docker host
+  included, chooses its own <code>X-Forwarded-For</code> (see
+  <a href="#trusted-proxy-hops">TRUSTED_PROXY_HOPS</a>).</li>
+<li><code>restart: unless-stopped</code> starts the container again when it exits and when the
+  Docker host restarts, unless you stopped it. Docker does not restart a container
+  that is only unhealthy.</li>
+<li><code>logging</code> keeps at most three log files of 10 MB each for the container.</li>
+</ul>
+<p>A <code>&lt;NAME&gt;_FILE</code> setting (<code>SECRET_KEY_FILE</code>, <code>EMAIL_HOST_PASSWORD_FILE</code>,
+<code>SLACK_CLIENT_SECRET_FILE</code>, <code>DB_PASSWORD_FILE</code>) reads the value from a file instead,
+for example a secret mounted into the container; the file has to be readable by
+user ID 100. The image has no <code>hc/local_settings.py</code>: to use one, mount it read-only
+at <code>/opt/healthchecks/hc/local_settings.py</code> in the <code>web</code> service's <code>volumes</code>.</p>
+<h2 id="sqlite">SQLite and the /data Volume</h2>
+<p>SQLite is the default. The image sets <code>DB_NAME=/data/hc.sqlite</code>, and
+<code>docker-compose.yml</code> mounts the named volume <code>hc-data</code> at <code>/data</code>. A <code>DB_NAME</code> line
+in <code>.env</code> would replace the image's path.</p>
+<p>The first start creates the database file, owned by <code>hc</code>, with SQLite's incremental
+auto-vacuum, which lets the daily housekeeping give the space of deleted rows back to
+the file system (see <a href="../self_hosted/#database-cleanup">Data Retention</a>).</p>
+<p>A new named volume takes its owner from the image's <code>/data</code>, so the <code>hc</code> user can
+write to it; a host directory mounted there instead must be writable by user ID 100.</p>
+<p>The database runs in SQLite's WAL mode: while it is in use, <code>hc.sqlite-wal</code> and
+<code>hc.sqlite-shm</code> sit beside <code>hc.sqlite</code> in <code>/data</code>, and the latest commits are in the
+<code>-wal</code> file until a checkpoint copies them into <code>hc.sqlite</code>. So:</p>
+<ul>
+<li><code>/data</code> must be a local file system, used by the containers of one host: WAL mode
+  does not work over a network file system.</li>
+<li>Never copy <code>hc.sqlite</code> alone while the container runs: the copy misses what the
+  <code>-wal</code> file holds, and a restore of it is inconsistent. Back up with <code>VACUUM INTO</code>
+  (see <a href="#backups">Backups and Restore</a>).</li>
+<li>A clean stop (<code>docker compose stop</code> or <code>down</code>) checkpoints the <code>-wal</code> file and
+  removes both files. A killed container (<code>docker kill</code>, out of memory, a host
+  crash) leaves them, and the next start applies the <code>-wal</code> file to <code>hc.sqlite</code>.</li>
+<li>The first write after a checkpoint cuts the <code>-wal</code> file back to 16 MiB, but under
+  sustained concurrent writes it grows past that between checkpoints: keep about
+  50 MiB of disk free for it beside the database.</li>
+</ul>
+<p>Commits use <code>synchronous = NORMAL</code>: a crash of the container loses no committed ping,
+but a power loss or a crash of the host's operating system can lose the last ones.</p>
+<h2 id="postgresql">PostgreSQL</h2>
+<p>To run on PostgreSQL 18 instead, layer <code>docker-compose.postgres.yml</code> over
+<code>docker-compose.yml</code>. It adds a <code>db</code> service that runs <code>postgres:18</code> with its data in
+the <code>db-data</code> volume, makes <code>web</code> wait until <code>db</code> is healthy, and points <code>web</code> at it.</p>
+<ul>
+<li>Copy <code>docker-compose.postgres.yml</code> beside <code>docker-compose.yml</code>.</li>
+<li>In <code>.env</code>, set <code>DB_PASSWORD</code>, the PostgreSQL password: both services refuse to
+  start without it. The <code>db</code> container applies it only when it first creates its
+  data volume, so changing it later breaks the connection. <code>DB_SSLMODE</code> and
+  <code>DB_TARGET_SESSION_ATTRS</code> tune the connection; leave <code>DB</code>, <code>DB_HOST</code>, <code>DB_NAME</code>
+  and <code>DB_USER</code> to the override. With
+  <a href="../self_hosted_configuration/#DB_CONN_MAX_AGE">DB_CONN_MAX_AGE</a> at its default,
+  600 seconds, each uWSGI worker keeps its connection open between requests, so
+  PostgreSQL holds a connection per worker beside those of the daemons.</li>
+<li>Name both files in every <code>docker compose</code> command:<div class="highlight"><pre><span></span><code>$<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.yml<span class="w"> </span>-f<span class="w"> </span>docker-compose.postgres.yml<span class="w"> </span>up<span class="w"> </span>-d
 </code></pre></div>
 
-<p>If you have forgotten the password, set a new one with
-<code>docker compose exec web /opt/healthchecks/manage.py changepassword</code>.</p>
-<h2>uWSGI Configuration</h2>
-<p>The reference Dockerfile uses <a href="https://uwsgi-docs.readthedocs.io/en/latest/">uWSGI</a>
-as the WSGI server. You can configure uWSGI by setting <code>UWSGI_...</code> environment
-variables in <code>docker/.env</code>. For example, to adjust the number of uWSGI processes
-(to save memory, say), set:</p>
+</li>
+</ul>
+<p>The other commands on this page are written for SQLite. With PostgreSQL, put
+<code>-f docker-compose.yml -f docker-compose.postgres.yml</code> after <code>docker compose</code> in each
+of them: without the override, Docker Compose knows no <code>db</code> service and no PostgreSQL
+settings.</p>
+<h2 id="management-commands">Running Management Commands</h2>
+<p>Run a management command in the running <code>web</code> container:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>web<span class="w"> </span>./manage.py<span class="w"> </span>&lt;command&gt;
+</code></pre></div>
+
+<p>It runs as <code>hc</code>, in <code>/opt/healthchecks</code>, with the container's settings, and prints
+to your terminal, not to the container's log. Add <code>-T</code> to pipe input into it, for
+example a script for <code>manage.py shell</code>:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-T<span class="w"> </span>web<span class="w"> </span>./manage.py<span class="w"> </span>shell<span class="w"> </span>&lt;<span class="w"> </span>script.py
+</code></pre></div>
+
+<p>While <code>web</code> is stopped, run the command in a one-off container instead:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>--no-deps<span class="w"> </span>web<span class="w"> </span>./manage.py<span class="w"> </span>&lt;command&gt;
+</code></pre></div>
+
+<p>Without <code>--skip-checks</code>, a command prints the system checks' warnings first, such as
+the two SMTP warnings while <code>EMAIL_HOST</code> is unset. <code>manage.py dbshell</code> fails, since
+the image has no <code>sqlite3</code> or <code>psql</code> program: use Python's <code>sqlite3</code> module for
+SQLite, and <code>psql</code> in the <code>db</code> container for PostgreSQL.</p>
+<h2 id="processes">What Runs in the Container</h2>
+<p>The container's main process is uWSGI, configured by <code>docker/uwsgi.ini</code>. At every
+start it:</p>
+<ul>
+<li>runs <code>./manage.py migrate</code>, which applies new migrations and runs the system
+  checks; when either fails, uWSGI exits before it starts any worker, and the
+  compose file's restart policy starts the container again, in a loop, until the
+  cause is fixed;</li>
+<li>loads the web application and serves it on port 8000;</li>
+<li>starts <code>./manage.py sendalerts</code> and <code>./manage.py sendreports --loop</code> as daemons,
+  and starts either again when it exits;</li>
+<li>schedules <code>./manage.py prune</code> every day at 03:17 UTC (see
+  <a href="#housekeeping">Housekeeping</a>).</li>
+</ul>
+<p>The start of the container's log shows each of them, among uWSGI's other lines:</p>
+<div class="highlight"><pre><span></span><code>running "exec:./manage.py migrate" (asap)...
+  No migrations to apply.
+*** Starting uWSGI 2.0.31 (64bit) on [Sun Oct  4 20:05:03 2026] ***
+[uwsgi-cron] command "./manage.py prune --skip-checks" registered as cron task
+spawned uWSGI worker 1 (pid: 8, cores: 1)
+spawned uWSGI worker 2 (pid: 9, cores: 1)
+spawned uWSGI worker 3 (pid: 10, cores: 1)
+spawned uWSGI worker 4 (pid: 11, cores: 1)
+[uwsgi-daemons] spawning "./manage.py sendalerts --skip-checks" (uid: 100 gid: 101)
+[uwsgi-daemons] spawning "./manage.py sendreports --loop --skip-checks" (uid: 100 gid: 101)
+2026-10-04 20:05:06,036 INFO hc sendreports is now running
+2026-10-04 20:05:06,156 INFO hc sendalerts is now running
+</code></pre></div>
+
+<p><code>docker compose logs -f web</code> follows the log (see <a href="../self_hosted/#logs">Logs</a>).</p>
+<h3 id="uwsgi">uWSGI Configuration</h3>
+<p>You can configure uWSGI by setting <code>UWSGI_...</code> environment variables in <code>.env</code>. For
+example, to adjust the number of uWSGI processes (to save memory, say), set:</p>
 <div class="highlight"><pre><span></span><code>UWSGI_PROCESSES=2
 </code></pre></div>
 
@@ -95,82 +254,340 @@ variables in <code>docker/.env</code>. For example, to adjust the number of uWSG
 <li>uWSGI listens on <code>:8000</code> (IPv4). When <code>LISTEN_IPV6</code> is set, to any value, even
   <code>False</code>, it listens on <code>[::]:8000</code> instead.</li>
 <li>uWSGI kills a worker whose request runs longer than 10 seconds
-  (<code>harakiri = 10</code>).</li>
-<li>The image sets <code>USE_GZIP_MIDDLEWARE=True</code>.</li>
+  (<code>harakiri = 10</code>), and a <code>prune</code> run that runs longer than 1800 seconds.</li>
+<li>uWSGI refuses a request whose body is larger than 2,621,440 bytes (2.5 MiB)
+  before it reads the body, and closes the connection without an HTTP response
+  (<code>limit-post</code>; curl reports "Empty reply from server", exit code 52).
+  <code>UWSGI_LIMIT_POST</code> replaces that limit: with a
+  <a href="../self_hosted_configuration/#PING_BODY_LIMIT">PING_BODY_LIMIT</a> above 2,621,440,
+  set it to the same value.</li>
+<li>uWSGI treats a request with <code>X-Forwarded-Proto: https</code> as HTTPS, as Healthchecks
+  does by default (see
+  <a href="../self_hosted_configuration/#SECURE_PROXY_SSL_HEADER">SECURE_PROXY_SSL_HEADER</a>).</li>
+<li>The image sets <code>DEBUG=False</code> and <code>USE_GZIP_MIDDLEWARE=True</code>.</li>
 <li>The image's Docker <code>HEALTHCHECK</code> runs <code>fetchstatus.py</code>, which requests
-  <code>/api/v3/status/</code> on port 8000, under <code>SITE_ROOT</code>'s path, with <code>SITE_ROOT</code>'s host
-  as the <code>Host</code> header. <code>SITE_ROOT</code>'s host must therefore be in <code>ALLOWED_HOSTS</code>, or
-  the container reports unhealthy (and the <code>web</code> container never shows as healthy
-  in <code>docker compose ps</code>).</li>
+  <code>/api/v3/status/</code> on port 8000, over plain HTTP, under <code>SITE_ROOT</code>'s path, with
+  <code>SITE_ROOT</code>'s host as the <code>Host</code> header; it works with an <code>https://</code> <code>SITE_ROOT</code>
+  too. A <code>SITE_ROOT</code> host missing from <code>ALLOWED_HOSTS</code> stops the container before
+  that, with <code>hc.api.E002</code>.</li>
 </ul>
-<h2 id="sqlite">Running on SQLite</h2>
-<p>The image can also run on SQLite, without the <code>db</code> container:</p>
-<ul>
-<li>In <code>docker/.env</code>, set <code>DB=sqlite</code> (any value other than <code>postgres</code> selects
-  SQLite, which reads <code>DB_NAME</code> alone and ignores the other <code>DB_*</code> lines) and
-  <code>DB_NAME=/data/hc.sqlite</code>.
-  <code>/data</code> is the one directory in the image that its <code>hc</code> user can write to:
-  without <code>DB_NAME</code>, the database file would go under <code>/opt/healthchecks</code>, and the
-  migrations fail with "unable to open database file".</li>
-<li>In <code>docker-compose.yml</code>, remove the <code>db</code> service and the <code>web</code> service's
-  <code>depends_on</code>, and mount a named volume at <code>/data</code>, so the database outlives the
-  container:</li>
-</ul>
-<div class="highlight"><pre><span></span><code><span class="nt">volumes</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">hc-data</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{}</span>
+<h2 id="housekeeping">Housekeeping</h2>
+<p>uWSGI runs <code>./manage.py prune</code> every day at 03:17 UTC, in the same container. It
+deletes what each table keeps past its retention (see
+<a href="../self_hosted/#database-cleanup">Data Retention</a>) and, on SQLite, gives the freed
+pages back to the file system. A run is skipped while the previous one is still
+going; a run stops by itself after 900 seconds and leaves the rest to the next day.
+A run missed while the container was down is not made up.</p>
+<p>To check that it ran, look for its three lines in the container's log:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span>logs<span class="w"> </span>--timestamps<span class="w"> </span>web
+</code></pre></div>
 
-<span class="nt">services</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">web</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">build</span><span class="p">:</span>
-<span class="w">      </span><span class="nt">context</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">..</span>
-<span class="w">      </span><span class="nt">dockerfile</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">docker/Dockerfile</span>
-<span class="w">    </span><span class="nt">env_file</span><span class="p">:</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">.env</span>
-<span class="w">    </span><span class="nt">ports</span><span class="p">:</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">"8000:8000"</span>
+<p>A run logs the time it started, one summary line, and how long it took, for example:</p>
+<div class="highlight"><pre><span></span><code>Sun Oct  4 13:54:42 2026 - [uwsgi-cron] running "./manage.py prune --skip-checks" (pid 14)
+Deleted api_ping 833, api_notification 0, api_flip 0, api_tokenbucket 0, django_session 0, django_admin_log 0; freed 90 SQLite pages, 0 left free; checkpointed 841 of 841 WAL frames
+[uwsgi-cron] command "./manage.py prune --skip-checks" running with pid 14 exited after 3 second(s)
+</code></pre></div>
+
+<p>On SQLite, the run ends with a checkpoint, which moves the <code>-wal</code> file's frames into
+<code>hc.sqlite</code>, so the file shrinks by the pages the run freed; "checkpointed N of M"
+with N below M means another connection still needed some frames, and a later
+checkpoint moves them. On PostgreSQL the summary line ends after <code>django_admin_log</code>.</p>
+<p>uWSGI does not log the exit status: a run that fails prints a Python traceback in
+place of the summary line. A summary that ends with "reached the 900 s time limit"
+means the run left work for the next one.</p>
+<p>To run it now, by hand:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>web<span class="w"> </span>./manage.py<span class="w"> </span>prune<span class="w"> </span>--skip-checks
+</code></pre></div>
+
+<p>To watch the schedule itself work without waiting for 03:17, add this line to <code>.env</code>
+and run <code>docker compose up -d</code>:</p>
+<div class="highlight"><pre><span></span><code>UWSGI_CRON2="minute=-1,unique=1 ./manage.py prune --skip-checks"
+</code></pre></div>
+
+<p>The job then runs a few seconds after the start and every minute after that. Remove
+the line and run <code>docker compose up -d</code> again.</p>
+<h2 id="backups">Backups and Restore</h2>
+<p>Keep the backups off the Docker host, and try a restore once.</p>
+<h3>SQLite</h3>
+<p>Back up while the container runs: <code>VACUUM INTO</code> writes a consistent copy, the
+commits still in <code>hc.sqlite-wal</code> included, and only reads the live database.</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>web<span class="w"> </span>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">"import sqlite3; sqlite3.connect('/data/hc.sqlite').execute(\"VACUUM INTO '/tmp/hc-backup.sqlite'\")"</span>
+$<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span>cp<span class="w"> </span>web:/tmp/hc-backup.sqlite<span class="w"> </span>./hc-backup.sqlite
+</code></pre></div>
+
+<p><code>VACUUM INTO</code> refuses an existing target: for a second backup from the same
+container, remove <code>/tmp/hc-backup.sqlite</code> first. The copy keeps the database's
+auto-vacuum mode, and is a single file in SQLite's rollback-journal mode; the first
+connection after a restore switches it back to WAL mode.</p>
+<p>To restore, stop <code>web</code>, remove the <code>-wal</code> and <code>-shm</code> files, write the backup into
+the volume as the <code>hc</code> user, and start <code>web</code> again:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span>stop<span class="w"> </span>web
+$<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>--no-deps<span class="w"> </span>-T<span class="w"> </span>web<span class="w"> </span>sh<span class="w"> </span>-c<span class="w"> </span><span class="s1">'rm -f /data/hc.sqlite-wal /data/hc.sqlite-shm /data/hc.sqlite-journal &amp;&amp; cat &gt; /data/hc.sqlite.restore &amp;&amp; mv /data/hc.sqlite.restore /data/hc.sqlite'</span><span class="w"> </span>&lt;<span class="w"> </span>hc-backup.sqlite
+$<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span>start<span class="w"> </span>web
+</code></pre></div>
+
+<p><strong>Important:</strong> the <code>rm -f</code> is part of the restore. A killed container leaves its
+<code>-wal</code> and <code>-shm</code> files, and the next start applies that old <code>-wal</code> file to the
+restored <code>hc.sqlite</code>: the result is a corrupt database, and nothing reports it.</p>
+<p><strong>Important:</strong> <code>docker compose cp ./hc-backup.sqlite web:/data/hc.sqlite</code> alone
+leaves the <code>-wal</code> and <code>-shm</code> files in place, and the file owned by your host user. The
+container then starts, reports healthy and shows the restored data, but cannot write
+the file: every ping fails with 500 and the log shows "attempt to write a readonly
+database". After a <code>docker compose cp</code>, remove the two files and give the database
+to <code>hc</code> before you start <code>web</code>:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span>--no-deps<span class="w"> </span>--user<span class="w"> </span>root<span class="w"> </span>web<span class="w"> </span>sh<span class="w"> </span>-c<span class="w"> </span><span class="s1">'rm -f /data/hc.sqlite-wal /data/hc.sqlite-shm /data/hc.sqlite-journal &amp;&amp; chown hc:hc /data/hc.sqlite'</span>
+</code></pre></div>
+
+<p>Before <code>docker compose start web</code>, <code>docker compose run --rm --no-deps web ls -ln /data</code>
+should show <code>hc.sqlite</code> alone, with <code>100</code> and <code>101</code> as its owner and group.</p>
+<h3>PostgreSQL</h3>
+<p>Back up with <code>pg_dump</code> in the <code>db</code> container:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.yml<span class="w"> </span>-f<span class="w"> </span>docker-compose.postgres.yml<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-T<span class="w"> </span>db<span class="w"> </span>pg_dump<span class="w"> </span>-U<span class="w"> </span>postgres<span class="w"> </span>-Fc<span class="w"> </span>hc<span class="w"> </span>&gt;<span class="w"> </span>hc.dump
+</code></pre></div>
+
+<p>To restore, stop <code>web</code>, restore into the <code>hc</code> database, and start <code>web</code> again:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.yml<span class="w"> </span>-f<span class="w"> </span>docker-compose.postgres.yml<span class="w"> </span>stop<span class="w"> </span>web
+$<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.yml<span class="w"> </span>-f<span class="w"> </span>docker-compose.postgres.yml<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-T<span class="w"> </span>db<span class="w"> </span>pg_restore<span class="w"> </span>-U<span class="w"> </span>postgres<span class="w"> </span>-d<span class="w"> </span>hc<span class="w"> </span>--clean<span class="w"> </span>--if-exists<span class="w"> </span>--single-transaction<span class="w"> </span>&lt;<span class="w"> </span>hc.dump
+$<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker-compose.yml<span class="w"> </span>-f<span class="w"> </span>docker-compose.postgres.yml<span class="w"> </span>start<span class="w"> </span>web
+</code></pre></div>
+
+<h2 id="upgrading">Upgrading</h2>
+<p>A new release is a new image; the database stays in its volume.</p>
+<ul>
+<li>Read the release notes.</li>
+<li>Take a backup (see <a href="#backups">Backups and Restore</a>).</li>
+<li>
+<p>Set <code>HC_IMAGE</code> in <code>.env</code> to the new release, then pull it and recreate the
+  container:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span>pull
+$<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d
+</code></pre></div>
+
+</li>
+<li>
+<p>Wait until <code>docker compose ps</code> shows <code>web</code> as healthy: <code>migrate</code> applies the new
+  release's migrations at the start.</p>
+</li>
+</ul>
+<p>There is no way back across a migration other than restoring the backup taken
+before the upgrade, with the old image.</p>
+<h2 id="upgrading-postgresql">Upgrading PostgreSQL</h2>
+<p>When you move the <code>db</code> service to a new PostgreSQL major version in
+<code>docker-compose.postgres.yml</code> (for example, from <code>postgres:16</code> to <code>postgres:18</code>), you
+will also need to upgrade your postgres data directory. One way to do this is using
+the <a href="https://hub.docker.com/r/pgautoupgrade/pgautoupgrade">pgautoupgrade</a> container.</p>
+<p>Steps:</p>
+<ul>
+<li>As the very first step, <strong>take a full backup of your database</strong>, for example:
+  <code>docker compose -f docker-compose.yml -f docker-compose.postgres.yml exec -T db pg_dumpall -U postgres &gt; healthchecks-backup.sql</code></li>
+<li>Stop the <code>db</code> and <code>web</code> containers:
+  <code>docker compose -f docker-compose.yml -f docker-compose.postgres.yml stop</code></li>
+<li>Look up the name of the postgres data volume using <code>docker volume ls</code></li>
+<li>Run <code>pgautoupgrade</code> like so (with the old <code>/var/lib/postgresql/data</code> mount target
+  it exits without upgrading anything):</li>
+</ul>
+<div class="highlight"><pre><span></span><code><span class="n">docker</span><span class="w"> </span><span class="n">run</span><span class="w"> </span><span class="o">--</span><span class="n">rm</span><span class="w"> </span><span class="o">--</span><span class="n">name</span><span class="w"> </span><span class="n">pgauto</span><span class="w"> </span><span class="o">-</span><span class="n">it</span><span class="w"> </span>\
+<span class="w">   </span><span class="o">--</span><span class="n">mount</span><span class="w"> </span><span class="n">type</span><span class="o">=</span><span class="n">volume</span><span class="p">,</span><span class="n">source</span><span class="o">=&lt;</span><span class="n">pg</span><span class="o">-</span><span class="n">volume</span><span class="o">-</span><span class="n">name</span><span class="o">-</span><span class="n">here</span><span class="o">&gt;</span><span class="p">,</span><span class="n">target</span><span class="o">=/</span><span class="k">var</span><span class="o">/</span><span class="n">lib</span><span class="o">/</span><span class="n">postgresql</span><span class="w"> </span>\
+<span class="w">   </span><span class="o">-</span><span class="n">e</span><span class="w"> </span><span class="n">POSTGRES_PASSWORD</span><span class="o">=</span><span class="n">password</span><span class="w"> </span>\
+<span class="w">   </span><span class="o">-</span><span class="n">e</span><span class="w"> </span><span class="n">PGAUTO_ONESHOT</span><span class="o">=</span><span class="n">yes</span><span class="w"> </span>\
+<span class="w">   </span><span class="n">pgautoupgrade</span><span class="o">/</span><span class="n">pgautoupgrade</span><span class="p">:</span><span class="mi">18</span><span class="o">-</span><span class="n">trixie</span>
+</code></pre></div>
+
+<ul>
+<li>Update the <code>db</code> service in <code>docker-compose.postgres.yml</code> to the new image. From
+  <code>postgres:18</code> on, the data volume is mounted at <code>/var/lib/postgresql</code>, as the file
+  does (with the old mount target, <code>/var/lib/postgresql/data</code>, <code>postgres:18</code> exits
+  with an error that starts
+  <code>Error: in 18+, these Docker images are configured to store database data</code>):</li>
+</ul>
+<div class="highlight"><pre><span></span><code><span class="nt">services</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">db</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres:18</span>
 <span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hc-data:/data</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">db-data:/var/lib/postgresql</span>
 </code></pre></div>
 
-<p>A new named volume takes its owner from the image's <code>/data</code>, so the <code>hc</code> user can
-write to it; a host directory mounted there instead must be writable by user ID 100.</p>
-<h2 id="tls-termination">Reverse Proxy, TLS Termination, and CSRF Protection</h2>
-<p>If you plan to expose your Healthchecks instance to the public internet, make sure you
-put a TLS-terminating reverse proxy or a load balancer in front of it.</p>
-<p><strong>Important:</strong> configure the reverse proxy to replace the <code>X-Forwarded-For</code> request
-header with the client's address. Healthchecks trusts it to determine the client's
-IP address, and takes the first address in it, so appending to a value the client
-sent is not enough. In NGINX:</p>
-<div class="highlight"><pre><span></span><code>proxy_set_header X-Forwarded-For $remote_addr;
-</code></pre></div>
-
-<p>(not <code>$proxy_add_x_forwarded_for</code>, which appends). In HAProxy:</p>
-<div class="highlight"><pre><span></span><code>http-request set-header X-Forwarded-For %[src]
-</code></pre></div>
-
-<p>Otherwise a client can choose the IP address Healthchecks records for its pings,
-and can dodge the per-IP limit on login link requests from a new browser.
-Password attempts are limited per email address, not per IP address.</p>
-<p><strong>Important:</strong> This Dockerfile uses uWSGI, which relies on the <a href="https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Forwarded-Proto">X-Forwarded-Proto</a>
-header to determine if a request is secure or not. Without this information you
-may run into HTTP 403 "CSRF verification failed." errors when using your Healthchecks
-instance. See <a href="https://github.com/healthchecks/healthchecks/discussions/851#discussioncomment-6293396">this issue comment</a>
-for more information.</p>
-<p>Make sure your TLS-terminating reverse proxy:</p>
 <ul>
-<li>Discards the <code>X-Forwarded-Proto</code> header sent by the end user.</li>
-<li>Sets the <code>X-Forwarded-Proto</code> header value to match the protocol of the original request
-  ("http" or "https").</li>
+<li>Start containers:
+  <code>docker compose -f docker-compose.yml -f docker-compose.postgres.yml up -d</code></li>
+<li>If the <code>db</code> container logs a warning that a database <code>has a collation version mismatch</code>,
+  the database was created by a <code>postgres</code> image built on an older Debian release
+  (such as bookworm). <code>pgautoupgrade</code> has already reindexed every database, so record
+  the new collation version:</li>
 </ul>
-<p>For example, in NGINX you can use the <code>$scheme</code> variable like so:</p>
-<div class="highlight"><pre><span></span><code>proxy_set_header X-Forwarded-Proto $scheme;
+<div class="highlight"><pre><span></span><code>echo "SELECT format('ALTER DATABASE %I REFRESH COLLATION VERSION', datname) FROM pg_database WHERE datallowconn \gexec" | docker compose -f docker-compose.yml -f docker-compose.postgres.yml exec -T db psql -U postgres
 </code></pre></div>
 
-<p>If you are using haproxy, you can do the same like so:</p>
-<div class="highlight"><pre><span></span><code>http-request set-header X-Forwarded-Proto https if { ssl_fc }
+<h2 id="tls-termination">Reverse Proxy and TLS</h2>
+<p>The container serves plain HTTP on <code>127.0.0.1:8000</code>. Expose Healthchecks to the
+internet only through a reverse proxy that terminates TLS and that:</p>
+<ul>
+<li>passes the <code>Host</code> header unchanged: Healthchecks answers 400 to a host that is not
+  in <a href="../self_hosted_configuration/#ALLOWED_HOSTS">ALLOWED_HOSTS</a>;</li>
+<li>sets <code>X-Forwarded-Proto</code> to the scheme the client used, replacing any value the
+  client sent: Healthchecks trusts it to tell an HTTPS request (see
+  <a href="../self_hosted_configuration/#SECURE_PROXY_SSL_HEADER">SECURE_PROXY_SSL_HEADER</a>),
+  for the scheme it records with each ping, for HSTS, and for Django's CSRF checks;</li>
+<li>sets or appends to <code>X-Forwarded-For</code> the client's address: Healthchecks takes the
+  client's address from it, as <a href="#trusted-proxy-hops">TRUSTED_PROXY_HOPS</a> describes.</li>
+</ul>
+<p>Caddy does all three by default.</p>
+<h3 id="caddy">Caddy</h3>
+<p>On Debian 13, install Caddy from Debian's own repository. The package runs Caddy
+under systemd as the <code>caddy</code> user, and keeps the certificates in that user's home,
+<code>/var/lib/caddy</code>:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>caddy
+</code></pre></div>
+
+<p>Replace the package's <code>/etc/caddy/Caddyfile</code>, which serves a placeholder page on port
+80, with one site block that names your <code>SITE_ROOT</code> host and forwards to the
+container:</p>
+<div class="highlight"><pre><span></span><code>hc.example.org {
+    reverse_proxy 127.0.0.1:8000
+}
+</code></pre></div>
+
+<p>Check the file, and reload Caddy:</p>
+<div class="highlight"><pre><span></span><code><span class="o">$</span><span class="w"> </span><span class="n">sudo</span><span class="w"> </span><span class="n">caddy</span><span class="w"> </span><span class="n">validate</span><span class="w"> </span><span class="o">--</span><span class="n">config</span><span class="w"> </span><span class="o">/</span><span class="n">etc</span><span class="o">/</span><span class="n">caddy</span><span class="o">/</span><span class="n">Caddyfile</span>
+<span class="o">$</span><span class="w"> </span><span class="n">sudo</span><span class="w"> </span><span class="n">systemctl</span><span class="w"> </span><span class="n">reload</span><span class="w"> </span><span class="n">caddy</span>
+</code></pre></div>
+
+<p>With this, Caddy:</p>
+<ul>
+<li>listens on TCP ports 80 and 443 on every IPv4 and IPv6 address of the host, and on
+  UDP port 443 for HTTP/3;</li>
+<li>gets a public certificate for the name, which needs the name's <code>A</code> and <code>AAAA</code> DNS
+  records to point at the host, and ports 80 and 443 to be reachable: keep port 80
+  open beside 443, for the certificate authority's challenge and for the redirect;</li>
+<li>answers every plain-HTTP request with a 308 redirect to HTTPS, ping URLs included
+  (see <a href="#http-pings">Pings over Plain HTTP</a>);</li>
+<li>passes <code>Host</code> unchanged, and replaces <code>X-Forwarded-For</code>, <code>X-Forwarded-Proto</code> and
+  <code>X-Forwarded-Host</code> with what it saw: one address, the client's, IPv4 or IPv6, and
+  <code>https</code>. A client that forges these headers changes nothing Healthchecks records,
+  and <a href="#trusted-proxy-hops">TRUSTED_PROXY_HOPS</a> stays at its default, <code>1</code>;</li>
+<li>adds no <code>Strict-Transport-Security</code> header (see <a href="#hsts">HSTS</a>).</li>
+</ul>
+<h3 id="http-pings">Pings over Plain HTTP</h3>
+<p>Behind Caddy, give your jobs <code>https://</code> ping URLs. With an <code>https://</code> <code>SITE_ROOT</code>,
+<code>PING_ENDPOINT</code>, and so every ping URL Healthchecks shows, is one already. An
+<code>http://</code> ping URL gets Caddy's 308 redirect, which <code>curl -fsS</code> takes for success: it
+exits with 0, prints nothing, and the ping is not recorded, <code>--retry</code> or not. With
+<code>-L</code>, curl follows the redirect, keeps the method and the body, and the ping is
+recorded.</p>
+<p>Healthchecks itself never redirects to HTTPS: <code>SECURE_SSL_REDIRECT</code> stays off, so
+pings and the image's health check work over plain HTTP wherever the proxy lets them
+through. The redirect to HTTPS belongs at the proxy, and is for the console: if you
+have jobs that ping over plain HTTP and that you cannot change, keep <code>/ping/</code> out of
+it. In Caddy, add this block to the Caddyfile, which forwards <code>/ping/</code> over plain
+HTTP and redirects every other path:</p>
+<div class="highlight"><pre><span></span><code>http://hc.example.org {
+    handle /ping/* {
+        reverse_proxy 127.0.0.1:8000
+    }
+    handle {
+        redir https://{host}{uri} 308
+    }
+}
+</code></pre></div>
+
+<p>Such pings are recorded with the scheme <code>http</code>; Caddy still replaces a forged
+<code>X-Forwarded-Proto: https</code>. With a path in <code>SITE_ROOT</code>, the ping path is
+<code>/&lt;path&gt;/ping/*</code>.</p>
+<h3 id="trusted-proxy-hops">TRUSTED_PROXY_HOPS</h3>
+<p>Healthchecks records each ping's client address, and limits login attempts per
+client address (see <a href="../self_hosted/#login-lockout">Login Lockout</a>). It reads the
+address from <code>X-Forwarded-For</code> as
+<a href="../self_hosted_configuration/#TRUSTED_PROXY_HOPS">TRUSTED_PROXY_HOPS</a> describes;
+the default, <code>1</code>, fits one proxy such as Caddy or NGINX, which may append to the
+header as well as replace it. Behind a second proxy, such as a CDN, Caddy replaces
+the header, and so does not append, unless the outer proxy's addresses are in its
+<code>trusted_proxies</code> option.</p>
+<p>Whatever reaches port 8000 without passing the proxy chooses its own address: with
+the compose file's <code>127.0.0.1</code> binding, that is any process on the Docker host.</p>
+<h3 id="nginx">NGINX</h3>
+<p>NGINX needs the three headers set in the <code>location</code> that forwards to the container:</p>
+<div class="highlight"><pre><span></span><code>proxy_pass http://127.0.0.1:8000;
+proxy_set_header Host $host;
+proxy_set_header X-Forwarded-For $remote_addr;
+proxy_set_header X-Forwarded-Proto $scheme;
+</code></pre></div>
+
+<p><code>$proxy_add_x_forwarded_for</code>, which appends, works with <code>TRUSTED_PROXY_HOPS=1</code> too.
+On port 80, forward <code>location /ping/</code> the same way, and answer every other path with
+<code>return 308 https://$host$request_uri;</code>.</p>
+<p>In HAProxy:</p>
+<div class="highlight"><pre><span></span><code>http-request set-header X-Forwarded-For %[src]
+http-request set-header X-Forwarded-Proto https if { ssl_fc }
 http-request set-header X-Forwarded-Proto http unless { ssl_fc }
 </code></pre></div>
 
+<h3 id="hsts">HSTS and the Content Security Policy</h3>
+<p>HSTS, the <code>Strict-Transport-Security</code> response header, makes a browser use only HTTPS
+for the host. Neither Caddy nor Healthchecks sends it by default; once HTTPS works,
+turn it on with
+<a href="../self_hosted_configuration/#SECURE_HSTS_SECONDS">SECURE_HSTS_SECONDS</a>. It changes
+nothing for your jobs' pings: curl keeps no HSTS list unless it runs with <code>--hsts</code>,
+and a client that keeps one only moves its pings to HTTPS.</p>
+<p>Every page carries an enforced <code>Content-Security-Policy</code>, so the proxy needs to
+add none. If you customise a template, an inline <code>&lt;script&gt;</code> or <code>&lt;style&gt;</code> element
+needs <code>{% csp_nonce_attr %}</code> in its tag, and a <code>style</code> attribute or an inline event
+handler such as <code>onclick</code> has to move to a static file: the browser blocks them
+otherwise.</p>
+<h2 id="debian-vps">Example: Debian 13 on a VPS</h2>
+<p>One host, such as a Linode node with Debian 13, runs the image on SQLite under Docker
+Compose; Caddy, from Debian's package, terminates TLS on port 443 over IPv4 and IPv6
+and forwards to the container on <code>127.0.0.1:8000</code>; email goes out through Amazon SES.
+The host steps marked <em>(not tested here)</em> were not verified with this setup: follow
+their own documentation where it differs.</p>
+<ul>
+<li><strong>DNS</strong> <em>(not tested here)</em>: point the <code>A</code> and <code>AAAA</code> records of the name, here
+  <code>hc.example.org</code>, at the host's IPv4 and IPv6 addresses. Caddy needs them for the
+  certificate.</li>
+<li><strong>Firewall</strong> <em>(not tested here)</em>: allow inbound TCP 80 and 443, and UDP 443 for
+  HTTP/3, over IPv4 and IPv6, besides SSH. Port 8000 needs no rule: the compose file
+  publishes it on <code>127.0.0.1</code> only.</li>
+<li><strong>Docker</strong> <em>(not tested here)</em>: install Docker Engine and its Compose plugin from
+  Docker's own apt repository, as
+  <a href="https://docs.docker.com/engine/install/debian/">Docker's guide for Debian</a>
+  describes.</li>
+<li>
+<p><strong>Healthchecks</strong>: in a directory such as <code>/srv/healthchecks</code>, put
+  <code>docker-compose.yml</code> and <code>.env.example</code> from the repository's <code>docker/</code> directory,
+  copy <code>.env.example</code> to <code>.env</code>, and set in it:</p>
+<div class="highlight"><pre><span></span><code><span class="n">HC_IMAGE</span><span class="o">=</span><span class="n">ghcr</span><span class="o">.</span><span class="n">io</span><span class="o">/</span><span class="n">zhaow</span><span class="o">-</span><span class="n">de</span><span class="o">/</span><span class="n">healthchecks</span><span class="p">:</span><span class="n">vX</span><span class="o">.</span><span class="n">Y</span><span class="o">.</span><span class="n">Z</span>
+<span class="n">SECRET_KEY</span><span class="o">=&lt;</span><span class="n">the</span> <span class="n">output</span> <span class="n">of</span><span class="p">:</span> <span class="n">python3</span> <span class="o">-</span><span class="n">c</span> <span class="s1">'import secrets; print(secrets.token_urlsafe(50))'</span><span class="o">&gt;</span>
+<span class="n">SITE_ROOT</span><span class="o">=</span><span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">hc</span><span class="o">.</span><span class="n">example</span><span class="o">.</span><span class="n">org</span>
+</code></pre></div>
+
+<p>Delete the <code>ALLOWED_HOSTS</code> and <code>PING_ENDPOINT</code> lines, so that both follow
+<code>SITE_ROOT</code>, and set the email settings of
+<a href="../self_hosted/#ses">Example: Amazon SES</a>. <code>TRUSTED_PROXY_HOPS=1</code> and the default
+<code>SECURE_PROXY_SSL_HEADER</code> fit Caddy. Start the container, which waits until it is
+healthy, and create the superuser:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span>up<span class="w"> </span>-d<span class="w"> </span>--wait
+$<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>web<span class="w"> </span>./manage.py<span class="w"> </span>createsuperuser
+</code></pre></div>
+
+</li>
+<li>
+<p><strong>Caddy</strong>: install it, put the site block of <a href="#caddy">Caddy</a> with your name in
+  <code>/etc/caddy/Caddyfile</code>, check it, and reload (<em>systemd's reload not tested here</em>):</p>
+<div class="highlight"><pre><span></span><code><span class="o">$</span><span class="w"> </span><span class="n">sudo</span><span class="w"> </span><span class="n">apt</span><span class="w"> </span><span class="n">install</span><span class="w"> </span><span class="n">caddy</span>
+<span class="o">$</span><span class="w"> </span><span class="n">sudo</span><span class="w"> </span><span class="n">caddy</span><span class="w"> </span><span class="n">validate</span><span class="w"> </span><span class="o">--</span><span class="n">config</span><span class="w"> </span><span class="o">/</span><span class="n">etc</span><span class="o">/</span><span class="n">caddy</span><span class="o">/</span><span class="n">Caddyfile</span>
+<span class="o">$</span><span class="w"> </span><span class="n">sudo</span><span class="w"> </span><span class="n">systemctl</span><span class="w"> </span><span class="n">reload</span><span class="w"> </span><span class="n">caddy</span>
+</code></pre></div>
+
+</li>
+<li>
+<p><strong>Check</strong> <em>(the public certificate not tested here)</em>: open
+  <code>https://hc.example.org</code>, log in, and ping "My First Check" with the URL its
+  details page shows:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>curl<span class="w"> </span>-fsS<span class="w"> </span>https://hc.example.org/ping/&lt;uuid&gt;
+OK
+</code></pre></div>
+
+</li>
+</ul>
 <h2>Making Healthchecks Trust Your Self-signed TLS Certificate</h2>
 <p>If you configure Healthchecks to deliver notifications to a server that uses
 a self-signed TLS certificate, you may see a "TLS handshake failed" error
@@ -182,9 +599,10 @@ It is possible to turn off certificate validation, but doing so is
 <p>To make curl accept a self-hosted certificate, add your self-signed certificate to
 the Healthchecks container's trust store.</p>
 <p>First, mount the certificate inside the container running the healthchecks
-web application. In <code>docker-compose.yml</code>, add the following in the <code>web:</code> section:</p>
-<div class="highlight"><pre><span></span><code><span class="nt">volumes</span><span class="p">:</span>
-<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/cert.pem:/usr/local/share/ca-certificates/my-selfsigned-cert.crt:ro</span>
+web application. In <code>docker-compose.yml</code>, add it to the <code>web</code> service's <code>volumes</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hc-data:/data</span>
+<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/cert.pem:/usr/local/share/ca-certificates/my-selfsigned-cert.crt:ro</span>
 </code></pre></div>
 
 <p>Note: <code>/path/to/cert.pem</code> must be <strong>an absolute path</strong> in the host system pointing
@@ -201,77 +619,13 @@ to <code>.env</code> or <code>docker-compose.yml</code>, an image update, or <co
 <p>If the server's address is private (127.0.0.1, 192.168.x.x, ...), also set
 <a href="../self_hosted_configuration/#INTEGRATIONS_ALLOW_PRIVATE_IPS">INTEGRATIONS_ALLOW_PRIVATE_IPS</a>
 to <code>True</code>; otherwise the request is refused before the certificate is checked.</p>
-<h2>Upgrading Database</h2>
-<p>When you upgrade the database version in <code>docker-compose.yml</code> (for example,
-from <code>postgres:16</code> to <code>postgres:18</code>), you will also need to upgrade your postgres
-data directory. One way to do this is using the
-<a href="https://hub.docker.com/r/pgautoupgrade/pgautoupgrade">pgautoupgrade</a> container.</p>
-<p>Steps:</p>
-<ul>
-<li>As the very first step, <strong>take a full backup of your database</strong>, for example:
-  <code>docker compose exec -T db pg_dumpall -U postgres &gt; healthchecks-backup.sql</code></li>
-<li>Stop the <code>db</code> and <code>web</code> containers: <code>docker compose stop</code></li>
-<li>Look up the name of the postgres data volume using <code>docker volume ls</code></li>
-<li>Run <code>pgautoupgrade</code> like so (with the old <code>/var/lib/postgresql/data</code> mount target
-  it exits without upgrading anything):</li>
-</ul>
-<div class="highlight"><pre><span></span><code><span class="n">docker</span><span class="w"> </span><span class="n">run</span><span class="w"> </span><span class="o">--</span><span class="n">rm</span><span class="w"> </span><span class="o">--</span><span class="n">name</span><span class="w"> </span><span class="n">pgauto</span><span class="w"> </span><span class="o">-</span><span class="n">it</span><span class="w"> </span>\
-<span class="w">   </span><span class="o">--</span><span class="n">mount</span><span class="w"> </span><span class="n">type</span><span class="o">=</span><span class="n">volume</span><span class="p">,</span><span class="n">source</span><span class="o">=&lt;</span><span class="n">pg</span><span class="o">-</span><span class="n">volume</span><span class="o">-</span><span class="n">name</span><span class="o">-</span><span class="n">here</span><span class="o">&gt;</span><span class="p">,</span><span class="n">target</span><span class="o">=/</span><span class="k">var</span><span class="o">/</span><span class="n">lib</span><span class="o">/</span><span class="n">postgresql</span><span class="w"> </span>\
-<span class="w">   </span><span class="o">-</span><span class="n">e</span><span class="w"> </span><span class="n">POSTGRES_PASSWORD</span><span class="o">=</span><span class="n">password</span><span class="w"> </span>\
-<span class="w">   </span><span class="o">-</span><span class="n">e</span><span class="w"> </span><span class="n">PGAUTO_ONESHOT</span><span class="o">=</span><span class="n">yes</span><span class="w"> </span>\
-<span class="w">   </span><span class="n">pgautoupgrade</span><span class="o">/</span><span class="n">pgautoupgrade</span><span class="p">:</span><span class="mi">18</span><span class="o">-</span><span class="n">trixie</span>
+<h2 id="building">Building the Image Yourself</h2>
+<p>To run an image of your own checkout, build it from the root of the checkout:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>docker<span class="w"> </span>build<span class="w"> </span>-t<span class="w"> </span>hc:local<span class="w"> </span>-f<span class="w"> </span>docker/Dockerfile<span class="w"> </span>.
 </code></pre></div>
 
-<ul>
-<li>Update the <code>docker-compose.yml</code> file to use the <code>postgres:18</code> image and to mount
-  the data volume at <code>/var/lib/postgresql</code> (with the old mount target, <code>postgres:18</code>
-  exits with an error that starts
-  <code>Error: in 18+, these Docker images are configured to store database data</code>):</li>
-</ul>
-<div class="highlight"><pre><span></span><code><span class="nt">services</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">db</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres:18</span>
-<span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
-<span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">db-data:/var/lib/postgresql</span>
-</code></pre></div>
-
-<ul>
-<li>Start containers: <code>docker compose up -d</code></li>
-<li>If the <code>db</code> container logs a warning that a database <code>has a collation version mismatch</code>,
-  the database was created by a <code>postgres</code> image built on an older Debian release
-  (such as bookworm). <code>pgautoupgrade</code> has already reindexed every database, so record
-  the new collation version:</li>
-</ul>
-<div class="highlight"><pre><span></span><code>echo "SELECT format('ALTER DATABASE %I REFRESH COLLATION VERSION', datname) FROM pg_database WHERE datallowconn \gexec" | docker compose exec -T db psql -U postgres
-</code></pre></div>
-
-<h2>Pre-built Images</h2>
-<p>Pre-built Docker images are available
-<a href="https://github.com/zhaow-de/healthchecks/pkgs/container/healthchecks">on the GitHub Container Registry</a>
-as <code>ghcr.io/zhaow-de/healthchecks</code>. They are published from the Dockerfile in the
-<code>/docker/</code> directory: every release as <code>vX.Y.Z</code>, every build of the <code>develop</code> and <code>main</code>
-branches as its full 40-character commit SHA, and the newest build of <code>main</code> as
-<code>latest</code>. The release and <code>latest</code> tags start with the first release after v4.5.0,
-which predates the image workflow; until then the registry holds only commit-SHA tags
-of <code>develop</code> builds, and the <code>latest</code> line commented out in <code>docker-compose.yml</code>
-cannot be pulled.</p>
-<p>The Docker images built from the Dockerfile in the <code>/docker/</code> directory:</p>
-<ul>
-<li>Support the amd64 architecture only.</li>
-<li>Use uWSGI as the web server. uWSGI is configured to perform database migrations
-  on startup, and to run <code>sendalerts</code> and <code>sendreports</code> in the background.
-  You do not need to run them separately.</li>
-<li>Ship with the PostgreSQL database driver.</li>
-<li>Serve static files using the whitenoise library.</li>
-<li>Do <em>not</em> handle TLS termination. In a production setup, you will want to put
-  the Healthchecks container behind a reverse proxy or load balancer that handles TLS
-  termination.</li>
-</ul>
-<p>To use a pre-built image for Healthchecks version X.Y.Z, in the <code>docker-compose.yml</code> file
-replace the "build" section with:</p>
-<div class="highlight"><pre><span></span><code>image: ghcr.io/zhaow-de/healthchecks:vX.Y.Z
-</code></pre></div>
-
-<p>For a build of a commit, use its full commit SHA as the tag:</p>
-<div class="highlight"><pre><span></span><code>image: ghcr.io/zhaow-de/healthchecks:&lt;commit-sha&gt;
-</code></pre></div>
+<p>Then set <code>HC_IMAGE=hc:local</code> in <code>.env</code> and run <code>docker compose up -d</code>. The build
+compiles uWSGI, pycurl and the PostgreSQL driver, so the first one takes a while.</p>
+<p>Alternatively, replace <code>image:</code> in <code>docker-compose.yml</code> with the <code>build:</code> section its
+comment shows, and run <code>docker compose up -d --build</code> after each change to the
+checkout.</p>

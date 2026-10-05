@@ -3,12 +3,13 @@ import logging
 import os
 import subprocess
 import sys
+from unittest.mock import patch
 
 from django.conf import settings
 from django.core import mail
 from django.test.utils import override_settings
 
-from hc.logs.models import Record
+from hc.api.tests.test_database import settings_module
 from hc.test import BaseTestCase
 
 # Runs outside the test run, where the console handler is not replaced
@@ -26,6 +27,7 @@ logging.getLogger("django").debug("debug line")
 logging.getLogger("django").info("Hello %s", "World")
 logging.getLogger("hc").debug("debug line")
 logging.getLogger("hc").info("Sending")
+logging.getLogger("hc").warning("Retrying")
 logging.getLogger("concurrent.futures").info("info line")
 logging.getLogger("concurrent.futures").warning("Careful")
 """
@@ -50,39 +52,33 @@ def run_script(log_format: str | None = None) -> subprocess.CompletedProcess[str
 
 
 class LoggingConfigTestCase(BaseTestCase):
-    def test_hc_logs_info_to_console_and_warnings_to_db(self) -> None:
+    def test_hc_logs_info_to_console_alone(self) -> None:
         self.assertEqual(
             settings.LOGGING["loggers"]["hc"],
-            {"level": "INFO", "handlers": ["console", "db"], "propagate": False},
+            {"level": "INFO", "handlers": ["console"], "propagate": False},
         )
 
         logger = logging.getLogger("hc")
         self.assertTrue(logger.isEnabledFor(logging.INFO))
         self.assertFalse(logger.isEnabledFor(logging.DEBUG))
 
-        # Only problems should reach the database
-        logging.getLogger("hc.test").info("Sent monthly report")
-        self.assertFalse(Record.objects.exists())
-        logging.getLogger("hc.test").warning("Careful")
-        self.assertEqual(Record.objects.get().message, "Careful")
-
     def test_django_request_logs_errors_only(self) -> None:
         self.assertEqual(
             settings.LOGGING["loggers"]["django.request"],
-            {"level": "ERROR", "handlers": ["console", "db", "mail_admins"], "propagate": False},
+            {"level": "ERROR", "handlers": ["console", "mail_admins"], "propagate": False},
         )
 
     @override_settings(ADMINS=["admin@example.org"])
     def test_django_errors_reach_admins_unless_debug(self) -> None:
-        logger = logging.getLogger("django.security.DisallowedHost")
+        logger = logging.getLogger("django.security.SuspiciousOperation")
         with override_settings(DEBUG=True):
-            logger.error("Invalid HTTP_HOST header")
+            logger.error("Suspicious operation")
         self.assertEqual(len(mail.outbox), 0)
 
-        logger.warning("Forbidden (CSRF cookie not set.)")
+        logger.warning("Suspicious operation")
         self.assertEqual(len(mail.outbox), 0)
 
-        logger.error("Invalid HTTP_HOST header")
+        logger.error("Suspicious operation")
         self.assertEqual([m.to for m in mail.outbox], [["admin@example.org"]])
 
     def test_django_server_is_silent(self) -> None:
@@ -98,9 +94,19 @@ class LoggingConfigTestCase(BaseTestCase):
         ts = r"\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3}"
         self.assertRegex(
             result.stdout,
-            rf"\A{ts} INFO django Hello World\n{ts} INFO hc Sending\n{ts} WARNING concurrent.futures Careful\n\Z",
+            rf"\A{ts} INFO django Hello World\n{ts} INFO hc Sending\n{ts} WARNING hc Retrying\n"
+            rf"{ts} WARNING concurrent.futures Careful\n\Z",
         )
         self.assertEqual(result.stderr, "")
+
+    def test_a_log_format_in_local_settings_reaches_the_console_handler(self) -> None:
+        # As outside a test run, where the console handler is not replaced
+        with patch.object(sys, "argv", ["manage.py"]), patch.dict(sys.modules):
+            sys.modules.pop("pytest", None)
+            module = settings_module({"LOG_FORMAT": " JSON "}, LOG_FORMAT="text")
+            kept = settings_module({"LOG_FORMAT": "json", "LOGGING": {"version": 1}})
+        self.assertEqual(module.LOGGING["handlers"]["console"]["formatter"], "json")
+        self.assertEqual(kept.LOGGING, {"version": 1})
 
     def test_console_writes_json(self) -> None:
         # The value should be read case-insensitively, without the whitespace
@@ -114,6 +120,7 @@ class LoggingConfigTestCase(BaseTestCase):
                     [
                         ("INFO", "django", "Hello World"),
                         ("INFO", "hc", "Sending"),
+                        ("WARNING", "hc", "Retrying"),
                         ("WARNING", "concurrent.futures", "Careful"),
                     ],
                 )

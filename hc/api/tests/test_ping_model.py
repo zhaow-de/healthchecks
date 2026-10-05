@@ -15,17 +15,25 @@ class PingModelTestCase(BaseTestCase):
         self.check = Check.objects.create(project=self.project)
 
     def test_it_calculates_duration(self) -> None:
-        Ping.objects.create(owner=self.check, created=EPOCH, kind="start")
+        Ping.objects.create(owner=self.check, n=1, created=EPOCH, kind="start")
 
-        p2 = Ping.objects.create(owner=self.check, created=EPOCH + td(minutes=5))
+        p2 = Ping.objects.create(owner=self.check, n=2, created=EPOCH + td(minutes=5))
+        assert p2.duration
+        self.assertEqual(p2.duration.total_seconds(), 300)
+
+    def test_it_looks_back_by_n(self) -> None:
+        # The start event has the higher id, the lower n
+        p2 = Ping.objects.create(owner=self.check, n=2, created=EPOCH + td(minutes=5))
+        Ping.objects.create(owner=self.check, n=1, created=EPOCH, kind="start")
+
         assert p2.duration
         self.assertEqual(p2.duration.total_seconds(), 300)
 
     def test_it_handles_no_adjacent_start_event(self) -> None:
-        Ping.objects.create(owner=self.check, created=EPOCH, kind="start")
-        Ping.objects.create(owner=self.check, created=EPOCH + td(minutes=5))
+        Ping.objects.create(owner=self.check, n=1, created=EPOCH, kind="start")
+        Ping.objects.create(owner=self.check, n=2, created=EPOCH + td(minutes=5))
 
-        p3 = Ping.objects.create(owner=self.check, created=EPOCH + td(minutes=10))
+        p3 = Ping.objects.create(owner=self.check, n=3, created=EPOCH + td(minutes=10))
         self.assertIsNone(p3.duration)
 
     def test_it_runs_no_queries_for_the_first_ping(self) -> None:

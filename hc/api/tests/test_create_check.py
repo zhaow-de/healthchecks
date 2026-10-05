@@ -1,5 +1,7 @@
 from datetime import timedelta as td
 
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.utils.timezone import now
 
 from hc.api.models import Channel, Check
@@ -188,6 +190,21 @@ class CreateCheckTestCase(BaseTestCase):
         check.refresh_from_db()
         self.assertEqual(check.tags, "bar")
 
+    def test_it_reads_the_unique_check_once_under_the_lock(self) -> None:
+        Check.objects.create(project=self.project, name="Foo")
+
+        with CaptureQueriesContext(connection) as ctx:
+            r = self.post({"name": "Foo", "tags": "bar", "unique": ["name"]})
+        self.assertEqual(r.status_code, 200)
+
+        sqls = [q["sql"] for q in ctx.captured_queries]
+        # The view's transaction, a savepoint inside the test's own
+        savepoint = next(i for i, sql in enumerate(sqls) if sql.startswith("SAVEPOINT"))
+        (read,) = [i for i, sql in enumerate(sqls) if sql.startswith("SELECT") and 'FROM "api_check"' in sql]
+        self.assertGreater(read, savepoint)
+        if connection.features.has_select_for_update_of:
+            self.assertTrue(sqls[read].endswith(' FOR NO KEY UPDATE OF "api_check"'), sqls[read])
+
     def test_it_creates_new_check_if_unique_references_absent_field(self) -> None:
         Check.objects.create(project=self.project)
         for s in ["name", "slug", "tags", "timeout", "grace"]:
@@ -283,6 +300,19 @@ class CreateCheckTestCase(BaseTestCase):
 
     def test_it_rejects_long_name(self) -> None:
         self.post({"name": "01234567890" * 20}, expect_fragment="name is too long")
+
+    def test_it_bounds_tags_by_the_column(self) -> None:
+        self.post({"tags": "a" * 501}, expect_fragment="tags is too long")
+
+        r = self.post({"tags": "a" * 500})
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(Check.objects.get().tags, "a" * 500)
+
+    def test_it_bounds_desc(self) -> None:
+        self.post({"desc": "a" * 10_001}, expect_fragment="desc is too long")
+
+        r = self.post({"desc": "a" * 10_000})
+        self.assertEqual(r.status_code, 201)
 
     def test_unique_accepts_only_specific_values(self) -> None:
         self.post(

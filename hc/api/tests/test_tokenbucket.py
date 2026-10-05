@@ -4,6 +4,7 @@ from unittest import skipUnless
 from unittest.mock import patch
 
 from django.db import connection
+from django.test import RequestFactory
 from django.test.utils import CaptureQueriesContext, override_settings
 from django.utils.timezone import now
 
@@ -96,6 +97,40 @@ class TokenBucketTestCase(BaseTestCase):
             self.assertTrue(TokenBucket.authorize_login_password(f"user{i}@example.org"))
 
         self.assertTrue(TokenBucket.authorize_login_password("alice@example.org"))
+
+    def auth_ip_values(self, *addresses: str) -> list[str]:
+        for addr in addresses:
+            self.assertTrue(TokenBucket.authorize_auth_ip(RequestFactory().get("/", REMOTE_ADDR=addr)))
+        return sorted(TokenBucket.objects.values_list("value", flat=True))
+
+    def test_it_keys_an_ipv4_client_by_its_address(self) -> None:
+        values = self.auth_ip_values("192.0.2.1", "192.0.2.2")
+        self.assertEqual(values, ["auth-ip-192.0.2.1", "auth-ip-192.0.2.2"])
+
+    def test_it_keys_an_ipv6_client_by_its_64_network(self) -> None:
+        values = self.auth_ip_values("2001:db8:1:2::1", "2001:DB8:1:2:ffff:ffff:ffff:fffe")
+        self.assertEqual(values, ["auth-ip-2001:db8:1:2::/64"])
+        self.assertAlmostEqual(TokenBucket.objects.get().tokens, 0.9, places=4)
+
+    def test_it_keys_ipv6_networks_apart(self) -> None:
+        values = self.auth_ip_values("2001:db8:1:2::1", "2001:db8:1:3::1")
+        self.assertEqual(values, ["auth-ip-2001:db8:1:2::/64", "auth-ip-2001:db8:1:3::/64"])
+
+    def test_it_keys_an_ipv4_mapped_client_by_its_ipv4_address(self) -> None:
+        values = self.auth_ip_values("::ffff:192.0.2.1", "::ffff:192.0.2.2")
+        self.assertEqual(values, ["auth-ip-192.0.2.1", "auth-ip-192.0.2.2"])
+
+    def test_it_keys_every_unknown_address_alike(self) -> None:
+        self.assertEqual(self.auth_ip_values("not-an-ip", "", "x" * 100), ["auth-ip-unknown"])
+        self.assertAlmostEqual(TokenBucket.objects.get().tokens, 0.85, places=4)
+
+    def test_it_keys_a_forwarded_ipv6_client_by_its_64_network(self) -> None:
+        # Behind Caddy: one X-Forwarded-For entry, the client's, and REMOTE_ADDR the bridge gateway
+        for addr in ("2001:db8:1:2::1", "2001:db8:1:2::2"):
+            request = RequestFactory().get("/", REMOTE_ADDR="172.17.0.1", HTTP_X_FORWARDED_FOR=addr)
+            self.assertTrue(TokenBucket.authorize_auth_ip(request))
+
+        self.assertEqual(list(TokenBucket.objects.values_list("value", flat=True)), ["auth-ip-2001:db8:1:2::/64"])
 
     def test_str_shows_the_value(self) -> None:
         self.assertEqual(str(TokenBucket(value="em-" + ALICE_HASH)), "em-" + ALICE_HASH)
