@@ -71,6 +71,19 @@ class NotifyTestCase(TransactionTestCase):
         )
 
     @patch("hc.api.transports.curl.request", autospec=True)
+    def test_an_unnamed_check_is_logged_by_its_slug(self, mock_request: Mock) -> None:
+        self._setup_data("slack", "https://hooks.slack.com/services/T0/B0/secret-token")
+        self.check.slug = "nightly-backup"
+        self.check.save()
+        mock_request.return_value.status_code = 500
+
+        with self.assertLogs("hc.api.models", "ERROR") as logs:
+            self.channel.notify(self.flip)
+
+        (record,) = logs.records
+        self.assertIn("check 'nightly-backup', slack channel", record.getMessage())
+
+    @patch("hc.api.transports.curl.request", autospec=True)
     def test_a_failed_test_notification_is_not_logged(self, mock_request: Mock) -> None:
         self._setup_data("slack", "https://hooks.slack.com/services/T0/B0/secret-token")
         mock_request.return_value.status_code = 500

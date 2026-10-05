@@ -204,6 +204,10 @@ class Check(models.Model):
 
         return str(self.code)
 
+    def name_then_slug(self) -> str:
+        """What a log line calls the check: never its code, the secret part of its ping URL."""
+        return self.name or self.slug
+
     def url(self) -> str | None:
         """Return check's ping url in user's preferred style.
 
@@ -965,8 +969,14 @@ class Channel(models.Model):
         return _transport_class(path)(self)
 
     def _failure_log(self, flip: Flip, error: str) -> tuple[str, str, str, str, str]:
-        """Names the check by its name, never its code: the code is the secret part of its ping URL."""
-        return ("Notification failed: check %r, %s channel %s: %s", flip.owner.name, self.kind, str(self.code)[:8], error)
+        """The format and arguments of the ERROR line for a dispatch that failed."""
+        return (
+            "Notification failed: check %r, %s channel %s: %s",
+            flip.owner.name_then_slug(),
+            self.kind,
+            str(self.code)[:8],
+            error,
+        )
 
     def notify(self, flip: Flip, is_test: bool = False) -> str:
         try:
