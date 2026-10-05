@@ -52,7 +52,7 @@ and DELETE requests read the header only, and no request reads the key from the
 query string.
 
 A read-only key receives check objects without the `uuid`, `ping_url`, `update_url`,
-`pause_url` and `resume_url` fields and with an extra `unique_key` field,
+`pause_url`, `resume_url` and `channels` fields and with an extra `unique_key` field,
 so it can read a check but cannot learn the URL that pings it. A read-only key sent
 to an endpoint that needs a read-write key gets "401 wrong api key".
 
@@ -218,7 +218,7 @@ Field | Type | Present | Meaning
 `uuid` | string | read-write key | The check's UUID.
 `ping_url` | string | read-write key | The URL that pings the check.
 `update_url`, `pause_url`, `resume_url` | string | read-write key | The [update](#update-check), [pause](#pause-check) and [resume](#resume-check) URLs of the check.
-`channels` | string | always | Comma-separated UUIDs of the integrations assigned to the check; `""` for none. Join them with [list integrations](#list-channels) for each one's kind and state.
+`channels` | string | read-write key | Comma-separated UUIDs of the integrations assigned to the check; `""` for none. Join them with [list integrations](#list-channels) for each one's kind and state.
 `unique_key` | string | read-only key | A stable 40-character identifier, for the [get a check](#get-check) and [list flips](#list-flips) calls.
 `timeout` | integer | Simple checks | The expected period in seconds.
 `schedule` | string | Cron and OnCalendar checks | The cron or OnCalendar expression.
@@ -323,7 +323,7 @@ curl --header "X-Api-Key: your-api-key" SITE_ROOT/api/v3/checks/
 The [check object](#check-object) describes each field.
 
 With a read-only key, the same request returns the checks without `uuid`, `ping_url`,
-`update_url`, `pause_url` and `resume_url`, and with an extra
+`update_url`, `pause_url`, `resume_url` and `channels`, and with an extra
 `unique_key` field. The `unique_key` identifier is stable across API calls, and you
 can use it in the [Get a single check](#get-check) and
 [List check's status changes](#list-flips) API calls:
@@ -354,7 +354,6 @@ can use it in the [Get a single check](#get-check) and
       "filter_http_body": false,
       "filter_default_fail": false,
       "unique_key": "a6c7b0a8a66bed0df66abfdab3c77736861703ee",
-      "channels": "1bdea468-03bf-47b8-ab27-29a9dd0e4b94,51c6eb2b-2ae1-456b-99fe-6f1e0a36cd3c",
       "timeout": 3600
     }
   ]
@@ -427,8 +426,8 @@ curl --header "X-Api-Key: your-api-key" \
 }
 ```
 
-The response to a read-only key omits `uuid`, `ping_url`, `update_url`, `pause_url`
-and `resume_url`, and adds `unique_key`:
+The response to a read-only key omits `uuid`, `ping_url`, `update_url`, `pause_url`,
+`resume_url` and `channels`, and adds `unique_key`:
 
 ```json
 {
@@ -455,7 +454,6 @@ and `resume_url`, and adds `unique_key`:
   "filter_default_fail": false,
   "last_duration": 312,
   "unique_key": "124f983e0e3dcaeba921cfcef46efd084576e783",
-  "channels": "1bdea468-03bf-47b8-ab27-29a9dd0e4b94,51c6eb2b-2ae1-456b-99fe-6f1e0a36cd3c",
   "schedule": "15 5 * * *",
   "tz": "UTC"
 }
@@ -1333,7 +1331,7 @@ Field | Type | Meaning
 `id` | string | The integration's UUID.
 `name` | string | The integration's name; `""` when it has none.
 `kind` | string | `email`, `group`, `slack` or `webhook`.
-`disabled` | boolean | `true` once alerts to the integration have stopped: after a delivery failure that will not recover, such as Slack answering 404, after an email bounce, or after its address unsubscribed. A disabled integration is skipped for every alert, and nothing is logged for the skip.
+`disabled` | boolean | `true` once a delivery failure that will not recover, such as Slack answering 404, a hard email bounce, or an unsubscribe has stopped the integration's own alerts; nothing is logged when an alert skips it. A group that includes it still sends to it.
 
 ### Errors
 

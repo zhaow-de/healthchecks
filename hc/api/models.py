@@ -433,9 +433,7 @@ class Check(models.Model):
             result["update_url"] = update_url
             result["pause_url"] = update_url + "/pause"
             result["resume_url"] = update_url + "/resume"
-
-        # Channel ids are not credentials, so a read-only key gets them too
-        result["channels"] = self.channels_str(channel_codes)
+            result["channels"] = self.channels_str(channel_codes)
 
         if self.kind == "simple":
             result["timeout"] = int(self.timeout.total_seconds())

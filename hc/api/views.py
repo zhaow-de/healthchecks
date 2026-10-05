@@ -417,6 +417,8 @@ def get_checks(request: ApiRequest) -> JsonResponse:
 
     # precise, final filtering
     checks = [check for check in q if not tags or check.matches_tag_set(tags)]
+    if request.readonly:
+        return JsonResponse({"checks": [check.to_dict(readonly=True) for check in checks]})
 
     # Codes from the link table, not channel_set: building Channel instances for them costs more
     codes: dict[int, list[UUID]] = {}
@@ -424,8 +426,7 @@ def get_checks(request: ApiRequest) -> JsonResponse:
     for check_id, code in links.values_list("check_id", "channel__code"):
         codes.setdefault(check_id, []).append(code)
 
-    docs = [check.to_dict(readonly=request.readonly, channel_codes=codes.get(check.id, [])) for check in checks]
-    return JsonResponse({"checks": docs})
+    return JsonResponse({"checks": [check.to_dict(channel_codes=codes.get(check.id, [])) for check in checks]})
 
 
 @authorize

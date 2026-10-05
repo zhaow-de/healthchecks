@@ -167,16 +167,16 @@ class ListChecksTestCase(BaseTestCase):
         ro_key = self.project.set_api_key_readonly()
         self.project.save()
 
-        # Expect a query to check the API key, one to retrieve checks, and one for their channels
-        with self.assertNumQueries(3):
+        # Expect a query to check the API key, and a query to retrieve checks
+        with self.assertNumQueries(2):
             r = self.client.get("/api/v3/checks/", HTTP_X_API_KEY=ro_key)
 
         self.assertEqual(r.status_code, 200)
 
         # When using readonly keys, the ping URLs should not be exposed:
         self.assertNotContains(r, str(self.a1.code))
-        by_name = {doc["name"]: doc for doc in r.json()["checks"]}
-        self.assertEqual(by_name["Alice 1"]["channels"], str(self.c1.code))
+        # Nor the channel ids: a read-only check object posted to create must not name another project's channels
+        self.assertNotContains(r, '"channels"')
 
     def test_it_reports_started_separately(self) -> None:
         self.a1.last_start = now()

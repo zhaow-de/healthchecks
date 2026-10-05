@@ -59,7 +59,7 @@ before the body is read, so a wrong one gets 401 even when the body is not JSON.
 and DELETE requests read the header only, and no request reads the key from the
 query string.</p>
 <p>A read-only key receives check objects without the <code>uuid</code>, <code>ping_url</code>, <code>update_url</code>,
-<code>pause_url</code> and <code>resume_url</code> fields and with an extra <code>unique_key</code> field,
+<code>pause_url</code>, <code>resume_url</code> and <code>channels</code> fields and with an extra <code>unique_key</code> field,
 so it can read a check but cannot learn the URL that pings it. A read-only key sent
 to an endpoint that needs a read-write key gets "401 wrong api key".</p>
 <h3 id="requests">Requests</h3>
@@ -540,7 +540,7 @@ field.</p>
 <tr>
 <td><code>channels</code></td>
 <td>string</td>
-<td>always</td>
+<td>read-write key</td>
 <td>Comma-separated UUIDs of the integrations assigned to the check; <code>""</code> for none. Join them with <a href="#list-channels">list integrations</a> for each one's kind and state.</td>
 </tr>
 <tr>
@@ -683,7 +683,7 @@ filtered by slug and by one or more tags.</p>
 
 <p>The <a href="#check-object">check object</a> describes each field.</p>
 <p>With a read-only key, the same request returns the checks without <code>uuid</code>, <code>ping_url</code>,
-<code>update_url</code>, <code>pause_url</code> and <code>resume_url</code>, and with an extra
+<code>update_url</code>, <code>pause_url</code>, <code>resume_url</code> and <code>channels</code>, and with an extra
 <code>unique_key</code> field. The <code>unique_key</code> identifier is stable across API calls, and you
 can use it in the <a href="#get-check">Get a single check</a> and
 <a href="#list-flips">List check's status changes</a> API calls:</p>
@@ -712,7 +712,6 @@ can use it in the <a href="#get-check">Get a single check</a> and
 <span class="w">      </span><span class="nt">"filter_http_body"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
 <span class="w">      </span><span class="nt">"filter_default_fail"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
 <span class="w">      </span><span class="nt">"unique_key"</span><span class="p">:</span><span class="w"> </span><span class="s2">"a6c7b0a8a66bed0df66abfdab3c77736861703ee"</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">"channels"</span><span class="p">:</span><span class="w"> </span><span class="s2">"1bdea468-03bf-47b8-ab27-29a9dd0e4b94,51c6eb2b-2ae1-456b-99fe-6f1e0a36cd3c"</span><span class="p">,</span>
 <span class="w">      </span><span class="nt">"timeout"</span><span class="p">:</span><span class="w"> </span><span class="mi">3600</span>
 <span class="w">    </span><span class="p">}</span>
 <span class="w">  </span><span class="p">]</span>
@@ -793,8 +792,8 @@ key works with either identifier; the response has the fields of the key's kind.
 <span class="p">}</span>
 </code></pre></div>
 
-<p>The response to a read-only key omits <code>uuid</code>, <code>ping_url</code>, <code>update_url</code>, <code>pause_url</code>
-and <code>resume_url</code>, and adds <code>unique_key</code>:</p>
+<p>The response to a read-only key omits <code>uuid</code>, <code>ping_url</code>, <code>update_url</code>, <code>pause_url</code>,
+<code>resume_url</code> and <code>channels</code>, and adds <code>unique_key</code>:</p>
 <div class="highlight"><pre><span></span><code><span class="p">{</span>
 <span class="w">  </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Database Backup"</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"slug"</span><span class="p">:</span><span class="w"> </span><span class="s2">"database-backup"</span><span class="p">,</span>
@@ -819,7 +818,6 @@ and <code>resume_url</code>, and adds <code>unique_key</code>:</p>
 <span class="w">  </span><span class="nt">"filter_default_fail"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"last_duration"</span><span class="p">:</span><span class="w"> </span><span class="mi">312</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"unique_key"</span><span class="p">:</span><span class="w"> </span><span class="s2">"124f983e0e3dcaeba921cfcef46efd084576e783"</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">"channels"</span><span class="p">:</span><span class="w"> </span><span class="s2">"1bdea468-03bf-47b8-ab27-29a9dd0e4b94,51c6eb2b-2ae1-456b-99fe-6f1e0a36cd3c"</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"schedule"</span><span class="p">:</span><span class="w"> </span><span class="s2">"15 5 * * *"</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"tz"</span><span class="p">:</span><span class="w"> </span><span class="s2">"UTC"</span>
 <span class="p">}</span>
@@ -2217,7 +2215,7 @@ get the same objects, which carry no webhook URL, token or address.</p>
 <tr>
 <td><code>disabled</code></td>
 <td>boolean</td>
-<td><code>true</code> once alerts to the integration have stopped: after a delivery failure that will not recover, such as Slack answering 404, after an email bounce, or after its address unsubscribed. A disabled integration is skipped for every alert, and nothing is logged for the skip.</td>
+<td><code>true</code> once a delivery failure that will not recover, such as Slack answering 404, a hard email bounce, or an unsubscribe has stopped the integration's own alerts; nothing is logged when an alert skips it. A group that includes it still sends to it.</td>
 </tr>
 </tbody>
 </table>
