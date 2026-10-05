@@ -28,6 +28,22 @@ class ListChannelsTestCase(BaseTestCase):
         self.assertEqual(c["id"], str(self.c1.code))
         self.assertEqual(c["kind"], "email")
         self.assertEqual(c["name"], "Email to Alice")
+        self.assertIs(c["disabled"], False)
+
+    def test_it_reports_a_disabled_channel(self) -> None:
+        self.c1.disabled = True
+        self.c1.save()
+
+        c = self.get().json()["channels"][0]
+        self.assertIs(c["disabled"], True)
+
+    def test_a_readonly_key_gets_the_same_objects(self) -> None:
+        ro_key = self.project.set_api_key_readonly()
+        self.project.save()
+
+        r = self.client.get(self.url, HTTP_X_API_KEY=ro_key)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json(), self.get().json())
 
     def test_it_handles_options(self) -> None:
         r = self.client.options(self.url)

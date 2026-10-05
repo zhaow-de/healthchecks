@@ -111,6 +111,7 @@ class GetCheckTestCase(BaseTestCase):
         self.assertNotContains(r, str(self.a1.code))
         for key in ("uuid", "ping_url", "update_url", "pause_url", "resume_url"):
             self.assertNotContains(r, key)
+        self.assertEqual(r.json()["channels"], str(self.c1.code))
 
     def test_it_reports_started_separately(self) -> None:
         self.a1.last_start = now()

@@ -37,7 +37,7 @@ Each key is 32 characters long, and its prefix tells its kind:
 Key | Starts with | Works with
 ----|-------------|-----------
 read-write | `hcw_` | every endpoint that takes a key
-read-only | `hcr_` | [list checks](#list-checks), [get a check](#get-check), [list flips](#list-flips); every other endpoint that takes a key, [list integrations](#list-channels), [list pings](#list-pings) and [a ping's body](#ping-body) included, answers it with "401 wrong api key"
+read-only | `hcr_` | [list checks](#list-checks), [get a check](#get-check), [list flips](#list-flips), [list integrations](#list-channels); every other endpoint that takes a key, [list pings](#list-pings) and [a ping's body](#ping-body) included, answers it with "401 wrong api key"
 
 Send the key in the `X-Api-Key` request header:
 
@@ -52,7 +52,7 @@ and DELETE requests read the header only, and no request reads the key from the
 query string.
 
 A read-only key receives check objects without the `uuid`, `ping_url`, `update_url`,
-`pause_url`, `resume_url` and `channels` fields and with an extra `unique_key` field,
+`pause_url` and `resume_url` fields and with an extra `unique_key` field,
 so it can read a check but cannot learn the URL that pings it. A read-only key sent
 to an endpoint that needs a read-write key gets "401 wrong api key".
 
@@ -182,7 +182,7 @@ Endpoint Name                                         | Endpoint Address | Key
 **Flips**                                             | |
 [List check's status changes](#list-flips)            | `GET SITE_ROOT/api/v3/checks/<uuid>/flips/`<br>`GET SITE_ROOT/api/v3/checks/<unique_key>/flips/` | read-only or read-write
 **Integrations**                                      | |
-[List existing integrations](#list-channels)          | `GET SITE_ROOT/api/v3/channels/` | read-write
+[List existing integrations](#list-channels)          | `GET SITE_ROOT/api/v3/channels/` | read-only or read-write
 **Service status**                                    | |
 [Check database connectivity](#status)                | `GET SITE_ROOT/api/v3/status/` | none
 [Read service metrics](#metrics)                      | `GET SITE_ROOT/api/v3/metrics/` | the metrics key
@@ -218,7 +218,7 @@ Field | Type | Present | Meaning
 `uuid` | string | read-write key | The check's UUID.
 `ping_url` | string | read-write key | The URL that pings the check.
 `update_url`, `pause_url`, `resume_url` | string | read-write key | The [update](#update-check), [pause](#pause-check) and [resume](#resume-check) URLs of the check.
-`channels` | string | read-write key | Comma-separated UUIDs of the integrations assigned to the check; `""` for none.
+`channels` | string | always | Comma-separated UUIDs of the integrations assigned to the check; `""` for none. Join them with [list integrations](#list-channels) for each one's kind and state.
 `unique_key` | string | read-only key | A stable 40-character identifier, for the [get a check](#get-check) and [list flips](#list-flips) calls.
 `timeout` | integer | Simple checks | The expected period in seconds.
 `schedule` | string | Cron and OnCalendar checks | The cron or OnCalendar expression.
@@ -323,7 +323,7 @@ curl --header "X-Api-Key: your-api-key" SITE_ROOT/api/v3/checks/
 The [check object](#check-object) describes each field.
 
 With a read-only key, the same request returns the checks without `uuid`, `ping_url`,
-`update_url`, `pause_url`, `resume_url` and `channels`, and with an extra
+`update_url`, `pause_url` and `resume_url`, and with an extra
 `unique_key` field. The `unique_key` identifier is stable across API calls, and you
 can use it in the [Get a single check](#get-check) and
 [List check's status changes](#list-flips) API calls:
@@ -354,6 +354,7 @@ can use it in the [Get a single check](#get-check) and
       "filter_http_body": false,
       "filter_default_fail": false,
       "unique_key": "a6c7b0a8a66bed0df66abfdab3c77736861703ee",
+      "channels": "1bdea468-03bf-47b8-ab27-29a9dd0e4b94,51c6eb2b-2ae1-456b-99fe-6f1e0a36cd3c",
       "timeout": 3600
     }
   ]
@@ -426,8 +427,8 @@ curl --header "X-Api-Key: your-api-key" \
 }
 ```
 
-The response to a read-only key omits `uuid`, `ping_url`, `update_url`, `pause_url`,
-`resume_url` and `channels`, and adds `unique_key`:
+The response to a read-only key omits `uuid`, `ping_url`, `update_url`, `pause_url`
+and `resume_url`, and adds `unique_key`:
 
 ```json
 {
@@ -454,6 +455,7 @@ The response to a read-only key omits `uuid`, `ping_url`, `update_url`, `pause_u
   "filter_default_fail": false,
   "last_duration": 312,
   "unique_key": "124f983e0e3dcaeba921cfcef46efd084576e783",
+  "channels": "1bdea468-03bf-47b8-ab27-29a9dd0e4b94,51c6eb2b-2ae1-456b-99fe-6f1e0a36cd3c",
   "schedule": "15 5 * * *",
   "tz": "UTC"
 }
@@ -1294,8 +1296,8 @@ GET SITE_ROOT/api/v3/channels/
 Returns a list of integrations belonging to the project. Use their `id` or `name` in
 the `channels` field of [create](#create-check) and [update](#update-check).
 
-**Authentication:** a read-write key, in the `X-Api-Key` header. A read-only key gets
-"401 wrong api key".
+**Authentication:** a read-write or a read-only key, in the `X-Api-Key` header. Both
+get the same objects, which carry no webhook URL, token or address.
 
 ### Parameters
 
@@ -1313,12 +1315,14 @@ curl --header "X-Api-Key: your-api-key" SITE_ROOT/api/v3/channels/
     {
       "id": "4ec5a071-2d08-4baa-898a-eb4eb3cd6941",
       "name": "My Work Email",
-      "kind": "email"
+      "kind": "email",
+      "disabled": false
     },
     {
       "id": "746a083e-f542-4554-be1a-707ce16d3acc",
       "name": "Team Slack",
-      "kind": "slack"
+      "kind": "slack",
+      "disabled": false
     }
   ]
 }
@@ -1329,14 +1333,11 @@ Field | Type | Meaning
 `id` | string | The integration's UUID.
 `name` | string | The integration's name; `""` when it has none.
 `kind` | string | `email`, `group`, `slack` or `webhook`.
+`disabled` | boolean | `true` once alerts to the integration have stopped: after a delivery failure that will not recover, such as Slack answering 404, after an email bounce, or after its address unsubscribed. A disabled integration is skipped for every alert, and nothing is logged for the skip.
 
 ### Errors
 
-Status | Body | When
--------|------|-----
-401 | `{"error": "wrong api key"}` | The key is a read-only key.
-
-Plus the errors every endpoint can return; see [Status codes](#status-codes).
+The errors every endpoint can return; see [Status codes](#status-codes).
 
 ## Check Database Connectivity {: #status .rule }
 

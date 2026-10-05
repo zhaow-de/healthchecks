@@ -433,7 +433,9 @@ class Check(models.Model):
             result["update_url"] = update_url
             result["pause_url"] = update_url + "/pause"
             result["resume_url"] = update_url + "/resume"
-            result["channels"] = self.channels_str(channel_codes)
+
+        # Channel ids are not credentials, so a read-only key gets them too
+        result["channels"] = self.channels_str(channel_codes)
 
         if self.kind == "simple":
             result["timeout"] = int(self.timeout.total_seconds())
@@ -929,8 +931,8 @@ class Channel(models.Model):
 
         return self.get_kind_display()
 
-    def to_dict(self) -> dict[str, str]:
-        return {"id": str(self.code), "name": self.name, "kind": self.kind}
+    def to_dict(self) -> dict[str, str | bool]:
+        return {"id": str(self.code), "name": self.name, "kind": self.kind, "disabled": self.disabled}
 
     def is_editable(self) -> bool:
         return self.kind in (
