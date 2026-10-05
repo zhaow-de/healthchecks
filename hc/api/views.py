@@ -460,7 +460,7 @@ def checks(request: HttpRequest) -> HttpResponse:
 
 @cors("GET")
 @csrf_exempt
-@authorize
+@authorize_read
 def channels(request: ApiRequest) -> JsonResponse:
     q = Channel.objects.filter(project=request.project)
     channels = [ch.to_dict() for ch in q]

@@ -929,8 +929,8 @@ class Channel(models.Model):
 
         return self.get_kind_display()
 
-    def to_dict(self) -> dict[str, str]:
-        return {"id": str(self.code), "name": self.name, "kind": self.kind}
+    def to_dict(self) -> dict[str, str | bool]:
+        return {"id": str(self.code), "name": self.name, "kind": self.kind, "disabled": self.disabled}
 
     def is_editable(self) -> bool:
         return self.kind in (

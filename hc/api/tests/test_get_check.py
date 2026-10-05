@@ -109,7 +109,7 @@ class GetCheckTestCase(BaseTestCase):
 
         # When using readonly keys, the ping URLs should not be exposed:
         self.assertNotContains(r, str(self.a1.code))
-        for key in ("uuid", "ping_url", "update_url", "pause_url", "resume_url"):
+        for key in ("uuid", "ping_url", "update_url", "pause_url", "resume_url", "channels"):
             self.assertNotContains(r, key)
 
     def test_it_reports_started_separately(self) -> None:

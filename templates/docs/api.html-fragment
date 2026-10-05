@@ -45,7 +45,7 @@ Each key is 32 characters long, and its prefix tells its kind:</p>
 <tr>
 <td>read-only</td>
 <td><code>hcr_</code></td>
-<td><a href="#list-checks">list checks</a>, <a href="#get-check">get a check</a>, <a href="#list-flips">list flips</a>; every other endpoint that takes a key, <a href="#list-channels">list integrations</a>, <a href="#list-pings">list pings</a> and <a href="#ping-body">a ping's body</a> included, answers it with "401 wrong api key"</td>
+<td><a href="#list-checks">list checks</a>, <a href="#get-check">get a check</a>, <a href="#list-flips">list flips</a>, <a href="#list-channels">list integrations</a>; every other endpoint that takes a key, <a href="#list-pings">list pings</a> and <a href="#ping-body">a ping's body</a> included, answers it with "401 wrong api key"</td>
 </tr>
 </tbody>
 </table>
@@ -372,7 +372,7 @@ response.</p>
 <tr>
 <td><a href="#list-channels">List existing integrations</a></td>
 <td><code>GET SITE_ROOT/api/v3/channels/</code></td>
-<td>read-write</td>
+<td>read-only or read-write</td>
 </tr>
 <tr>
 <td><strong>Service status</strong></td>
@@ -541,7 +541,7 @@ field.</p>
 <td><code>channels</code></td>
 <td>string</td>
 <td>read-write key</td>
-<td>Comma-separated UUIDs of the integrations assigned to the check; <code>""</code> for none.</td>
+<td>Comma-separated UUIDs of the integrations assigned to the check; <code>""</code> for none. Join them with <a href="#list-channels">list integrations</a> for each one's kind and state.</td>
 </tr>
 <tr>
 <td><code>unique_key</code></td>
@@ -2162,8 +2162,8 @@ Clearing a check's events in the web UI removes all of its flips at once.</p>
 
 <p>Returns a list of integrations belonging to the project. Use their <code>id</code> or <code>name</code> in
 the <code>channels</code> field of <a href="#create-check">create</a> and <a href="#update-check">update</a>.</p>
-<p><strong>Authentication:</strong> a read-write key, in the <code>X-Api-Key</code> header. A read-only key gets
-"401 wrong api key".</p>
+<p><strong>Authentication:</strong> a read-write or a read-only key, in the <code>X-Api-Key</code> header. Both
+get the same objects, which carry no webhook URL, token or address.</p>
 <h3>Parameters</h3>
 <p>None.</p>
 <h3>Example</h3>
@@ -2175,12 +2175,14 @@ the <code>channels</code> field of <a href="#create-check">create</a> and <a hre
 <span class="w">    </span><span class="p">{</span>
 <span class="w">      </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"4ec5a071-2d08-4baa-898a-eb4eb3cd6941"</span><span class="p">,</span>
 <span class="w">      </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"My Work Email"</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"email"</span>
+<span class="w">      </span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"email"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"disabled"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span>
 <span class="w">    </span><span class="p">},</span>
 <span class="w">    </span><span class="p">{</span>
 <span class="w">      </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"746a083e-f542-4554-be1a-707ce16d3acc"</span><span class="p">,</span>
 <span class="w">      </span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Team Slack"</span><span class="p">,</span>
-<span class="w">      </span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"slack"</span>
+<span class="w">      </span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"slack"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"disabled"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span>
 <span class="w">    </span><span class="p">}</span>
 <span class="w">  </span><span class="p">]</span>
 <span class="p">}</span>
@@ -2210,26 +2212,15 @@ the <code>channels</code> field of <a href="#create-check">create</a> and <a hre
 <td>string</td>
 <td><code>email</code>, <code>group</code>, <code>slack</code> or <code>webhook</code>.</td>
 </tr>
+<tr>
+<td><code>disabled</code></td>
+<td>boolean</td>
+<td><code>true</code> once a delivery failure that will not recover, such as Slack answering 404, a hard email bounce, or an unsubscribe has stopped the integration's own alerts; a group that includes it still sends to it.</td>
+</tr>
 </tbody>
 </table>
 <h3>Errors</h3>
-<table>
-<thead>
-<tr>
-<th>Status</th>
-<th>Body</th>
-<th>When</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>401</td>
-<td><code>{"error": "wrong api key"}</code></td>
-<td>The key is a read-only key.</td>
-</tr>
-</tbody>
-</table>
-<p>Plus the errors every endpoint can return; see <a href="#status-codes">Status codes</a>.</p>
+<p>The errors every endpoint can return; see <a href="#status-codes">Status codes</a>.</p>
 <h2 class="rule" id="status">Check Database Connectivity</h2>
 <div class="highlight"><pre><span></span><code>GET SITE_ROOT/api/v3/status/
 </code></pre></div>

@@ -37,7 +37,7 @@ Each key is 32 characters long, and its prefix tells its kind:
 Key | Starts with | Works with
 ----|-------------|-----------
 read-write | `hcw_` | every endpoint that takes a key
-read-only | `hcr_` | [list checks](#list-checks), [get a check](#get-check), [list flips](#list-flips); every other endpoint that takes a key, [list integrations](#list-channels), [list pings](#list-pings) and [a ping's body](#ping-body) included, answers it with "401 wrong api key"
+read-only | `hcr_` | [list checks](#list-checks), [get a check](#get-check), [list flips](#list-flips), [list integrations](#list-channels); every other endpoint that takes a key, [list pings](#list-pings) and [a ping's body](#ping-body) included, answers it with "401 wrong api key"
 
 Send the key in the `X-Api-Key` request header:
 
@@ -182,7 +182,7 @@ Endpoint Name                                         | Endpoint Address | Key
 **Flips**                                             | |
 [List check's status changes](#list-flips)            | `GET SITE_ROOT/api/v3/checks/<uuid>/flips/`<br>`GET SITE_ROOT/api/v3/checks/<unique_key>/flips/` | read-only or read-write
 **Integrations**                                      | |
-[List existing integrations](#list-channels)          | `GET SITE_ROOT/api/v3/channels/` | read-write
+[List existing integrations](#list-channels)          | `GET SITE_ROOT/api/v3/channels/` | read-only or read-write
 **Service status**                                    | |
 [Check database connectivity](#status)                | `GET SITE_ROOT/api/v3/status/` | none
 [Read service metrics](#metrics)                      | `GET SITE_ROOT/api/v3/metrics/` | the metrics key
@@ -218,7 +218,7 @@ Field | Type | Present | Meaning
 `uuid` | string | read-write key | The check's UUID.
 `ping_url` | string | read-write key | The URL that pings the check.
 `update_url`, `pause_url`, `resume_url` | string | read-write key | The [update](#update-check), [pause](#pause-check) and [resume](#resume-check) URLs of the check.
-`channels` | string | read-write key | Comma-separated UUIDs of the integrations assigned to the check; `""` for none.
+`channels` | string | read-write key | Comma-separated UUIDs of the integrations assigned to the check; `""` for none. Join them with [list integrations](#list-channels) for each one's kind and state.
 `unique_key` | string | read-only key | A stable 40-character identifier, for the [get a check](#get-check) and [list flips](#list-flips) calls.
 `timeout` | integer | Simple checks | The expected period in seconds.
 `schedule` | string | Cron and OnCalendar checks | The cron or OnCalendar expression.
@@ -1294,8 +1294,8 @@ GET SITE_ROOT/api/v3/channels/
 Returns a list of integrations belonging to the project. Use their `id` or `name` in
 the `channels` field of [create](#create-check) and [update](#update-check).
 
-**Authentication:** a read-write key, in the `X-Api-Key` header. A read-only key gets
-"401 wrong api key".
+**Authentication:** a read-write or a read-only key, in the `X-Api-Key` header. Both
+get the same objects, which carry no webhook URL, token or address.
 
 ### Parameters
 
@@ -1313,12 +1313,14 @@ curl --header "X-Api-Key: your-api-key" SITE_ROOT/api/v3/channels/
     {
       "id": "4ec5a071-2d08-4baa-898a-eb4eb3cd6941",
       "name": "My Work Email",
-      "kind": "email"
+      "kind": "email",
+      "disabled": false
     },
     {
       "id": "746a083e-f542-4554-be1a-707ce16d3acc",
       "name": "Team Slack",
-      "kind": "slack"
+      "kind": "slack",
+      "disabled": false
     }
   ]
 }
@@ -1329,14 +1331,11 @@ Field | Type | Meaning
 `id` | string | The integration's UUID.
 `name` | string | The integration's name; `""` when it has none.
 `kind` | string | `email`, `group`, `slack` or `webhook`.
+`disabled` | boolean | `true` once a delivery failure that will not recover, such as Slack answering 404, a hard email bounce, or an unsubscribe has stopped the integration's own alerts; a group that includes it still sends to it.
 
 ### Errors
 
-Status | Body | When
--------|------|-----
-401 | `{"error": "wrong api key"}` | The key is a read-only key.
-
-Plus the errors every endpoint can return; see [Status codes](#status-codes).
+The errors every endpoint can return; see [Status codes](#status-codes).
 
 ## Check Database Connectivity {: #status .rule }
 
