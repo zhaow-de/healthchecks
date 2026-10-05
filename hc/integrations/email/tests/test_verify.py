@@ -1,3 +1,6 @@
+from typing import Any
+from unittest.mock import patch
+
 from hc.api.models import Channel
 from hc.test import BaseTestCase
 
@@ -41,3 +44,15 @@ class VerifyEmailTestCase(BaseTestCase):
         token = self.channel.make_token()
         self.channel.value = "bob@example.org"
         self.assertNotEqual(self.channel.make_token(), token)
+
+    def test_it_handles_a_channel_deleted_after_it_was_read(self) -> None:
+        def get_and_delete(*args: Any, **kwargs: Any) -> Channel:
+            channel = Channel.objects.get(id=self.channel.id)
+            Channel.objects.filter(id=self.channel.id).delete()
+            return channel
+
+        token = self.channel.make_token()
+        url = f"/integrations/{self.channel.code}/verify/{token}/"
+        with patch("hc.integrations.email.views.get_object_or_404", get_and_delete):
+            r = self.client.get(url)
+        self.assertEqual(r.status_code, 404)

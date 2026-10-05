@@ -19,7 +19,9 @@ class GetPingBodyTestCase(BaseTestCase):
         self.url = f"/api/v3/checks/{self.check.code}/pings/1/body"
 
     def test_it_works(self) -> None:
-        r = self.client.get(self.url, HTTP_X_API_KEY=self.api_key)
+        # The key's project with its owner's profile, the check, the ping
+        with self.assertNumQueries(3):
+            r = self.client.get(self.url, HTTP_X_API_KEY=self.api_key)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.headers["Content-Type"], "text/plain")
         self.assertEqual(r.content, b"Foo\nBar\nBaz")

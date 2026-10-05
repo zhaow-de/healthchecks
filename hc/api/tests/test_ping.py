@@ -1,8 +1,11 @@
+import re
 from datetime import timedelta as td
 from uuid import UUID, uuid4
 
+from django.core import mail
+from django.db import connection
 from django.test import Client
-from django.test.utils import override_settings
+from django.test.utils import CaptureQueriesContext, override_settings
 from django.utils.timezone import now
 
 from hc.api.models import Check, Flip, Ping
@@ -22,6 +25,7 @@ class PingTestCase(BaseTestCase):
         self.assertEqual(r.text, "OK")
         self.assertEqual(r.headers["Access-Control-Allow-Origin"], "*")
         self.assertEqual(r.headers["Ping-Body-Limit"], "10000")
+        self.assertEqual(r.headers["Access-Control-Expose-Headers"], "Ping-Body-Limit")
 
         self.check.refresh_from_db()
         self.assertEqual(self.check.n_pings, 1)
@@ -87,6 +91,15 @@ class PingTestCase(BaseTestCase):
         self.assertEqual(r.status_code, 404)
         self.assertEqual(r.text, "not found")
 
+    @override_settings(ADMINS=["admin@example.org"])
+    def test_it_refuses_foreign_host_without_emailing_admins(self) -> None:
+        r = self.client.get(self.url, HTTP_HOST="foreign.example.org")
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(mail.outbox, [])
+
+        self.check.refresh_from_db()
+        self.assertEqual(self.check.n_pings, 0)
+
     def test_it_handles_120_char_ua(self) -> None:
         ua = (
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_4) "
@@ -124,7 +137,7 @@ class PingTestCase(BaseTestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(ping.remote_addr, "2001::1")
 
-    def test_it_reads_first_forwarded_ip(self) -> None:
+    def test_it_reads_the_forwarded_ip_the_proxy_wrote(self) -> None:
         ip = "1.1.1.1, 2.2.2.2"
         r = self.client.get(
             self.url,
@@ -133,7 +146,23 @@ class PingTestCase(BaseTestCase):
         )
         ping = Ping.objects.get()
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(ping.remote_addr, "1.1.1.1")
+        self.assertEqual(ping.remote_addr, "2.2.2.2")
+
+    def test_it_records_no_address_for_a_forwarded_entry_that_is_not_one(self) -> None:
+        for ip in ("unknown", " 1.1.1.1x", "[2001:db8::1]:443:1", "x" * 60):
+            with self.subTest(ip=ip):
+                r = self.client.get(self.url, HTTP_X_FORWARDED_FOR=ip, REMOTE_ADDR="3.3.3.3")
+                self.assertEqual(r.status_code, 200)
+                self.assertIsNone(Ping.objects.latest("n").remote_addr)
+
+        self.check.refresh_from_db()
+        self.assertEqual(self.check.n_pings, 4)
+
+    @override_settings(TRUSTED_PROXY_HOPS=0)
+    def test_it_reads_remote_addr_with_no_trusted_proxy(self) -> None:
+        r = self.client.get(self.url, HTTP_X_FORWARDED_FOR="1.1.1.1", REMOTE_ADDR="3.3.3.3")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(Ping.objects.get().remote_addr, "3.3.3.3")
 
     def test_it_handles_forwarded_ip_plus_port(self) -> None:
         ip = "1.1.1.1:1234"
@@ -155,13 +184,108 @@ class PingTestCase(BaseTestCase):
         )
         ping = Ping.objects.get()
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(ping.remote_addr, "::ffff:1.1.1.1")
+        self.assertEqual(ping.remote_addr, "1.1.1.1")
 
-    def test_it_reads_forwarded_protocol(self) -> None:
-        r = self.client.get(self.url, HTTP_X_FORWARDED_PROTO="https")
-        ping = Ping.objects.get()
+    def test_it_records_https_for_a_secure_request(self) -> None:
+        r = self.client.get(self.url, secure=True)
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(ping.scheme, "https")
+        self.assertEqual(Ping.objects.get().scheme, "https")
+
+    def test_it_records_the_scheme_uwsgi_takes_from_x_forwarded_proto(self) -> None:
+        # uWSGI copies X-Forwarded-Proto into wsgi.url_scheme as it is
+        for value, expected in (("https", "https"), ("https, http", "http"), ("x" * 20, "http")):
+            with self.subTest(value=value):
+                r = self.client.get(self.url, **{"wsgi.url_scheme": value})
+                self.assertEqual(r.status_code, 200)
+                self.assertEqual(Ping.objects.latest("n").scheme, expected)
+
+    @override_settings(SECURE_PROXY_SSL_HEADER=None)
+    def test_it_ignores_x_forwarded_proto_django_does_not_trust(self) -> None:
+        for value in ("https", "https, http"):
+            with self.subTest(value=value):
+                r = self.client.get(self.url, HTTP_X_FORWARDED_PROTO=value)
+                self.assertEqual(r.status_code, 200)
+                self.assertEqual(Ping.objects.latest("n").scheme, "http")
+
+    def test_it_reads_x_forwarded_proto_by_default(self) -> None:
+        for value, expected in (("https", "https"), ("https, http", "https"), ("http", "http")):
+            with self.subTest(value=value):
+                r = self.client.get(self.url, HTTP_X_FORWARDED_PROTO=value)
+                self.assertEqual(r.status_code, 200)
+                self.assertEqual(Ping.objects.latest("n").scheme, expected)
+
+    def test_it_cuts_a_long_method_to_the_column(self) -> None:
+        r = self.client.generic("VERYLONGMETHODNAME", self.url)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(Ping.objects.get().method, "VERYLONGME")
+
+    def test_it_answers_a_preflight_and_records_nothing(self) -> None:
+        with self.assertNumQueries(0):
+            r = self.client.options(
+                self.url,
+                HTTP_ORIGIN="https://example.org",
+                HTTP_ACCESS_CONTROL_REQUEST_METHOD="POST",
+                HTTP_ACCESS_CONTROL_REQUEST_HEADERS="content-type, x-run-id",
+            )
+
+        self.assertEqual(r.status_code, 204)
+        self.assertEqual(r.headers["Access-Control-Allow-Origin"], "*")
+        self.assertEqual(r.headers["Access-Control-Allow-Methods"], "GET, HEAD, POST, OPTIONS")
+        self.assertEqual(r.headers["Access-Control-Allow-Headers"], "content-type, x-run-id")
+        self.assertEqual(r.headers["Access-Control-Max-Age"], "600")
+        self.assertFalse(Ping.objects.exists())
+
+        self.check.refresh_from_db()
+        self.assertEqual(self.check.n_pings, 0)
+        self.assertEqual(self.check.status, "new")
+
+    def test_preflight_allows_content_type_when_no_header_is_requested(self) -> None:
+        r = self.client.options(self.url + "/fail", HTTP_ACCESS_CONTROL_REQUEST_METHOD="POST")
+        self.assertEqual(r.status_code, 204)
+        self.assertEqual(r.headers["Access-Control-Allow-Headers"], "Content-Type")
+
+    def test_it_answers_a_preflight_to_an_unknown_check(self) -> None:
+        with self.assertNumQueries(0):
+            r = self.client.options("/ping/07c2f548-9850-4b27-af5d-6c9dc157ec02/")
+        self.assertEqual(r.status_code, 204)
+
+    def test_it_reads_the_check_once_and_writes_only_what_a_ping_changes(self) -> None:
+        self.check.status = "up"
+        self.check.save()
+
+        with CaptureQueriesContext(connection) as ctx:
+            r = self.client.get(self.url)
+        self.assertEqual(r.status_code, 200)
+
+        # TestCase wraps each test in a transaction, so the atomic block shows as a savepoint
+        sqls = [q["sql"] for q in ctx.captured_queries]
+        self.assertEqual([sql.split()[0] for sql in sqls], ["SAVEPOINT", "SELECT", "UPDATE", "INSERT", "RELEASE"])
+        update = sqls[2]
+        set_clause = update.split(" SET ", 1)[1].split(" WHERE ", 1)[0]
+        columns = set(re.findall(r'"(\w+)" = ', set_clause))
+        expected = {
+            "last_ping",
+            "last_start",
+            "last_start_rid",
+            "last_duration",
+            "status",
+            "alert_after",
+            "n_pings",
+            "has_confirmation_link",
+        }
+        self.assertEqual(columns, expected)
+
+    def test_a_session_cookie_neither_costs_queries_nor_varies_the_response(self) -> None:
+        self.client.login(username="alice@example.org", password="password")
+
+        with CaptureQueriesContext(connection) as ctx:
+            r = self.client.get(self.url)
+        self.assertEqual(r.status_code, 200)
+        self.assertNotIn("Vary", r.headers)
+
+        sqls = " ".join(q["sql"] for q in ctx.captured_queries)
+        self.assertNotIn("django_session", sqls)
+        self.assertNotIn("auth_user", sqls)
 
     def test_it_never_caches(self) -> None:
         r = self.client.get(self.url)
@@ -308,6 +432,7 @@ class PingTestCase(BaseTestCase):
         self.check.refresh_from_db()
         self.assertEqual(self.check.status, "new")
         self.assertIsNone(self.check.last_ping)
+        self.assertEqual(self.check.n_pings, 1)
 
         ping = Ping.objects.get()
         self.assertEqual(ping.scheme, "http")
@@ -342,6 +467,7 @@ class PingTestCase(BaseTestCase):
 
         self.check.refresh_from_db()
         self.assertEqual(self.check.status, "paused")
+        self.assertEqual(self.check.n_pings, 1)
 
         ping = Ping.objects.get()
         self.assertEqual(ping.scheme, "http")
@@ -364,6 +490,8 @@ class PingTestCase(BaseTestCase):
 
         self.check.refresh_from_db()
         self.assertEqual(self.check.status, "down")
+        self.assertTrue(self.check.last_ping)
+        self.assertIsNone(self.check.alert_after)
 
         ping = Ping.objects.get()
         self.assertEqual(ping.kind, "fail")
@@ -391,6 +519,7 @@ class PingTestCase(BaseTestCase):
         self.assertEqual(self.check.status, "new")
         self.assertIsNone(self.check.alert_after)
         self.assertFalse(self.check.last_ping)
+        self.assertEqual(self.check.n_pings, 1)
 
         ping = Ping.objects.get()
         self.assertEqual(ping.kind, "log")

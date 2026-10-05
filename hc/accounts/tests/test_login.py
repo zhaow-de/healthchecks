@@ -169,7 +169,8 @@ class LoginTestCase(BaseTestCase):
         obj.save()
 
         form = {"identity": "alice@example.org"}
-        xff = "127.0.0.2:1234,127.0.0.3"
+        # The entry the proxy wrote, after one the client sent
+        xff = "127.0.0.3,127.0.0.2:1234"
         r = self.client.post("/accounts/login/", form, HTTP_X_FORWARDED_FOR=xff)
         self.assertContains(r, "Too many attempts")
 

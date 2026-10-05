@@ -9,11 +9,10 @@ report success, start, failure and log events: the Management API records no pin
 <p>Every endpoint lives under <code>SITE_ROOT/api/v3/</code>; v3 is the only version. Paths are
 matched exactly:</p>
 <ul>
-<li>A collection path ends with a slash: <code>checks/</code>, <code>checks/&lt;uuid&gt;/pings/</code>,
-  <code>checks/&lt;uuid&gt;/flips/</code>, <code>channels/</code>, <code>status/</code>, <code>metrics/</code>. Send the
-  slash. Without it, a GET gets a 301 redirect to the slashed path, and so does a POST
-  while the server runs with <code>DEBUG</code> off; with <code>DEBUG</code> on, the setting's default,
-  a POST, PUT or PATCH gets a 500, since Django will not redirect those.</li>
+<li>A collection path is written with a trailing slash: <code>checks/</code>,
+  <code>checks/&lt;uuid&gt;/pings/</code>, <code>checks/&lt;uuid&gt;/flips/</code>, <code>channels/</code>, <code>status/</code>,
+  <code>metrics/</code>, <code>bounces/</code>. Each answers without the slash as well, the same way and
+  for every method: nothing is redirected.</li>
 <li>A path that names one check has no trailing slash: <code>checks/&lt;uuid&gt;</code>,
   <code>checks/&lt;uuid&gt;/pause</code>, <code>checks/&lt;uuid&gt;/resume</code>, <code>checks/&lt;uuid&gt;/pings/&lt;n&gt;/body</code>.
   With one, it gets 404.</li>
@@ -55,8 +54,10 @@ Each key is 32 characters long, and its prefix tells its kind:</p>
 </code></pre></div>
 
 <p>A POST request with a JSON body may carry the key in an <code>api_key</code> field of the body
-instead; the header wins when both are present. GET and DELETE requests read the
-header only, and no request reads the key from the query string.</p>
+instead; the header wins when both are present. A key in the header is checked
+before the body is read, so a wrong one gets 401 even when the body is not JSON. GET
+and DELETE requests read the header only, and no request reads the key from the
+query string.</p>
 <p>A read-only key receives check objects without the <code>uuid</code>, <code>ping_url</code>, <code>update_url</code>,
 <code>pause_url</code>, <code>resume_url</code> and <code>channels</code> fields and with an extra <code>unique_key</code> field,
 so it can read a check but cannot learn the URL that pings it. A read-only key sent
@@ -66,7 +67,8 @@ to an endpoint that needs a read-write key gets "401 wrong api key".</p>
 SITE_NAME parses the body as JSON whatever the <code>Content-Type</code> header says, so
 <code>curl --data '{...}'</code> works; a <code>multipart/form-data</code> or URL-encoded form gets
 "400 could not parse request body". An empty body counts as <code>{}</code>. Fields the
-endpoint does not know are ignored.</p>
+endpoint does not know are ignored. A body larger than 64 KiB (65,536 bytes) gets
+"413 request body too large" before anything else is checked.</p>
 <p>Field types are strict: <code>timeout</code> and <code>grace</code> are JSON integers (not strings, and not
 numbers with a fraction or a decimal point such as <code>300.0</code>), booleans are <code>true</code> or
 <code>false</code> (not <code>1</code> or <code>"true"</code>), and text fields are strings. <code>null</code> is refused for
@@ -79,11 +81,17 @@ body</a> (<code>text/plain</code>), <a href="#status">status</a> (the text <code
 responses the table below marks as text, HTML or empty. Timestamps are ISO 8601 in
 UTC (<code>2020-03-24T14:02:03+00:00</code>), and durations are integers in seconds. Every
 endpoint that returns a check returns the same <a href="#check-object">check object</a>.</p>
+<p>Every response but the HTML error pages, those of status, metrics and bounces
+included, carries
+<code>Cache-Control: max-age=0, no-cache, no-store, must-revalidate, private</code>: check
+objects hold ping URLs, which no cache should keep.</p>
 <p>Every endpoint except status, metrics and bounces answers an OPTIONS request with
 "204 No Content", and puts <code>Access-Control-Allow-Origin: *</code>,
-<code>Access-Control-Allow-Headers: X-Api-Key</code> and <code>Access-Control-Allow-Methods</code> on its
-responses, the 4xx ones included, so a browser page on another origin can call the
-API. A 301 redirect and an HTML 404 page carry none of them.</p>
+<code>Access-Control-Allow-Headers: X-Api-Key, Content-Type</code>,
+<code>Access-Control-Allow-Methods</code> (the endpoint's methods, then <code>OPTIONS</code>) and
+<code>Access-Control-Max-Age: 600</code> on its responses, the 4xx ones included, so a browser
+page on another origin can call the API. Only the HTML 404 page of a path that
+matches no endpoint carries none of them.</p>
 <h3 id="status-codes">Status Codes and Errors</h3>
 <table>
 <thead>
@@ -108,11 +116,6 @@ API. A 301 redirect and an HTML 404 page carry none of them.</p>
 <td>204</td>
 <td>empty</td>
 <td>The answer to an OPTIONS request.</td>
-</tr>
-<tr>
-<td>301</td>
-<td>empty</td>
-<td>The path lacks its trailing slash; the <code>Location</code> header holds the right path. A POST gets this only while <code>DEBUG</code> is off.</td>
 </tr>
 <tr>
 <td>400</td>
@@ -146,13 +149,18 @@ API. A 301 redirect and an HTML 404 page carry none of them.</p>
 </tr>
 <tr>
 <td>404</td>
-<td>HTML page or empty</td>
-<td>The check, the ping or the ping's body does not exist, or the path matches no endpoint (a misspelled UUID, a wrong trailing slash).</td>
+<td>empty</td>
+<td>The check, the ping or the ping's body does not exist.</td>
+</tr>
+<tr>
+<td>404</td>
+<td>HTML page</td>
+<td>The path matches no endpoint (a misspelled UUID, a trailing slash after a path that names one check).</td>
 </tr>
 <tr>
 <td>405</td>
 <td>empty</td>
-<td>The endpoint does not take this method (HEAD included).</td>
+<td>The endpoint does not take this method (HEAD included); the <code>Allow</code> header lists the methods it takes.</td>
 </tr>
 <tr>
 <td>409</td>
@@ -160,9 +168,14 @@ API. A 301 redirect and an HTML 404 page carry none of them.</p>
 <td><a href="#resume-check">Resume</a> was called on a check that is not paused.</td>
 </tr>
 <tr>
+<td>413</td>
+<td><code>{"error": "request body too large"}</code></td>
+<td>A POST body is larger than 64 KiB (65,536 bytes).</td>
+</tr>
+<tr>
 <td>500</td>
 <td>HTML page</td>
-<td>A server error; <a href="#status">status</a> returns it when the database query fails. Also a POST, PUT or PATCH to a collection path without its trailing slash while <code>DEBUG</code> is on, and a <code>tags</code> value over 500 characters on PostgreSQL.</td>
+<td>A server error; <a href="#status">status</a> returns it when the database query fails.</td>
 </tr>
 </tbody>
 </table>
@@ -562,8 +575,8 @@ the check's UUID can construct them itself.</p>
 <div class="highlight"><pre><span></span><code>GET SITE_ROOT/api/v3/checks/
 </code></pre></div>
 
-<p>Returns a list of the project's checks, optionally filtered by slug and by one or
-more tags.</p>
+<p>Returns a list of the project's checks, in the order they were created, optionally
+filtered by slug and by one or more tags.</p>
 <p><strong>Authentication:</strong> a read-write or a read-only key, in the <code>X-Api-Key</code> header.</p>
 <h3>Parameters</h3>
 <table>
@@ -827,7 +840,7 @@ key works with either identifier; the response has the fields of the key's kind.
 </tr>
 <tr>
 <td>404</td>
-<td>HTML page or empty</td>
+<td>empty</td>
 <td>No check has this UUID, or the key's project has no check with this <code>unique_key</code>.</td>
 </tr>
 </tbody>
@@ -883,7 +896,7 @@ the ones that need more than a line.</p>
 <tr>
 <td><code>tags</code></td>
 <td>body</td>
-<td>string, at most 500 characters; the API does not check the length, and a longer value is stored whole on SQLite and gets a 500 on PostgreSQL</td>
+<td>string, at most 500 characters</td>
 <td>no</td>
 <td><code>""</code></td>
 <td>Space-separated tags, for example <code>"reports staging"</code>.</td>
@@ -891,7 +904,7 @@ the ones that need more than a line.</p>
 <tr>
 <td><code>desc</code></td>
 <td>body</td>
-<td>string</td>
+<td>string, at most 10,000 characters</td>
 <td>no</td>
 <td><code>""</code></td>
 <td>The description.</td>
@@ -1432,7 +1445,7 @@ rules, and the <a href="#field-notes">field notes</a> apply; only the defaults d
 </tr>
 <tr>
 <td>404</td>
-<td>HTML page or empty</td>
+<td>empty</td>
 <td>No check has this UUID, or it was deleted during the update.</td>
 </tr>
 </tbody>
@@ -1538,7 +1551,7 @@ header is sometimes required by some network proxies and web servers.</p>
 </tr>
 <tr>
 <td>404</td>
-<td>HTML page</td>
+<td>empty</td>
 <td>No check has this UUID.</td>
 </tr>
 </tbody>
@@ -1642,7 +1655,7 @@ header is sometimes required by some network proxies and web servers.</p>
 </tr>
 <tr>
 <td>404</td>
-<td>HTML page</td>
+<td>empty</td>
 <td>No check has this UUID.</td>
 </tr>
 <tr>
@@ -1749,7 +1762,7 @@ body is not read).</p>
 </tr>
 <tr>
 <td>404</td>
-<td>HTML page</td>
+<td>empty</td>
 <td>No check has this UUID, or it is already deleted.</td>
 </tr>
 </tbody>
@@ -1874,17 +1887,17 @@ them.</p>
 <tr>
 <td><code>scheme</code></td>
 <td>string</td>
-<td><code>http</code> or <code>https</code>, from the <code>X-Forwarded-Proto</code> request header; <code>http</code> when it is absent.</td>
+<td><code>https</code> when the ping reached the server over HTTPS, as its reverse proxy reports in the <code>X-Forwarded-Proto</code> request header; <code>http</code> otherwise.</td>
 </tr>
 <tr>
 <td><code>remote_addr</code></td>
-<td>string</td>
-<td>The client's IP address (the first address in <code>X-Forwarded-For</code> when present).</td>
+<td>string or null</td>
+<td>The client's IP address: the <code>X-Forwarded-For</code> entry that the server's <code>TRUSTED_PROXY_HOPS</code> setting selects from the right, or the address of the connection. <code>null</code> when that is not an IP address.</td>
 </tr>
 <tr>
 <td><code>method</code></td>
 <td>string</td>
-<td>The HTTP method of the ping.</td>
+<td>The HTTP method of the ping, cut to 10 characters.</td>
 </tr>
 <tr>
 <td><code>ua</code></td>
@@ -1932,7 +1945,7 @@ says only how SITE_NAME counted the ping.</p>
 </tr>
 <tr>
 <td>404</td>
-<td>HTML page</td>
+<td>empty</td>
 <td>No check has this UUID.</td>
 </tr>
 </tbody>
@@ -2012,7 +2025,7 @@ Backup finished, 42 files
 </tr>
 <tr>
 <td>404</td>
-<td>HTML page</td>
+<td>empty</td>
 <td>The check does not exist, the ping does not exist or is older than the ping log limit, or the ping has no body data.</td>
 </tr>
 </tbody>
@@ -2023,7 +2036,8 @@ Backup finished, 42 files
 GET SITE_ROOT/api/v3/checks/&lt;unique_key&gt;/flips/
 </code></pre></div>
 
-<p>Returns a list of "flips" this check has experienced, most recent first. A flip is a
+<p>Returns a list of "flips" this check has experienced, most recent first, by the
+time of the flip (<code>timestamp</code>). A flip is a
 change of status: the check going up or down, and also the changes that pausing and
 resuming make. <code>up</code> is <code>1</code> when the check became up and <code>0</code> for every other new
 status, paused and new included.</p>
@@ -2136,7 +2150,7 @@ Clearing a check's events in the web UI removes all of its flips at once.</p>
 </tr>
 <tr>
 <td>404</td>
-<td>HTML page or empty</td>
+<td>empty</td>
 <td>No check has this UUID, or the key's project has no check with this <code>unique_key</code>.</td>
 </tr>
 </tbody>
@@ -2235,6 +2249,7 @@ monitor at it with GET.</p>
 
 <div class="highlight"><pre><span></span><code><span class="kr">HTTP</span><span class="o">/</span><span class="m">1.1</span> <span class="m">200</span> <span class="ne">OK</span>
 <span class="na">Content-Type</span><span class="o">:</span> <span class="l">text/html; charset=utf-8</span>
+<span class="na">Cache-Control</span><span class="o">:</span> <span class="l">max-age=0, no-cache, no-store, must-revalidate, private</span>
 
 OK
 </code></pre></div>

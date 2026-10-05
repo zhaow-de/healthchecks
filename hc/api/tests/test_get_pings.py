@@ -85,7 +85,7 @@ class GetPingsTestCase(BaseTestCase):
         self.a1.ping_set.create(n=3, rid=a, created=EPOCH + m * 2)
         self.a1.ping_set.create(n=4, rid=b, created=EPOCH + m * 6)
 
-        with self.assertNumQueries(4):
+        with self.assertNumQueries(3):
             doc = self.get().json()
             self.assertEqual(doc["pings"][0]["duration"], 300.0)
             self.assertEqual(doc["pings"][1]["duration"], 120.0)
@@ -108,7 +108,7 @@ class GetPingsTestCase(BaseTestCase):
             self.a1.ping_set.create(n=i, rid=uuid4(), created=EPOCH + td(minutes=i))
 
         # Make sure we don't run Ping.duration() per ping:
-        with self.assertNumQueries(4):
+        with self.assertNumQueries(3):
             doc = self.get().json()
             for d in doc["pings"]:
                 self.assertNotIn("duration", d)

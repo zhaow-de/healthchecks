@@ -281,8 +281,8 @@ class ProjectManager(models.Manager["Project"]):
         then calls Project.compare_api_key().
         """
 
-        # The owner comes along, so owner_profile costs one query, not two
-        q = Project.objects.select_related("owner")
+        # The owner and the profile come along, so owner_profile costs no query
+        q = Project.objects.select_related("owner__profile")
         if accept_rw and api_key.startswith("hcw_"):
             q = q.filter(api_key__startswith=api_key[4:12])
         elif accept_ro and api_key.startswith("hcr_"):
@@ -300,7 +300,7 @@ class Project(models.Model):
     api_key = models.CharField(max_length=128, blank=True, db_index=True)
     api_key_readonly = models.CharField(max_length=128, blank=True, db_index=True)
     ping_key = models.CharField(max_length=128, blank=True, null=True, unique=True)
-    show_slugs = models.BooleanField(default=False)
+    show_slugs = models.BooleanField(default=True)
 
     objects = ProjectManager()
     # used in hc.front.views to cache the aggregate status of all checks in the project

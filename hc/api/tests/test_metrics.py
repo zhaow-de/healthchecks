@@ -1,3 +1,6 @@
+import hmac
+from unittest.mock import patch
+
 from django.test.utils import override_settings
 from django.utils.timezone import now
 
@@ -52,3 +55,15 @@ class MetricsTestCase(BaseTestCase):
     def test_it_handles_incorrect_metrics_key(self) -> None:
         r = self.client.get(self.url, HTTP_X_METRICS_KEY="bar")
         self.assertEqual(r.status_code, 403)
+
+    def test_it_handles_a_missing_or_non_ascii_metrics_key(self) -> None:
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+        self.assertEqual(self.client.get(self.url, HTTP_X_METRICS_KEY="fö").status_code, 403)
+
+    def test_it_compares_the_key_in_constant_time(self) -> None:
+        with patch("hc.api.views.hmac.compare_digest", wraps=hmac.compare_digest) as compare_digest:
+            r = self.client.get(self.url, HTTP_X_METRICS_KEY="foo")
+
+        self.assertEqual(r.status_code, 200)
+        compare_digest.assert_called_once_with(b"foo", b"foo")
+        self.assertIn("no-store", r["Cache-Control"])

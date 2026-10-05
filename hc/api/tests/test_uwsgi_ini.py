@@ -49,3 +49,14 @@ class UwsgiIniTestCase(SimpleTestCase):
     def test_it_prunes_daily(self) -> None:
         cron = ("cron2", "minute=17,hour=3,unique=1,harakiri=1800 ./manage.py prune --skip-checks")
         self.assertIn(cron, uwsgi_options())
+
+    def test_limit_post_is_djangos_body_limit(self) -> None:
+        option = ("limit-post", str(settings.DATA_UPLOAD_MAX_MEMORY_SIZE))
+        self.assertIn(option, uwsgi_options())
+
+    def test_it_leaves_static_files_to_whitenoise(self) -> None:
+        keys = {key for key, _ in uwsgi_options()}
+        self.assertFalse(keys & {"check-static", "static-map", "static-gzip-dir"})
+
+    def test_it_migrates_as_an_asap_hook(self) -> None:
+        self.assertIn(("hook-asap", "exec:./manage.py migrate"), uwsgi_options())

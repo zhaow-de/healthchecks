@@ -1,9 +1,13 @@
 from datetime import UTC, datetime
 from datetime import timedelta as td
+from typing import Any
+from unittest.mock import patch
 
 import time_machine
 from django.test.utils import override_settings
+from django.utils.timezone import now
 
+from hc.accounts.models import Project
 from hc.api.models import Channel, Check, Flip, Ping
 from hc.test import BaseTestCase
 
@@ -27,6 +31,9 @@ class DetailsTestCase(BaseTestCase):
 
     @override_settings(SITE_NAME="Mychecks")
     def test_it_works(self) -> None:
+        self.project.show_slugs = False
+        self.project.save()
+
         self.check.kind = "cron"
         self.check.tz = "Europe/Berlin"
         self.check.save()
@@ -54,6 +61,9 @@ class DetailsTestCase(BaseTestCase):
 
     @override_settings(PING_ENDPOINT="http://ping.example.org/")
     def test_it_shows_no_ping_email_address(self) -> None:
+        self.project.show_slugs = False
+        self.project.save()
+
         self.client.login(username="alice@example.org", password="password")
         r = self.client.get(self.url)
         self.assertContains(r, f"http://ping.example.org/{self.check.code}", status_code=200)
@@ -308,10 +318,29 @@ class DetailsTestCase(BaseTestCase):
 
     def test_it_saves_url_format_preference(self) -> None:
         self.client.login(username="alice@example.org", password="password")
-        self.client.get(self.url + "?urls=slug")
+        self.client.get(self.url + "?urls=uuid")
+        self.project.refresh_from_db()
+        self.assertFalse(self.project.show_slugs)
 
+        self.client.get(self.url + "?urls=slug")
         self.project.refresh_from_db()
         self.assertTrue(self.project.show_slugs)
+
+    def test_it_handles_a_project_deleted_after_it_was_read(self) -> None:
+        def get_and_delete(*args: Any, **kwargs: Any) -> Check:
+            check = Check.objects.select_related("project").get(id=self.check.id)
+            Project.objects.filter(id=self.project.id).delete()
+            return check
+
+        # The failed save marks the test's transaction for rollback, so the session
+        # must stay unmodified: its save would fail and answer 400
+        self.profile.last_active_date = now()
+        self.profile.save()
+
+        self.client.login(username="alice@example.org", password="password")
+        with patch("hc.front.views._get_check_for_user", get_and_delete):
+            r = self.client.get(self.url + "?urls=slug")
+        self.assertEqual(r.status_code, 404)
 
     def test_it_outputs_period_grace_as_integers(self) -> None:
         self.check.timeout = td(seconds=123)

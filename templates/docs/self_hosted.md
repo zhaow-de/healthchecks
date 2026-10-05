@@ -172,6 +172,34 @@ dictionary (a standard Django setting, [docs](https://docs.djangoproject.com/en/
 nothing, but every email fails with Django's `InvalidMailer` error ("The 'use_ssl'
 and 'use_tls' OPTIONS are incompatible").
 
+### Example: Amazon SES {: #ses }
+
+Amazon SES takes email over SMTP with STARTTLS on port 587:
+
+```ini
+DEFAULT_FROM_EMAIL=healthchecks@example.org
+EMAIL_HOST=email-smtp.<region>.amazonaws.com
+EMAIL_PORT=587
+EMAIL_HOST_USER=<SES SMTP user name>
+EMAIL_HOST_PASSWORD=<SES SMTP password>
+EMAIL_USE_TLS=True
+```
+
+- `EMAIL_HOST` is the SMTP endpoint of the AWS region your SES account sends from,
+  such as `email-smtp.eu-central-1.amazonaws.com`.
+- `EMAIL_HOST_USER` and `EMAIL_HOST_PASSWORD` are SES SMTP credentials, which the SES
+  console creates under its SMTP settings. An IAM access key ID and its secret access
+  key are not SMTP credentials, and SES refuses them.
+- [DEFAULT_FROM_EMAIL](../self_hosted_configuration/#DEFAULT_FROM_EMAIL) has to be a
+  verified identity in SES, the address itself or its domain: SES refuses a message
+  from any sender it has not verified. Leave
+  [SERVER_EMAIL](../self_hosted_configuration/#SERVER_EMAIL) and
+  [EMAIL_MAIL_FROM_TMPL](../self_hosted_configuration/#EMAIL_MAIL_FROM_TMPL) unset,
+  or point them at verified addresses too.
+- While the SES account is in the sandbox, SES delivers only to verified addresses
+  as well: verify the user's own email address, each `ADMINS` address and the address
+  of each email integration, or ask AWS for production access.
+
 ## Sending Status Notifications {: #sending-notifications }
 
 The `sendalerts` management command continuously polls the database for any checks
@@ -291,8 +319,10 @@ account's email it gets per-email limits of its own and skips the per-IP one. A 
 browser shares the per-email limits with everyone else, so a run of wrong passwords
 for the account's email, from anywhere, can lock it out; and 20 attempts from one
 address, on either form, lock out every new browser behind that address until the
-limit refills. The client address is the one the reverse proxy puts in
-`X-Forwarded-For` (see [Reverse Proxy](../self_hosted_docker/#tls-termination)).
+limit refills. The client address is the one your reverse proxy puts in
+`X-Forwarded-For`, as [TRUSTED_PROXY_HOPS](../self_hosted_configuration/#TRUSTED_PROXY_HOPS)
+selects it; attempts whose address is not an IP address share one limit (see
+[Reverse Proxy and TLS](../self_hosted_docker/#tls-termination)).
 
 To get back in, wait for the limits to refill, log in from a browser that has
 logged in before, use the login link sent by email if email is set up, or clear
@@ -309,14 +339,21 @@ per-email limits, but not the per-IP one, and has other effects, listed there.
 
 ## Before Going Live {: #checklist }
 
-* `DEBUG=False`. The default is `True`, and the Docker image does not change it; the
-  sample `.env` sets `False`.
-* [SECRET_KEY](../self_hosted_configuration/#SECRET_KEY) set to a random value before
-  the first API key is created, and kept.
-* [SITE_ROOT](../self_hosted_configuration/#SITE_ROOT) set to the public URL, and
-  `ALLOWED_HOSTS` unset or listing its host.
-* A reverse proxy in front that terminates TLS and sets `X-Forwarded-For` and
-  `X-Forwarded-Proto` (see [Reverse Proxy](../self_hosted_docker/#tls-termination)).
+* `DEBUG=False`. The Docker image sets it; from source, the default is `True`.
+* [SECRET_KEY](../self_hosted_configuration/#SECRET_KEY) set to a random value of at
+  least 50 characters before the first API key is created, and kept. With
+  `DEBUG=False`, a weak key stops the start.
+* [SITE_ROOT](../self_hosted_configuration/#SITE_ROOT) set to the public `https://`
+  URL, which marks the console's cookies Secure, and `ALLOWED_HOSTS` unset or listing
+  its host.
+* A reverse proxy in front that terminates TLS, passes `Host`, and sets
+  `X-Forwarded-For` and `X-Forwarded-Proto`, with
+  [TRUSTED_PROXY_HOPS](../self_hosted_configuration/#TRUSTED_PROXY_HOPS) matching the
+  number of proxies (see [Reverse Proxy and TLS](../self_hosted_docker/#tls-termination)).
+* Ping URLs over HTTPS, or the proxy's redirect to HTTPS kept off `/ping/` (see
+  [Pings over Plain HTTP](../self_hosted_docker/#http-pings)).
+* [SECURE_HSTS_SECONDS](../self_hosted_configuration/#SECURE_HSTS_SECONDS) raised once
+  HTTPS works, if you want browsers to use HTTPS only.
 * Email set up, if you want email alerts, and
   [ADMINS](../self_hosted_configuration/#ADMINS) set to receive the error emails.
 * Backups, and a restore tried once.

@@ -5,16 +5,21 @@ from urllib.parse import urlsplit
 from django.apps import AppConfig
 from django.conf import settings
 from django.core import checks
+from django.core.checks.security.base import check_secret_key
 from django.db.backends.base.base import BaseDatabaseWrapper
 from django.db.backends.signals import connection_created
 from django.http.request import split_domain_port, validate_host
 
 
-def set_incremental_auto_vacuum(sender: object, connection: BaseDatabaseWrapper, **kwargs: Any) -> None:
-    """Give a SQLite file with no pages yet auto_vacuum INCREMENTAL, so prune can free pages.
+def set_up_sqlite_file(sender: object, connection: BaseDatabaseWrapper, **kwargs: Any) -> None:
+    """Give a SQLite file with no pages yet auto_vacuum INCREMENTAL, so prune can free pages,
+    and switch any file not in WAL mode to WAL.
 
-    The mode takes effect only before the first table exists, and setting it on an
-    existing file writes the header, so any other file is only read here.
+    auto_vacuum takes effect only while the file has no pages, and the switch to WAL
+    writes page 1, so the switch comes second. Setting either on an existing file
+    writes its header, so a file already in WAL mode is only read here. The check
+    runs on every connection, not only on a new file: a VACUUM INTO backup comes out
+    in rollback mode, and the first connection after a restore switches it back.
     """
     if connection.vendor != "sqlite":
         return
@@ -24,15 +29,20 @@ def set_incremental_auto_vacuum(sender: object, connection: BaseDatabaseWrapper,
         if cursor.fetchone()[0] == 0:
             cursor.execute("PRAGMA auto_vacuum = INCREMENTAL")
 
+        # An in-memory database answers "memory" and ignores the switch
+        cursor.execute("PRAGMA journal_mode")
+        if cursor.fetchone()[0] != "wal":
+            cursor.execute("PRAGMA journal_mode = WAL")
+
 
 class ApiConfig(AppConfig):
     name = "hc.api"
 
     def ready(self) -> None:
-        connection_created.connect(set_incremental_auto_vacuum, dispatch_uid="hc.api.auto_vacuum")
+        connection_created.connect(set_up_sqlite_file, dispatch_uid="hc.api.sqlite_file")
 
 
-@checks.register()  # W001, W002, W005, E002, E003
+@checks.register()  # W001, W002, W005, E002, E003, E005
 def settings_check(
     app_configs: Sequence[AppConfig] | None,
     databases: Sequence[str] | None,
@@ -79,6 +89,16 @@ def settings_check(
             )
         )
 
+    hops = settings.TRUSTED_PROXY_HOPS
+    if not isinstance(hops, int) or hops < 0:
+        items.append(
+            checks.Error(
+                "settings.TRUSTED_PROXY_HOPS is not a whole number of 0 or more",
+                hint="Set it to the number of reverse proxies in front of Healthchecks: 0 for none, 1 for one",
+                id="hc.api.E005",
+            )
+        )
+
     if settings.TIME_ZONE != "UTC":
         items.append(
             checks.Error(
@@ -89,3 +109,27 @@ def settings_check(
         )
 
     return items
+
+
+@checks.register(checks.Tags.security)  # E004
+def secret_key_check(
+    app_configs: Sequence[AppConfig] | None,
+    databases: Sequence[str] | None,
+    **kwargs: dict[str, Any],
+) -> list[checks.CheckMessage]:
+    # Django's own check of this rule is a warning that only "check --deploy" runs
+    if settings.DEBUG:
+        return []
+
+    return [
+        checks.Error(
+            warning.msg,
+            hint=(
+                "This is an error when DEBUG is False. Set SECRET_KEY (or SECRET_KEY_FILE) "
+                "to a random value, for example the output of "
+                "python3 -c 'import secrets; print(secrets.token_urlsafe(50))'"
+            ),
+            id="hc.api.E004",
+        )
+        for warning in check_secret_key(app_configs)
+    ]

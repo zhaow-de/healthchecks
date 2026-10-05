@@ -12,10 +12,11 @@ environment of every process (see <a href="../self_hosted_source/#production">Ru
 <li>An integer setting accepts a whole number or <code>None</code>. Anything else, an empty
   value included, stops startup with a <code>ValueError</code>.</li>
 <li>A string setting set to an empty value is the empty string, not the default. For
-  <code>ADMINS</code>, <code>ALLOWED_HOSTS</code>, <code>EMAIL_HOST</code>, <code>METRICS_KEY</code>, <code>RP_ID</code>,
-  <code>SECURE_PROXY_SSL_HEADER</code>, <code>SLACK_CLIENT_ID</code> and <code>SUPPORT_EMAIL</code> that is the same
-  as unset; for the others, <code>SITE_ROOT</code>, <code>SITE_NAME</code> and <code>PING_ENDPOINT</code> among
-  them, delete the line to get the default.</li>
+  <code>ADMINS</code>, <code>ALLOWED_HOSTS</code>, <code>EMAIL_HOST</code>, <code>METRICS_KEY</code>, <code>RP_ID</code>, <code>SLACK_CLIENT_ID</code>
+  and <code>SUPPORT_EMAIL</code> that is the same as unset; for the others, <code>SITE_ROOT</code>,
+  <code>SITE_NAME</code>, <code>PING_ENDPOINT</code> and <code>SERVER_EMAIL</code> among them, delete the line to get
+  the default. An empty <code>SECURE_PROXY_SSL_HEADER</code> turns that setting off, while
+  unset it has its default.</li>
 <li>A <code>&lt;NAME&gt;_FILE</code> variable with a non-empty value names a file whose content is used
   instead of <code>&lt;NAME&gt;</code>; an empty one counts as unset, and <code>&lt;NAME&gt;</code> is read. A
   non-empty value that does not name an existing regular file stops startup with
@@ -59,7 +60,9 @@ environment of every process (see <a href="../self_hosted_source/#production">Ru
 <li><a href="#RP_ID">RP_ID</a></li>
 <li><a href="#SECRET_KEY">SECRET_KEY</a></li>
 <li><a href="#SECRET_KEY_FILE">SECRET_KEY_FILE</a></li>
+<li><a href="#SECURE_HSTS_SECONDS">SECURE_HSTS_SECONDS</a></li>
 <li><a href="#SECURE_PROXY_SSL_HEADER">SECURE_PROXY_SSL_HEADER</a></li>
+<li><a href="#SERVER_EMAIL">SERVER_EMAIL</a></li>
 <li><a href="#SITE_NAME">SITE_NAME</a></li>
 <li><a href="#SITE_ROOT">SITE_ROOT</a></li>
 <li><a href="#SLACK_CLIENT_ID">SLACK_CLIENT_ID</a></li>
@@ -67,6 +70,7 @@ environment of every process (see <a href="../self_hosted_source/#production">Ru
 <li><a href="#SLACK_CLIENT_SECRET_FILE">SLACK_CLIENT_SECRET_FILE</a></li>
 <li><a href="#SLACK_ENABLED">SLACK_ENABLED</a></li>
 <li><a href="#SUPPORT_EMAIL">SUPPORT_EMAIL</a></li>
+<li><a href="#TRUSTED_PROXY_HOPS">TRUSTED_PROXY_HOPS</a></li>
 <li><a href="#USE_GZIP_MIDDLEWARE">USE_GZIP_MIDDLEWARE</a></li>
 <li><a href="#WEBHOOKS_ENABLED">WEBHOOKS_ENABLED</a></li>
 </ul>
@@ -81,11 +85,10 @@ request/response cycle to the listed addresses. Example:</p>
 
 <p>Note: for error notifications to work, make sure you have also specified working
 SMTP credentials in the <code>EMAIL_...</code> environment variables.</p>
-<p>Django sends these emails with the subject prefix "[Django] " and from its
-<code>SERVER_EMAIL</code> setting, which no environment variable sets, so the sender is
-<code>root@localhost</code>; if your SMTP server rejects that sender, set <code>SERVER_EMAIL</code> in
-<code>hc/local_settings.py</code>. Healthchecks' own warnings and errors are not emailed: they
-go to the console only (see <a href="../self_hosted/#logs">Logs</a>).</p>
+<p>Django sends these emails with the subject prefix "[Django] " and from
+<a href="#SERVER_EMAIL">SERVER_EMAIL</a>, which defaults to
+<a href="#DEFAULT_FROM_EMAIL">DEFAULT_FROM_EMAIL</a>. Healthchecks' own warnings and errors are
+not emailed: they go to the console only (see <a href="../self_hosted/#logs">Logs</a>).</p>
 <h2 id="ALLOWED_HOSTS"><code>ALLOWED_HOSTS</code></h2>
 <p>Default: the domain part of <code>SITE_ROOT</code></p>
 <p>The host/domain names that this site can serve. Healthchecks populates this setting
@@ -109,13 +112,18 @@ Read more about it in the
 <p>The database engine to use. Possible values: <code>sqlite</code>, <code>postgres</code>.</p>
 <p>Only the exact value <code>postgres</code> selects PostgreSQL; any other value, or none, means
 SQLite. <code>DB_HOST</code>, <code>DB_PORT</code>, <code>DB_USER</code>, <code>DB_PASSWORD</code> (or <code>DB_PASSWORD_FILE</code>),
-<code>DB_CONN_MAX_AGE</code>, <code>DB_SSLMODE</code> and <code>DB_TARGET_SESSION_ATTRS</code> are read only when
-<code>DB=postgres</code>. With SQLite, only <a href="#DB_NAME">DB_NAME</a>, a file path, applies.</p>
+<code>DB_SSLMODE</code> and <code>DB_TARGET_SESSION_ATTRS</code> are read only when <code>DB=postgres</code>. With
+SQLite, only <a href="#DB_NAME">DB_NAME</a>, a file path, and
+<a href="#DB_CONN_MAX_AGE">DB_CONN_MAX_AGE</a> apply.</p>
 <h2 id="DB_CONN_MAX_AGE"><code>DB_CONN_MAX_AGE</code></h2>
-<p>Default: <code>0</code></p>
+<p>Default: <code>600</code></p>
 <p>The lifetime of a database connection, in seconds: an integer, <code>0</code> to close each
 connection at the end of its request, or <code>None</code> for unlimited persistent
-connections. PostgreSQL only.</p>
+connections. It applies to SQLite and PostgreSQL alike. With the default, each web
+server process, and each of <code>sendalerts</code> and <code>sendreports</code>, keeps its connection for
+up to 10 minutes. Before a request reuses a connection, Django checks that it still
+works (<code>CONN_HEALTH_CHECKS</code>, on), and replaces one that a PostgreSQL restart closed
+without failing the request; on SQLite the check does nothing.</p>
 <p>This is a standard Django setting, read more in
 <a href="https://docs.djangoproject.com/en/6.1/ref/settings/#conn-max-age">Django documentation</a>.</p>
 <h2 id="DB_HOST"><code>DB_HOST</code></h2>
@@ -158,12 +166,18 @@ precedence.</p>
 <p>Default: <code>True</code></p>
 <p>A boolean that turns on/off debug mode.</p>
 <p><em>Never run a Healthchecks instance in production with the debug mode turned on!</em></p>
-<p>The Docker image does not set it, so a container runs with <code>True</code> unless <code>.env</code>
-sets <code>DEBUG=False</code>, as the sample <code>.env.example</code> does.</p>
+<p>The Docker image sets <code>DEBUG=False</code>; from source, set it yourself. With
+<code>DEBUG=False</code>, a weak <a href="#SECRET_KEY">SECRET_KEY</a> stops startup.</p>
 <p>This is a standard Django setting, read more in
 <a href="https://docs.djangoproject.com/en/6.1/ref/settings/#debug">Django documentation</a>.</p>
 <h2 id="DEFAULT_FROM_EMAIL"><code>DEFAULT_FROM_EMAIL</code></h2>
 <p>Default: <code>healthchecks@example.org</code></p>
+<p>The <code>From:</code> address of every email Healthchecks sends, and its envelope sender (the
+SMTP <code>MAIL FROM</code> address) unless <a href="#EMAIL_MAIL_FROM_TMPL">EMAIL_MAIL_FROM_TMPL</a> is set.
+It is also the sender of the <code>ADMINS</code> error emails unless
+<a href="#SERVER_EMAIL">SERVER_EMAIL</a> is set. With an SMTP service that sends only from
+verified addresses, such as Amazon SES, make it one of those (see
+<a href="../self_hosted/#ses">Example: Amazon SES</a>).</p>
 <p>This is a standard Django setting, read more in
 <a href="https://docs.djangoproject.com/en/6.1/ref/settings/#default-from-email">Django documentation</a>.</p>
 <h2 id="EMAIL_HOST"><code>EMAIL_HOST</code></h2>
@@ -177,7 +191,8 @@ no login by link, no sudo mode (so Set Password, Change Email, Close Account, th
 two-factor changes and the password change in the administration panel show an
 "Email Needed" page; use <code>manage.py changepassword</code> instead), no email alerts,
 reports or <code>ADMINS</code> mail, and <code>manage.py</code> commands print the warnings
-<code>hc.api.W002</code> and <code>mail.W001</code>. See <a href="../self_hosted/#sending-emails">Sending Emails</a>.</p>
+<code>hc.api.W002</code> and <code>mail.W001</code>. See <a href="../self_hosted/#sending-emails">Sending Emails</a>,
+and <a href="../self_hosted/#ses">Example: Amazon SES</a>.</p>
 <p><strong>On using <code>local_settings.py</code>:</strong>
 Healthchecks reads SMTP settings from the <code>EMAIL_*</code> environment variables,
 and uses them to construct the <code>settings.MAILERS</code> dictionary (a standard Django setting,
@@ -332,8 +347,11 @@ The default value is 10000 (10 kilobytes). Healthchecks stores the first
 and sends the value in the <code>Ping-Body-Limit</code> response header. With <code>None</code>, the body
 is stored whole and the header is omitted.</p>
 <p>Independently, a request whose body is larger than 2,621,440 bytes (2.5 MiB) is
-refused with 400 and not recorded, and <code>None</code> does not lift that cap. Only a limit
-above 2,621,440 raises the cap, to the limit itself. See
+refused and not recorded, and <code>None</code> does not lift that cap: the Docker image's
+uWSGI closes the connection without an HTTP response, and under a server without
+that limit Django answers 400. Only a limit above 2,621,440 raises the cap, to the
+limit itself; in the Docker image, set <code>UWSGI_LIMIT_POST</code> to the same value too (see
+<a href="../self_hosted_docker/#uwsgi">uWSGI Configuration</a>). See
 <a href="../http_api/#request-body">Request Body</a>.</p>
 <p>Healthchecks stores each ping body in the database, with its ping. Keep
 <code>PING_BODY_LIMIT</code>, and the bodies your jobs send, no bigger than the output you
@@ -380,8 +398,15 @@ factor is available with or without it. An empty value counts as unset. Browsers
 allow WebAuthn only over HTTPS, or on <code>localhost</code>.</p>
 <h2 id="SECRET_KEY"><code>SECRET_KEY</code></h2>
 <p>Default: <code>---</code></p>
-<p>A secret key used for cryptographic signing. Should be set to a unique,
-unpredictable value.</p>
+<p>A secret key used for cryptographic signing. Set it to a unique, unpredictable value
+of at least 50 characters, with at least 5 different ones, that does not start with
+<code>django-insecure-</code>, for example the output of:</p>
+<div class="highlight"><pre><span></span><code>python3<span class="w"> </span>-c<span class="w"> </span><span class="s1">'import secrets; print(secrets.token_urlsafe(50))'</span>
+</code></pre></div>
+
+<p>With <code>DEBUG=False</code>, a key that breaks this rule, the default <code>---</code> included, fails
+the system check <code>hc.api.E004</code>, which stops every <code>manage.py</code> command that runs the
+system checks, <code>migrate</code> included, and so the Docker container's start.</p>
 <p>Set it once, before first use, and keep it. Changing it later:</p>
 <ul>
 <li>stops every Management API key (read-write and read-only) from working, because
@@ -392,8 +417,6 @@ unpredictable value.</p>
   verification link and unsubscribe link in emails already sent.</li>
 <li>resets the per-email <a href="../self_hosted/#login-lockout">login rate limits</a>.</li>
 </ul>
-<p>The Docker sample's <code>SECRET_KEY=---</code> must be replaced before the first API key is
-created.</p>
 <p>This is a standard Django setting, read more in
 <a href="https://docs.djangoproject.com/en/6.1/ref/settings/#secret-key">Django documentation</a>.</p>
 <h2 id="SECRET_KEY_FILE"><code>SECRET_KEY_FILE</code></h2>
@@ -402,38 +425,60 @@ created.</p>
 read the contents of the file into the <a href="#SECRET_KEY">SECRET_KEY</a> setting.
 If <code>SECRET_KEY</code> and <code>SECRET_KEY_FILE</code> are both set, <code>SECRET_KEY_FILE</code> takes
 precedence.</p>
+<h2 id="SECURE_HSTS_SECONDS"><code>SECURE_HSTS_SECONDS</code></h2>
+<p>Default: <code>0</code></p>
+<p>The <code>max-age</code>, in seconds, of the <code>Strict-Transport-Security</code> (HSTS) header that
+Healthchecks sends on every response to a request it sees as HTTPS (see
+<a href="#SECURE_PROXY_SSL_HEADER">SECURE_PROXY_SSL_HEADER</a>); <code>0</code> sends no header. A browser
+that has seen the header uses only HTTPS for the host until the <code>max-age</code> runs out,
+even if you go back to plain HTTP: turn it on once HTTPS works, with a small value
+first, such as <code>3600</code>, then <code>31536000</code> (a year). The header carries neither
+<code>includeSubDomains</code> nor <code>preload</code>. See
+<a href="../self_hosted_docker/#hsts">HSTS and the Content Security Policy</a>.</p>
+<p><code>manage.py check --deploy</code> reports the warning <code>security.W004</code> while it is <code>0</code>.</p>
+<p>This is a standard Django setting, read more in
+<a href="https://docs.djangoproject.com/en/6.1/ref/settings/#secure-hsts-seconds">Django documentation</a>.</p>
 <h2 id="SECURE_PROXY_SSL_HEADER"><code>SECURE_PROXY_SSL_HEADER</code></h2>
-<p>Default: <code>None</code></p>
-<p>Comma-separated HTTP header name and value that signifies a request is secure
-(made over https://). This information is important for CSRF protection.</p>
-<p>If Healthchecks is running behind a proxy, the proxy may be "swallowing" whether the original
-request uses HTTPS or not. In this case, you may see HTTP 403 errors when submitting
-forms (for example, trying to log in).</p>
-<p>If set, the value should contain the name of the header to look for and the required
-value, separated with comma. The header name must be specified in upper-case,
-with any dashes replaced with underscores, and prefixed with <code>HTTP_</code>. Example:</p>
+<p>Default: <code>HTTP_X_FORWARDED_PROTO,https</code></p>
+<p>The request header, and its value, that mark a request as made over HTTPS: the header
+name and the value, separated with a comma. With the default, Healthchecks treats a
+request as HTTPS when the first comma-separated item of its <code>X-Forwarded-Proto</code>
+header is exactly <code>https</code>. That decides the scheme Healthchecks records with each
+ping, whether it sends <a href="#SECURE_HSTS_SECONDS">HSTS</a>, and which of Django's CSRF checks
+a form gets.</p>
+<p>The default fits a reverse proxy that sets <code>X-Forwarded-Proto</code> itself, replacing
+what the client sent, as Caddy does, and NGINX with
+<code>proxy_set_header X-Forwarded-Proto $scheme</code> (see
+<a href="../self_hosted_docker/#tls-termination">Reverse Proxy and TLS</a>). If nothing in front
+of Healthchecks replaces that header, a client could claim HTTPS: set the variable to
+an empty value, <code>SECURE_PROXY_SSL_HEADER=</code>, to turn the setting off. In the Docker
+image, uWSGI then still treats a request with exactly <code>X-Forwarded-Proto: https</code> as
+HTTPS.</p>
+<p>The header name is written in upper case, with any dashes replaced with underscores,
+and prefixed with <code>HTTP_</code>. Example:</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># environment variable</span>
 <span class="na">SECURE_PROXY_SSL_HEADER</span><span class="o">=</span><span class="s">HTTP_X_FORWARDED_PROTO,https</span>
 </code></pre></div>
 
-<p>You should <em>only</em> set this environment variable if you control your proxy or have some
-other guarantee that it sets/strips this header appropriately.</p>
-<p>The Docker image does not need this setting: its uWSGI already treats a request with
-<code>X-Forwarded-Proto: https</code> as secure (see
-<a href="../self_hosted_docker/#tls-termination">Reverse Proxy, TLS Termination, and CSRF Protection</a>).
-Set it for other WSGI servers. Independently of it, Healthchecks records each ping's
-scheme from <code>X-Forwarded-Proto</code>.</p>
 <p><strong>Note on using <code>local_settings.py</code>:</strong>
 When Healthchecks reads settings from environment variables, it expects
 <code>SECURE_PROXY_SSL_HEADER</code> to contain header name and value, separated with comma.
 If you set <code>SECURE_PROXY_SSL_HEADER</code> in <code>local_settings.py</code>, it should be a tuple
-with two elements instead:</p>
+with two elements instead, or <code>None</code> to turn it off:</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># in local_settings.py</span>
 <span class="na">SECURE_PROXY_SSL_HEADER</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">("HTTP_X_FORWARDED_PROTO", "https")</span>
 </code></pre></div>
 
 <p>This environment variable maps to a standard Django setting, read more in
 <a href="https://docs.djangoproject.com/en/6.1/ref/settings/#secure-proxy-ssl-header">Django documentation</a>.</p>
+<h2 id="SERVER_EMAIL"><code>SERVER_EMAIL</code></h2>
+<p>Default: the value of <a href="#DEFAULT_FROM_EMAIL">DEFAULT_FROM_EMAIL</a></p>
+<p>The sender of the error emails Django sends to <a href="#ADMINS">ADMINS</a>. Leave it unset to
+send them from <code>DEFAULT_FROM_EMAIL</code>. Django's own default, <code>root@localhost</code>, is a
+sender that an SMTP service sending only from verified addresses, such as Amazon SES,
+refuses.</p>
+<p>This is a standard Django setting, read more in
+<a href="https://docs.djangoproject.com/en/6.1/ref/settings/#server-email">Django documentation</a>.</p>
 <h2 id="SITE_NAME"><code>SITE_NAME</code></h2>
 <p>Default: <code>Healthchecks</code></p>
 <p>The display name of this Healthchecks instance. Healthchecks uses it throughout
@@ -447,6 +492,11 @@ several other settings, detailed below.</p>
 automatically populates it with the domain part of <code>SITE_ROOT</code>. Under typical scenarios
 you can use the automatically populated value and do not need to set
 <code>ALLOWED_HOSTS</code> yourself.</p>
+<p>With an <code>https://</code> <code>SITE_ROOT</code>, the session, CSRF, messages, device and auto-login
+cookies are marked <code>Secure</code>, so a browser sends them over HTTPS only: log in through
+the HTTPS URL. <code>SITE_ROOT</code>'s origin is also trusted for CSRF
+(<code>CSRF_TRUSTED_ORIGINS</code>), so a form posted from it passes Django's origin check even
+when the proxy does not mark the request as HTTPS.</p>
 <p>If the SITE_ROOT contains a path (for example, <code>http://localhost:8000<b>/prefix</b></code>),
 then Healthchecks automatically sets the following additional Django settings:</p>
 <ul>
@@ -465,10 +515,9 @@ setting, read more about it in
 path unchanged, without stripping the prefix.</p>
 <p>A trailing slash is removed. A value that does not start with <code>http://</code> or
 <code>https://</code> triggers the warning <code>hc.api.W001</code>.</p>
-<p><strong>On using <code>local_settings.py</code>:</strong> Healthchecks only sets the above additional settings
-if you specify <code>SITE_ROOT</code> via an environment variable. If you instead specify it in
-<code>local_settings.py</code>, you will also need to set <code>ALLOWED_HOSTS</code>, <code>LOGIN_URL</code>, and
-<code>STATIC_URL</code> there. The route prefix follows <code>SITE_ROOT</code> wherever it is set.</p>
+<p><strong>On using <code>local_settings.py</code>:</strong> the settings above, the route prefix and the default
+of <a href="#PING_ENDPOINT">PING_ENDPOINT</a> follow a <code>SITE_ROOT</code> set there too. One of those
+settings that <code>local_settings.py</code> sets itself keeps that value.</p>
 <h2 id="SLACK_CLIENT_ID"><code>SLACK_CLIENT_ID</code></h2>
 <p>Default: <code>None</code></p>
 <p>The Slack Client ID, used by the Healthchecks integration for Slack.</p>
@@ -508,6 +557,27 @@ fails with the error "Slack notifications are not enabled."</p>
 <p>An email address to contact for help. When it is set, the login page's "Lost your
 password?" dialog shows it, and so does the email that
 <a href="../self_hosted/#sending-notifications"><code>sendflappingnotices</code></a> sends.</p>
+<h2 id="TRUSTED_PROXY_HOPS"><code>TRUSTED_PROXY_HOPS</code></h2>
+<p>Default: <code>1</code></p>
+<p>The number of reverse proxies in front of Healthchecks that write the
+<code>X-Forwarded-For</code> request header. Healthchecks records the client's address with each
+ping, and limits login attempts per client address. It takes that address from the
+<code>TRUSTED_PROXY_HOPS</code>-th entry of <code>X-Forwarded-For</code> from the right, the one the
+outermost of those proxies wrote, whatever the client put to the left of it:</p>
+<ul>
+<li><code>0</code>: clients connect to Healthchecks directly. The header is ignored, and the
+  address of the connection is used.</li>
+<li><code>1</code>: one proxy, such as Caddy or NGINX in front of the Docker container.</li>
+<li><code>2</code> or more: a chain of that many proxies that each append to the header, such as a
+  CDN or a load balancer in front of your proxy.</li>
+</ul>
+<p>For a request with fewer entries than that, or no header, the address of the
+connection is used. An entry that is not an IP address gives none: the ping's
+<code>remote_addr</code> is <code>null</code>, and such login attempts share one limit.</p>
+<p>A value below <code>0</code>, or <code>None</code>, fails the system check <code>hc.api.E005</code>, which stops every
+<code>manage.py</code> command that runs the system checks, the Docker container's start
+included. See <a href="../self_hosted_docker/#trusted-proxy-hops">TRUSTED_PROXY_HOPS</a> on the
+Docker page.</p>
 <h2 id="USE_GZIP_MIDDLEWARE"><code>USE_GZIP_MIDDLEWARE</code></h2>
 <p>Default: <code>False</code> (the Docker image sets <code>True</code>)</p>
 <p>A boolean that adds Django's <code>GZipMiddleware</code>, which compresses responses for

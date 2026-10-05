@@ -26,7 +26,7 @@ $<span class="w"> </span><span class="nb">cd</span><span class="w"> </span>healt
 $<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>./manage.py<span class="w"> </span>createsuperuser
 </code></pre></div>
 
-<p>With the default configuration, Healthchecks stores data in a SQLite file <code>hc.sqlite</code> in the project directory (<code>~/webapps/healthchecks/</code>).</p>
+<p>With the default configuration, Healthchecks stores data in a SQLite file <code>hc.sqlite</code> in the project directory (<code>~/webapps/healthchecks/</code>), in WAL mode: while it is in use, <code>hc.sqlite-wal</code> and <code>hc.sqlite-shm</code> sit beside it.</p>
 </li>
 <li>
 <p>Run tests:</p>
@@ -54,7 +54,7 @@ $<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>./
 <p><code>manage.py runserver</code> is intended for development only. In production, an instance from source needs:</p>
 <ul>
 <li>the dependencies without the development tools, and uWSGI;</li>
-<li>its settings, <code>DEBUG=False</code> among them (see <a href="../self_hosted/#checklist">Before Going Live</a>), in the environment of every process below, or in <code>hc/local_settings.py</code>;</li>
+<li>its settings, <code>DEBUG=False</code> and a strong <code>SECRET_KEY</code> among them (see <a href="../self_hosted/#checklist">Before Going Live</a>), in the environment of every process below, or in <code>hc/local_settings.py</code>: with <code>DEBUG=False</code>, a weak <a href="../self_hosted_configuration/#SECRET_KEY">SECRET_KEY</a> stops <code>migrate</code> and every other command that runs the system checks;</li>
 <li>the database migrations and the static files, after every checkout of a new version;</li>
 <li>the web application under uWSGI, behind a reverse proxy that terminates TLS;</li>
 <li><code>sendalerts</code> and <code>sendreports --loop</code>, always running;</li>
@@ -76,8 +76,8 @@ $<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>--
 <div class="highlight"><pre><span></span><code>$<span class="w"> </span>uv<span class="w"> </span>run<span class="w"> </span>--no-sync<span class="w"> </span>uwsgi<span class="w"> </span>--http<span class="w"> </span>:8000<span class="w"> </span>--module<span class="w"> </span>hc.wsgi<span class="w"> </span>--disable-logging
 </code></pre></div>
 
-<p><a href="https://github.com/zhaow-de/healthchecks/blob/main/docker/uwsgi.ini">docker/uwsgi.ini</a> is the configuration the image runs: worker count, time limits, buffer sizes, the migrations at start, the two daemons and the daily <code>prune</code>. A copy of it with <code>chdir</code> set to your project directory runs all of that from source too, under <code>uv run --no-sync uwsgi &lt;your copy&gt;</code>; its <code>./manage.py</code> commands run the first <code>python</code> on the <code>PATH</code>, which <code>uv run</code> makes the virtual environment's. With such a copy, skip the daemons and the schedule below.</p>
-<p>Put a reverse proxy in front of uWSGI that terminates TLS and sets <code>X-Forwarded-For</code> and <code>X-Forwarded-Proto</code> as <a href="../self_hosted_docker/#tls-termination">Reverse Proxy, TLS Termination, and CSRF Protection</a> describes. If submitting a form then fails with 403 "CSRF verification failed.", see <a href="../self_hosted_configuration/#SECURE_PROXY_SSL_HEADER">SECURE_PROXY_SSL_HEADER</a>.</p>
+<p><a href="https://github.com/zhaow-de/healthchecks/blob/main/docker/uwsgi.ini">docker/uwsgi.ini</a> is the configuration the image runs: worker count, time limits, buffer sizes, the request body limit, the migrations at start, the two daemons and the daily <code>prune</code>. A copy of it with <code>chdir</code> set to your project directory runs all of that from source too, under <code>uv run --no-sync uwsgi &lt;your copy&gt;</code>; its <code>./manage.py</code> commands run the first <code>python</code> on the <code>PATH</code>, which <code>uv run</code> makes the virtual environment's. With such a copy, skip the daemons and the schedule below.</p>
+<p>Put a reverse proxy in front of uWSGI that terminates TLS, passes <code>Host</code>, and sets <code>X-Forwarded-For</code> and <code>X-Forwarded-Proto</code>, as <a href="../self_hosted_docker/#tls-termination">Reverse Proxy and TLS</a> describes. Healthchecks trusts <code>X-Forwarded-Proto</code> by default (<a href="../self_hosted_configuration/#SECURE_PROXY_SSL_HEADER">SECURE_PROXY_SSL_HEADER</a>), and takes the client's address from <code>X-Forwarded-For</code> as <a href="../self_hosted_configuration/#TRUSTED_PROXY_HOPS">TRUSTED_PROXY_HOPS</a> says, 1 proxy by default; with no proxy in front, set it to 0.</p>
 <h3 id="daemons">Running sendalerts and sendreports</h3>
 <p><code>sendalerts</code> and <code>sendreports --loop</code> have to be always running: started on boot, and started again when they exit. With systemd, give each a service unit. For example, <code>/etc/systemd/system/hc-sendalerts.service</code>, with the checkout in <code>/home/hc/healthchecks</code> and the settings in <code>/home/hc/healthchecks.env</code> as <code>NAME=value</code> lines:</p>
 <div class="highlight"><pre><span></span><code><span class="k">[Unit]</span>

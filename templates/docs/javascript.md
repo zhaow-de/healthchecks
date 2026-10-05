@@ -54,9 +54,9 @@ runJob();
 ## Browser
 
 You can also send pings from a browser environment. SITE_NAME sets
-`Access-Control-Allow-Origin: *` on successful (200) responses, so a GET,
-HEAD, or POST with a `text/plain` body (or no body) from a page on another origin
-works:
+`Access-Control-Allow-Origin: *` on successful (200) responses, and exposes their
+`Ping-Body-Limit` header, so a GET, HEAD or POST from a page on another origin works,
+and the page can read the response:
 
 ```js
 var xhr = new XMLHttpRequest();
@@ -67,15 +67,12 @@ xhr.send(null);
 Error responses carry no CORS header, so the page cannot read their status:
 `XMLHttpRequest` reports status 0 and `fetch` rejects, instead of showing the 404.
 
-Do not send a request that needs a CORS preflight, such as one with a JSON content
-type, custom headers, or a method other than GET, HEAD and POST. SITE_NAME records
-the preflight OPTIONS request as a ping, and the browser then blocks the real
-request, because the response has no `Access-Control-Allow-Methods` or
-`Access-Control-Allow-Headers` header. The preflight is classified as a ping of that
-URL with an empty body would be: by default, as a ping of the URL's kind (a preflight
-of a `/fail` URL is a failure); on a check that accepts POST requests only, as
-"Ignored"; on a check that filters by keywords, as "Ignored", or as a failure when
-"If no keywords match" is set to "Classify the ping as failure" (see
-[How SITE_NAME Interprets a Ping](../http_api/#interpreting-pings)).
+A request that needs a CORS preflight, such as a POST with a JSON content type or a
+request with custom headers, works too. SITE_NAME answers the preflight OPTIONS
+request with "204 No Content", allows the methods GET, HEAD and POST and the headers
+the browser asks for, and records no ping for it; the request that follows is
+recorded as usual (see [Responses](../http_api/#responses)). A method other than GET,
+HEAD and POST, such as PUT, is not allowed, and the browser blocks it after the
+preflight.
 
 A ping URL in a page's source can be read, and used, by anyone who loads the page.

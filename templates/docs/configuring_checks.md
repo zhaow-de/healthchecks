@@ -35,10 +35,12 @@ dialog. It is the "Name and Tags" dialog, with these four fields:
 Good naming becomes especially important as you add more checks to the
 account. SITE_NAME will display check names in the web interface, email reports,
 and notifications. A name can be up to 100 characters long.
-* **Slug**: URL-friendly identifier used in [slug-based ping URLs](../http_api/#success-slug)
-(an alternative to the default UUID-based ping URLs). The slug should only contain the
-following characters: `a-z`, `0-9`, hyphens, and underscores. If you don't plan to use
-slug-based ping URLs, you can leave the slug field empty. The "Use Suggested" button
+* **Slug**: URL-friendly identifier used in [slug-based ping URLs](../http_api/#success-slug),
+which the checks list shows by default (its "uuid" / "slug" switch shows the UUID-based
+ones instead). A slug-based URL also needs the project's ping key, which the project's
+**Settings** page generates. The slug should only contain the
+following characters: `a-z`, `0-9`, hyphens, and underscores. A check without a slug has
+only its UUID-based URL. The "Use Suggested" button
 beside the field fills in a slug derived from the name. A slug can be up to 100
 characters long.
 * **Tags**: a space-separated list of optional labels. Use tags to organize and group

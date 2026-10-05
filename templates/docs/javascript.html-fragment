@@ -47,9 +47,9 @@ async/await and the <code>ping</code> function above:</p>
 
 <h2>Browser</h2>
 <p>You can also send pings from a browser environment. SITE_NAME sets
-<code>Access-Control-Allow-Origin: *</code> on successful (200) responses, so a GET,
-HEAD, or POST with a <code>text/plain</code> body (or no body) from a page on another origin
-works:</p>
+<code>Access-Control-Allow-Origin: *</code> on successful (200) responses, and exposes their
+<code>Ping-Body-Limit</code> header, so a GET, HEAD or POST from a page on another origin works,
+and the page can read the response:</p>
 <div class="highlight"><pre><span></span><code><span class="kd">var</span><span class="w"> </span><span class="nx">xhr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">XMLHttpRequest</span><span class="p">();</span>
 <span class="nx">xhr</span><span class="p">.</span><span class="nx">open</span><span class="p">(</span><span class="s1">&#39;GET&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;PING_URL&#39;</span><span class="p">,</span><span class="w"> </span><span class="kc">true</span><span class="p">);</span>
 <span class="nx">xhr</span><span class="p">.</span><span class="nx">send</span><span class="p">(</span><span class="kc">null</span><span class="p">);</span>
@@ -57,14 +57,11 @@ works:</p>
 
 <p>Error responses carry no CORS header, so the page cannot read their status:
 <code>XMLHttpRequest</code> reports status 0 and <code>fetch</code> rejects, instead of showing the 404.</p>
-<p>Do not send a request that needs a CORS preflight, such as one with a JSON content
-type, custom headers, or a method other than GET, HEAD and POST. SITE_NAME records
-the preflight OPTIONS request as a ping, and the browser then blocks the real
-request, because the response has no <code>Access-Control-Allow-Methods</code> or
-<code>Access-Control-Allow-Headers</code> header. The preflight is classified as a ping of that
-URL with an empty body would be: by default, as a ping of the URL's kind (a preflight
-of a <code>/fail</code> URL is a failure); on a check that accepts POST requests only, as
-"Ignored"; on a check that filters by keywords, as "Ignored", or as a failure when
-"If no keywords match" is set to "Classify the ping as failure" (see
-<a href="../http_api/#interpreting-pings">How SITE_NAME Interprets a Ping</a>).</p>
+<p>A request that needs a CORS preflight, such as a POST with a JSON content type or a
+request with custom headers, works too. SITE_NAME answers the preflight OPTIONS
+request with "204 No Content", allows the methods GET, HEAD and POST and the headers
+the browser asks for, and records no ping for it; the request that follows is
+recorded as usual (see <a href="../http_api/#responses">Responses</a>). A method other than GET,
+HEAD and POST, such as PUT, is not allowed, and the browser blocks it after the
+preflight.</p>
 <p>A ping URL in a page's source can be read, and used, by anyone who loads the page.</p>

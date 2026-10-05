@@ -25,7 +25,7 @@ Healthchecks uses [uv](https://docs.astral.sh/uv/) to manage the Python interpre
         $ uv run ./manage.py migrate
         $ uv run ./manage.py createsuperuser
 
-    With the default configuration, Healthchecks stores data in a SQLite file `hc.sqlite` in the project directory (`~/webapps/healthchecks/`).
+    With the default configuration, Healthchecks stores data in a SQLite file `hc.sqlite` in the project directory (`~/webapps/healthchecks/`), in WAL mode: while it is in use, `hc.sqlite-wal` and `hc.sqlite-shm` sit beside it.
 
 * Run tests:
 
@@ -50,7 +50,7 @@ Outside Docker, nothing reads a `.env` file: Healthchecks reads its settings fro
 `manage.py runserver` is intended for development only. In production, an instance from source needs:
 
 * the dependencies without the development tools, and uWSGI;
-* its settings, `DEBUG=False` among them (see [Before Going Live](../self_hosted/#checklist)), in the environment of every process below, or in `hc/local_settings.py`;
+* its settings, `DEBUG=False` and a strong `SECRET_KEY` among them (see [Before Going Live](../self_hosted/#checklist)), in the environment of every process below, or in `hc/local_settings.py`: with `DEBUG=False`, a weak [SECRET_KEY](../self_hosted_configuration/#SECRET_KEY) stops `migrate` and every other command that runs the system checks;
 * the database migrations and the static files, after every checkout of a new version;
 * the web application under uWSGI, behind a reverse proxy that terminates TLS;
 * `sendalerts` and `sendreports --loop`, always running;
@@ -74,9 +74,9 @@ Run the web application under uWSGI, from the project's root directory:
 
     $ uv run --no-sync uwsgi --http :8000 --module hc.wsgi --disable-logging
 
-[docker/uwsgi.ini](https://github.com/zhaow-de/healthchecks/blob/main/docker/uwsgi.ini) is the configuration the image runs: worker count, time limits, buffer sizes, the migrations at start, the two daemons and the daily `prune`. A copy of it with `chdir` set to your project directory runs all of that from source too, under `uv run --no-sync uwsgi <your copy>`; its `./manage.py` commands run the first `python` on the `PATH`, which `uv run` makes the virtual environment's. With such a copy, skip the daemons and the schedule below.
+[docker/uwsgi.ini](https://github.com/zhaow-de/healthchecks/blob/main/docker/uwsgi.ini) is the configuration the image runs: worker count, time limits, buffer sizes, the request body limit, the migrations at start, the two daemons and the daily `prune`. A copy of it with `chdir` set to your project directory runs all of that from source too, under `uv run --no-sync uwsgi <your copy>`; its `./manage.py` commands run the first `python` on the `PATH`, which `uv run` makes the virtual environment's. With such a copy, skip the daemons and the schedule below.
 
-Put a reverse proxy in front of uWSGI that terminates TLS and sets `X-Forwarded-For` and `X-Forwarded-Proto` as [Reverse Proxy, TLS Termination, and CSRF Protection](../self_hosted_docker/#tls-termination) describes. If submitting a form then fails with 403 "CSRF verification failed.", see [SECURE_PROXY_SSL_HEADER](../self_hosted_configuration/#SECURE_PROXY_SSL_HEADER).
+Put a reverse proxy in front of uWSGI that terminates TLS, passes `Host`, and sets `X-Forwarded-For` and `X-Forwarded-Proto`, as [Reverse Proxy and TLS](../self_hosted_docker/#tls-termination) describes. Healthchecks trusts `X-Forwarded-Proto` by default ([SECURE_PROXY_SSL_HEADER](../self_hosted_configuration/#SECURE_PROXY_SSL_HEADER)), and takes the client's address from `X-Forwarded-For` as [TRUSTED_PROXY_HOPS](../self_hosted_configuration/#TRUSTED_PROXY_HOPS) says, 1 proxy by default; with no proxy in front, set it to 0.
 
 ### Running sendalerts and sendreports {: #daemons }
 
