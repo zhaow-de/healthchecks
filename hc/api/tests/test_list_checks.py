@@ -175,6 +175,8 @@ class ListChecksTestCase(BaseTestCase):
 
         # When using readonly keys, the ping URLs should not be exposed:
         self.assertNotContains(r, str(self.a1.code))
+        # Nor the channel ids: a read-only check object posted to create must not name another project's channels
+        self.assertNotContains(r, '"channels"')
 
     def test_it_reports_started_separately(self) -> None:
         self.a1.last_start = now()

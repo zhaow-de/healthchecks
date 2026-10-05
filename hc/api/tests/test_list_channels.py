@@ -1,3 +1,4 @@
+from hc.accounts.models import Project
 from hc.api.models import Channel
 from hc.test import BaseTestCase, TestHttpResponse
 
@@ -24,10 +25,35 @@ class ListChannelsTestCase(BaseTestCase):
         doc = r.json()
         self.assertEqual(len(doc["channels"]), 1)
 
+        # A read-only key gets this object too, so a new field must not carry a URL or token
         c = doc["channels"][0]
-        self.assertEqual(c["id"], str(self.c1.code))
-        self.assertEqual(c["kind"], "email")
-        self.assertEqual(c["name"], "Email to Alice")
+        self.assertEqual(c, {"id": str(self.c1.code), "name": "Email to Alice", "kind": "email", "disabled": False})
+
+    def test_it_reports_a_disabled_channel(self) -> None:
+        self.c1.disabled = True
+        self.c1.save()
+
+        c = self.get().json()["channels"][0]
+        self.assertIs(c["disabled"], True)
+
+    def test_a_readonly_key_gets_the_same_objects(self) -> None:
+        ro_key = self.project.set_api_key_readonly()
+        self.project.save()
+
+        r = self.client.get(self.url, HTTP_X_API_KEY=ro_key)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json(), self.get().json())
+
+    def test_a_readonly_key_gets_only_its_projects_channels(self) -> None:
+        # Another project of the same owner: the key's project bounds the list, not its owner
+        other = Project.objects.create(owner=self.alice)
+        others = Channel.objects.create(project=other, kind="email", name="Other")
+        Channel.objects.create(project=self.charlies_project, kind="email", name="Charlie")
+        ro_key = other.set_api_key_readonly()
+        other.save()
+
+        r = self.client.get(self.url, HTTP_X_API_KEY=ro_key)
+        self.assertEqual([c["id"] for c in r.json()["channels"]], [str(others.code)])
 
     def test_it_handles_options(self) -> None:
         r = self.client.options(self.url)
