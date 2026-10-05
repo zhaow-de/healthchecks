@@ -45,9 +45,10 @@ class ListChannelsTestCase(BaseTestCase):
         self.assertEqual(r.json(), self.get().json())
 
     def test_a_readonly_key_gets_only_its_projects_channels(self) -> None:
-        # Another project of the same owner, not charlie's: the key's project bounds the list, not its owner
+        # Another project of the same owner: the key's project bounds the list, not its owner
         other = Project.objects.create(owner=self.alice)
         others = Channel.objects.create(project=other, kind="email", name="Other")
+        Channel.objects.create(project=self.charlies_project, kind="email", name="Charlie")
         ro_key = other.set_api_key_readonly()
         other.save()
 
