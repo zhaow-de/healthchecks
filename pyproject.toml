@@ -29,7 +29,7 @@ uwsgi = ["uwsgi"]
 # Installed by default by "uv sync" and "uv run".
 dev = [
     "markdown>=3.11",
-    "pre-commit>=4.6.2",
+    "pre-commit>=4.7.0",
     "pygments>=2.21.0",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
