@@ -1,18 +1,18 @@
 [project]
 name = "healthchecks"
 # Bumped by cz bump (see .cz.toml), never by hand; hc/settings.py reads it.
-version = "6.2.0"
+version = "6.3.0"
 requires-python = "==3.14.*"
 dependencies = [
     "cronsim>=2.7",
-    "django>=6.1.1",
+    "django>=6.1.2",
     "django-compressor>=4.6",
-    "django-stubs-ext>=6.1.1",
+    "django-stubs-ext>=6.1.2",
     "fido2>=2.2.1",
     "oncalendar>=1.1",
     "psycopg>=3.3.6",
     "pycurl>=7.48.0",
-    "pydantic>=2.13.5",
+    "pydantic>=2.14.1",
     "pyotp>=2.10.0",
     "segno>=1.6.6",
     "tzdata>=2026.5",
@@ -29,13 +29,13 @@ uwsgi = ["uwsgi"]
 # Installed by default by "uv sync" and "uv run".
 dev = [
     "markdown>=3.11",
-    "pre-commit>=4.6.2",
+    "pre-commit>=4.7.0",
     "pygments>=2.21.0",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "pytest-django>=4.14.0",
     "pytest-xdist>=3.8.0",
-    "ruff>=0.16.10",
+    "ruff>=0.17.0",
     "time-machine>=3.5.1",
 ]
 
