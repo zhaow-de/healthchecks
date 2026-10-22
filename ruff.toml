@@ -24,6 +24,10 @@ ignore = [
     "RUF003",
 ]
 
+[lint.per-file-ignores]
+# makemigrations writes `import datetime`, which ICN001 wants as `dt`
+"*/migrations/*.py" = ["ICN001"]
+
 [lint.flake8-tidy-imports.banned-api]
 "__future__.annotations".msg = "Python 3.14 evaluates annotations lazily (PEP 649)."
 
