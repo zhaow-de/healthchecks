@@ -4,7 +4,7 @@ FROM python:3.14-alpine AS builder
 
 SHELL ["/bin/sh", "-o", "pipefail", "-c"]
 
-COPY --from=ghcr.io/astral-sh/uv:0.12.19@sha256:04d046b13e60d6bcec73cbc5e1cad25d680dea90c8573340950a0ac2d1aef424 /uv /bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.13.5@sha256:32a7bb39b496babbd997b0a39a4d66c126bdaf5661b302bf6f06abda8deca6ff /uv /bin/uv
 
 # PyPI has no musllinux wheels for pycurl, psycopg-c and uwsgi, so they compile here:
 # gcc and musl-dev for all three, curl-dev for pycurl, libpq-dev for psycopg[c],
