@@ -36,7 +36,7 @@ class RemoveCredentialTestCase(BaseTestCase):
         self.assertContains(r, "two-factor authentication will no longer be active")
 
     def test_it_skips_warning_when_other_2fa_methods_exist(self) -> None:
-        self.profile.totp = "0" * 32
+        self.profile.totp = "A" * 32
         self.profile.save()
 
         self.client.login(username="alice@example.org", password="password")

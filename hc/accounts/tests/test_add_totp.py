@@ -61,7 +61,7 @@ class AddTotpTestCase(BaseTestCase):
         self.assertIsNone(self.profile.totp_created)
 
     def test_it_checks_if_totp_already_configured(self) -> None:
-        self.profile.totp = "0" * 32
+        self.profile.totp = "A" * 32
         self.profile.save()
 
         self.client.login(username="alice@example.org", password="password")

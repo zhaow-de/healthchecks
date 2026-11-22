@@ -5,7 +5,6 @@ from urllib.parse import urlparse
 from uuid import UUID
 
 import pyotp
-import segno
 from django.conf import settings
 from django.contrib.auth import authenticate, update_session_auth_hash
 from django.contrib.auth import login as auth_login
@@ -18,10 +17,12 @@ from django.db.models.functions import Lower
 from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest
 from django.shortcuts import redirect, render
 from django.urls import Resolver404, resolve, reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.timezone import now
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.debug import sensitive_post_parameters
 from django.views.decorators.http import require_POST
+lazy import segno
 
 from hc.accounts import device, forms
 from hc.accounts.decorators import require_sudo_mode
@@ -30,7 +31,7 @@ from hc.accounts.models import Credential, Profile, Project
 from hc.api.models import TokenBucket
 from hc.front.views import _get_project_for_user
 from hc.lib.tz import all_timezones
-from hc.lib.webauthn import CreateHelper, GetHelper
+lazy from hc.lib.webauthn import CreateHelper, GetHelper
 
 logger = logging.getLogger(__name__)
 
@@ -46,16 +47,12 @@ POST_LOGIN_ROUTES = (
 
 
 def _allow_redirect(redirect_url: str | None) -> bool:
-    if not redirect_url:
-        return False
-
-    parsed = urlparse(redirect_url)
-    if parsed.netloc:
-        # Allow redirects only to relative URLs
+    # Allow only relative URLs
+    if not redirect_url or not url_has_allowed_host_and_scheme(redirect_url, allowed_hosts=set()):
         return False
 
     try:
-        match = resolve(parsed.path)
+        match = resolve(urlparse(redirect_url).path)
     except Resolver404:
         return False
 

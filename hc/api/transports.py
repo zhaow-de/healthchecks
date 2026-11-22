@@ -1,9 +1,9 @@
-from typing import TYPE_CHECKING, Any, NoReturn
+from typing import Any, NoReturn
 
 from hc.lib import curl
 
-if TYPE_CHECKING:
-    from hc.api.models import Channel, Flip, Notification, Ping
+# hc.api.models imports this module: an eager import here would be circular
+lazy from hc.api.models import Channel, Flip, Notification, Ping
 
 
 def get_ping_body(ping: Ping | None, maxlen: int | None = None) -> str | None:

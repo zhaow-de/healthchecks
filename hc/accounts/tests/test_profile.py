@@ -74,7 +74,7 @@ class ProfileTestCase(BaseTestCase):
 
     @override_settings(RP_ID="testserver")
     def test_it_shows_totp(self) -> None:
-        self.profile.totp = "0" * 32
+        self.profile.totp = "A" * 32
         self.profile.totp_created = "2020-01-01T00:00:00+00:00"
         self.profile.save()
 
@@ -101,7 +101,7 @@ class ProfileTestCase(BaseTestCase):
 
     def test_it_shows_no_warning_if_key_and_totp_is_registered(self) -> None:
         Credential.objects.create(user=self.alice, name="Alices Key")
-        self.profile.totp = "0" * 32
+        self.profile.totp = "A" * 32
         self.profile.totp_created = "2020-01-01T00:00:00+00:00"
         self.profile.save()
 
@@ -112,7 +112,7 @@ class ProfileTestCase(BaseTestCase):
 
     @override_settings(RP_ID=None)
     def test_it_does_not_mention_security_key_if_rp_id_is_not_set(self) -> None:
-        self.profile.totp = "0" * 32
+        self.profile.totp = "A" * 32
         self.profile.totp_created = "2020-01-01T00:00:00+00:00"
         self.profile.save()
 

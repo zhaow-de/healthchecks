@@ -215,8 +215,11 @@ While `web` is stopped, run the command in a one-off container instead:
 
 Without `--skip-checks`, a command prints the system checks' warnings first, such as
 the two SMTP warnings while `EMAIL_HOST` is unset. `manage.py dbshell` fails, since
-the image has no `sqlite3` or `psql` program: use Python's `sqlite3` module for
-SQLite, and `psql` in the `db` container for PostgreSQL.
+the image has no `sqlite3` or `psql` program: use `psql` in the `db` container for
+PostgreSQL, and Python's `sqlite3` shell for SQLite. It completes table and column
+names with Tab, and `mode=ro` opens the database read-only:
+
+    $ docker compose exec web python -m sqlite3 'file:/data/hc.sqlite?mode=ro'
 
 ## What Runs in the Container {: #processes }
 
@@ -251,6 +254,18 @@ spawned uWSGI worker 4 (pid: 11, cores: 1)
 ```
 
 `docker compose logs -f web` follows the log (see [Logs](../self_hosted/#logs)).
+
+### A Stuck Daemon {: #stack-dump }
+
+When `sendalerts` or `sendreports` stops working without logging an error, Python's
+sampling profiler prints where each of its threads is, without stopping it:
+
+    $ docker compose exec web sh -c 'python -m profiling.sampling dump --all-threads $(pgrep -f "^python ./manage.py sendalerts")'
+
+It reads the `manage.py` processes only: on a uWSGI process it fails with
+`Failed to parse initial frame in chain`. Where the host sets
+`kernel.yama.ptrace_scope` to 1 or 2, it fails for lack of permission; run it with
+`docker compose exec -u root --privileged` instead.
 
 ### uWSGI Configuration {: #uwsgi }
 

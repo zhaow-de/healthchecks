@@ -1,10 +1,10 @@
-# python:3.14-alpine is left unpinned on purpose: each build takes the newest Python 3.14
+# python:3.15-alpine is left unpinned on purpose: each build takes the newest Python 3.15
 # on the newest Alpine
-FROM python:3.14-alpine AS builder
+FROM python:3.15-alpine AS builder
 
 SHELL ["/bin/sh", "-o", "pipefail", "-c"]
 
-COPY --from=ghcr.io/astral-sh/uv:0.13.5@sha256:32a7bb39b496babbd997b0a39a4d66c126bdaf5661b302bf6f06abda8deca6ff /uv /bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.13.9@sha256:d3b601f0c7b118bc1753febf7c41cc80981df678445e0254284eecf84db79a7d /uv /bin/uv
 
 # PyPI has no musllinux wheels for pycurl, psycopg-c and uwsgi, so they compile here:
 # gcc and musl-dev for all three, curl-dev for pycurl, libpq-dev for psycopg[c],
@@ -22,7 +22,7 @@ RUN --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     uv sync --locked --no-dev --all-extras
 
-FROM python:3.14-alpine
+FROM python:3.15-alpine
 
 RUN addgroup -S hc && adduser -S -D -H -G hc hc
 ENV PYTHONUNBUFFERED=1
@@ -42,6 +42,13 @@ COPY docker/fetchstatus.py /opt/healthchecks/
 RUN \
     DEBUG=False SECRET_KEY=build-key ./manage.py collectstatic --noinput && \
     DEBUG=False SECRET_KEY=build-key ./manage.py compress
+
+# The processes run as hc, which cannot write __pycache__ into the root-owned
+# /opt/healthchecks and /usr/local, and the base image ships the standard library
+# without bytecode: without this, each process compiles the hc/ and standard library
+# modules the build steps above did not import, at every start
+RUN python -m compileall -q -x /tests/ /opt/healthchecks/hc \
+    "$(python -c 'import sysconfig; print(sysconfig.get_path("stdlib"))')"
 
 RUN mkdir /data && chown hc /data
 # SQLite on the /data volume. With DB=postgres, set DB_NAME as well: left as
