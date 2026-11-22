@@ -5,7 +5,6 @@ from urllib.parse import urlparse
 from uuid import UUID
 
 import pyotp
-import segno
 from django.conf import settings
 from django.contrib.auth import authenticate, update_session_auth_hash
 from django.contrib.auth import login as auth_login
@@ -23,6 +22,7 @@ from django.utils.timezone import now
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.debug import sensitive_post_parameters
 from django.views.decorators.http import require_POST
+lazy import segno
 
 from hc.accounts import device, forms
 from hc.accounts.decorators import require_sudo_mode
@@ -31,7 +31,7 @@ from hc.accounts.models import Credential, Profile, Project
 from hc.api.models import TokenBucket
 from hc.front.views import _get_project_for_user
 from hc.lib.tz import all_timezones
-from hc.lib.webauthn import CreateHelper, GetHelper
+lazy from hc.lib.webauthn import CreateHelper, GetHelper
 
 logger = logging.getLogger(__name__)
 
