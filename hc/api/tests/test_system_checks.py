@@ -84,7 +84,7 @@ class SystemChecksCase(BaseTestCase):
     def test_it_lists_every_lazy_import_of_the_accounts_views(self) -> None:
         tree = ast.parse(Path(views.__file__).read_text())
         lazy = set()
-        for node in tree.body:
+        for node in ast.walk(tree):
             if isinstance(node, ast.Import) and node.is_lazy:
                 lazy.update(alias.name for alias in node.names)
             elif isinstance(node, ast.ImportFrom) and node.is_lazy:
