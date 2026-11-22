@@ -278,6 +278,10 @@ class LoginTestCase(BaseTestCase):
         samples = [
             "/evil/",
             f"https://example.org/projects/{self.project.code}/checks/",
+            # No host, but from an https page a browser takes the first path segment for one
+            f"///projects/{self.project.code}/checks/",
+            f"https:///projects/{self.project.code}/checks/",
+            f"http:/projects/{self.project.code}/checks/",
         ]
 
         for sample in samples:

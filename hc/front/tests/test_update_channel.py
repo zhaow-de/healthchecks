@@ -77,6 +77,13 @@ class UpdateChannelTestCase(BaseTestCase):
         r = self.client.post(self.channels_url, data=payload)
         self.assertEqual(r.status_code, 403)
 
+    def test_it_handles_channel_code_with_trailing_newline(self) -> None:
+        payload = {"channel": f"{self.channel.code}\n"}
+
+        self.client.login(username="alice@example.org", password="password")
+        r = self.client.post(self.channels_url, data=payload)
+        self.assertEqual(r.status_code, 400)
+
     def test_it_handles_invalid_check_uuid(self) -> None:
         payload = {
             "channel": self.channel.code,

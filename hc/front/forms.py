@@ -45,7 +45,7 @@ class NameTagsForm(forms.Form):
     name = forms.CharField(max_length=100, required=False)
     # The characters a slug ping URL accepts (ping_by_slug refuses uppercase)
     slug = forms.RegexField(
-        regex=r"^[a-z0-9_-]+$",
+        regex=r"\A[a-z0-9_-]+\Z",
         max_length=100,
         required=False,
         error_messages={"invalid": "Use lowercase letters, digits, dashes and underscores only."},

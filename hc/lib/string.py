@@ -1,6 +1,6 @@
 import re
 
-uuid_match_regex = re.compile("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE)
+uuid_match_regex = re.compile("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.IGNORECASE)
 
 
 def replace(template: str, ctx: dict[str, str]) -> str:
@@ -44,7 +44,7 @@ def replace(template: str, ctx: dict[str, str]) -> str:
 
 
 def is_valid_uuid_string(value: str) -> bool:
-    return bool(uuid_match_regex.match(value))
+    return bool(uuid_match_regex.fullmatch(value))
 
 
 def match_keywords(haystack: str, keywords: str) -> bool:

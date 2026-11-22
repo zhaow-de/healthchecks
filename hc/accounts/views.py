@@ -18,6 +18,7 @@ from django.db.models.functions import Lower
 from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest
 from django.shortcuts import redirect, render
 from django.urls import Resolver404, resolve, reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.timezone import now
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.debug import sensitive_post_parameters
@@ -46,16 +47,14 @@ POST_LOGIN_ROUTES = (
 
 
 def _allow_redirect(redirect_url: str | None) -> bool:
-    if not redirect_url:
-        return False
-
-    parsed = urlparse(redirect_url)
-    if parsed.netloc:
-        # Allow redirects only to relative URLs
+    # Allow only relative URLs. A check of urlparse()'s netloc alone passes "///x" and
+    # "https:///x", which browsers resolve to a host named after the first path segment,
+    # as they do "http:/x" from an https page
+    if not redirect_url or not url_has_allowed_host_and_scheme(redirect_url, allowed_hosts=set()):
         return False
 
     try:
-        match = resolve(parsed.path)
+        match = resolve(urlparse(redirect_url).path)
     except Resolver404:
         return False
 

@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from hc.lib.string import replace
+from hc.lib.string import is_valid_uuid_string, replace
 
 
 class StringTestCase(TestCase):
@@ -19,3 +19,8 @@ class StringTestCase(TestCase):
     def test_it_preserves_non_placeholder_dollar_signs(self) -> None:
         result = replace("$3.50", {"$A": "text"})
         self.assertEqual(result, "$3.50")
+
+    def test_it_validates_uuid_strings(self) -> None:
+        self.assertTrue(is_valid_uuid_string("684E2E73-017e-465f-8149-d70b7c5aaa49"))
+        self.assertFalse(is_valid_uuid_string("684e2e73-017e-465f-8149-d70b7c5aaa49\n"))
+        self.assertFalse(is_valid_uuid_string("684e2e73-017e-465f-8149-d70b7c5aaa490"))
