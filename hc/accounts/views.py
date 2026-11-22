@@ -47,9 +47,7 @@ POST_LOGIN_ROUTES = (
 
 
 def _allow_redirect(redirect_url: str | None) -> bool:
-    # Allow only relative URLs. A check of urlparse()'s netloc alone passes "///x" and
-    # "https:///x", which browsers resolve to a host named after the first path segment,
-    # as they do "http:/x" from an https page
+    # Allow only relative URLs
     if not redirect_url or not url_has_allowed_host_and_scheme(redirect_url, allowed_hosts=set()):
         return False
 

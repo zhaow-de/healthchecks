@@ -287,6 +287,8 @@ class LoginTestCase(BaseTestCase):
         for sample in samples:
             r = self.client.post("/accounts/login/?next=" + sample, form)
             self.assertRedirects(r, self.checks_url)
+            # assertRedirects reads "///x" as "/x", the same path
+            self.assertEqual(r.url, self.checks_url)
 
     def test_it_handles_wrong_password(self) -> None:
         form = {
