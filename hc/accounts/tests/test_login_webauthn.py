@@ -31,14 +31,14 @@ class LoginWebAuthnTestCase(BaseTestCase):
         self.assertIn("state", self.client.session)
 
     def test_it_shows_totp_option(self) -> None:
-        self.profile.totp = "0" * 32
+        self.profile.totp = "A" * 32
         self.profile.save()
 
         r = self.client.get(self.url)
         self.assertContains(r, "Use authenticator app")
 
     def test_it_preserves_next_parameter_in_totp_url(self) -> None:
-        self.profile.totp = "0" * 32
+        self.profile.totp = "A" * 32
         self.profile.save()
 
         url = self.url + "?next=" + self.channels_url

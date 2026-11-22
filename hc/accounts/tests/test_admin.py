@@ -46,7 +46,7 @@ class AccountsAdminTestCase(BaseTestCase):
         self.assertNotContains(r, "charlie&friends@example.org")
 
     def test_it_offers_no_profile_actions(self) -> None:
-        self.profile.totp = "0" * 32
+        self.profile.totp = "A" * 32
         self.profile.totp_created = now()
         self.profile.save()
 
@@ -61,7 +61,7 @@ class AccountsAdminTestCase(BaseTestCase):
 
         self.assertEqual(self.client.session["_auth_user_id"], str(self.alice.id))
         self.profile.refresh_from_db()
-        self.assertEqual(self.profile.totp, "0" * 32)
+        self.assertEqual(self.profile.totp, "A" * 32)
         self.assertEqual(len(mail.outbox), 0)
 
     def test_it_does_not_show_totp_fields(self) -> None:
@@ -77,7 +77,7 @@ class AccountsAdminTestCase(BaseTestCase):
         self.assertEqual(r.status_code, 403)
 
     def test_it_does_not_delete_profiles(self) -> None:
-        self.profile.totp = "0" * 32
+        self.profile.totp = "A" * 32
         self.profile.totp_created = now()
         self.profile.save()
 
@@ -91,7 +91,7 @@ class AccountsAdminTestCase(BaseTestCase):
         payload = {"action": "delete_selected", "_selected_action": [self.profile.id], "post": "yes"}
         self.client.post(reverse("admin:accounts_profile_changelist"), payload)
         self.profile.refresh_from_db()
-        self.assertEqual(self.profile.totp, "0" * 32)
+        self.assertEqual(self.profile.totp, "A" * 32)
 
     def test_it_shows_users(self) -> None:
         self.client.login(username="alice@example.org", password="password")
