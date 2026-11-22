@@ -26,7 +26,7 @@ class UpdateNameTestCase(BaseTestCase):
 
     def test_it_rejects_slug_the_ping_url_refuses(self) -> None:
         self.client.login(username="alice@example.org", password="password")
-        for slug in ("UpperCase", "a.b", "a b"):
+        for slug in ("UpperCase", "a.b", "a b", "abc\n"):
             r = self.client.post(self.url, data={"name": "Alice", "slug": slug})
             self.assertEqual(r.status_code, 400, slug)
 

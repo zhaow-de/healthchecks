@@ -278,11 +278,17 @@ class LoginTestCase(BaseTestCase):
         samples = [
             "/evil/",
             f"https://example.org/projects/{self.project.code}/checks/",
+            # No host, but from an https page a browser takes the first path segment for one
+            f"///projects/{self.project.code}/checks/",
+            f"https:///projects/{self.project.code}/checks/",
+            f"http:/projects/{self.project.code}/checks/",
         ]
 
         for sample in samples:
             r = self.client.post("/accounts/login/?next=" + sample, form)
             self.assertRedirects(r, self.checks_url)
+            # assertRedirects reads "///x" as "/x", the same path
+            self.assertEqual(r.url, self.checks_url)
 
     def test_it_handles_wrong_password(self) -> None:
         form = {

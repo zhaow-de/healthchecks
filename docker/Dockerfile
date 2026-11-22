@@ -43,6 +43,13 @@ RUN \
     DEBUG=False SECRET_KEY=build-key ./manage.py collectstatic --noinput && \
     DEBUG=False SECRET_KEY=build-key ./manage.py compress
 
+# The processes run as hc, which cannot write __pycache__ into the root-owned
+# /opt/healthchecks and /usr/local, and the base image ships the standard library
+# without bytecode: without this, each process compiles the hc/ and standard library
+# modules the build steps above did not import, at every start
+RUN python -m compileall -q -x /tests/ /opt/healthchecks/hc \
+    "$(python -c 'import sysconfig; print(sysconfig.get_path("stdlib"))')"
+
 RUN mkdir /data && chown hc /data
 # SQLite on the /data volume. With DB=postgres, set DB_NAME as well: left as
 # it is, this path names the PostgreSQL database.

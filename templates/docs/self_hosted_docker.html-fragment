@@ -209,8 +209,12 @@ example a script for <code>manage.py shell</code>:</p>
 
 <p>Without <code>--skip-checks</code>, a command prints the system checks' warnings first, such as
 the two SMTP warnings while <code>EMAIL_HOST</code> is unset. <code>manage.py dbshell</code> fails, since
-the image has no <code>sqlite3</code> or <code>psql</code> program: use Python's <code>sqlite3</code> module for
-SQLite, and <code>psql</code> in the <code>db</code> container for PostgreSQL.</p>
+the image has no <code>sqlite3</code> or <code>psql</code> program: use <code>psql</code> in the <code>db</code> container for
+PostgreSQL, and Python's <code>sqlite3</code> shell for SQLite. It completes table and column
+names with Tab, and <code>mode=ro</code> opens the database read-only:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>web<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>sqlite3<span class="w"> </span><span class="s1">'file:/data/hc.sqlite?mode=ro'</span>
+</code></pre></div>
+
 <h2 id="processes">What Runs in the Container</h2>
 <p>The container's main process is uWSGI, configured by <code>docker/uwsgi.ini</code>. At every
 start it:</p>
@@ -241,6 +245,16 @@ spawned uWSGI worker 4 (pid: 11, cores: 1)
 </code></pre></div>
 
 <p><code>docker compose logs -f web</code> follows the log (see <a href="../self_hosted/#logs">Logs</a>).</p>
+<h3 id="stack-dump">A Stuck Daemon</h3>
+<p>When <code>sendalerts</code> or <code>sendreports</code> stops working without logging an error, Python's
+sampling profiler prints where each of its threads is, without stopping it:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>docker<span class="w"> </span>compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>web<span class="w"> </span>sh<span class="w"> </span>-c<span class="w"> </span><span class="s1">'python -m profiling.sampling dump --all-threads $(pgrep -f "^python ./manage.py sendalerts")'</span>
+</code></pre></div>
+
+<p>It reads the <code>manage.py</code> processes only: on a uWSGI process it fails with
+<code>Failed to parse initial frame in chain</code>. Where the host sets
+<code>kernel.yama.ptrace_scope</code> to 1 or 2, it fails for lack of permission; run it with
+<code>docker compose exec -u root --privileged</code> instead.</p>
 <h3 id="uwsgi">uWSGI Configuration</h3>
 <p>You can configure uWSGI by setting <code>UWSGI_...</code> environment variables in <code>.env</code>. For
 example, to adjust the number of uWSGI processes (to save memory, say), set:</p>

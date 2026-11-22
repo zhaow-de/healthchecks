@@ -1,7 +1,12 @@
+import ast
+from pathlib import Path
+from unittest.mock import patch
+
 from django.core import checks
 from django.test.utils import override_settings
 
-from hc.api.apps import secret_key_check, settings_check
+from hc.accounts import views
+from hc.api.apps import LAZY_DEPENDENCIES, lazy_dependencies_check, secret_key_check, settings_check
 from hc.test import BaseTestCase
 
 # 50 characters, the shortest key Django's rule accepts
@@ -63,3 +68,26 @@ class SystemChecksCase(BaseTestCase):
     def test_it_registers_the_secret_key_check(self) -> None:
         errors = [item for item in checks.run_checks() if item.is_serious()]
         self.assertEqual([item.id for item in errors], ["hc.api.E004"])
+
+    def test_it_imports_the_lazy_dependencies(self) -> None:
+        self.assertEqual(lazy_dependencies_check(None, None), [])
+
+    def test_it_reports_a_lazy_dependency_that_fails_to_import(self) -> None:
+        with patch("hc.api.apps.import_module", side_effect=ImportError("simulated")):
+            errors = lazy_dependencies_check(None, None)
+            registered = [item.id for item in checks.run_checks() if item.is_serious()]
+
+        self.assertEqual([item.id for item in errors], ["hc.api.E006", "hc.api.E006"])
+        self.assertEqual(errors[0].msg, "Cannot import hc.lib.webauthn: simulated")
+        self.assertIn("hc.api.E006", registered)
+
+    def test_it_lists_every_lazy_import_of_the_accounts_views(self) -> None:
+        tree = ast.parse(Path(views.__file__).read_text())
+        lazy = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import) and node.is_lazy:
+                lazy.update(alias.name for alias in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.is_lazy:
+                lazy.add(node.module)
+
+        self.assertEqual(lazy, set(LAZY_DEPENDENCIES))
