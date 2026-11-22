@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from importlib import import_module
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -133,3 +134,31 @@ def secret_key_check(
         )
         for warning in check_secret_key(app_configs)
     ]
+
+
+# The modules hc.accounts.views imports lazily. Importing them here keeps a broken
+# install failing the checks, which migrate runs at every container start, rather
+# than the first security-key or TOTP setup view
+LAZY_DEPENDENCIES = ("hc.lib.webauthn", "segno")
+
+
+@checks.register()  # E006
+def lazy_dependencies_check(
+    app_configs: Sequence[AppConfig] | None,
+    databases: Sequence[str] | None,
+    **kwargs: dict[str, Any],
+) -> list[checks.CheckMessage]:
+    items: list[checks.CheckMessage] = []
+    for name in LAZY_DEPENDENCIES:
+        try:
+            import_module(name)
+        except ImportError as e:
+            items.append(
+                checks.Error(
+                    f"Cannot import {name}: {e}",
+                    hint="Reinstall the dependencies with uv sync --locked, or rebuild the image",
+                    id="hc.api.E006",
+                )
+            )
+
+    return items
