@@ -31,7 +31,7 @@ class ChangeEmailTestCase(BaseTestCase):
         self.assertContains(r, "Two-factor authentication is active")
 
     def test_it_shows_2fa_warning_if_totp_is_active(self) -> None:
-        self.profile.totp = "0" * 32
+        self.profile.totp = "A" * 32
         self.profile.save()
 
         self.client.login(username="alice@example.org", password="password")

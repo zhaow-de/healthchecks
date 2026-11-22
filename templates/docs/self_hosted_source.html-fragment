@@ -18,7 +18,7 @@ $<span class="w"> </span><span class="nb">cd</span><span class="w"> </span>healt
 <div class="highlight"><pre><span></span><code>$<span class="w"> </span>uv<span class="w"> </span>sync
 </code></pre></div>
 
-<p>This creates a virtual environment in <code>.venv</code> and installs the exact package versions listed in <code>uv.lock</code>, the development tools included. If you do not have Python 3.14, uv downloads it.</p>
+<p>This creates a virtual environment in <code>.venv</code> and installs the exact package versions listed in <code>uv.lock</code>, the development tools included. If you do not have Python 3.15, uv downloads it.</p>
 </li>
 <li>
 <p>Create database tables and the superuser account (see <a href="../self_hosted/#superuser">Creating the Superuser</a>):</p>

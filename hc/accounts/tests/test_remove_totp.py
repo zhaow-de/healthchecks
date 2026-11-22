@@ -6,7 +6,7 @@ class RemoveCredentialTestCase(BaseTestCase):
     def setUp(self) -> None:
         super().setUp()
 
-        self.profile.totp = "0" * 32
+        self.profile.totp = "A" * 32
         self.profile.save()
 
         self.url = "/accounts/two_factor/totp/remove/"

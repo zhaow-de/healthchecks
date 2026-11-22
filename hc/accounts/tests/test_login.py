@@ -341,7 +341,7 @@ class LoginTestCase(BaseTestCase):
         )
 
     def test_it_redirects_to_totp_form(self) -> None:
-        self.profile.totp = "0" * 32
+        self.profile.totp = "A" * 32
         self.profile.save()
 
         form = {"action": "login", "email": "alice@example.org", "password": "password"}
@@ -357,7 +357,7 @@ class LoginTestCase(BaseTestCase):
         self.assertEqual(user_id, self.alice.id)
 
     def test_redirect_to_totp_form_preserves_next(self) -> None:
-        self.profile.totp = "0" * 32
+        self.profile.totp = "A" * 32
         self.profile.save()
 
         form = {"action": "login", "email": "alice@example.org", "password": "password"}

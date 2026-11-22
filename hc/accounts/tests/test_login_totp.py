@@ -17,7 +17,7 @@ class LoginTotpTestCase(BaseTestCase):
         session["2fa_user"] = [self.alice.id, self.alice.email, (time.time()) + 300]
         session.save()
 
-        self.profile.totp = "0" * 32
+        self.profile.totp = "A" * 32
         self.profile.save()
 
         self.url = "/accounts/login/two_factor/totp/"

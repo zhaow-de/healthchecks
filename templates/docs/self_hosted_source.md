@@ -18,7 +18,7 @@ Healthchecks uses [uv](https://docs.astral.sh/uv/) to manage the Python interpre
 
         $ uv sync
 
-    This creates a virtual environment in `.venv` and installs the exact package versions listed in `uv.lock`, the development tools included. If you do not have Python 3.14, uv downloads it.
+    This creates a virtual environment in `.venv` and installs the exact package versions listed in `uv.lock`, the development tools included. If you do not have Python 3.15, uv downloads it.
 
 * Create database tables and the superuser account (see [Creating the Superuser](../self_hosted/#superuser)):
 
