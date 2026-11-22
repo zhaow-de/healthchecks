@@ -18,7 +18,7 @@ exclude: |
 
 # Not the Python pre-commit was installed with, which may predate 3.14 and reject `except A, B:`.
 default_language_version:
-  python: python3.14
+  python: python3.15
 
 # Every hook is a commit-time hook unless it says otherwise. Without this line a hook whose manifest
 # declares no stages runs at every installed hook type, the commit-msg one included.

@@ -36,7 +36,7 @@ to group checks, each with its own read-write and read-only API keys.
 
 The building blocks are:
 
-* Python 3.14
+* Python 3.15
 * Django 6.1
 * SQLite (the default) or PostgreSQL
 
@@ -93,7 +93,7 @@ To set up Healthchecks development environment:
   ```
 
   This creates a virtual environment in `.venv` and installs the exact package
-  versions listed in `uv.lock`. If you do not have Python 3.14, uv downloads it.
+  versions listed in `uv.lock`. If you do not have Python 3.15, uv downloads it.
 
   Most dependencies are installed from pre-built wheels. On platforms where a
   dependency has no pre-built wheel (for example, `cryptography` on Intel Macs),

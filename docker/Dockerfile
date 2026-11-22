@@ -1,6 +1,6 @@
-# python:3.14-alpine is left unpinned on purpose: each build takes the newest Python 3.14
+# python:3.15-alpine is left unpinned on purpose: each build takes the newest Python 3.15
 # on the newest Alpine
-FROM python:3.14-alpine AS builder
+FROM python:3.15-alpine AS builder
 
 SHELL ["/bin/sh", "-o", "pipefail", "-c"]
 
@@ -22,7 +22,7 @@ RUN --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     uv sync --locked --no-dev --all-extras
 
-FROM python:3.14-alpine
+FROM python:3.15-alpine
 
 RUN addgroup -S hc && adduser -S -D -H -G hc hc
 ENV PYTHONUNBUFFERED=1
