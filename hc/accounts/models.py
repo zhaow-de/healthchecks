@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from datetime import timedelta as td
 from secrets import token_urlsafe
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from django.conf import settings
@@ -24,11 +24,8 @@ from hc.lib.date import day_boundaries, month_boundaries, week_boundaries
 from hc.lib.signing import sign_bounce_id
 from hc.lib.urls import absolute_reverse
 
-if TYPE_CHECKING:
-    # Importing Check at runtime would cause a circular import, so only import it
-    # during type checking
-    from hc.api.models import Check
-
+# hc.api.models imports this module: an eager import here would be circular
+lazy from hc.api.models import Check
 
 NO_NAG = td()
 NAG_PERIODS = (
@@ -132,8 +129,6 @@ class Profile(models.Model):
         return Project.objects.filter(owner_id=self.user_id).order_by(Lower("name"))
 
     def checks_from_all_projects(self) -> QuerySet[Check]:
-        from hc.api.models import Check
-
         return Check.objects.filter(project__owner_id=self.user_id)
 
     def send_report(self, nag: bool = False) -> bool:
@@ -225,8 +220,6 @@ class Profile(models.Model):
         return True
 
     def num_checks_used(self) -> int:
-        from hc.api.models import Check
-
         return Check.objects.filter(project__owner_id=self.user_id).count()
 
     def disable_reports(self) -> None:
